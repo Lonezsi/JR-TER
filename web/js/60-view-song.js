@@ -45,6 +45,15 @@ J.views.song = {
        * render, and that is the one the page is showing rather than whatever the
        * player happens to be holding from another song. */
       currentVersion: () => current || versions[0] || null,
+      /* Which of A and B the page is pointed at, and what each one is carrying.
+       *
+       * A starts on the preset the song opens with, because that is what would play if
+       * you pressed play right now. Leaving it blank next to a song that plainly has an
+       * equaliser reads as broken, the same way "not set" did next to three renders. */
+      deck: {
+        selected: "A",
+        preset: { A: presets.find((p) => p.is_current) || presets[0] || null, B: null },
+      },
     };
     J.songCtx = ctx;
 
@@ -242,6 +251,83 @@ function parallax(root) {
   }, { passive: true });
 }
 
+/* A and B were a property of playback, and they should be a property of the page.
+ *
+ * Everything that asked which deck it was on asked the player, and the player only had
+ * an answer while it held this song with a take in the active slot. So on a song at
+ * rest, choosing an equaliser moved the Sound panel and nothing else: the chips above
+ * said what they had always said, and pressing play played the preset the song opens
+ * with rather than the one just chosen. The page holds the choice now. The player is
+ * told whenever it happens to be here, and told again when it arrives.
+ */
+J.deckSelected = (ctx) => {
+  const state = J.player.state;
+  if (state.song && state.song.id === ctx.song.id) return state.active;
+  return ctx.deck.selected;
+};
+
+J.deckPreset = (ctx, slot) => {
+  const state = J.player.state;
+  if (state.song && state.song.id === ctx.song.id) {
+    const held = state.slots[slot].preset;
+    if (held) return held;
+  }
+  return ctx.deck.preset[slot];
+};
+
+/* Put a preset on one of the page's decks.
+ *
+ * The page copy is written first and the player second, because set() only reaches
+ * state.slots after awaiting the audio context. A drag calls this on every pointermove,
+ * and reading the player back would have fired a set() for every frame of it. Nothing is
+ * touched when the player is somewhere else: this song's equaliser has no business
+ * landing on another song's decks. */
+J.deckSetPreset = (ctx, slot, preset) => {
+  ctx.deck.preset[slot] = preset || null;
+  const state = J.player.state;
+  const here = state.song && state.song.id === ctx.song.id;
+  const done = here ? J.player.set(slot, { preset }) : Promise.resolve();
+  J.emit("deck:change", { songId: ctx.songId });
+  return done;
+};
+
+J.deckSelect = (ctx, slot) => {
+  ctx.deck.selected = slot;
+  const state = J.player.state;
+  if (state.song && state.song.id === ctx.song.id
+      && state.slots[slot].version && state.active !== slot) {
+    // switchTo emits player:change, which is what repaints. Nothing to add.
+    return J.player.switchTo(slot);
+  }
+  J.emit("deck:change", { songId: ctx.songId });
+  return Promise.resolve();
+};
+
+/* Hand the page's decks to the player once it is holding this song.
+ *
+ * play() puts the song's own preset on both decks and it has to, or the equaliser from
+ * the last song you played leaks onto this one. That also throws away a preset chosen
+ * here while nothing was playing, so the choice is handed over again as soon as the
+ * player arrives. Guarded by comparing what the deck already holds, so this settles
+ * rather than answering its own event.
+ */
+function pushDecks(ctx) {
+  const state = J.player.state;
+  if (!state.song || state.song.id !== ctx.song.id) return;
+  ctx.deck.selected = state.active;
+  for (const slot of ["A", "B"]) {
+    /* B is a take you put there, and play() empties it whenever the song changes. A
+     * preset remembered for a B that no longer exists belongs to nothing, so it goes
+     * with the take. */
+    if (slot === "B" && !state.slots.B.version) { ctx.deck.preset.B = null; continue; }
+    const want = ctx.deck.preset[slot];
+    if (!want) continue;
+    const held = state.slots[slot].preset;
+    if (held && held.id === want.id) continue;
+    J.player.set(slot, { preset: want });
+  }
+}
+
 /* ── A and B, in the header ───────────────────────────────────────────────── */
 function wireAB(root, ctx) {
   const bar = J.$("#abInline", root);
@@ -262,10 +348,16 @@ function wireAB(root, ctx) {
        * "not set" next to a song that plainly has three renders reads as something being
        * broken, and it made you press it to find out what it meant. */
       const shown = held.version || (slot === "A" ? ctx.currentVersion() : null);
+      const preset = J.deckPreset(ctx, slot);
       const label = shown
-        ? `v${shown.n}${held.preset ? " &middot; " + J.esc(held.preset.name) : ""}`
+        ? `v${shown.n}${preset ? " &middot; " + J.esc(preset.name) : ""}`
         : "not set";
       J.$(".v", chip).innerHTML = label;
+      /* Two marks, because they are two facts that are usually the same one. The selected
+       * chip is where a chosen equaliser lands, playing or not. The live one is the side
+       * coming out of the speakers. Only the live mark existed, so on a song at rest
+       * nothing on the page said which deck you were about to change. */
+      chip.classList.toggle("sel", J.deckSelected(ctx) === slot);
       chip.classList.toggle("live", playing && J.player.state.active === slot && !!held.version);
     }
 
@@ -312,7 +404,10 @@ function wireAB(root, ctx) {
     if (!e.target.closest(".caret")) {
       const playing = J.player.state.song && J.player.state.song.id === ctx.song.id;
       const held = playing ? J.player.state.slots[slot] : null;
-      if (held && held.version) { J.player.switchTo(slot); paint(); return; }
+      // A always has an answer, playing or not: it is the render that would play. B does
+      // not exist until a take is in it, and its chip is hidden until then, so falling
+      // through to the menu only happens for a B you reached some other way.
+      if (slot === "A" || (held && held.version)) { J.deckSelect(ctx, slot); paint(); return; }
       // Nothing in it to select yet, so the useful thing is to put something there.
     }
     openSlotMenu(chip, slot, ctx, paint);
@@ -320,6 +415,14 @@ function wireAB(root, ctx) {
 
   J.on("player:change", function onChange() {
     if (!bar.isConnected) { J.bus.removeEventListener("player:change", onChange); return; }
+    pushDecks(ctx);
+    paint();
+  });
+
+  /* Choosing a deck or an equaliser with nothing playing. The player has no event for
+   * it, because as far as the player is concerned nothing happened. */
+  J.on("deck:change", function onDeck() {
+    if (!bar.isConnected) { J.bus.removeEventListener("deck:change", onDeck); return; }
     paint();
   });
   paint();
@@ -350,7 +453,11 @@ async function forkIfShared(slot, ctx) {
     { name: `${mine.preset.name} ${slot}`, data: mine.preset.data }));
   if (!made || !made.preset) return;                        // it still works, just shared
   ctx.presets = (ctx.presets || []).concat([made.preset]);
-  await J.player.set(slot, { preset: made.preset });
+  /* Through the page as well as the player. Telling only the player leaves the page
+   * still believing this deck carries the shared preset, and the next reconcile would
+   * put the shared one back: A and B would quietly become one equaliser again, which is
+   * the exact thing this function exists to stop. */
+  await J.deckSetPreset(ctx, slot, made.preset);
   J.emit("sound:change");
 }
 
@@ -423,6 +530,9 @@ function openSlotMenu(anchor, slot, ctx, done) {
 
   const playing = J.player.state.song && J.player.state.song.id === ctx.song.id;
   const held = playing ? J.player.state.slots[slot] : { version: null, preset: null };
+  // Which equaliser this deck carries, from the page rather than only from the player,
+  // or the tick beside it is missing on a song that is not playing.
+  const heldPreset = J.deckPreset(ctx, slot);
 
   const menu = document.createElement("div");
   menu.className = "slot-menu";
@@ -451,7 +561,7 @@ function openSlotMenu(anchor, slot, ctx, done) {
       </button>` : ""}
     ${ctx.presets.length ? `<div class="menu-group">Sound</div>
       ${ctx.presets.map((p) => `
-        <button class="menu-row ${held.preset && held.preset.id === p.id ? "on" : ""}"
+        <button class="menu-row ${heldPreset && heldPreset.id === p.id ? "on" : ""}"
                 data-preset="${p.id}">
           <span class="tagline">${(p.data.bands || []).length || "flat"}</span>
           <span class="grow truncate">${J.esc(p.name)}</span>
@@ -494,18 +604,20 @@ function openSlotMenu(anchor, slot, ctx, done) {
     }
     const row = e.target.closest("[data-version], [data-preset]");
     if (!row) return;
-    if (!playing) {
+    if (row.dataset.version) {
+      // Choosing a take is asking to hear it, so it starts the song if nothing is on.
       // Nothing is loaded yet, so the first choice starts this song rather than doing
       // nothing and looking broken.
-      await J.playSong(ctx.song);
-    }
-    if (row.dataset.version) {
+      if (!playing) await J.playSong(ctx.song);
       const version = ctx.versions.find((v) => String(v.id) === row.dataset.version);
       await J.player.set(slot, { version });
       await forkIfShared(slot, ctx);
     } else {
+      /* Choosing a sound is not asking to hear it yet. It used to start the song, back
+       * when landing it on the deck was the only way it could have any effect at all.
+       * The chip now says which deck carries it, and pressing play plays it. */
       const preset = ctx.presets.find((p) => String(p.id) === row.dataset.preset);
-      await J.player.set(slot, { preset });
+      await J.deckSetPreset(ctx, slot, preset);
     }
     if (slot === "B" && J.player.state.active !== "B" && J.player.state.slots.B.version) {
       // Choosing a B is asking to hear it.

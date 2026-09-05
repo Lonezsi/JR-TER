@@ -65,41 +65,65 @@ J.blockSound = async function (panel, ctx) {
    * nothing else, so shaping one song never changes what another is playing. */
   const pushToPlayer = () => J.player.presetEdited(active.id, active.data);
 
-  /* Touching a control turns it on, and puts what you are shaping where you can hear it.
+  /* Put what you are shaping on the deck you are shaping.
+   *
+   * Cheap enough for a pointermove: it compares first, and deckSetPreset writes the
+   * page's copy synchronously, so a drag sets the deck once rather than once a frame. */
+  function takeDeck() {
+    if (!active) return false;
+    const slot = editingSlot();
+    const held = J.deckPreset(ctx, slot);
+    if (held && held.id === active.id) return false;
+    J.deckSetPreset(ctx, slot, active);
+    return true;
+  }
+
+  /* Touching a control turns it on.
    *
    * Dragging a curve on a bypassed preset, or the limiter's lines while the limiter is
    * off, used to change numbers and make no sound: the thing you were adjusting was
    * switched off and nothing said so. Reaching for a control is the clearest statement
    * there is that you want to hear it, so the reach turns it on.
-   *
-   * The same for the preset itself. If the deck is playing something else, shaping this
-   * one is shaping a thing you are not listening to, so it goes on the deck.
    */
-  function makeAudible(what) {
-    if (!active) return;
+  function wake(what) {
+    if (!active) return false;
     let changed = false;
     if (active.data.bypass) { active.data.bypass = false; changed = true; }
     if (what === "limiter") {
       const lim = active.data.limiter || (active.data.limiter = {});
       if (!lim.on) { lim.on = true; changed = true; }
     }
-    const slot = liveSlot();
-    const held = slot && J.player.state.slots[slot].preset;
-    if (slot && (!held || held.id !== active.id)) {
-      J.player.set(slot, { preset: active });
-      changed = true;
-    }
     return changed;
   }
 
-  /* The deck this panel is editing.
+  /* One edit, done the same way everywhere.
    *
-   * A and B are not two views of one equaliser, they are two equalisers, and which one
-   * you are shaping is whichever is selected. Before this, the panel chose a preset on
-   * its own and then only made a sound if a deck happened to be holding that same
-   * preset, which is why it used to have to say "put this preset in A or B above to
-   * hear it": you could shape a curve at length and hear nothing at all. */
-  function liveSlot() {
+   * The curve and the limiter's two lines went through a function that adopted the deck
+   * and the controls beside them did not, so turning Q, moving Release or nudging Output
+   * changed numbers on a preset the deck was not holding: the thing you were adjusting
+   * was not the thing you were listening to, and nothing said so. Called without a name
+   * where the control is itself an on and off switch, because waking a bypassed preset
+   * on the way into the Bypass button means the button can never bypass.
+   */
+  function edited(what) {
+    const took = takeDeck();
+    const woke = what ? wake(what) : false;
+    pushToPlayer();
+    save(active);
+    return took || woke;
+  }
+
+  /* The deck this panel is shaping, and the deck it can hear.
+   *
+   * These were one function, and it answered the narrower question: which slot is active
+   * on a player that is holding this song with a take in it. Everything used it, so with
+   * nothing playing, choosing an equaliser or dragging a curve moved the panel and left
+   * A and B carrying whatever they already had. The deck you are shaping is whichever is
+   * selected, at rest or not. The deck you can hear is the narrower thing, and only the
+   * spectrum behind the curve and the limiter's meters need it. */
+  const editingSlot = () => J.deckSelected(ctx);
+
+  function audibleSlot() {
     const state = J.player.state;
     if (!state.song || state.song.id !== ctx.song.id) return null;
     const held = state.slots[state.active];
@@ -114,9 +138,7 @@ J.blockSound = async function (panel, ctx) {
    * catches up the only thing that knows about the new one is the deck holding it.
    * Without this fallback the panel quietly kept editing A while B was selected. */
   function presetOfSelection() {
-    const slot = liveSlot();
-    if (!slot) return null;
-    const held = J.player.state.slots[slot].preset;
+    const held = J.deckPreset(ctx, editingSlot());
     if (!held) return null;
     return presets.find((p) => p.id === held.id) || held;
   }
@@ -126,8 +148,7 @@ J.blockSound = async function (panel, ctx) {
   function choose(preset, { push = true } = {}) {
     if (!preset || (active && preset.id === active.id && !push)) return;
     active = preset;
-    const slot = liveSlot();
-    if (push && slot) J.player.set(slot, { preset });
+    if (push) J.deckSetPreset(ctx, editingSlot(), preset);
     draw();
   }
 
@@ -354,10 +375,13 @@ J.blockSound = async function (panel, ctx) {
     }
     const note = J.$("#soundNote", panel);
     if (note) {
-      const slot = liveSlot();
+      // There is always a deck being shaped now, and whether you can hear it is a
+      // separate question, so the note answers both rather than conflating them.
+      const at = editingSlot();
+      const heard = audibleSlot();
       note.textContent = "Playback only. Your uploaded render is never modified."
-        + (slot ? ` You are shaping ${slot}.`
-                : " Play this song to hear what you are shaping.");
+        + ` You are shaping ${at}.`
+        + (heard === at ? "" : " Play this song to hear it.");
     }
     const sw = J.$("#limiterSwitch", panel);
     if (sw) sw.classList.toggle("on", !!(active.data.limiter || {}).on);
@@ -369,12 +393,10 @@ J.blockSound = async function (panel, ctx) {
     if (editor) editor.stop();
     editor = J.eq.create(canvas, {
       data: active.data,
-      slot: liveSlot,
+      slot: audibleSlot,
       onChange: (data) => {
         active.data = data;
-        const woke = makeAudible("eq");
-        pushToPlayer();
-        save(active);
+        const woke = edited("eq");
         const cards = J.$$("#bandList .band-card", panel).length;
         if (cards !== (data.bands || []).length) renderBands();
         else updateBandNumbers();
@@ -398,15 +420,13 @@ J.blockSound = async function (panel, ctx) {
     limiterView = J.limiter.create(canvas, {
       data: active.data,
       reduction: () => {
-        const slot = liveSlot();
+        const slot = audibleSlot();
         return slot ? J.audio.reductionOf(slot) : 0;
       },
-      level: () => { const at = liveSlot(); return at ? J.audio.peakDb(at) : -60; },
+      level: () => { const at = audibleSlot(); return at ? J.audio.peakDb(at) : -60; },
       onChange: (data) => {
         active.data = data;
-        const woke = makeAudible("limiter");
-        pushToPlayer();
-        save(active);
+        const woke = edited("limiter");
         showLimiterNumbers();
         if (woke) syncChrome();
       },
@@ -419,7 +439,7 @@ J.blockSound = async function (panel, ctx) {
     const nums = J.$("#limiterNums", panel);
     if (!nums) return;
     const lim = active.data.limiter || {};
-    const slot = liveSlot();
+    const slot = audibleSlot();
     const reduction = slot ? J.audio.reductionOf(slot) : 0;
     nums.innerHTML = `<span>thr <b>${Number(lim.threshold).toFixed(1)}</b></span>
       <span>ceil <b>${Number(lim.ceiling).toFixed(1)}</b></span>
@@ -497,8 +517,7 @@ J.blockSound = async function (panel, ctx) {
     const move = (event) => {
       const delta = (startY - event.clientY) / 140;      // 140px is the full sweep
       band.q = Math.round(qFromFraction(startFraction + delta) * 100) / 100;
-      pushToPlayer();
-      save(active);
+      if (edited("eq")) syncChrome();
       updateBandNumbers();
       if (editor) editor.select(band.id);
     };
@@ -523,7 +542,8 @@ J.blockSound = async function (panel, ctx) {
     if (!step) return;
     e.preventDefault();
     band.q = Math.round(qFromFraction(qFraction(band.q) + step) * 100) / 100;
-    pushToPlayer(); save(active); updateBandNumbers();
+    if (edited("eq")) syncChrome();
+    updateBandNumbers();
   });
 
   panel.addEventListener("click", async (e) => {
@@ -564,18 +584,18 @@ J.blockSound = async function (panel, ctx) {
     }
     if (what === "bypass") {
       active.data.bypass = !active.data.bypass;
-      pushToPlayer(); save(active); syncChrome();
+      edited(); syncChrome();
     }
     if (what === "limiter-toggle") {
       active.data.limiter.on = !active.data.limiter.on;
-      pushToPlayer(); save(active); syncChrome();
+      edited(); syncChrome();
     }
     if (what === "reset") {
       const sure = await J.confirm("Flatten this preset?",
         "Every band goes and the limiter switches off.", "Flatten it");
       if (!sure) return;
       active.data = FLAT();
-      pushToPlayer(); save.now(active); draw();
+      takeDeck(); pushToPlayer(); save.now(active); draw();
     }
     if (what === "make-current") {
       await J.try(() => J.post(`/api/sound/${active.id}/current`), "This one opens first");
@@ -639,13 +659,13 @@ J.blockSound = async function (panel, ctx) {
         `${parseFloat(range.value).toFixed(0)} ms`;
       range.style.setProperty("--fill",
         `${((range.value - range.min) / (range.max - range.min)) * 100}%`);
-      pushToPlayer(); save(active);
+      if (edited("limiter")) syncChrome();
     }
     if (range.hasAttribute("data-gain")) {
       active.data.gain = parseFloat(range.value);
       J.$("b", range.closest(".knob-row")).textContent = `${active.data.gain.toFixed(1)} dB`;
       range.style.setProperty("--fill", `${((active.data.gain + 12) / 24) * 100}%`);
-      pushToPlayer(); save(active);
+      if (edited("eq")) syncChrome();
     }
   });
 
@@ -655,13 +675,21 @@ J.blockSound = async function (panel, ctx) {
    * only when the preset behind the selection actually differs, because this fires on
    * every play, pause and seek and rebuilding the panel under a pointer throws the
    * canvas away mid drag. */
-  J.on("player:change", function follow() {
-    if (!panel.isConnected) { J.bus.removeEventListener("player:change", follow); return; }
+  function follow() {
+    if (!panel.isConnected) {
+      J.bus.removeEventListener("player:change", follow);
+      J.bus.removeEventListener("deck:change", follow);
+      return;
+    }
     if (!presets.length) return;
     const theirs = presetOfSelection();
     if (theirs && active && theirs.id !== active.id) choose(theirs, { push: false });
     else syncChrome();
-  });
+  }
+  J.on("player:change", follow);
+  /* Selecting a deck or a preset with nothing playing never reaches the player, so it
+   * has an event of its own and the panel has to hear both. */
+  J.on("deck:change", follow);
 
   /* A preset came or went somewhere else on the page. Reload rather than patch: the list
    * is small and guessing which end of it moved is how a stale tab row happens. */

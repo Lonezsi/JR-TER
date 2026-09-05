@@ -209,6 +209,27 @@ J.views.renders = {
       });
     }
 
+    /* Making a song out of a render, in one place for the same reason renaming is. It
+     * used to live inside the click handler, so the menu item had to find a button on
+     * the row and press it, and it broke the moment that button went. */
+    async function makeSongFrom(render) {
+      const fields = await J.sheet({
+        title: "Make a song from this render",
+        sub: "The render becomes its first version. It keeps its own name in the list.",
+        confirm: "Make the song",
+        body: `<input class="field" name="title" value="${J.esc(render.name)}">`,
+      });
+      if (!fields || !fields.title.trim()) return;
+      return J.try(async () => {
+        const made = await J.post(`/api/renders/${render.id}/attach`,
+                                  { title: fields.title.trim() });
+        J.emit("renders:changed");
+        J.emit("songs:changed");
+        J.toast(`${made.song.title} made, with this as v${made.version.n}.`);
+        location.hash = `#/song/${made.song.id}`;
+      });
+    }
+
     /* Whether a row is the one sounding is the player's business now, not a flag kept
      * here that could disagree with it. */
     const isSounding = (render) => !!(J.player.state.song
@@ -261,6 +282,17 @@ J.views.renders = {
       return `<span class="render-dates">${bits.join('<span class="dot"></span>')}</span>`;
     }
 
+    /* One row, read left to right: what it is, then the one thing this row is for, then
+     * the tools. The cover, the play button and the name are identity and none of them
+     * navigate anywhere. The action is next. The two icons are a group at the right
+     * edge, with the one that cannot be undone last.
+     *
+     * The cover used to be a button that made a song. It was the biggest press target in
+     * a row whose job is "add this to a song", and on a row that had already found its
+     * song it made a second one. Making a song is on the menu, and it is the first row
+     * of the sheet this row opens. The name used to make a song too, while being drawn
+     * with a text cursor and an underline that said rename, which is what it does now.
+     */
     function card(render) {
       const used = !render.waiting;
       return `
@@ -268,19 +300,15 @@ J.views.renders = {
              ${used ? "" : 'data-act="attach" role="button" tabindex="0"'}
              ${used ? "" : `aria-label="Add ${J.esc(render.name)} to a song"`}>
           ${J.waveform(render.shape, { className: "render-wave" })}
-          <button class="render-art" data-act="makesong"
-                  title="Make a song from ${J.esc(render.name)}"
-                  aria-label="Make a song from ${J.esc(render.name)}">
-            ${J.cover({ title: render.name, className: "cover" })}
-          </button>
+          ${J.cover({ title: render.name, className: "render-art" })}
           <button class="icon-btn play" data-act="play" aria-label="Play ${J.esc(render.name)}">
             ${J.player.state.playing && isSounding(render)
               ? `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 6h3v12H8zM13 6h3v12h-3z" fill="currentColor"/></svg>`
               : `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor"/></svg>`}
           </button>
           <span class="grow truncate">
-            <span class="render-name truncate" data-act="makesong"
-                  title="Make a song from this render"
+            <span class="render-name truncate" data-act="rename"
+                  title="Rename this render"
               >${J.esc(render.name)}</span>
             <span class="s truncate">
               ${render.duration ? J.time(render.duration) + " · " : ""}${J.bytes(render.size)}
@@ -291,19 +319,23 @@ J.views.renders = {
             </span>
             ${dates(render)}
           </span>
+          <span class="row-actions">
           ${used
             ? `<button class="btn sm ghost" data-act="unattach">Put back</button>`
             : `<span class="row-go">Add to a song</span>`}
-          ${J.state.modules.includes("playlists") ? `
-            <button class="icon-btn" data-act="playlist"
-                    title="Add ${J.esc(render.name)} to a playlist"
-                    aria-label="Add ${J.esc(render.name)} to a playlist">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-                   stroke-width="1.9" stroke-linecap="round"><path d="M4 7h11M4 12h11M4 17h7"/><path d="M17 14v6M14 17h6"/></svg>
-            </button>` : ""}
-          <button class="icon-btn" data-act="dismiss" aria-label="Throw this render away">
-            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-          </button>
+          <span class="row-tools">
+            ${J.state.modules.includes("playlists") ? `
+              <button class="icon-btn" data-act="playlist"
+                      title="Add ${J.esc(render.name)} to a playlist"
+                      aria-label="Add ${J.esc(render.name)} to a playlist">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                     stroke-width="1.9" stroke-linecap="round"><path d="M4 7h11M4 12h11M4 17h7"/><path d="M17 14v6M14 17h6"/></svg>
+              </button>` : ""}
+            <button class="icon-btn" data-act="dismiss" aria-label="Throw this render away">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+            </button>
+          </span>
+          </span>
           ${shape(render)}
         </div>`;
     }
@@ -366,8 +398,12 @@ J.views.renders = {
               icon: "open",
               run: () => node.querySelector('[data-act="unattach"]').click() },
         { divider: true },
-        { label: "Make a song from it", icon: "add",
-          run: () => node.querySelector('[data-act="makesong"]').click() },
+        /* Only on one still waiting. Attaching with a title to a render that already has
+         * a song makes a second song and leaves the first one's version pointing at
+         * nothing that is listed here. */
+        render.waiting
+          ? { label: "Make a song from it", icon: "add", run: () => makeSongFrom(render) }
+          : null,
         { label: "Rename", icon: "edit", run: () => renameRender(render) },
         J.state.modules.includes("playlists") ? {
           label: "Add to a playlist", icon: "tag",
@@ -444,24 +480,6 @@ J.views.renders = {
           await J.player.playRender(render, queue);
         }
         return draw();
-      }
-
-      if (act.dataset.act === "makesong") {
-        const fields = await J.sheet({
-          title: "Make a song from this render",
-          sub: "The render becomes its first version. It keeps its own name in the list.",
-          confirm: "Make the song",
-          body: `<input class="field" name="title" value="${J.esc(render.name)}">`,
-        });
-        if (!fields || !fields.title.trim()) return;
-        return J.try(async () => {
-          const made = await J.post(`/api/renders/${render.id}/attach`,
-                                    { title: fields.title.trim() });
-          J.emit("renders:changed");
-          J.emit("songs:changed");
-          J.toast(`${made.song.title} made, with this as v${made.version.n}.`);
-          location.hash = `#/song/${made.song.id}`;
-        });
       }
 
       if (act.dataset.act === "playlist") {

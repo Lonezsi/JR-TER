@@ -19,6 +19,45 @@ J.blockLyrics = async function (block, ctx) {
   let editing = false;
   let history = null;
   let viewing = null;
+  let madeHere = null;      // a sheet this editor created, still empty and still unkept
+
+  /* Back gets you out of the words without keeping them.
+   *
+   * An entry is pushed when the editor opens, carrying the URL it already had. The
+   * router runs off hashchange alone, and the hash does not move, so nothing re-renders
+   * and the popstate that comes back belongs to this panel and nothing else. What the
+   * entry buys is one Back press that lands here instead of on the last screen.
+   *
+   * window.history, spelled out every time. The `history` two lines up is the list of
+   * revisions and it shadows the browser's own for the whole of this function, so a bare
+   * history.pushState in here is a call on null.
+   */
+  const BACK_STOP = "lyric-edit";
+  let backCaught = false;   // an entry of ours is on the stack for Back to land on
+  let ourOwnPop = false;    // the pop we asked for, not the one the person pressed
+
+  function catchBack() {
+    if (backCaught) return;
+    backCaught = true;
+    window.history.pushState({ stop: BACK_STOP }, "");
+  }
+
+  /* Give the entry back when the editor closes any other way, or the next Back press
+   * closes an editor that is not open and does nothing anybody can see.
+   *
+   * Only from a panel that is still on the page and still standing on its own entry.
+   * Clicking a link while writing saves and navigates in one gesture, and a blind back()
+   * from the screen you have just arrived at would carry you straight to the one you
+   * left. The pop is asynchronous, so the handler is told this one is ours.
+   */
+  function letBackGo() {
+    if (!backCaught) return;
+    backCaught = false;
+    const now = window.history.state;
+    if (!block.isConnected || !now || now.stop !== BACK_STOP) return;
+    ourOwnPop = true;
+    window.history.back();
+  }
 
   async function load(keepIndex) {
     const data = await J.get(`/api/songs/${ctx.songId}/lyrics`);
@@ -212,7 +251,7 @@ J.blockLyrics = async function (block, ctx) {
         <div class="card-foot">
           <span class="faint" id="lyricCount"></span>
           <span class="grow"></span>
-          <span class="faint edit-hint">click away to keep it</span>
+          <span class="faint edit-hint">click away to keep it, Esc or Back to leave it</span>
         </div>
       </article>`;
       const box = J.$("#lyricText", block);
@@ -224,16 +263,39 @@ J.blockLyrics = async function (block, ctx) {
       };
       box.addEventListener("input", () => { tally(); grow(box); });
       box.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); box.blur(); }
-        // Escape leaves the words alone rather than throwing them away: it is the same
-        // as clicking off, and History is where taking something back lives.
-        if (e.key === "Escape") { e.preventDefault(); box.blur(); }
+        // Straight to save, not through blur. The blur handler now has to work out
+        // whether a blur was somebody leaving or the window going away, and the one
+        // gesture that says keep this out loud should not be asking that question.
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+        /* Escape leaves the words as they were, which is what Back does.
+         *
+         * It used to blur the box, which saved, on the grounds that History keeps every
+         * revision so nothing is really lost. That is only true of what reached the
+         * server, and it made this the one place in the app where Escape means yes: it
+         * closes the menu, it closes the sheet, it puts the song title back and it
+         * clears the search box. One key cannot mean throw this away everywhere and keep
+         * it here. */
+        if (e.key === "Escape") { e.preventDefault(); cancel(); }
       });
       /* Clicking away is what saves.
        *
        * A blur fires for anything that takes focus, including the History button and the
-       * arrows, so this is the one path out and every way of leaving goes through it. */
-      box.addEventListener("blur", () => { if (editing) save(); });
+       * arrows, so this is the one path out and every way of leaving goes through it.
+       *
+       * Except the browser's own Back button, which is the thing this all exists for.
+       * Pressing it hands focus to the toolbar, the toolbar is not the page, and the box
+       * blurs. The save landed a moment before the popstate arrived to throw it away, so
+       * Back looked like it did nothing. A blur that leaves the whole page unfocused is
+       * nobody clicking away from anything, so the editor stays open and waits.
+       *
+       * Asked of the document rather than of the event: relatedTarget is null both when
+       * the window goes and when focus lands on something that cannot hold it, and
+       * clicking the empty part of the card is one of the ordinary ways to leave. */
+      box.addEventListener("blur", () => {
+        if (!editing) return;
+        if (!document.hasFocus()) return;
+        save();
+      });
       tally();
       grow(box);
       focusInto(box);
@@ -377,10 +439,55 @@ J.blockLyrics = async function (block, ctx) {
     const unchanged = text === (sheet() ? sheet().text : "");
     if (!unchanged) {
       const result = await J.try(() => J.put(`/api/lyrics/${sheet().id}/text`, { text }));
+      // Still editing, and still holding the entry it was given: a save that failed has
+      // more to lose than one that never started, so its way out stays where it is.
       if (!result) { editing = true; drawCards(); return; }
     }
+    madeHere = null;
+    letBackGo();
     history = null;
     await load(true);
+  }
+
+  /* Leaving the words without keeping them.
+   *
+   * Nothing is written and nothing has to be put back. The box was filled from
+   * sheets[at].text and never writes into it, so drawing the reading view again shows
+   * the words the server still has.
+   *
+   * editing goes down before any markup changes. The redraw takes the textarea out of
+   * the page while it holds the caret, and a removed textarea fires blur on the way out
+   * in some browsers, which would run save() and keep the very thing that was cancelled.
+   * With the flag already down that blur finds nothing to do, which is what the guard on
+   * the blur handler has always been for.
+   */
+  async function cancel() {
+    if (!editing) return;
+    const box = J.$("#lyricText", block);
+    const typed = box ? box.value : "";
+    const lost = !!box && typed !== (sheet() ? sheet().text : "");
+    editing = false;
+    letBackGo();
+    landAt = null;
+
+    /* Clicking into a song with no words writes an empty sheet before the editor opens,
+     * so cancelling out of that one would leave a nameless empty card behind that the
+     * card itself has no delete button for. Undoing the creation is not the same act as
+     * throwing away words somebody wrote: nothing was ever kept, and the sheet existed
+     * only to hold what was just abandoned. Anything actually typed is a save, not this.
+     */
+    const born = madeHere;
+    madeHere = null;
+    if (born && !typed.trim()) {
+      await J.try(() => J.del(`/api/lyrics/${born}`));
+      await load();
+      return;
+    }
+
+    drawCards();
+    // Only when there was something to lose. A cancel that discards nothing is just a
+    // Back press, and a toast on every Back press is the noise this app does not make.
+    if (lost) J.toast("Left as it was.");
   }
 
   block.addEventListener("click", async (e) => {
@@ -418,8 +525,11 @@ J.blockLyrics = async function (block, ctx) {
         if (!made) return;
         await load();
         at = sheets.length - 1;
+        // Remembered so that backing out of it takes the empty sheet with it. See cancel.
+        madeHere = sheets.length ? sheets[at].id : null;
       }
       editing = true;
+      catchBack();
       drawCards();
     }
     if (what === "back") { viewing = null; draw(); }
@@ -448,6 +558,8 @@ J.blockLyrics = async function (block, ctx) {
       const index = sheets.findIndex((sh) => sh.id === made.sheet.id);
       at = index < 0 ? sheets.length - 1 : index;
       viewing = null; history = null; editing = true;
+      madeHere = made.sheet.id;
+      catchBack();
       draw();
     }
 
@@ -557,6 +669,36 @@ J.blockLyrics = async function (block, ctx) {
     if (e.key === "ArrowRight") go(at + 1);
   };
   document.addEventListener("keydown", onKey);
+
+  /* Back, whether it came from the browser button, the phone gesture or the swipe.
+   *
+   * Order in here is load bearing. ourOwnPop is read and cleared first, because a pop we
+   * asked for must never be mistaken for the person's. backCaught is cleared before
+   * cancel() runs, so cancel's own letBackGo finds nothing to give back: the press that
+   * brought us here already took it. Two quick Backs then close the editor and leave the
+   * page, which is what a modal does.
+   */
+  const onPop = () => {
+    if (!block.isConnected) { window.removeEventListener("popstate", onPop); return; }
+    if (ourOwnPop) { ourOwnPop = false; return; }
+    if (!backCaught) return;
+    backCaught = false;          // it went with the press that brought us here
+    if (editing) cancel();
+  };
+  window.addEventListener("popstate", onPop);
+
+  /* The one thing the focus test gives away.
+   *
+   * From in here, pressing the browser's Back button and switching to another window
+   * look the same, so neither saves any more. Coming back to a window finds the words
+   * still in the box, which is fine. A tab that is closed and an app that is swiped away
+   * never come back, and that is the moment there is nothing left to cancel with.
+   */
+  const onHide = () => {
+    if (!block.isConnected) { document.removeEventListener("visibilitychange", onHide); return; }
+    if (editing && document.visibilityState === "hidden") save();
+  };
+  document.addEventListener("visibilitychange", onHide);
 
   await load();
   wireDrag();

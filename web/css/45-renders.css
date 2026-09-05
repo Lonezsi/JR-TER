@@ -19,29 +19,84 @@
 }
 .render-row:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
 
-/* Says what pressing the row does, and only steps forward when you are on it. */
+/* Says what pressing the row does.
+
+   It used to rest on --elevated with --text-3 on it, which is the pairing the meta line
+   uses and close enough to a disabled control that it was read as one. On a phone that
+   was permanent: the accent only arrived on hover and a finger cannot hover.
+
+   So it rests in the quiet green .pick-row.new already uses for "you can press this,
+   said quietly", and fills in only when the pointer is on the row or a finger is on it.
+   Still not forty four filled pills down a list, which is the thing that was rejected.
+
+   Its height is .btn.sm's height, so a waiting row and a row with Put back on it line up
+   down a mixed list rather than sitting two pixels apart. */
 .row-go {
   flex: none;
-  padding: 6px var(--s4);
+  display: inline-flex; align-items: center;
+  height: 30px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--accent-line);
   border-radius: var(--r-pill);
-  background: var(--elevated);
-  color: var(--text-3);
+  background: var(--accent-soft);
+  color: var(--accent-hi);
   font-size: 12.5px; font-weight: 650;
   white-space: nowrap;
-  transition: background var(--fast), color var(--fast);
+  transition: background var(--fast), color var(--fast), border-color var(--fast);
 }
 .render-row:hover .row-go,
-.render-row:focus-visible .row-go {
+.render-row:focus-visible .row-go,
+.render-row[role="button"]:active .row-go {
   background: var(--grad-accent);
+  border-color: var(--accent);
   color: var(--text-on-accent);
 }
+
+/* The action and the tools, held together only so that a phone can put them on one line.
+
+   On a wide row this wrapper is not there at all: display: contents hands its children
+   straight to the row, so the layout is the flat one the rule describes and the tools'
+   auto margin still measures against the whole row. On a narrow one it becomes a real
+   box asking for the full width, which is what forces the break. Without it the name
+   column shrank just enough to let the pill stay up on the first line and the two icons
+   wrapped on their own, which is a tall row with a hole in it. */
+.row-actions { display: contents; }
+
+/* The two things a row can do that are not the row's own job, kept together at the right
+   edge so they read as a pair of tools rather than as two more steps in the sentence.
+   Their own gap is tighter than the row's and there is more space in front of them: at
+   the row's uniform twelve pixels, five controls all read as five peers, which is what
+   made the order look scattered.
+
+   The auto margin does nothing on a wide row, where the name column has already taken
+   the slack. It earns its place on a phone, where the row wraps and this is what stops
+   the buttons trailing off into the middle of the second line. */
+.row-tools {
+  display: flex; align-items: center; gap: 2px;
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--s3);
+}
+/* Round, never squeezed into ovals. Only the play button said flex: none. */
+.row-tools .icon-btn { flex: none; }
+/* Throwing a render away is the one thing in this row that cannot be taken back, so it
+   is last and it is the only icon that changes colour under the pointer. */
+.row-tools [data-act="dismiss"]:hover { color: var(--bad-hi); }
 .render-row .grow { min-width: 0; flex: 1; display: block; }
 /* One that has found its song stays readable but stops asking for attention. */
 .render-row.used { opacity: 0.62; }
 .render-row.used:hover { opacity: 1; }
 
+/* The one thing on the row you can change, sized to itself.
+
+   It was display: block, so it filled the whole name column: the hover underline ran the
+   width of the screen and clicking the empty space to the right of a short name opened a
+   sheet you had not aimed at. max-width keeps .truncate's ellipsis working, and
+   vertical-align stops an inline-block leaving a gap under the text. */
 .render-name {
-  display: block;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
   font-weight: 650;
   cursor: text;
   border-bottom: 1px solid transparent;
@@ -133,36 +188,42 @@
 }
 
 @media (max-width: 900px) {
-  /* On a phone the buttons come off the row rather than squeezing the name to nothing. */
-  .render-row { flex-wrap: wrap; }
+  /* On a phone the row wraps on purpose. The name asks for sixty per cent so the break
+     happens after it: cover, play and name take the first line, the action and the tools
+     take the second.
+
+     The buttons used to be told to grow into whatever was left on that second line,
+     which is how Put back ended up as a two hundred pixel pill with two icons stuck on
+     the end of it. They keep their own size now, and .row-tools' auto margin is what
+     puts the space between them. Wrapping itself is unconditional, up at the top of the
+     file, so it is not restated here. */
   .render-row .grow { flex: 1 1 60%; }
-  .render-row .btn { flex: 1 1 auto; }
+  .row-actions {
+    display: flex; align-items: center; gap: var(--s3);
+    flex: 1 1 100%;
+  }
 }
 
 
-/* The render's own square. It is the biggest thing in the row and the most obviously
-   pressable, so it does the thing you would expect of it: makes a song out of this. */
-.render-art {
-  width: 40px; height: 40px; flex: none;
-  padding: 0; border: 0; border-radius: var(--r-sm);
-  background: none;
-  cursor: pointer;
-  transition: transform var(--fast);
-}
-.render-art .cover { width: 40px; height: 40px; border-radius: var(--r-sm); }
-.render-art:hover { transform: scale(1.06); }
-.render-art:active { transform: scale(0.97); }
-.render-name { cursor: pointer; }
+/* The render's own square. It is a generated letter tile, never artwork, and it is not a
+   control. It used to be a button that made a song out of the render, which meant the
+   biggest press target in a row whose job is "add this to a song" did something else,
+   and on a row that had already found its song it made a second one. No display here:
+   .cover already sets its own, and two single class rules disagreeing about display on
+   one element is the thing that put the name's cursor 109 lines from its own rule. */
+.render-art { width: 40px; height: 40px; border-radius: var(--r-sm); }
 
-/* The two dates a render can carry. Its own line at the end of the row, wrapping onto a
-   line of its own the way the arrangement strip does, so a long name never pushes them
-   out of the row and nothing here is what gets clipped first. */
+/* The two dates a render can carry. They sit inside the name column, under the size
+   line, so a long name never pushes them out of the row and nothing here is the first
+   thing to be clipped. This used to say flex: 0 0 100%, which did nothing at all: its
+   parent is a block, and the line it gets is ordinary block flow. */
 .render-dates {
-  flex: 0 0 100%;
   display: flex; align-items: center; gap: var(--s2);
   margin-top: 2px;
   font-size: 11.5px; color: var(--text-3);
+  overflow: hidden;
 }
+.render-dates span { overflow: hidden; text-overflow: ellipsis; }
 .render-dates .dot {
   width: 3px; height: 3px; border-radius: 50%;
   background: currentColor; opacity: 0.5; flex: none;

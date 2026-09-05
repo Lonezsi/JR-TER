@@ -240,6 +240,10 @@
   border-radius: var(--r-sm);
 }
 .slot-pick .caret:hover { opacity: 1; background: var(--hover); }
+/* The deck a chosen equaliser lands on, playing or not. Only an outline, because at rest
+   there is nothing coming out of the speakers to point at. Above .live so that when both
+   are set, which is the usual case, the louder one wins on file order. */
+.slot-pick.sel { border-color: var(--accent-line); }
 /* The side you are actually hearing. */
 .slot-pick.live { border-color: var(--accent); background: var(--accent-soft); }
 .slot-pick.live .k { background: var(--accent); color: var(--text-on-accent); }
@@ -425,8 +429,16 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
   padding-top: var(--s3);
   margin-top: var(--s4);
 }
-.edit-hint { font-size: 11.5px; }
-.card-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+/* It names both ways out now, which is longer than it was, and on a phone the line
+   count and the hint no longer fit side by side. Wrapping is right here: the hint is the
+   only line in the editor that teaches a gesture, and clipping it would take away the
+   half that says the words can be left behind. */
+.edit-hint { font-size: 11.5px; text-align: right; }
+.card-foot {
+  display: flex; align-items: center; gap: var(--s2);
+  flex-wrap: wrap;
+  margin-top: var(--s3);
+}
 
 .deck-arrow {
   display: grid; place-items: center;
