@@ -669,3 +669,107 @@ def test_a_key_pressed_on_a_nested_control_does_that_controls_job():
             assert guarded, (
                 "%s has a delegated Enter handler on %s with nothing stopping it firing "
                 "when focus is on a control inside the row" % (name, marker))
+
+
+def test_every_script_actually_parses():
+    """One bad character takes the whole app down.
+
+    The JS files are concatenated into a single /jong.js, so a syntax error anywhere in
+    any of them means no J at all: every screen renders empty and nothing in the console
+    points at which file. It has happened twice, both times from an escape mangled while
+    editing rather than from the code being wrong.
+
+    Skipped rather than failed where node is missing, because this checks the tooling
+    that happens to be here, not the library.
+    """
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not on this machine, so nothing can parse the scripts")
+
+    broken = {}
+    for name in sorted(os.listdir(JS_DIR)):
+        if not name.endswith(".js"):
+            continue
+        done = subprocess.run([node, "--check", os.path.join(JS_DIR, name)],
+                              capture_output=True, text=True)
+        if done.returncode != 0:
+            first = [line for line in done.stderr.splitlines() if "Error" in line]
+            broken[name] = first[0] if first else done.stderr.strip()[:120]
+    assert not broken, "these do not parse, so the whole app is blank: %s" % broken
+
+
+HARNESS = """
+const fs = require("fs");
+const path = require("path");
+const dir = process.argv[2];
+const NL = String.fromCharCode(10);
+
+global.J = {
+  esc: (s) => String(s == null ? "" : s)
+    .split("&").join("&amp;").split("<").join("&lt;")
+    .split(">").join("&gt;").split('"').join("&quot;"),
+};
+eval(fs.readFileSync(path.join(dir, "10-markdown.js"), "utf8"));
+
+const fail = [];
+
+// Where the body starts has to agree with what the body is, or the cursor lands in
+// the wrong place by exactly the length of the title.
+const texts = [
+  "title" + NL + "body one" + NL + "body two",
+  NL + NL + "title after blanks" + NL + "words",
+  "only a title",
+  "",
+];
+for (const text of texts) {
+  const start = J.mdBodyStart(text);
+  if (text.slice(start) !== J.mdBody(text)) {
+    fail.push("mdBodyStart disagrees with mdBody for " + JSON.stringify(text) +
+              ": slice gave " + JSON.stringify(text.slice(start)) +
+              " and mdBody gave " + JSON.stringify(J.mdBody(text)));
+  }
+}
+
+// Every kind of block carries the line it was written on, in order, none missing.
+const source = ["a plain line", "", "# a heading", "- a bullet", "1. numbered",
+                "> a quote", "**bold**", "---", "last"].join(NL);
+const html = J.md(source);
+const seen = [];
+const finder = /data-l="([0-9]+)"/g;
+let hit = null;
+while ((hit = finder.exec(html))) seen.push(Number(hit[1]));
+
+const want = source.split(NL).map((_, i) => i);
+if (JSON.stringify(seen) !== JSON.stringify(want)) {
+  fail.push("blocks are numbered " + JSON.stringify(seen) + " but the source has lines " +
+            JSON.stringify(want));
+}
+
+if (fail.length) { console.error(fail.join(NL)); process.exit(1); }
+console.log("ok");
+"""
+
+
+def test_every_drawn_block_says_which_line_it_came_from(tmp_path):
+    """Clicking into the words puts the cursor where the click was, and that only works
+    because the renderer numbers each block by its source line.
+
+    Counting characters across the drawing instead was wrong for anything marked up: a
+    bullet is two characters shorter on screen than in the text, a heading two or more,
+    a blank line has no text in it at all. So the numbering is the contract, and it has
+    to cover every kind of block the renderer can produce, in order, with none skipped.
+    """
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not on this machine, so nothing can run the scripts")
+
+    harness = tmp_path / "check-markdown.js"
+    harness.write_text(HARNESS, encoding="utf-8")
+    done = subprocess.run([node, str(harness), JS_DIR], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr.strip() or done.stdout.strip()

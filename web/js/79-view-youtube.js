@@ -94,6 +94,7 @@ J.views.youtube = {
 
       node.innerHTML = `
         <span><b>v${ctx.current ? ctx.current.n : "?"}</b></span>
+        ${ctx.current ? J.trouble(ctx.current) : ""}
         <span class="dot"></span>
         <span>${bands ? `${bands} band${bands === 1 ? "" : "s"}` : "flat"}</span>
         <span class="dot"></span>

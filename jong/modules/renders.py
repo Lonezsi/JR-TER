@@ -35,12 +35,28 @@ SCHEMA = [
       used_at     REAL NOT NULL DEFAULT 0,
       project_at  REAL NOT NULL DEFAULT 0,
       rendered_at REAL NOT NULL DEFAULT 0,
+      peaks       TEXT NOT NULL DEFAULT '',
+      peak_db     REAL,
+      trouble     TEXT NOT NULL DEFAULT '',
       song_id     INTEGER,
       version_id  INTEGER
     )
     """,
     "CREATE INDEX IF NOT EXISTS renders_waiting ON renders(used_at, created_at DESC)",
 ]
+
+
+def _add_shape_columns():
+    """The drawn shape of a render, and whether it is worth playing.
+
+    peaks is 120 numbers as a compact string, peak_db is the loudest sample in dBFS, and
+    trouble is empty for a good file or names what is wrong with it. Kept on the row
+    rather than worked out when a list is drawn, because a hundred renders would be a
+    hundred files opened every time the screen was painted.
+    """
+    db.add_column_if_missing("renders", "peaks", "TEXT NOT NULL DEFAULT ''")
+    db.add_column_if_missing("renders", "peak_db", "REAL")
+    db.add_column_if_missing("renders", "trouble", "TEXT NOT NULL DEFAULT ''")
 
 
 def MIGRATE():
@@ -59,6 +75,7 @@ def MIGRATE():
     """
     db.add_column_if_missing("renders", "project_at", "REAL NOT NULL DEFAULT 0")
     db.add_column_if_missing("renders", "rendered_at", "REAL NOT NULL DEFAULT 0")
+    _add_shape_columns()
 
 
 def get(render_id):
@@ -75,6 +92,8 @@ def _decorate(rows):
         row["song_title"] = titles.get(row["song_id"])
         row["name"] = os.path.splitext(row["filename"])[0] or "render"
         row["waiting"] = not row["used_at"]
+        raw = row.pop("peaks", "") or ""
+        row["shape"] = [int(n) for n in raw.split(",") if n.isdigit()]
     return rows
 
 
@@ -86,6 +105,32 @@ def list_renders(req):
         rows = db.query("SELECT * FROM renders WHERE used_at = 0 ORDER BY created_at DESC")
     waiting = db.one("SELECT COUNT(*) AS n FROM renders WHERE used_at = 0")
     return {"renders": _decorate(rows), "waiting": waiting["n"] if waiting else 0}
+
+
+def _shape_of(digest, ext):
+    """Look at the audio once, when it arrives, and write down what is there.
+
+    Done here rather than when a list is drawn: two hundred renders on screen would be
+    two hundred files opened every repaint. Done at all because "this one is silent" is
+    the single most useful thing to know about a batch of bounces, and finding out by
+    pressing play on each of them in turn is how an afternoon goes.
+    """
+    try:
+        found = audio_meta.peaks(blobs.path_for(digest), ext)
+    except Exception:
+        return {"peaks": "", "peak_db": None, "trouble": "unreadable"}
+    trouble = ""
+    if found["unreadable"]:
+        trouble = "unreadable"
+    elif found["silent"]:
+        trouble = "silent"
+    return {
+        # Comma separated rather than JSON: it is a list of small integers and this is
+        # half the bytes over the wire for two hundred rows.
+        "peaks": ",".join(str(n) for n in found["peaks"]),
+        "peak_db": found["peak_db"],
+        "trouble": trouble,
+    }
 
 
 def _remember(digest, ext, size, filename, source_path, origin, duration=0.0, bitrate=0,
@@ -111,11 +156,14 @@ def _remember(digest, ext, size, filename, source_path, origin, duration=0.0, bi
             db.update("renders", existing["id"], learned)
             return get(existing["id"]), False
         return existing, False
+    shape = _shape_of(digest, ext)
     render_id = db.insert("renders", {
         "digest": digest, "ext": ext, "size": size, "duration": duration,
         "bitrate": bitrate, "filename": filename, "source_path": source_path,
         "origin": origin, "created_at": time.time(),
-        "project_at": project_at or 0.0, "rendered_at": rendered_at or 0.0})
+        "project_at": project_at or 0.0, "rendered_at": rendered_at or 0.0,
+        "peaks": shape["peaks"], "peak_db": shape["peak_db"],
+        "trouble": shape["trouble"]})
     return get(render_id), True
 
 
@@ -299,6 +347,32 @@ def audio(req):
                                                    "application/octet-stream"))
 
 
+def examine(req):
+    """Look again at renders whose shape is not known yet.
+
+    Every render that arrived before this existed has no shape and no verdict, and there
+    is no moment in normal use when they would get one. Bounded per call so a library of
+    seven hundred does not hold a request open for a minute: the screen asks again until
+    there is nothing left.
+    """
+    limit = as_int(req.q("limit") or 60, "limit")
+    rows = db.query("SELECT id, digest, ext FROM renders "
+                    "WHERE peaks = '' AND trouble = '' LIMIT ?", (max(1, min(200, limit)),))
+    looked, found = 0, 0
+    for row in rows:
+        shape = _shape_of(row["digest"], row["ext"])
+        # An unreadable file gets its verdict; a format the server cannot decode gets a
+        # marker so it is not examined again on every pass forever.
+        if not shape["peaks"] and not shape["trouble"]:
+            shape["trouble"] = "not looked at"
+        db.update("renders", row["id"], shape)
+        looked += 1
+        if shape["trouble"] in ("silent", "unreadable"):
+            found += 1
+    left = db.one("SELECT COUNT(*) AS n FROM renders WHERE peaks = '' AND trouble = ''")
+    return {"looked_at": looked, "trouble": found, "left": left["n"] if left else 0}
+
+
 def SUMMARY():
     waiting = db.one("SELECT COUNT(*) AS n FROM renders WHERE used_at = 0")
     total = db.one("SELECT COUNT(*) AS n FROM renders")
@@ -311,6 +385,7 @@ def ROUTES():
         ("GET", "/api/renders"): list_renders,
         ("POST", "/api/renders"): upload,
         ("POST", "/api/renders/ingest"): ingest,
+        ("POST", "/api/renders/examine"): examine,
         ("POST", "/api/renders/clear"): clear,
         ("GET", "/api/renders/<id>/audio"): audio,
         ("POST", "/api/renders/<id>/attach"): attach,

@@ -364,3 +364,58 @@ J.pageWash = function (url, hue) {
   else { wash.style.backgroundImage = ""; wash.style.setProperty("--hue", hue); }
   wash.classList.add("on");
 };
+
+/* The shape of a render, drawn small.
+ *
+ * A hundred and twenty numbers from the server, 0 to 255, one per column. Drawn as an
+ * SVG polygon rather than a canvas because it sits behind a row in a list: a canvas per
+ * row would be a hundred contexts and a hundred repaints on every scroll, and this never
+ * animates. It is decoration for recognising a file at a glance, so it is aria-hidden
+ * and carries no interaction of its own.
+ */
+J.waveform = function (shape, opts) {
+  const o = opts || {};
+  if (!shape || !shape.length) return "";
+  const width = 100;
+  const half = 20;
+  const step = width / (shape.length - 1 || 1);
+
+  // Down the top, back along the bottom: one closed shape rather than a bar per column,
+  // which keeps a hundred of these to a few kilobytes of markup.
+  const top = [];
+  const bottom = [];
+  shape.forEach((value, i) => {
+    const x = (i * step).toFixed(2);
+    const y = (value / 255) * half;
+    top.push(`${x},${(half - y).toFixed(2)}`);
+    bottom.push(`${x},${(half + y).toFixed(2)}`);
+  });
+  bottom.reverse();
+
+  return `<svg class="wave ${o.className || ""}" viewBox="0 0 ${width} ${half * 2}"
+     preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <polygon points="${top.concat(bottom).join(" ")}"></polygon>
+  </svg>`;
+};
+
+/* What is wrong with a render, as a word and a mark.
+ *
+ * Silent and unreadable are the two that matter and they are found when the file
+ * arrives, so a list can say so before anything is played. */
+J.trouble = function (render) {
+  const what = render && render.trouble;
+  if (!what || what === "not looked at") return "";
+  const said = {
+    silent: "There is no sound in this one",
+    unreadable: "This will not play",
+  }[what] || what;
+  return `<span class="trouble" title="${J.esc(said)}">
+    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+      <path d="M12 3l10 18H2z" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linejoin="round"/>
+      <path d="M12 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="12" cy="17.5" r="1.1" fill="currentColor"/>
+    </svg>
+    <span>${J.esc(what === "silent" ? "silent" : "will not play")}</span>
+  </span>`;
+};

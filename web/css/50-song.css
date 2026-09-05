@@ -394,18 +394,38 @@
 }
 .card-body a { color: var(--accent-hi); text-decoration: underline; }
 
+/* Almost not there.
+ *
+ * Reading and writing are the same view: the same type, the same measure, the same place
+ * on the card. A bordered box with its own background made writing feel like filling in
+ * a form laid over the page, when the whole point is that the card is the page and the
+ * words are the thing. What is left is a caret and a faint line under the block so the
+ * card still reads as live rather than merely rendered. */
 textarea.card-edit {
-  width: 100%; min-height: 340px;
-  font: inherit; font-size: 16px; line-height: 1.85;
-  /* Darker than the card it sits in, so the writing area is obvious, but still not a
-     solid black rectangle dropped onto a pane of glass. */
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--r-md);
-  padding: var(--s4);
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  font: inherit;
+  font-size: 16.5px;
+  line-height: 1.85;
   color: var(--text);
-  outline: none; resize: vertical;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  resize: none;
+  overflow: hidden;          /* it grows to the words instead */
+  outline: none;
 }
+textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
+/* The one mark that says this card is being written in rather than read. */
+.lyric-card.editing { border-color: var(--accent-line); }
+.lyric-card.editing .card-foot {
+  border-top: 1px solid var(--line);
+  padding-top: var(--s3);
+  margin-top: var(--s4);
+}
+.edit-hint { font-size: 11.5px; }
 .card-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
 
 .deck-arrow {

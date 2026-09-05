@@ -29,7 +29,10 @@ SCHEMA = [
       source_path TEXT NOT NULL DEFAULT '',
       created_at  REAL NOT NULL,
       project_at  REAL NOT NULL DEFAULT 0,
-      rendered_at REAL NOT NULL DEFAULT 0
+      rendered_at REAL NOT NULL DEFAULT 0,
+      peaks       TEXT NOT NULL DEFAULT '',
+      peak_db     REAL,
+      trouble     TEXT NOT NULL DEFAULT ''
     )
     """,
     "CREATE INDEX IF NOT EXISTS versions_song ON versions(song_id, n DESC)",
@@ -49,9 +52,23 @@ def _add_date_columns():
     db.add_column_if_missing("versions", "rendered_at", "REAL NOT NULL DEFAULT 0")
 
 
+def _add_shape_columns():
+    """The drawn shape and the verdict, the same three a render carries.
+
+    A version is a render that was filed, so it answers the same question: is there
+    anything in this file. Kept on the version rather than looked up through the render
+    it came from, because a version can outlive that row and an upload straight onto a
+    song never had one.
+    """
+    db.add_column_if_missing("versions", "peaks", "TEXT NOT NULL DEFAULT ''")
+    db.add_column_if_missing("versions", "peak_db", "REAL")
+    db.add_column_if_missing("versions", "trouble", "TEXT NOT NULL DEFAULT ''")
+
+
 #: Named steps, each run once ever and recorded by name. See jong/registry.py.
 MIGRATE = [
     ("dates_from_the_render", _add_date_columns),
+    ("shape_and_trouble", _add_shape_columns),
 ]
 
 def get(version_id):
@@ -64,7 +81,23 @@ def get(version_id):
 def list_versions(req):
     song = songs.get(req.params["id"])
     rows = db.query("SELECT * FROM versions WHERE song_id = ? ORDER BY n DESC", (song["id"],))
+    for row in rows:
+        # Numbers to draw with, rather than the string they are stored as.
+        raw = row.pop("peaks", "") or ""
+        row["shape"] = [int(n) for n in raw.split(",") if n.isdigit()]
     return {"versions": rows, "current_version_id": song["current_version_id"]}
+
+
+def _shape_of(digest, ext):
+    """What the audio looks like and whether it is worth playing. See renders._shape_of:
+    the same question, asked once per file, when the file arrives."""
+    try:
+        found = audio_meta.peaks(blobs.path_for(digest), ext)
+    except Exception:
+        return {"peaks": "", "peak_db": None, "trouble": "unreadable"}
+    trouble = "unreadable" if found["unreadable"] else ("silent" if found["silent"] else "")
+    return {"peaks": ",".join(str(n) for n in found["peaks"]),
+            "peak_db": found["peak_db"], "trouble": trouble}
 
 
 def add_stored(song_id, digest, ext, size, duration=0.0, bitrate=0,
@@ -87,7 +120,8 @@ def add_stored(song_id, digest, ext, size, duration=0.0, bitrate=0,
         "size": size, "duration": duration or 0.0, "bitrate": bitrate or 0,
         "label": label or "", "filename": filename or "",
         "source_path": source_path or "", "created_at": time.time(),
-        "project_at": project_at or 0.0, "rendered_at": rendered_at or 0.0})
+        "project_at": project_at or 0.0, "rendered_at": rendered_at or 0.0,
+        **_shape_of(digest, ext)})
     db.update("songs", song_id, {"current_version_id": version_id,
                                  "updated_at": time.time()})
     return get(version_id), False
@@ -236,9 +270,35 @@ def SUMMARY():
             "distinct_files": distinct["n"] if distinct else 0}
 
 
+def examine(req):
+    """Look again at the takes whose shape is not known yet.
+
+    Same job as renders.examine, on the other table. A version that arrived before shapes
+    existed has none, and nothing in ordinary use would give it one, so the song screen
+    asks for a batch when it opens and asks again until there is nothing left.
+    """
+    limit = as_int(req.q("limit") or 60, "limit")
+    rows = db.query("SELECT id, digest, ext FROM versions "
+                    "WHERE peaks = '' AND trouble = '' LIMIT ?", (max(1, min(200, limit)),))
+    looked, found = 0, 0
+    for row in rows:
+        shape = _shape_of(row["digest"], row["ext"])
+        # A format the server cannot decode gets a marker rather than being asked about
+        # again on every pass forever. The browser fills those in when it plays them.
+        if not shape["peaks"] and not shape["trouble"]:
+            shape["trouble"] = "not looked at"
+        db.update("versions", row["id"], shape)
+        looked += 1
+        if shape["trouble"] in ("silent", "unreadable"):
+            found += 1
+    left = db.one("SELECT COUNT(*) AS n FROM versions WHERE peaks = '' AND trouble = ''")
+    return {"looked_at": looked, "trouble": found, "left": left["n"] if left else 0}
+
+
 def ROUTES():
     return {
         ("GET", "/api/versions/have"): have,
+        ("POST", "/api/versions/examine"): examine,
         ("GET", "/api/songs/<id>/versions"): list_versions,
         ("POST", "/api/songs/<id>/versions"): upload,
         ("PATCH", "/api/versions/<id>"): patch_version,

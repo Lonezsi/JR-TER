@@ -31,22 +31,35 @@ J.md = function (source) {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
              '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
-  for (let raw of lines) {
+  /* Every block carries the line it came from.
+   *
+   * Clicking into the words has to put the cursor where the click was, and the drawn
+   * text is not the written text: a bullet loses its dash, a heading its hashes, a blank
+   * line becomes a gap with no text in it at all. Counting characters across the drawing
+   * gets it wrong as soon as anything is marked up. The line number is exact, and the
+   * writing side works out the rest. */
+  for (let index = 0; index < lines.length; index++) {
+    const raw = lines[index];
     const line = raw.replace(/\s+$/, "");
+    const at = ` data-l="${index}"`;
 
-    if (!line.trim()) { closeList(); closeQuote(); out.push('<div class="md-gap"></div>'); continue; }
+    if (!line.trim()) {
+      closeList(); closeQuote();
+      out.push(`<div class="md-gap"${at}></div>`);
+      continue;
+    }
 
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       closeList(); closeQuote();
       const level = heading[1].length;
-      out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+      out.push(`<h${level}${at}>${inline(heading[2])}</h${level}>`);
       continue;
     }
 
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
       closeList(); closeQuote();
-      out.push("<hr>");
+      out.push(`<hr${at}>`);
       continue;
     }
 
@@ -54,7 +67,7 @@ J.md = function (source) {
     if (quote) {
       closeList();
       if (!quoting) { out.push("<blockquote>"); quoting = true; }
-      out.push(`<p>${inline(quote[1])}</p>`);
+      out.push(`<p${at}>${inline(quote[1])}</p>`);
       continue;
     }
     closeQuote();
@@ -64,13 +77,13 @@ J.md = function (source) {
     if (bullet || numbered) {
       const want = bullet ? "ul" : "ol";
       if (list !== want) { closeList(); out.push(`<${want}>`); list = want; }
-      out.push(`<li>${inline((bullet || numbered)[1])}</li>`);
+      out.push(`<li${at}>${inline((bullet || numbered)[1])}</li>`);
       continue;
     }
     closeList();
 
     // Every remaining line is its own line. Song words are broken where they are broken.
-    out.push(`<div class="md-line">${inline(line)}</div>`);
+    out.push(`<div class="md-line"${at}>${inline(line)}</div>`);
   }
   closeList();
   closeQuote();
@@ -93,4 +106,18 @@ J.mdBody = function (source) {
   let i = 0;
   while (i < lines.length && !lines[i].trim()) i++;
   return lines.slice(i + 1).join("\n");
+};
+
+/* Where mdBody first character sits in the whole text.
+ *
+ * The reading view shows the title and the body as two things, and the writing view is
+ * one box holding both. Putting the cursor where somebody clicked means adding back
+ * exactly what mdBody dropped off the front. */
+J.mdBodyStart = function (source) {
+  const text = String(source || "");
+  const lines = text.split("\n");
+  let i = 0;
+  while (i < lines.length && !lines[i].trim()) i++;
+  if (i >= lines.length) return text.length;      // nothing but blank lines
+  return lines.slice(0, i + 1).join("\n").length + 1;
 };

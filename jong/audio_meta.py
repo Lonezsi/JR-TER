@@ -5,6 +5,7 @@ it cannot read comes back as a duration of 0, which the web player quietly corre
 first time the file is played, because the browser has already decoded it by then.
 """
 import os
+import math
 import struct
 import wave
 
@@ -44,6 +45,107 @@ def _wav(path):
         duration = frames / float(rate) if rate else 0.0
         bitrate = int(rate * w.getnchannels() * w.getsampwidth() * 8 / 1000)
     return {"duration": round(duration, 3), "bitrate": bitrate, "kind": "wav"}
+
+
+#: How many columns a drawn waveform has.
+#:
+#: Small on purpose. This is a shape behind a row, not an editing surface: at this size
+#: the whole thing is 120 bytes, it costs nothing to send with a list of two hundred
+#: renders, and it still shows the two things worth seeing at a glance, which are whether
+#: there is anything there at all and roughly where the song is loud.
+PEAK_COLUMNS = 120
+
+#: Below this, in dBFS, a file has nothing audible in it.
+#:
+#: Not zero. A bounce of a muted master is not digital silence: it carries dither, a
+#: noise floor, and often a few samples of a fade. Sixty dB down is well below anything
+#: anyone would call a quiet passage and well above the noise in an empty render.
+SILENT_DB = -60.0
+
+
+def peaks(path, ext=None, columns=PEAK_COLUMNS):
+    """A coarse shape of the audio, and whether there is anything in it.
+
+    Returns {"peaks": [0..255] * columns, "peak_db": float, "silent": bool,
+             "unreadable": bool}. Never raises: a file that cannot be read is a fact to
+    record on the row, not an error that fails an upload.
+
+    Only WAV, because that is what a bounce is and the standard library can decode no
+    other. Anything else comes back unreadable=False with no peaks, and the browser fills
+    it in when it decodes the file to play it.
+    """
+    ext = (ext or os.path.splitext(path)[1]).lower()
+    empty = {"peaks": [], "peak_db": None, "silent": False, "unreadable": False}
+    if ext != ".wav":
+        return empty
+    try:
+        return _wav_peaks(path, columns)
+    except Exception:
+        # Truncated, a wav that is not really a wav, a compressed payload in a .wav
+        # wrapper. All of them mean the same thing here: this will not play.
+        return {"peaks": [], "peak_db": None, "silent": False, "unreadable": True}
+
+
+def _wav_peaks(path, columns):
+    with wave.open(path, "rb") as w:
+        frames = w.getnframes()
+        channels = w.getnchannels()
+        width = w.getsampwidth()
+        if not frames or width not in (1, 2, 3, 4):
+            return {"peaks": [], "peak_db": None, "silent": True, "unreadable": not frames}
+
+        per = max(1, frames // columns)
+        full = float(1 << (width * 8 - 1))
+        shape, loudest = [], 0.0
+
+        for column in range(columns):
+            # A file shorter than the column count runs out partway. Past the end is a
+            # flat column, not a repeat of the last frame and not a negative read, which
+            # wave.readframes answers by handing back everything that is left.
+            start = column * per
+            if start >= frames:
+                shape.append(0)
+                continue
+            w.setpos(start)
+            raw = w.readframes(min(per, frames - start))
+            if not raw:
+                shape.append(0)
+                continue
+            highest = _loudest(raw, width, channels)
+            loudest = max(loudest, highest)
+            shape.append(min(255, int((highest / full) * 255)))
+
+    peak_db = 20 * math.log10(loudest / full) if loudest > 0 else None
+    return {
+        "peaks": shape,
+        "peak_db": round(peak_db, 2) if peak_db is not None else None,
+        "silent": peak_db is None or peak_db < SILENT_DB,
+        "unreadable": False,
+    }
+
+
+def _loudest(raw, width, channels):
+    """The largest absolute sample in a block, whatever the sample width.
+
+    Strided rather than exhaustive for the wide formats: a block is tens of thousands of
+    samples and this is drawing a shape a hundred pixels wide, so reading one frame in
+    eight is invisible in the result and several times faster over a gigabyte of audio.
+    """
+    step = max(1, channels * width * 8)
+    biggest = 0
+    if width == 1:
+        # 8 bit wav is unsigned, centred on 128.
+        for i in range(0, len(raw), max(1, channels * 8)):
+            biggest = max(biggest, abs(raw[i] - 128) * 256)
+        return float(biggest)
+    for i in range(0, len(raw) - width + 1, step):
+        chunk = raw[i:i + width]
+        value = int.from_bytes(chunk, "little", signed=True)
+        if value < 0:
+            value = -value
+        if value > biggest:
+            biggest = value
+    return float(biggest)
 
 
 def _skip_id3(f):

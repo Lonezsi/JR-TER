@@ -127,9 +127,10 @@ J.renders = {
             <svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor"/></svg>
           </button>
           <span class="grow truncate">
-            <span class="t truncate">${J.esc(render.name)}</span>
+            <span class="t truncate">${J.esc(render.name)} ${J.trouble(render)}</span>
             <span class="s">${render.duration ? J.time(render.duration) + " · " : ""}${J.bytes(render.size)}</span>
           </span>
+          ${J.waveform(render.shape, { className: "pick-wave" })}
           <span class="pick-go" data-take="${render.id}">Add</span>
         </div>`).join("")}</div>`,
       onMount(sheet, close) {
@@ -263,9 +264,10 @@ J.views.renders = {
     function card(render) {
       const used = !render.waiting;
       return `
-        <div class="render-row ${used ? "used" : ""}" data-id="${render.id}"
+        <div class="render-row ${used ? "used" : ""} ${render.trouble ? "in-trouble" : ""}" data-id="${render.id}"
              ${used ? "" : 'data-act="attach" role="button" tabindex="0"'}
              ${used ? "" : `aria-label="Add ${J.esc(render.name)} to a song"`}>
+          ${J.waveform(render.shape, { className: "render-wave" })}
           <button class="render-art" data-act="makesong"
                   title="Make a song from ${J.esc(render.name)}"
                   aria-label="Make a song from ${J.esc(render.name)}">
@@ -285,6 +287,7 @@ J.views.renders = {
               ${render.origin === "fl" || render.origin === "import"
                 ? ` · ${J.esc(render.ext.replace(".", "").toUpperCase())}` : ""}
               ${used ? ` · went to <b>${J.esc(render.song_title || "a song")}</b>` : ""}
+              ${J.trouble(render)}
             </span>
             ${dates(render)}
           </span>
@@ -505,6 +508,20 @@ J.views.renders = {
     });
 
     J.sort.wire(root, "renders", SORTS, draw);
+
+    /* Anything that arrived before shapes existed has none, and nothing in normal use
+     * would ever give it one. Asked for once when this screen opens, in bounded batches,
+     * so a library of seven hundred fills in over a few visits rather than holding one
+     * request open for a minute. */
+    (async () => {
+      for (let round = 0; round < 4; round++) {
+        const done = await J.post("/api/renders/examine?limit=60", {}).catch(() => null);
+        if (!done || !done.looked_at) break;
+        if (!root.isConnected) break;
+        await load();
+        if (!done.left) break;
+      }
+    })();
 
     await load();
   },

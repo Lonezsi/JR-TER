@@ -33,6 +33,93 @@ J.blockLyrics = async function (block, ctx) {
 
   const sheet = () => sheets[at];
 
+  /* Where the cursor lands when you click into the words.
+   *
+   * Clicking a line of a lyric and having the cursor appear at the end of the whole
+   * sheet is the difference between editing and retyping. The reading view is rendered
+   * markdown, so a click carries a caret position in the *rendered* text, not in the
+   * source. Rather than map between the two, the caret is placed by the character offset
+   * of the click within the rendered body, which for lyrics is close enough to exact:
+   * the markdown a person writes here is lines of words, and the rendered body has the
+   * same lines in the same order.
+   */
+  let landAt = null;
+
+  /* Where in the written text a click on the drawn text landed.
+   *
+   * Two steps, because the drawing and the writing are not the same string. Which block
+   * was clicked gives the line exactly, from the number the renderer put on it. Where in
+   * the line comes from the browser own caret hit test, and is only trusted when the
+   * block drew the line unchanged: a bullet, a heading or anything emphasised has fewer
+   * characters on screen than in the text, and a count taken from the drawing would put
+   * the cursor in the wrong place. Those land at the start of the line they belong to,
+   * which is somewhere a person can see and carry on from.
+   */
+  function offsetOfClick(bodyNode, event) {
+    if (!bodyNode || !event) return null;
+    const source = sheet() ? sheet().text : "";
+    if (!source) return null;
+
+    const point = document.caretPositionFromPoint
+      ? document.caretPositionFromPoint(event.clientX, event.clientY)
+      : (document.caretRangeFromPoint
+          ? document.caretRangeFromPoint(event.clientX, event.clientY) : null);
+    const node = point ? (point.offsetNode || point.startContainer) : null;
+    const into = point ? (point.offset === undefined ? point.startOffset : point.offset) : 0;
+
+    // The block that was clicked, whether the hit test found the text inside it or the
+    // click landed on the block itself, past the end of a short line.
+    let from = node && bodyNode.contains(node) ? node : event.target;
+    if (from && from.nodeType === 3) from = from.parentElement;
+    const holder = from && from.closest ? from.closest("[data-l]") : null;
+    if (!holder || !bodyNode.contains(holder)) return null;
+
+    const line = Number(holder.dataset.l);
+    const body = J.mdBodyStart(source);
+    const lines = source.slice(body).split("\n");
+    if (!Number.isInteger(line) || line < 0 || line >= lines.length) return null;
+
+    let at = body;
+    for (let i = 0; i < line; i++) at += lines[i].length + 1;
+    if (holder.textContent !== lines[line]) return at;   // drawn differently: line start
+
+    // Drawn as written, so the offset the hit test gave is the offset in the line, once
+    // everything drawn before it inside this block is counted.
+    if (!node || !holder.contains(node)) return at;
+    const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+    let before = 0;
+    let seen = null;
+    while ((seen = walker.nextNode())) {
+      if (seen === node) return at + before + into;
+      before += seen.textContent.length;
+    }
+    return at;
+  }
+
+  function focusInto(box) {
+    box.focus();
+    if (landAt === null) {
+      // Nothing was clicked, so the end is the only sensible place: a new set of words
+      // is empty and an existing one is being carried on with.
+      box.setSelectionRange(box.value.length, box.value.length);
+    } else {
+      const at = J.clamp(landAt, 0, box.value.length);
+      box.setSelectionRange(at, at);
+    }
+    landAt = null;
+    // Show the caret rather than the top of a long sheet.
+    const before = box.value.slice(0, box.selectionStart);
+    const line = Math.max(0, before.split(/\r?\n/).length - 6);
+    box.scrollTop = line * parseFloat(getComputedStyle(box).lineHeight || 28);
+  }
+
+  /* The box is as tall as the words, so there is no inner scrollbar and no sense of
+   * writing into a window laid over the page. */
+  function grow(box) {
+    box.style.height = "auto";
+    box.style.height = Math.max(220, box.scrollHeight) + "px";
+  }
+
   function draw() {
     const s = sheet();
     const many = sheets.length > 1;
@@ -109,14 +196,23 @@ J.blockLyrics = async function (block, ctx) {
     if (editing) {
       const s = sheet();
       track.style.transform = "translate3d(0,0,0)";
-      track.innerHTML = `<article class="lyric-card editing">
+      /* No frame around the writing, and no buttons under it.
+       *
+       * The card was one thing to read and a different thing to write in: a bordered
+       * box appeared inside it with Save and Cancel beneath. Writing words is the main
+       * act on this page and it should feel like writing on the page, so the textarea
+       * carries no border, no background of its own and the same type as the reading
+       * view. Clicking away saves. There is no Cancel because there is History, which
+       * keeps every revision and can put any of them back, and a Cancel button that
+       * silently discards is a worse version of that. */
+      track.innerHTML = `<article class="lyric-card on editing">
         <textarea class="card-edit" id="lyricText" spellcheck="true"
-          placeholder="# Name it on the first line&#10;&#10;Then the words.">${J.esc(s.text)}</textarea>
+          placeholder="Name it on the first line&#10;&#10;Then the words."
+          aria-label="The words">${J.esc(s.text)}</textarea>
         <div class="card-foot">
-          <button class="btn primary sm" data-act="save">Save</button>
-          <button class="btn ghost sm" data-act="cancel">Cancel</button>
-          <span class="grow"></span>
           <span class="faint" id="lyricCount"></span>
+          <span class="grow"></span>
+          <span class="faint edit-hint">click away to keep it</span>
         </div>
       </article>`;
       const box = J.$("#lyricText", block);
@@ -126,13 +222,21 @@ J.blockLyrics = async function (block, ctx) {
         count.textContent = `Markdown &middot; ${lines} line${lines === 1 ? "" : "s"}`
           .replace("&middot;", "·");
       };
-      box.addEventListener("input", tally);
+      box.addEventListener("input", () => { tally(); grow(box); });
       box.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
-        if (e.key === "Escape") { e.preventDefault(); editing = false; draw(); }
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); box.blur(); }
+        // Escape leaves the words alone rather than throwing them away: it is the same
+        // as clicking off, and History is where taking something back lives.
+        if (e.key === "Escape") { e.preventDefault(); box.blur(); }
       });
+      /* Clicking away is what saves.
+       *
+       * A blur fires for anything that takes focus, including the History button and the
+       * arrows, so this is the one path out and every way of leaving goes through it. */
+      box.addEventListener("blur", () => { if (editing) save(); });
       tally();
-      box.focus();
+      grow(box);
+      focusInto(box);
       return;
     }
 
@@ -260,13 +364,21 @@ J.blockLyrics = async function (block, ctx) {
     block.addEventListener("pointercancel", release);
   }
 
+  /* Leaving the words is what keeps them.
+   *
+   * Called from the blur, which every way out goes through, so it must be quiet: a toast
+   * on every click away from a lyric would be a toast every few seconds. It says
+   * something only when there was nothing to say, which is when a save failed. */
   async function save() {
     const box = J.$("#lyricText", block);
     if (!box) return;
-    const result = await J.try(() => J.put(`/api/lyrics/${sheet().id}/text`, { text: box.value }));
-    if (!result) return;
-    if (result.saved) J.toast("Saved");
     editing = false;
+    const text = box.value;
+    const unchanged = text === (sheet() ? sheet().text : "");
+    if (!unchanged) {
+      const result = await J.try(() => J.put(`/api/lyrics/${sheet().id}/text`, { text }));
+      if (!result) { editing = true; drawCards(); return; }
+    }
     history = null;
     await load(true);
   }
@@ -293,9 +405,23 @@ J.blockLyrics = async function (block, ctx) {
 
     if (what === "prev") go(at - 1);
     if (what === "next") go(at + 1);
-    if (what === "edit") { viewing = null; editing = true; drawCards(); }
-    if (what === "cancel") { editing = false; draw(); }
-    if (what === "save") await save();
+    if (what === "edit") {
+      viewing = null;
+      // Where in the words the click landed, worked out before the reading view is
+      // replaced by the box, because afterwards there is nothing left to measure.
+      landAt = offsetOfClick(act.closest(".card-body") || act, e);
+      /* A song with no words yet has nothing to edit, so clicking makes one and opens
+       * it in the same gesture. Before, the empty card told you to click and then asked
+       * you to press Write lyrics instead. */
+      if (!sheets.length) {
+        const made = await J.try(() => J.post(`/api/songs/${ctx.songId}/lyrics`, { text: "" }));
+        if (!made) return;
+        await load();
+        at = sheets.length - 1;
+      }
+      editing = true;
+      drawCards();
+    }
     if (what === "back") { viewing = null; draw(); }
 
     if (what === "history") {

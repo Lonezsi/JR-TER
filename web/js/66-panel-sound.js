@@ -65,6 +65,33 @@ J.blockSound = async function (panel, ctx) {
    * nothing else, so shaping one song never changes what another is playing. */
   const pushToPlayer = () => J.player.presetEdited(active.id, active.data);
 
+  /* Touching a control turns it on, and puts what you are shaping where you can hear it.
+   *
+   * Dragging a curve on a bypassed preset, or the limiter's lines while the limiter is
+   * off, used to change numbers and make no sound: the thing you were adjusting was
+   * switched off and nothing said so. Reaching for a control is the clearest statement
+   * there is that you want to hear it, so the reach turns it on.
+   *
+   * The same for the preset itself. If the deck is playing something else, shaping this
+   * one is shaping a thing you are not listening to, so it goes on the deck.
+   */
+  function makeAudible(what) {
+    if (!active) return;
+    let changed = false;
+    if (active.data.bypass) { active.data.bypass = false; changed = true; }
+    if (what === "limiter") {
+      const lim = active.data.limiter || (active.data.limiter = {});
+      if (!lim.on) { lim.on = true; changed = true; }
+    }
+    const slot = liveSlot();
+    const held = slot && J.player.state.slots[slot].preset;
+    if (slot && (!held || held.id !== active.id)) {
+      J.player.set(slot, { preset: active });
+      changed = true;
+    }
+    return changed;
+  }
+
   /* The deck this panel is editing.
    *
    * A and B are not two views of one equaliser, they are two equalisers, and which one
@@ -345,11 +372,13 @@ J.blockSound = async function (panel, ctx) {
       slot: liveSlot,
       onChange: (data) => {
         active.data = data;
+        const woke = makeAudible("eq");
         pushToPlayer();
         save(active);
         const cards = J.$$("#bandList .band-card", panel).length;
         if (cards !== (data.bands || []).length) renderBands();
         else updateBandNumbers();
+        if (woke) syncChrome();
       },
       onSelect: () => { refreshReadout(); updateBandNumbers(); },
       onFrame: refreshReadout,
@@ -375,9 +404,11 @@ J.blockSound = async function (panel, ctx) {
       level: () => { const at = liveSlot(); return at ? J.audio.peakDb(at) : -60; },
       onChange: (data) => {
         active.data = data;
+        const woke = makeAudible("limiter");
         pushToPlayer();
         save(active);
         showLimiterNumbers();
+        if (woke) syncChrome();
       },
     });
     if (open.limiter) limiterView.start();

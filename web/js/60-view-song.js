@@ -48,6 +48,29 @@ J.views.song = {
     };
     J.songCtx = ctx;
 
+    /* Takes that arrived before shapes existed have none. Asked for in bounded batches
+     * when a song opens, and the answers are copied onto the take objects already in
+     * hand rather than rebuilding the page: the only fields that change are the shape,
+     * the peak and the verdict, and the menus that show them are built when opened. */
+    if (has("versions") && versions.some((v) => !v.shape.length && !v.trouble)) {
+      (async () => {
+        for (let round = 0; round < 4; round++) {
+          const done = await J.post("/api/versions/examine?limit=60", {}).catch(() => null);
+          if (!done || !done.looked_at) break;
+          const fresh = await J.get(`/api/songs/${songId}/versions`).catch(() => null);
+          if (!fresh) break;
+          (fresh.versions || []).forEach((got) => {
+            const mine = versions.find((v) => v.id === got.id);
+            if (!mine) return;
+            mine.shape = got.shape;
+            mine.peak_db = got.peak_db;
+            mine.trouble = got.trouble;
+          });
+          if (!done.left) break;
+        }
+      })();
+    }
+
     // The song's artwork is the whole page's ground now, behind the rail and the player
     // too, rather than stopping at the edge of this panel.
     J.pageWash(cover, cover ? undefined : J.hue(song.title));
@@ -410,7 +433,8 @@ function openSlotMenu(anchor, slot, ctx, done) {
       <div class="menu-row ${held.version && held.version.id === v.id ? "on" : ""}"
            data-version="${v.id}" role="button" tabindex="0">
         <span class="tagline">v${v.n}</span>
-        <span class="grow truncate">${J.esc(J.versionSub(v))}</span>
+        <span class="grow truncate">${J.esc(J.versionSub(v))} ${J.trouble(v)}</span>
+        ${J.waveform(v.shape, { className: "pick-wave" })}
         <span class="when">${v.duration ? J.time(v.duration) : ""}</span>
         <button class="row-drop" data-drop="${v.id}" title="Delete this render"
                 aria-label="Delete v${v.n}">

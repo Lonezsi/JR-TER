@@ -372,3 +372,60 @@ def test_a_migration_step_runs_once_and_is_written_down(server):
     # A different module's step of the same name is its own business.
     registry._migrate("other", [("a_step", lambda: ran.append(2))])
     assert ran == [1, 2], "one module's history blocked another's"
+
+
+# ── what is actually in the file ─────────────────────────────────────────────
+
+def test_a_render_carries_a_drawn_shape_and_a_verdict(server, wav):
+    """Whether a bounce has anything in it is the most useful thing to know about a batch
+    of them, and finding out by pressing play on each in turn is how an afternoon goes.
+    Looked at once, when it arrives."""
+    _, arrived = server.upload("/api/renders", wav("real.wav", seconds=1.0, level=0.5))
+    render = arrived["render"]
+
+    assert render["shape"], "no shape was drawn"
+    assert len(render["shape"]) > 50, "the shape is too coarse to show anything"
+    assert max(render["shape"]) > 40, "a tone at half scale drew a flat line"
+    assert render["trouble"] == "", "a real file was flagged: %s" % render["trouble"]
+    assert render["peak_db"] is not None and render["peak_db"] > -20
+
+
+def test_a_silent_render_is_flagged_before_anybody_presses_play(server, wav):
+    """A third of one FL batch bounced to nothing, because the master was muted or the
+    playlist was empty when the project was saved. Every one of them looked exactly like
+    a good render in the list."""
+    _, arrived = server.upload("/api/renders", wav("quiet.wav", seconds=1.0, level=0.0))
+    render = arrived["render"]
+
+    assert render["trouble"] == "silent", \
+        "a silent render was not flagged, peak_db=%s" % render["peak_db"]
+    assert max(render["shape"] or [0]) <= 1, "silence drew something"
+
+
+def test_a_file_that_will_not_play_is_flagged_rather_than_failing_the_upload(server, tmp_path):
+    """A truncated or mislabelled file is a fact to record on the row, not an error that
+    loses the upload."""
+    broken = tmp_path / "broken.wav"
+    broken.write_bytes(b"RIFF\x00\x00\x00\x00WAVEjunk")
+
+    status, arrived = server.upload("/api/renders", str(broken))
+    assert status == 200, "the upload failed instead of recording the problem"
+    assert arrived["render"]["trouble"] == "unreadable"
+
+
+def test_renders_that_predate_the_shape_can_be_looked_at_afterwards(server, wav):
+    """Nothing in normal use would ever give them one, so there is a way to ask."""
+    from jong import db
+
+    _, arrived = server.upload("/api/renders", wav("older.wav", seconds=0.8, level=0.4))
+    render_id = arrived["render"]["id"]
+    db.update("renders", render_id, {"peaks": "", "peak_db": None, "trouble": ""})
+
+    status, done = server.post("/api/renders/examine", {})
+    assert status == 200, done
+    assert done["looked_at"] >= 1
+    assert done["left"] == 0
+
+    _, listing = server.get("/api/renders?all=1")
+    mine = [r for r in listing["renders"] if r["id"] == render_id][0]
+    assert mine["shape"], "it was not looked at after all"
