@@ -19,7 +19,7 @@ album costs a row and saves explaining the difference.
 import os
 import time
 
-from .. import db
+from .. import db, finding, registry
 from ..wire import Error, need
 
 NAME = "playlists"
@@ -332,6 +332,33 @@ def SUMMARY():
     total = db.one("SELECT COUNT(*) AS n FROM playlists")
     own = db.one("SELECT COUNT(*) AS n FROM playlists WHERE album_id IS NULL")
     return {"count": total["n"] if total else 0, "yours": own["n"] if own else 0}
+
+
+def SEARCH(term, limit):
+    """Running orders you made yourself.
+
+    An album is given a playlist with the same title, so searching both tables put the
+    same name under two headings and it read as a bug. The album backed ones are left
+    to the Albums category, but only while that module is loaded: with albums switched
+    off these rows are the only trace of the grouping left, and hiding them would be
+    the search deciding something is not there when it is.
+    """
+    like = finding.pattern(term)
+    sql = "SELECT * FROM playlists WHERE fold(title) LIKE ? ESCAPE '\\'"
+    if registry.has("albums"):
+        sql += " AND album_id IS NULL"
+    rows = db.query(sql, (like,))
+    for row in rows:
+        row["score"] = finding.rank(term, row["title"])
+    rows.sort(key=lambda r: (-r["score"], r["title"].casefold()))
+    hits = rows[:limit]
+    for row in hits:
+        counted = db.one("SELECT COUNT(*) AS n FROM playlist_items WHERE playlist_id = ?",
+                         (row["id"],))
+        row["count"] = counted["n"] if counted else 0
+        row["href"] = "#/playlist/%d" % row["id"]
+    return {"label": "Playlists", "kind": "playlist", "order": 30,
+            "total": len(rows), "hits": hits}
 
 
 def ROUTES():

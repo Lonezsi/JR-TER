@@ -189,6 +189,10 @@ async function boot() {
     console.warn(`[jriter] module ${name} failed to load\n`, detail);
   }
 
+  // No module, no box. A search field that filters nothing is worse than no field.
+  const box = J.$(".search");
+  if (box) box.hidden = !state.modules.includes("search");
+
   await buildRail(state);
 
   // ── shell wiring ─────────────────────────────────────────────────────────
@@ -483,6 +487,13 @@ async function boot() {
   showTerm();
   search.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { search.value = ""; runSearch.now(); search.blur(); }
+    /* Into the answers. Down out of a search box is what a hand tries first, and
+     * without it the results were reachable only by tabbing past everything in the
+     * topbar. The rows take it from here. */
+    if (e.key === "ArrowDown") {
+      const first = J.$("#view .track, #view [data-hit]");
+      if (first) { e.preventDefault(); first.focus(); }
+    }
     if (e.key === "Enter") runSearch.now();
   });
 

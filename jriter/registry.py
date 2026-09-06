@@ -114,6 +114,44 @@ def has(name):
     return name in _loaded
 
 
+def searches(term, limit):
+    """Ask every module what it can find. The second question the registry asks them all.
+
+    There is no list of tables anywhere above a module for the same reason there is no
+    list of routes: a feature that is switched off has to vanish without anything else
+    knowing it existed. A module answers for its own data or does not answer at all.
+
+    Every group comes back, including the empty ones, so the page can say which
+    categories were actually looked in when nothing matched. Saying "nothing in your
+    songs or albums" in a library with lyrics turned off would be a lie.
+    """
+    out = []
+    for name, module in _loaded.items():
+        fn = getattr(module, "SEARCH", None)
+        if not fn:
+            continue
+        try:
+            group = fn(term, limit)
+        except Exception:
+            out.append({"module": name, "label": name.capitalize(), "kind": name,
+                        "order": 100, "hits": [], "total": 0,
+                        "error": "this could not be searched"})
+            continue
+        if not group:
+            continue
+        group.setdefault("module", name)
+        group.setdefault("hits", [])
+        group.setdefault("total", len(group["hits"]))
+        group.setdefault("order", 100)
+        out.append(group)
+    return out
+
+
+def searchable():
+    """Which loaded modules can be searched at all. Asked without searching anything."""
+    return [name for name, module in _loaded.items() if getattr(module, "SEARCH", None)]
+
+
 def summaries():
     """Whatever each module wants to say about itself on the state endpoint."""
     out = {}

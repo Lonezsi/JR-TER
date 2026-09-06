@@ -13,6 +13,20 @@ from . import config
 _local = threading.local()
 
 
+def _fold(value):
+    """Lower case in a way that is not only about English.
+
+    SQLite's LIKE folds case for ASCII and stops there, so "Osz" and "osz" match and the
+    same pair with an accent does not. On a Hungarian library that is not an edge case,
+    it is most of the titles. Python knows the whole table, so the folding is done here
+    and the comparing stays in SQL.
+
+    No deterministic=True: that is only needed for indexed expressions, none of this uses
+    one, and passing it raises on older SQLite for no gain.
+    """
+    return value.casefold() if isinstance(value, str) else value
+
+
 def connect():
     """This thread's connection, opened on first use."""
     conn = getattr(_local, "conn", None)
@@ -26,6 +40,9 @@ def connect():
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA synchronous=NORMAL")
+    # Registered on every connection, because it is used from whichever modules happen to
+    # be switched on and there is no other moment that is true of.
+    conn.create_function("fold", 1, _fold)
     _local.conn = conn
     return conn
 

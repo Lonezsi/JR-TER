@@ -7,7 +7,7 @@ and first on another.
 import os
 import time
 
-from .. import db, blobs, config, registry
+from .. import blobs, config, db, finding, registry
 from ..wire import Error, Response, need, as_int
 from . import songs
 
@@ -216,6 +216,30 @@ def for_song(req):
 def SUMMARY():
     row = db.one("SELECT COUNT(*) AS n FROM albums")
     return {"count": row["n"] if row else 0}
+
+
+def SEARCH(term, limit):
+    """Albums by name, and by whatever was written on the back of them.
+
+    The note is searched because that is where the record is described in the words the
+    person would go looking with. It scores nothing, so a title match is always first.
+    """
+    like = finding.pattern(term)
+    rows = db.query(
+        "SELECT * FROM albums WHERE fold(title) LIKE ? ESCAPE '\\' "
+        "OR fold(notes) LIKE ? ESCAPE '\\'", (like, like))
+    for row in rows:
+        row["score"] = finding.rank(term, row["title"])
+    rows.sort(key=lambda r: (-r["score"], -(r["year"] or 0), r["title"].casefold()))
+    hits = rows[:limit]
+    for row in hits:
+        # Counted only for the handful being shown. Counting every album that matched
+        # would be two queries per row for rows nobody is going to see.
+        row.update(_counts(row["id"]))
+        row["has_cover"] = bool(row["cover_digest"])
+        row["href"] = "#/album/%d" % row["id"]
+    return {"label": "Albums", "kind": "album", "order": 20,
+            "total": len(rows), "hits": hits}
 
 
 def ROUTES():

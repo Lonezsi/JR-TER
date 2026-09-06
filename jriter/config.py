@@ -90,6 +90,11 @@ MODULES = [
     "youtube",
     "renders",
     "playlists",
+    # The one box that finds everything. Off is a library with no search box at all
+    # rather than one that half works: the box is drawn from /api/state like every other
+    # feature. /api/songs?q= is unaffected, so the desktop client still matches
+    # filenames against titles.
+    "search",
     "sync",
     "updater",
     # What changed, and the note that appears once after an update. Off is a library that

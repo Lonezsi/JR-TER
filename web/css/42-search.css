@@ -1,0 +1,48 @@
+/* Search results: the same rows as everywhere else, with a line between the kinds. */
+
+/* The break between two categories is an <hr>, because that is what it is, and a
+   screen reader is then told the same thing the eye is told. Written out because
+   nothing in this stylesheet styles a bare hr: the browser's own is an inset grey
+   ridge with half an em above and below, and it would be the only object on the page
+   that does not belong to this room. */
+.results hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: var(--s6) 0 0;
+}
+/* Even space either side of the line. The default section margin is forty pixels and
+   all of it lands underneath, which reads as the rule belonging to the heading below
+   rather than sitting between the two. */
+.results .section { margin-top: var(--s6); }
+.results .section:first-child { margin-top: var(--s3); }
+
+.hits { display: flex; flex-direction: column; }
+
+/* Borrowed measurements from .rail-album, under its own name: a search result is not
+   a rail album, and a class that lies about what it is on costs the next person ten
+   minutes. */
+.hit {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: 6px var(--s3);
+  border-radius: var(--r-md);
+  color: inherit; text-decoration: none;
+  transition: background var(--fast);
+}
+.hit:hover { background: var(--hover); }
+.hit:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: -2px; }
+.hit .cover { width: 38px; height: 38px; border-radius: var(--r-sm); flex: none; }
+.hit .t { font-weight: 600; font-size: 13.5px; display: block; }
+.hit .s { font-size: 12px; color: var(--text-3); display: block; }
+
+/* The matched line of a lyric. It is the reason the row is here, so it gets the room
+   a line of words needs rather than being clipped to one word past the match. */
+.hit-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The default is black on yellow, which on this page looks like something has gone
+   wrong rather than like an answer. */
+mark {
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+  border-radius: 3px;
+  padding: 0 2px;
+}

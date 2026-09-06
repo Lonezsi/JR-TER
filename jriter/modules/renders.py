@@ -13,7 +13,7 @@ version simply points at the same digest.
 import os
 import time
 
-from .. import db, blobs, config, audio_meta
+from .. import audio_meta, blobs, config, db, finding
 from ..wire import Error, Response, as_int, need
 from . import songs, versions
 
@@ -378,6 +378,34 @@ def SUMMARY():
     total = db.one("SELECT COUNT(*) AS n FROM renders")
     return {"waiting": waiting["n"] if waiting else 0,
             "count": total["n"] if total else 0}
+
+
+def SEARCH(term, limit):
+    """Renders by their filename, and by the folder they came out of.
+
+    Not through _decorate: that reads every song title in the library to attach one per
+    row, and it turns peaks into a hundred and twenty numbers for a waveform that
+    search results do not draw. Both are the wrong price for at most eight rows.
+    """
+    like = finding.pattern(term)
+    rows = db.query(
+        "SELECT r.id, r.filename, r.source_path, r.duration, r.size, r.used_at, "
+        "       r.trouble, r.song_id, s.title AS song_title, r.created_at "
+        "FROM renders r LEFT JOIN songs s ON s.id = r.song_id "
+        "WHERE fold(r.filename) LIKE ? ESCAPE '\\' "
+        "   OR fold(r.source_path) LIKE ? ESCAPE '\\'", (like, like))
+    for row in rows:
+        row["name"] = os.path.splitext(row["filename"])[0] or "render"
+        row["title"] = row["name"]
+        row["waiting"] = not row["used_at"]
+        row["score"] = finding.rank(term, row["name"])
+        row["sub"] = ("went to %s" % row["song_title"]) if row["song_title"] \
+            else "waiting for a song"
+        # There is no screen for one render, so it opens the list it is sitting in.
+        row["href"] = "#/renders"
+    rows.sort(key=lambda r: (-r["score"], -(r["created_at"] or 0)))
+    return {"label": "Renders", "kind": "render", "order": 60,
+            "total": len(rows), "hits": rows[:limit]}
 
 
 def ROUTES():

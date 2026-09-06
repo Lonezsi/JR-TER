@@ -18,7 +18,10 @@ J.router = (function () {
     const query = {};
     new URLSearchParams(queryPart || "").forEach((value, key) => { query[key] = value; });
 
-    if (!parts.length) return { view: "library", params: query };
+    // A query on the root is a search, and the root without one is the library. The
+    // URL stays #/?q= rather than becoming #/search, so every link anybody already has
+    // keeps working and the box, which writes this hash, does not have to change.
+    if (!parts.length) return { view: query.q ? "search" : "library", params: query };
     // Its own screen rather than a tab of the song, because it is the one thing here
     // that leaves the building.
     if (parts[0] === "song" && parts[2] === "youtube") {

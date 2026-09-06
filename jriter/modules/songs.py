@@ -7,7 +7,7 @@ every other feature can be switched off without leaving a hole in this table.
 import time
 import difflib
 
-from .. import db, registry
+from .. import db, finding, registry
 from ..wire import Error, need
 
 NAME = "songs"
@@ -183,6 +183,36 @@ def match(req):
 def SUMMARY():
     row = db.one("SELECT COUNT(*) AS n FROM songs")
     return {"count": row["n"] if row else 0}
+
+
+def SEARCH(term, limit):
+    """Songs by name, including names they no longer have.
+
+    Keeping old titles is the whole point of song_titles, and it is worth nothing if the
+    search cannot see them: the name you go looking for is usually the one you changed.
+    Found that way it ranks below every current title, and the row says which name it
+    was, or it looks like a hit that does not contain the word.
+    """
+    like = finding.pattern(term)
+    rows = db.query(
+        "SELECT s.*, (SELECT t.title FROM song_titles t WHERE t.song_id = s.id "
+        "   AND fold(t.title) LIKE ? ESCAPE '\\' ORDER BY t.id DESC LIMIT 1) AS was "
+        "FROM songs s WHERE fold(s.title) LIKE ? ESCAPE '\\' "
+        "   OR EXISTS (SELECT 1 FROM song_titles t WHERE t.song_id = s.id "
+        "              AND fold(t.title) LIKE ? ESCAPE '\\')",
+        (like, like, like))
+    for row in rows:
+        row["score"] = finding.rank(term, row["title"])
+    # Recently touched breaks a tie, which is what the library sorts by by default: the
+    # song you had open yesterday is the one you are looking for today.
+    rows.sort(key=lambda r: (-r["score"], -(r["updated_at"] or 0)))
+    hits = decorate(rows[:limit])
+    for row in hits:
+        row["href"] = "#/song/%d" % row["id"]
+        if not row["score"] and row.get("was"):
+            row["sub"] = "was called %s" % row["was"]
+    return {"label": "Songs", "kind": "song", "order": 10,
+            "total": len(rows), "hits": hits}
 
 
 def ROUTES():

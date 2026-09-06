@@ -7,7 +7,7 @@ a cover.
 import os
 import time
 
-from .. import db, blobs, config
+from .. import blobs, config, db, finding
 from ..wire import Error, Response, as_int
 from . import songs
 
@@ -113,6 +113,28 @@ def image(req):
 def SUMMARY():
     row = db.one("SELECT COUNT(*) AS n FROM artwork")
     return {"count": row["n"] if row else 0}
+
+
+def SEARCH(term, limit):
+    """Images, by what was written under them.
+
+    A caption is the only text artwork has. Most libraries have none, and then this
+    query finds nothing and the heading never appears, which needs no special case.
+    Last of the categories, because a caption is the weakest hit on this page.
+    """
+    like = finding.pattern(term)
+    rows = db.query(
+        "SELECT a.id, a.song_id, a.caption, a.created_at, s.title AS song_title "
+        "FROM artwork a JOIN songs s ON s.id = a.song_id "
+        "WHERE fold(a.caption) LIKE ? ESCAPE '\\'", (like,))
+    for row in rows:
+        row["score"] = finding.rank(term, row["caption"])
+        row["title"] = row["caption"]
+        row["sub"] = "on %s" % row["song_title"]
+        row["href"] = "#/song/%d" % row["song_id"]
+    rows.sort(key=lambda r: (-r["score"], -(r["created_at"] or 0)))
+    return {"label": "Artwork", "kind": "artwork", "order": 70,
+            "total": len(rows), "hits": rows[:limit]}
 
 
 def ROUTES():

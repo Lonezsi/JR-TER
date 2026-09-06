@@ -243,19 +243,17 @@ const ALBUM_SORTS = [
 
 J.views.library = {
   title: "Library",
-  async render(root, params) {
-    const term = (params.q || "").trim();
+  async render(root) {
+    // Searching has a screen of its own now, so this one is only ever the library.
     const [songData, albumData] = await Promise.all([
-      J.get(`/api/songs${term ? `?q=${encodeURIComponent(term)}` : ""}`),
-      // Not while searching: the template drops the albums section whenever there is a
-      // term, so this was a request per keystroke for something nobody was going to see.
-      J.state.modules.includes("albums") && !term
+      J.get("/api/songs"),
+      J.state.modules.includes("albums")
         ? J.get("/api/albums") : Promise.resolve({ albums: [] }),
     ]);
     const songs = songData.songs || [];
     const albums = albumData.albums || [];
 
-    if (!songs.length && !albums.length && !term) {
+    if (!songs.length && !albums.length) {
       /* The first screen anyone sees, so it says what this is for rather than that it
        * is empty. Three steps, in the order they actually happen, each with the button
        * that does it: nobody reads a paragraph and then goes looking. */
@@ -316,11 +314,10 @@ J.views.library = {
       return;
     }
 
-    const heading = term ? `Results for “${J.esc(term)}”` : "Songs";
     const inOrder = J.sort.apply(songs, "songs", SONG_SORTS);
 
     root.innerHTML = `
-      ${!term && J.state.modules.includes("albums") ? `
+      ${J.state.modules.includes("albums") ? `
         <div class="section">
           <div class="section-head"><h2>Albums</h2><span class="grow"></span>
             ${albums.length ? J.sort.control("albums", ALBUM_SORTS) : ""}
@@ -342,7 +339,7 @@ J.views.library = {
         </div>` : ""}
 
       <div class="section">
-        <div class="section-head"><h2>${heading}</h2><span class="grow"></span>
+        <div class="section-head"><h2>Songs</h2><span class="grow"></span>
           ${J.sort.control("songs", SONG_SORTS)}
           <button class="btn sm ghost" data-new-song>New song</button></div>
         ${songs.length ? `
@@ -350,7 +347,7 @@ J.views.library = {
             <span></span><span>Title</span><span>Latest</span><span>Length</span>
           </div>
           <div class="tracks">${inOrder.map((s) => J.trackRow(s)).join("")}</div>`
-          : `<div class="empty"><h3>No songs match that</h3><p>Try a shorter search.</p></div>`}
+          : ""}
       </div>`;
 
     // The same array the rows were drawn from, so what plays next is the row underneath.

@@ -7,7 +7,7 @@ call, and neither of them needs a multipart encoder.
 import os
 import time
 
-from .. import db, blobs, config, audio_meta, registry
+from .. import audio_meta, blobs, config, db, finding, registry
 from ..wire import Error, Response, as_int
 from . import songs
 
@@ -293,6 +293,36 @@ def examine(req):
             found += 1
     left = db.one("SELECT COUNT(*) AS n FROM versions WHERE peaks = '' AND trouble = ''")
     return {"looked_at": looked, "trouble": found, "left": left["n"] if left else 0}
+
+
+def SEARCH(term, limit):
+    """Takes, by what you called them.
+
+    A label is a thing somebody typed about a bounce, so "which take did I call the
+    loud one" is a real question and the label is the only place the answer lives.
+
+    Columns by name rather than *, because a version row carries peaks: 120 numbers as
+    a string, per row, to draw a waveform that search results do not draw.
+    """
+    like = finding.pattern(term)
+    rows = db.query(
+        "SELECT v.id, v.song_id, v.n, v.label, v.filename, v.duration, v.created_at, "
+        "       s.title AS song_title FROM versions v JOIN songs s ON s.id = v.song_id "
+        "WHERE fold(v.label) LIKE ? ESCAPE '\\' OR fold(v.filename) LIKE ? ESCAPE '\\' "
+        "   OR fold(v.source_path) LIKE ? ESCAPE '\\'", (like, like, like))
+    for row in rows:
+        row["score"] = finding.rank(term, row["label"] or row["filename"])
+        # The label if there is one, otherwise the file it came from. Falling back to
+        # "v1" put the same three characters in the title and in the line under it,
+        # which tells you nothing twice.
+        row["title"] = (row["label"]
+                        or os.path.splitext(row["filename"] or "")[0]
+                        or ("v%d" % row["n"]))
+        row["sub"] = "v%d of %s" % (row["n"], row["song_title"])
+        row["href"] = "#/song/%d" % row["song_id"]
+    rows.sort(key=lambda r: (-r["score"], -(r["created_at"] or 0)))
+    return {"label": "Takes", "kind": "version", "order": 50,
+            "total": len(rows), "hits": rows[:limit]}
 
 
 def ROUTES():
