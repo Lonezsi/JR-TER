@@ -809,3 +809,31 @@ def test_the_dust_is_only_there_when_no_artwork_is():
     wash = wash[:wash.index("\n};")]
     assert "if (url) J.dust.stop(); else J.dust.start(hue);" in wash, \
         "pageWash no longer turns the dust off when a song has artwork"
+
+
+def test_the_dust_only_draws_where_there_is_glass():
+    """It is not something on the page, it is something the glass finds behind it.
+
+    Drawn across the whole viewport it also showed through the main panel, which is solid
+    on the library screens and translucent on a song page, so the same effect was subtle
+    in one place and a field of specks over the words in another.
+    """
+    text = pathlib.Path(JS_DIR, "18-dust.js").read_text(encoding="utf-8")
+    assert 'const GLASS = ".rail, .topbar, .player"' in text
+    draw = text[text.index("function draw(dt)"):]
+    draw = draw[:draw.index("\n  }")]
+    assert "clipToGlass()" in draw and "ctx2d.clip()" in draw, \
+        "draw() no longer clips the specks to the glass"
+    # And nothing is drawn when there is none, rather than everything being drawn.
+    assert "if (!clipToGlass()) { ctx2d.restore(); return; }" in draw
+
+
+def test_the_dust_is_white():
+    """It was the accent, and through glass that already carries the accent everywhere
+    that read as a green cast on the rail rather than as specks."""
+    text = pathlib.Path(JS_DIR, "18-dust.js").read_text(encoding="utf-8")
+    tint = text[text.index("function tint()"):]
+    tint = tint[:tint.index("\n  }")]
+    assert "rgba(255, 255, 255" in tint
+    assert "--accent" not in tint and "hsla(" not in tint, \
+        "the dust is taking a colour from somewhere again"

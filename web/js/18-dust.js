@@ -61,6 +61,20 @@ J.dust = (function () {
   let specks = [];
   let hueNow = null;
 
+  /* The surfaces the dust is allowed to show in.
+   *
+   * Everything named here is backdrop filtered, and that is the whole point: the dust is
+   * not something on the page, it is something the glass finds behind it. Drawn across
+   * the whole viewport it also showed through the main panel, which is solid on the
+   * library screens but translucent on a song page, so the same effect was subtle in one
+   * place and a field of specks over the words in another.
+   *
+   * Clipped in the canvas rather than with a CSS mask, because clip-path takes one shape
+   * and these are three, and because a canvas clip costs one path per drawn frame at
+   * twelve frames a second. */
+  const GLASS = ".rail, .topbar, .player";
+  const corners = new WeakMap();
+
   /* Whether the PAGE wants dust, which is not the same as whether the loop is running.
    *
    * These were one thing, and taking the dial to nought tore the canvas down and left
@@ -91,24 +105,15 @@ J.dust = (function () {
     return c;
   }
 
-  /* The colour is the accent, because the accent is a setting and a hard coded green
-   * stops being the accent the moment somebody changes it. When a song without artwork is
-   * open, a third of the specks take that song's hue instead, which is the same number
-   * .page-wash.flat builds its two gradients from, so the dust belongs to the room rather
-   * than sitting on top of it. Lighter and less saturated than the wash's own 45 and 30,
-   * or a speck the same colour as the thing it is over is not a speck.
+  /* White.
    *
-   * Read once, here. The other canvases in this project ask getComputedStyle for the
-   * accent inside the frame, which is a style read twelve times a second for a value that
-   * only changes when somebody presses a colour picker. */
+   * It was the accent, with a third of the specks taking the song's own hue, on the
+   * grounds that the dust should belong to the room. Seen through the glass that read as
+   * a green cast on the rail rather than as specks: the glass already carries the accent
+   * everywhere, so dust in the accent is dust the same colour as what it is lying on.
+   * White is the only thing that is a speck against every hue the wash can be. */
   function tint() {
-    const hex = getComputedStyle(document.documentElement)
-      .getPropertyValue("--accent").trim() || "#54B37A";
-    const { r, g, b } = J.rgb(hex);
-    sprites = [makeSprite((a) => `rgba(${r}, ${g}, ${b}, ${a})`)];
-    if (hueNow !== null) {
-      sprites.push(makeSprite((a) => `hsla(${hueNow}, 50%, 74%, ${a})`));
-    }
+    sprites = [makeSprite((a) => `rgba(255, 255, 255, ${a})`)];
   }
 
   function seed() {
@@ -132,11 +137,14 @@ J.dust = (function () {
               * (0.3 + Math.random() * 0.7),
         // All of them the same way. Dust in a room is air moving, and specks going in
         // every direction reads as noise rather than as a draught.
-        vx: 3 + Math.random() * 6,
-        vy: -(0.5 + Math.random() * 2.5),
+        //
+        // A third of what it was. At nine pixels a second a speck crossed a rail in half
+        // a minute, which is drifting; through glass that magnifies and bends it, it read
+        // as something travelling. Slow enough now that you are never sure it moved.
+        vx: 1 + Math.random() * 2,
+        vy: -(0.2 + Math.random() * 0.8),
         phase: Math.random(),
         period: 9 + Math.random() * 11,       // seconds for one breath, never shared
-        sprite: sprites.length > 1 && Math.random() < 0.34 ? 1 : 0,
       });
     }
   }
@@ -163,8 +171,34 @@ J.dust = (function () {
     // popping into existence at full brightness partway through a drag.
   }
 
+  /* Clip to whatever glass is on screen. Returns false when there is none, which is a
+   * sheet open over everything or a layout with no player yet, and means there is nothing
+   * to draw rather than nothing to clip. */
+  function clipToGlass() {
+    ctx2d.beginPath();
+    let any = false;
+    for (const pane of document.querySelectorAll(GLASS)) {
+      const box = pane.getBoundingClientRect();
+      // A rail parked off screen still has a width, and a collapsed one has none.
+      if (box.width < 1 || box.height < 1) continue;
+      if (box.right < 0 || box.left > width || box.bottom < 0 || box.top > height) continue;
+      let radius = corners.get(pane);
+      if (radius === undefined) {
+        radius = parseFloat(getComputedStyle(pane).borderTopLeftRadius) || 0;
+        corners.set(pane, radius);
+      }
+      any = true;
+      if (ctx2d.roundRect) ctx2d.roundRect(box.left, box.top, box.width, box.height, radius);
+      else ctx2d.rect(box.left, box.top, box.width, box.height);
+    }
+    return any;
+  }
+
   function draw(dt) {
     ctx2d.clearRect(0, 0, width, height);
+    ctx2d.save();
+    if (!clipToGlass()) { ctx2d.restore(); return; }
+    ctx2d.clip();
     for (const p of specks) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -176,12 +210,10 @@ J.dust = (function () {
       const breath = 0.72 + 0.28 * Math.sin(p.phase * Math.PI * 2);
       ctx2d.globalAlpha = p.peak * breath;
       const half = p.size / 2;
-      // sprites can shrink from two back to one when a song's hue goes away, and a speck
-      // still holding the second index would otherwise draw nothing at all.
-      ctx2d.drawImage(sprites[p.sprite] || sprites[0],
-                      p.x - half, p.y - half, p.size, p.size);
+      ctx2d.drawImage(sprites[0], p.x - half, p.y - half, p.size, p.size);
     }
     ctx2d.globalAlpha = 1;
+    ctx2d.restore();
   }
 
   function frame(now) {

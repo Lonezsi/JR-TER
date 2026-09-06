@@ -39,6 +39,8 @@ ENTRIES = [
             "a restart would resume from always said nought.",
             "The dust and the colour fringing on the glass are settings now, nought to a "
             "hundred, and both start stronger.",
+            "The dust is white, drifts a third as fast, and only shows inside the glass. "
+            "A song with artwork behind it still has none at all.",
         ],
     },
     {
