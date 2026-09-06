@@ -29,6 +29,32 @@
   filter: blur(70px);
 }
 
+/* The dust, over the wash rather than inside it.
+
+   The wash carries blur(70px) and scale(1.3), and a one pixel speck through a seventy
+   pixel blur is not a faint speck, it is nothing at all. So this is a sibling sitting
+   directly on top of it: same z-index, later in the markup. 18-dust.js creates it when
+   there is no artwork behind the app and removes it again when there is, so there is no
+   idle full screen layer under the glass the rest of the time.
+
+   No will-change: a canvas that changes every frame gets its own compositor layer
+   without being asked, and adding one buys memory for nothing. */
+.page-dust {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--slow);
+}
+.page-dust.on { opacity: 1; }
+
+/* The loop never starts under this setting. This is the belt to that pair of braces, and
+   it is what catches a canvas already on the page when the setting is turned on. */
+@media (prefers-reduced-motion: reduce) {
+  .page-dust { display: none; }
+}
+
 .shell {
   position: relative;
   z-index: 1;

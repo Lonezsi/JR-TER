@@ -773,3 +773,34 @@ def test_every_drawn_block_says_which_line_it_came_from(tmp_path):
     harness.write_text(HARNESS, encoding="utf-8")
     done = subprocess.run([node, str(harness), JS_DIR], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr.strip() or done.stdout.strip()
+
+
+def test_the_dust_stops_completely():
+    """Every listener the field adds has to come off again.
+
+    This is the failure this project keeps repeating: an interval nobody cleared, a
+    listener that outlived its panel, a watcher inventing songs on a timer. The field
+    runs behind backdrop filtered glass, so one that carries on after a song's artwork
+    opens is not a stray callback, it is the compositor re running a displacement map and
+    a 22px blur over the rail and the player for ever.
+    """
+    text = pathlib.Path(JS_DIR, "18-dust.js").read_text(encoding="utf-8")
+    stop = text[text.index("function stop()"):text.index("function start(")]
+    for gone in ("cancelAnimationFrame",
+                 'removeEventListener("visibilitychange"',
+                 'removeEventListener("change"',
+                 "canvas.remove()"):
+        assert gone in stop, "18-dust.js stop() does not do %s" % gone
+    assert "if (motion.matches) return" in text, \
+        "18-dust.js starts the loop without checking prefers-reduced-motion"
+
+
+def test_the_dust_is_only_there_when_no_artwork_is():
+    """The whole point is that it fills the room a song's picture would have filled.
+    Left running under artwork it is a full screen canvas repainting under the glass for
+    something nobody can see."""
+    text = pathlib.Path(JS_DIR, "00-util.js").read_text(encoding="utf-8")
+    wash = text[text.index("J.pageWash = function"):]
+    wash = wash[:wash.index("\n};")]
+    assert "if (url) J.dust.stop(); else J.dust.start(hue);" in wash, \
+        "pageWash no longer turns the dust off when a song has artwork"

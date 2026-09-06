@@ -374,12 +374,20 @@ J.pageWash = function (url, hue) {
   if (!url && hue === undefined) {
     wash.classList.remove("on", "flat");
     wash.style.backgroundImage = "";
+    // Nothing behind the app at all. The dust is the only thing back there, and on these
+    // screens it shows through the rail and the player, which is the one time those two
+    // panes have anything to refract.
+    J.dust.start(null);
     return;
   }
   wash.classList.toggle("flat", !url);
   if (url) wash.style.backgroundImage = `url('${String(url).replace(/'/g, "%27")}')`;
   else { wash.style.backgroundImage = ""; wash.style.setProperty("--hue", hue); }
   wash.classList.add("on");
+  /* A picture behind the app is the thing the dust was standing in for, so it goes: the
+   * element is removed, not hidden. The hue is handed over as a number because --hue is
+   * an inline property on this element and a sibling cannot inherit it. */
+  if (url) J.dust.stop(); else J.dust.start(hue);
 };
 
 /* The shape of a render, drawn small.

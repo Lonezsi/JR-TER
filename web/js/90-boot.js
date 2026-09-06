@@ -14,6 +14,9 @@ J.applyAccent = function (hex) {
   root.style.setProperty("--accent-lo", J.lighten(hex, -0.18));
   root.style.setProperty("--accent-soft", J.alpha(hex, 0.14));
   root.style.setProperty("--accent-line", J.alpha(hex, 0.4));
+  // The dust is stamped from a prebuilt sprite rather than recoloured every frame, so it
+  // has to be told. Nothing happens unless it is actually drifting.
+  J.dust.retint();
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = getComputedStyle(document.body).backgroundColor || "#0F1311";
 };
