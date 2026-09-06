@@ -233,9 +233,9 @@ J.views.settings = {
           <div class="section-head"><h2>Video</h2></div>
           <p class="faint" style="margin-top:0">
             Turning a mix and its artwork into a video needs ffmpeg, which is a separate
-            program. JR!TER does not carry it and does not install it. Without it the
-            upload page still renders the mix and hands you the file, it just cannot send
-            it.
+            program. JR!TER does not carry one in its repository: it fetches a pinned
+            build the first time you send something, checks it against a digest written
+            into the source, and unpacks the one file it uses.
           </p>
           ${tool.found ? `
             <div class="list-row">
@@ -245,7 +245,12 @@ J.views.settings = {
               </span>
             </div>` : `
             <div class="sheet-fields" style="max-width:520px">
-              <p class="faint">${J.esc(tool.why || "Looking for it.")}</p>
+              <p class="faint">${tool.can_install
+                ? `There is none on this machine yet. Sending a mix will fetch ffmpeg
+                   ${J.esc(tool.install_version || "")} first, about
+                   ${J.bytes(tool.install_size || 0)}, once.`
+                : J.esc(tool.why || "Looking for it.")}</p>
+              <p class="faint">Or point it at one you already have:</p>
               <label class="sheet-label">Where ffmpeg is
                 <input class="field" id="ffmpegPath" autocomplete="off"
                        value="${J.esc(state.settings.ffmpeg_path || "")}"

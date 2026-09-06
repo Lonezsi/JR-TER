@@ -22,6 +22,26 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "2.2.0",
+        "date": "2026-09-06",
+        "name": JRITER,
+        "title": "It fetches ffmpeg itself, and the upload has been run",
+        "notes": [
+            "Sending a mix on a machine with no ffmpeg now fetches one: a pinned build, "
+            "checked against a digest written into the source before anything is "
+            "unpacked or run, on the same bar as the encode and the upload.",
+            "The video step has been run for real. A ten second mix comes out as h264 "
+            "yuv420p at 1280x720 with AAC at the mix's own sample rate.",
+            "The upload has been run end to end against a stand in that speaks YouTube's "
+            "resumable protocol, which found three real faults. Pressing Stop did not "
+            "stop an upload, it let it finish and then published the song. A token that "
+            "died halfway was replaced with the same dead token six times. And the note "
+            "a restart would resume from always said nought.",
+            "The dust and the colour fringing on the glass are settings now, nought to a "
+            "hundred, and both start stronger.",
+        ],
+    },
+    {
         "version": "2.1.0",
         "date": "2026-09-06",
         "name": JRITER,

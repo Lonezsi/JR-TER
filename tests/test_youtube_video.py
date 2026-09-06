@@ -4,9 +4,14 @@ None of this needs ffmpeg on the machine and none of it needs a YouTube account,
 the point: the two pieces most likely to be wrong are the ffmpeg argv and the resumable
 protocol's odd answers, and both can be checked without either.
 
-What is NOT covered here, said plainly so nobody reads a green suite as more than it is:
-no real encode has been run, and no request has ever reached Google. The first real upload
-is the first time the whole path runs end to end.
+Most of it needs neither, which is the point: the argv and the protocol's odd answers
+are the two things most likely to be wrong and both can be checked with nothing installed.
+The two at the foot of the file do need a real ffmpeg and skip without one.
+
+What is NOT covered, said plainly so nobody reads a green suite as more than it is: no
+request has ever reached Google. The encode is real now and the upload is proved against
+a stand in over a real socket in test_youtube_upload.py, but the first time a client id, a
+token and somebody's channel are all involved is still the first time.
 """
 import io
 import urllib.error
@@ -201,3 +206,62 @@ def test_the_session_uri_never_reaches_the_page():
         assert "session" not in shown and "cancel" not in shown
     finally:
         youtube._job = None
+
+
+# ── against a real ffmpeg, when the machine has one ──────────────────────────
+
+def _ffmpeg_or_skip():
+    found = video.find()
+    if not found["found"]:
+        pytest.skip("no ffmpeg on this machine, so the encode cannot be run")
+    return found["path"]
+
+
+def test_a_real_encode_makes_a_file_youtube_takes(tmp_path):
+    """The argv tests above check what is asked for. This checks what comes out.
+
+    Skipped rather than failed where there is no ffmpeg, because that is a fact about the
+    machine and not about this code, and video.fetch exists precisely so the machine that
+    matters can stop being one of those.
+    """
+    import math
+    import struct
+    import subprocess
+    import wave
+
+    tool = _ffmpeg_or_skip()
+    wav = str(tmp_path / "mix.wav")
+    with wave.open(wav, "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(44100)
+        w.writeframes(b"".join(
+            struct.pack("<hh", int(math.sin(i / 30.0) * 9000), int(math.sin(i / 30.0) * 9000))
+            for i in range(44100 * 3)))
+
+    mp4 = str(tmp_path / "video.mp4")
+    ok, tail = video.run(video.video_argv(tool, None, wav, 3.0, mp4), 3.0, lambda f: None)
+    assert ok, "\n".join(tail[-8:])
+
+    said = subprocess.run([tool, "-hide_banner", "-i", mp4],
+                          capture_output=True, text=True).stderr
+    # yuv420p, because a PNG decodes to RGB and libx264 writes yuv444p given the chance,
+    # which YouTube rejects and no phone plays.
+    assert "yuv420p" in said, said
+    assert "h264" in said and "aac" in said, said
+    # The mix's own rate. Resampling on the way out is a change to the sound made behind
+    # the person's back.
+    assert "44100 Hz" in said, said
+    # -t and -shortest, so a looped still cannot run forever.
+    assert "Duration: 00:00:03" in said, said
+
+
+def test_the_fetched_build_can_write_an_mp4():
+    """A build without libx264 passes -version and then fails every encode, which is the
+    one failure why_it_failed has a named message for."""
+    tool = _ffmpeg_or_skip()
+    import subprocess
+    said = subprocess.run([tool, "-hide_banner", "-encoders"],
+                          capture_output=True, text=True).stdout
+    assert "libx264" in said, "this ffmpeg cannot write the video JR!TER asks it for"
+    assert " aac " in said, "this ffmpeg cannot write the audio YouTube wants"

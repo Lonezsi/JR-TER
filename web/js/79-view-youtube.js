@@ -409,10 +409,11 @@ J.views.youtube = {
      * worse answer than a sentence saying why, because a sentence can say what to do
      * about it, and this page spent its first version being a disabled button. */
     function sendingCard() {
-      if (!ffmpeg.found) {
+      if (!ffmpeg.found && !ffmpeg.can_install) {
         return `<section class="yt-card yt-last">
           <h2>Sending it</h2>
-          <p>${J.esc(ffmpeg.why || "JR!TER cannot find ffmpeg on this machine.")}</p>
+          <p>${J.esc(ffmpeg.install_why || ffmpeg.why
+                     || "JR!TER cannot find ffmpeg on this machine.")}</p>
           <p class="faint">Everything above still works. Render it, save the file, and put
             it up by hand in the meantime.</p>
         </section>`;
@@ -479,6 +480,9 @@ J.views.youtube = {
         <p class="faint">JR!TER makes a video out of this mix and the artwork and sends it
           to ${J.esc(where)}. About ${J.bytes(bounced.blob.size)} goes to the server, and
           the video that goes to YouTube is a good deal smaller.</p>
+        ${ffmpeg.found ? "" : `<p class="faint">It has no ffmpeg yet, so the first thing
+          it will do is fetch one: ${J.esc(ffmpeg.install_version || "")}, about
+          ${J.bytes(ffmpeg.install_size || 0)}, once. The bar below covers that too.</p>`}
         <div class="row wrap">
           <button class="btn primary" data-act="send">Send to YouTube</button>
         </div>

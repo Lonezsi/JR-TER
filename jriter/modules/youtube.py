@@ -348,6 +348,24 @@ def _channel_name(access_token):
         return None          # a name is a nicety; not having it is not a failure
 
 
+def _forget_access_token():
+    """Drop the token being held, so the next ask is a real refresh.
+
+    _access_token hands back what it holds while its own clock says it is good, which is
+    right everywhere except here. A 401 mid upload means Google stopped taking that token
+    before its expiry, and asking again without saying so returned the same dead string
+    six times and called it "the upload kept breaking".
+    """
+    held = _all()
+    at, entry = _chosen()
+    if not entry:
+        return
+    entry.pop("access_token", None)
+    entry["expires_at"] = 0
+    held["accounts"][at] = entry
+    _save_account(held)
+
+
 def _access_token():
     """A live token for the chosen account, refreshed if the one held has expired."""
     held = _all()
@@ -408,13 +426,28 @@ def _work_dir():
 _lock = threading.Lock()
 _job = None
 
-STEPS = {"encoding": "making the video", "uploading": "sending it to YouTube"}
+STEPS = {"fetching": "getting ffmpeg",
+         "encoding": "making the video",
+         "uploading": "sending it to YouTube"}
+
+#: The states a job is still in the middle of. Named once, because it was three literal
+#: tuples in three places before there was a third state, and the one that gets forgotten
+#: is always the poll's, which then stops watching a job that is still running.
+RUNNING = ("fetching", "encoding", "uploading")
+
+#: How the one bar is divided when there is an ffmpeg to fetch first.
+#:
+#: The fetch only ever happens on a machine that has never made a video, so the encode
+#: and the upload cannot keep fixed places on the bar: they share what is left of it, in
+#: the proportion they always had. The alternative is a second bar, or a bar that fills
+#: and starts again, and both tell a person the job finished when it has not.
+FETCH_SHARE = 0.30
 
 
 def _new_job(song, version_id, digest):
     global _job
     with _lock:
-        if _job and _job["state"] in ("encoding", "uploading"):
+        if _job and _job["state"] in RUNNING:
             raise Error("JR!TER is already uploading %s. One at a time."
                         % _job["song_title"], 409)
         _job = {
@@ -441,14 +474,22 @@ def _note(**patch):
         return _job["cancel"]
 
 
+#: What the page is allowed to see, by name.
+#:
+#: A list of what to hide was the other way round and got it wrong as soon as a field was
+#: added: the session URI was only off the page because somebody remembered to name it,
+#: and it is a bearer URL, so anything holding it can PUT a video onto the channel.
+SHOWN = ("id", "song_id", "song_title", "version_id", "mix_digest", "state", "step",
+         "at", "sent", "total", "video_id", "url", "privacy_asked", "privacy_got",
+         "error", "fix", "log", "started_at", "finished_at")
+
+
 def _public_job():
-    """What the page is allowed to see. Never the session URI: it is a bearer URL, and
-    anything holding it can PUT a video onto the channel."""
     with _lock:
         if not _job:
             return None
-        out = {k: v for k, v in _job.items() if k not in ("session", "cancel")}
-        out["log"] = out["log"][-20:]
+        out = {k: _job[k] for k in SHOWN if k in _job}
+        out["log"] = out.get("log", [])[-20:]
         return out
 
 
@@ -459,7 +500,7 @@ def job_state(req):
 def cancel_job(req):
     """Stop. Honest about what stopping means once the bytes are moving."""
     with _lock:
-        if not _job or _job["state"] not in ("encoding", "uploading"):
+        if not _job or _job["state"] not in RUNNING:
             raise Error("Nothing is running.", 409)
         _job["cancel"] = True
     return {"job": _public_job()}
@@ -566,6 +607,15 @@ def _google_said(e):
     return "YouTube refused it: %s" % (said.get("message") or raw[:200])
 
 
+class Stopped(Exception):
+    """Asked to stop while the bytes were moving.
+
+    Its own type rather than anything else, because caught as an ordinary Exception it
+    becomes a recorded problem and a job the page paints red, which is a lie about
+    something the person did on purpose.
+    """
+
+
 class _Counting:
     """The file, wrapped so the job can say how far the upload has got.
 
@@ -584,8 +634,13 @@ class _Counting:
 
     def read(self, size=-1):
         chunk = self._handle.read(65536 if size is None or size < 0 else size)
-        if chunk:
-            self._seen(len(chunk))
+        if chunk and self._seen(len(chunk)):
+            # _seen returns whether the job has been asked to stop, the same as every
+            # other _note caller. Raising is the only place it can be noticed: http.client
+            # is inside a loop over this read() and there is nothing of ours on the stack
+            # again until the PUT is over. Before this, stop did not stop an upload, it
+            # let it finish and then wrote the row, so the stop button published the song.
+            raise Stopped()
         return chunk
 
 
@@ -610,6 +665,23 @@ def _begin(token, size, snippet, status):
     return where
 
 
+def _readable(raw):
+    """A finished video resource, or a refusal to guess.
+
+    _put has this guard and _how_far did not, so a session that said it was done with a
+    body this cannot read arrived at _land as resource["id"] and a KeyError, and the
+    person was handed an error reference instead of being told to go and look.
+    """
+    try:
+        video = json.loads((raw or b"").decode("utf-8", "ignore"))
+    except ValueError:
+        video = None
+    if not video or not video.get("id"):
+        raise Error("YouTube says this upload finished and then sent a reply JR!TER "
+                    "could not read. Check your channel before uploading it again.", 502)
+    return video
+
+
 def _how_far(uri, total):
     """Ask the session how much it already has, after something went wrong.
 
@@ -625,10 +697,10 @@ def _how_far(uri, total):
         "Content-Length": "0", "Content-Range": "bytes */%d" % total})
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
-            return {"done": True, "video": json.loads(response.read().decode("utf-8"))}
+            return {"done": True, "video": _readable(response.read())}
     except urllib.error.HTTPError as e:
         if e.code in (200, 201):
-            return {"done": True, "video": json.loads(e.read().decode("utf-8"))}
+            return {"done": True, "video": _readable(e.read())}
         if e.code == 308:
             # urllib's redirect handler covers 301, 302, 303 and 307 and not 308, which is
             # why this arrives here as an error rather than being followed into nowhere.
@@ -690,13 +762,36 @@ def _still_for(song_id, into):
 
 def _work(job, song, want):
     """Make the video and send it. Runs on its own thread; nothing here touches a Request."""
-    tool = video.find()["path"]
     room = os.path.join(_work_dir(), job["id"])
     os.makedirs(room, exist_ok=True)
-    wav = blobs.path_for(job["mix_digest"])
-    mp4 = os.path.join(room, "video.mp4")
-    seconds = audio_meta.probe(wav, ".wav")["duration"]
+    floor, span = 0.0, 1.0
     try:
+        found = video.find()
+        if not found["found"]:
+            # Here rather than in start_upload, for the reason the encode is here: this
+            # takes minutes, and a request handler that takes minutes is a browser that
+            # gives up and a person who has been told nothing. Same job, same lock, same
+            # poll and same bar as everything after it, so there is one thing to watch.
+            _note(state="fetching", step=STEPS["fetching"], at=0.0,
+                  sent=0, total=video.BUILD["size"])
+            got = video.fetch(lambda seen, total: _note(
+                sent=seen, total=total,
+                at=FETCH_SHARE * (seen / float(total or 1))))
+            if not got:
+                return _stopped(room)
+            found = video.find(again=True)
+            if not found["found"]:
+                # Cannot happen without a bug, and saying so beats encoding with a path
+                # that was never checked.
+                return _failed("JR!TER fetched ffmpeg to %s and then could not find it."
+                               % got, "", [], room, keep=True)
+            floor, span = FETCH_SHARE, 1.0 - FETCH_SHARE
+            _note(log=job["log"] + ["fetched " + found["version"]], sent=0, total=0)
+
+        tool = found["path"]
+        wav = blobs.path_for(job["mix_digest"])
+        mp4 = os.path.join(room, "video.mp4")
+        seconds = audio_meta.probe(wav, ".wav")["duration"]
         still = None
         cover = _still_for(song["id"], room)
         if cover:
@@ -711,24 +806,27 @@ def _work(job, song, want):
                 _note(log=job["log"] + ["the artwork could not be read, so the video is a "
                                         "plain colour"] + tail[-4:])
 
-        if _note(step=STEPS["encoding"], at=0.0):
+        if _note(state="encoding", step=STEPS["encoding"], at=floor):
             return _stopped(room)
         ok, tail = video.run(video.video_argv(tool, still, wav, seconds, mp4), seconds,
-                             lambda f: _note(at=f * 0.25))
+                             lambda f: _note(at=floor + span * f * 0.25))
         if not ok:
             fix = video.why_it_failed(tail)
             return _failed("ffmpeg could not make the video.", fix, tail, room, keep=True)
 
         total = os.path.getsize(mp4)
-        _note(state="uploading", step=STEPS["uploading"], at=0.25, total=total)
+        _note(state="uploading", step=STEPS["uploading"], at=floor + span * 0.25,
+              total=total, sent=0)
 
         token = _access_token()
         uri = _begin(token, total, want["snippet"], want["status"])
         _note(session=uri)
         _remember_on_disk(job["id"])
 
-        video_resource = _upload_with_retries(uri, mp4, total, job)
+        video_resource = _upload_with_retries(uri, mp4, total, job, floor, span)
         _land(job, song, video_resource, room)
+    except Stopped:
+        return _stopped(room)
     except Error as e:
         _failed(e.message, "", [], room, keep=True)
     except Exception as e:
@@ -740,7 +838,7 @@ def _work(job, song, want):
                 [], room, keep=True)
 
 
-def _upload_with_retries(uri, mp4, total, job):
+def _upload_with_retries(uri, mp4, total, job, floor=0.0, span=1.0):
     sent = 0
     for attempt, wait in enumerate([0] + list(BACKOFF)):
         if wait:
@@ -749,25 +847,44 @@ def _upload_with_retries(uri, mp4, total, job):
             token = _access_token()
             def seen(n, _box=[sent]):
                 _box[0] += n
-                _note(sent=_box[0], at=0.25 + 0.75 * (_box[0] / float(total)))
+                return _note(
+                    sent=_box[0],
+                    at=floor + span * (0.25 + 0.75 * (_box[0] / float(total))))
             return _put(uri, mp4, sent, total, token, seen)
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 # The token ran out mid upload. The session URI is not tied to it, so this
-                # is the one thing in here that is meant to be invisible: refresh and go on.
-                _access_token()
-                continue
-            if e.code not in (500, 502, 503, 504):
+                # is meant to be invisible: throw away the one being held, because
+                # _access_token trusts its own clock and Google has just said otherwise.
+                #
+                # No continue any more. A 401 can arrive after the session has already
+                # banked part of the file, and re-sending from a `sent` nothing has
+                # checked is a range YouTube rejects. Falling through asks the session,
+                # the same as every other way this loop can break.
+                _forget_access_token()
+            elif e.code not in (500, 502, 503, 504):
                 raise Error(_google_said(e), 502)
         except (urllib.error.URLError, OSError) as e:
             _note(step="the connection dropped, picking it up again")
-        # Something broke. Ask what YouTube actually has before sending anything again.
+        # Something broke. What was sent so far is the one thing a restarted server
+        # cannot work out for itself, and this is the moment it is known and about to be
+        # at risk, so it goes to disk before anything else is attempted. It used to be
+        # written once, right after the session was opened, so the note always said
+        # nought however far the upload had got.
+        _remember_on_disk(job["id"])
+        # Then ask what YouTube actually has, before sending anything again.
         where = _how_far(uri, total)
         if where["done"]:
             return where["video"]
         sent = where["sent"]
-        _note(sent=sent, at=0.25 + 0.75 * (sent / float(total)),
+        _note(sent=sent,
+              at=floor + span * (0.25 + 0.75 * (sent / float(total))),
               step="picking up at %s of %s" % (sent, total))
+        # Written here as well as after _begin, because this is the only moment the number
+        # changes in a way a restarted server could not work out for itself. It was called
+        # once, so the note always said nought however far the upload had got, while the
+        # comment above _lock claimed it was written as it changed.
+        _remember_on_disk(job["id"])
     raise Error("The upload kept breaking and JR!TER has stopped trying. Nothing was "
                 "published. Check the connection and start it again.", 502)
 
@@ -831,7 +948,11 @@ def start_upload(req):
 
     tool = video.find()
     if not tool["found"]:
-        raise Error(tool["why"], 409)
+        # Not a refusal any more if one can be fetched. The job's first step gets it, and
+        # the page watches that on the same bar as the encode and the upload.
+        can, why = video.can_install()
+        if not can:
+            raise Error(why or tool["why"], 409)
     at, _ = _chosen()
     if not at:
         raise Error("No YouTube account is chosen, so there is nowhere to send it.", 409)
@@ -870,9 +991,18 @@ def start_upload(req):
 
 
 def tool_state(req):
-    """Is there an ffmpeg, and where. Read on every load of the upload page, which is why
-    video.find caches."""
-    return dict(video.find(), unaudited=True)
+    """Is there an ffmpeg, where, and if not whether one can be fetched.
+
+    Read on every load of the upload page, which is why video.find caches. can_install is
+    cheap and does not touch the network: it answers from the platform and the pin.
+    """
+    found = video.find()
+    can, why = video.can_install()
+    return dict(found, unaudited=True,
+                can_install=can and not found["found"],
+                install_why=why,
+                install_size=video.BUILD["size"],
+                install_version=video.BUILD["version"])
 
 
 def SUMMARY():
