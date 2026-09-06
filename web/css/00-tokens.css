@@ -65,6 +65,18 @@
   --glass-filter:      url(#glass) blur(22px) saturate(180%) brightness(1.06);
   --glass-filter-thin: url(#glass-thin) blur(14px) saturate(170%) brightness(1.05);
 
+  /* The same glass with the colours coming apart slightly, for the two big panes that
+     have a real edge to them. Experimental, and deliberately one line: three
+     displacements instead of one is three times the work on a surface the compositor
+     already re reads whenever anything moves behind it, and I could not measure that
+     cost in the environment this was built in. If the rail or the player ever feels
+     heavy on a phone, put --glass-filter here and the effect is gone everywhere at once.
+
+     Not on the topbar, which sits over the one list that scrolls, and not on sheets or
+     menus, which are small and short lived. The cost is worth paying where the glass is
+     large and mostly still. */
+  --glass-filter-edge: url(#glass-ca) blur(22px) saturate(180%) brightness(1.06);
+
   /* The lit top edge every real pane has, and the shadow it sits in. */
   --edge-top: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);

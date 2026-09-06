@@ -43,6 +43,59 @@
     <feDisplacementMap in="SourceGraphic" in2="soft" scale="12"
                        xChannelSelector="R" yChannelSelector="G"/>
   </filter>
+  <!-- The same glass, with an edge to it.
+       A thick lens does not bend every colour by the same amount, so a bright edge seen
+       through one comes apart into a warm side and a cool side. That is the whole effect:
+       three refractions of the same backdrop at three strengths, put back together.
+
+       The field is #glass's field exactly, same seed, same blur, so this bends the
+       backdrop the same way and a rail next to a sheet does not visibly disagree. Only
+       the scale differs per channel, and blue is the largest because blue is the
+       wavelength that bends most. That is what makes the fringe warm on one side and
+       cool on the other rather than a symmetric halo.
+
+       The recombination is the part that is easy to get wrong. Adding three displaced
+       copies of a picture together makes it about three times as bright. These three
+       carry disjoint channels, so putting them back is reassembly and not addition:
+       R + 0 + 0 is R, and the luminance comes out exactly where it went in. Screened
+       rather than added because screen equals a sum whenever one side is zero, which is
+       always the case here, and unlike a sum it cannot overflow if that ever stops being
+       true. Checked: with all three scales equal this is pixel identical to #glass.
+
+       An earlier version flattened the turbulence alpha before blurring, on the grounds
+       that a premultiplied blur drags noisy alpha into the colour. It does, but that
+       makes a different and stronger field than #glass's, which pulled samples from
+       further out and visibly darkened the panel. The two filters have to share a field
+       more than they have to be arithmetically tidy. -->
+  <filter id="glass-ca" x="-25%" y="-25%" width="150%" height="150%"
+          color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="2"
+                  seed="17" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="3" result="soft"/>
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="18"
+                       xChannelSelector="R" yChannelSelector="G" result="rShift"/>
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="26"
+                       xChannelSelector="R" yChannelSelector="G" result="gShift"/>
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="34"
+                       xChannelSelector="R" yChannelSelector="G" result="bShift"/>
+    <feColorMatrix in="rShift" type="matrix" result="rOnly"
+      values="1 0 0 0 0
+              0 0 0 0 0
+              0 0 0 0 0
+              0 0 0 0 1"/>
+    <feColorMatrix in="gShift" type="matrix" result="gOnly"
+      values="0 0 0 0 0
+              0 1 0 0 0
+              0 0 0 0 0
+              0 0 0 0 1"/>
+    <feColorMatrix in="bShift" type="matrix" result="bOnly"
+      values="0 0 0 0 0
+              0 0 0 0 0
+              0 0 1 0 0
+              0 0 0 0 1"/>
+    <feBlend in="rOnly" in2="gOnly" mode="screen" result="rg"/>
+    <feBlend in="rg" in2="bOnly" mode="screen"/>
+  </filter>
 </svg>
 
 <div class="nav-bar" id="navBar" hidden><span></span></div>

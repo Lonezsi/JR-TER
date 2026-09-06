@@ -45,8 +45,8 @@
 .rail {
   grid-area: rail;
   background: var(--glass);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter-edge);
+  backdrop-filter: var(--glass-filter-edge);
   border: 1px solid var(--glass-line);
   box-shadow: var(--edge-top), var(--glass-shadow);
   isolation: isolate;

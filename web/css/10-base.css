@@ -196,9 +196,34 @@ button, input, textarea, select { font: inherit; color: inherit; }
    passes underneath, and everywhere else it is a grey box that costs a compositor layer.
 
    Where the filter cannot be had at all, those surfaces fall back to solid. */
-@supports not (backdrop-filter: blur(1px)) {
+/* The probe has to name the thing that is actually depended on.
+   blur(1px) is supported in places url(#glass) is not, and one unsupported function
+   invalidates the whole declaration, so a browser that failed only on the url() got no
+   blur AND no fallback: a five percent white film over the artwork with the text sitting
+   on nothing at all. */
+@supports not (backdrop-filter: url(#glass) blur(1px)) {
   .rail, .topbar, .player, .sheet, .slot-menu { background: var(--surface); }
   /* The card carries text rather than chrome, so it falls back to the panel colour
      it used to be rather than to a nearly invisible film. */
   .lyric-card { background: var(--surface-2); }
+}
+
+/* Somebody who has asked their system for less transparency has asked for exactly this:
+   not a weaker blur, no glass. Turning it off in one place rather than per surface means
+   the refraction, the fringing and the blur all go together and none of them can be left
+   on by a rule somewhere else.
+
+   prefers-reduced-motion is deliberately not here. Nothing in the filter animates: it is
+   a fixed distortion of whatever is behind it, and reduced motion is about animation. */
+@media (prefers-reduced-transparency: reduce) {
+  .rail, .topbar, .player, .sheet, .slot-menu {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .lyric-card {
+    background: var(--surface-2);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
