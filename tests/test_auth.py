@@ -384,3 +384,44 @@ def test_an_upload_token_can_do_everything_the_client_actually_does(secured):
     missing = sorted(w for w in wanted
                      if w not in allowed and not any(w.startswith(a + "/") for a in allowed))
     assert not missing, "the client calls these and an upload token cannot: %s" % missing
+
+
+def test_addresses_that_guessed_wrong_are_forgotten():
+    """The rate limiter kept every address that ever guessed wrong, for the life of the
+    process.
+
+    Two things wrong with that on a library which is on the internet: it grows without
+    limit, and it is a list of who knocked, kept for no reason. An entry outside its
+    window is the same as no entry, because the next failure starts a fresh one, and one
+    whose lockout has passed cannot change any answer this module gives.
+    """
+    import time
+
+    auth._attempts.clear()
+    for n in range(200):
+        auth._note_failure("10.0.0.%d" % n)
+    assert len(auth._attempts) == 200
+
+    # Age them past the window, with no lockout left to serve.
+    for entry in auth._attempts.values():
+        entry["since"] = time.time() - auth.WINDOW - 60
+        entry["until"] = 0
+
+    auth._note_failure("192.168.1.1")
+    assert len(auth._attempts) == 1, "old addresses are still being held"
+    assert "192.168.1.1" in auth._attempts
+
+    auth._attempts.clear()
+
+
+def test_an_address_still_serving_a_lockout_is_kept():
+    """Forgetting one of those would hand a guesser a fresh six tries by waiting."""
+    import time
+
+    auth._attempts.clear()
+    auth._attempts["10.0.0.1"] = {"fails": 0, "since": time.time() - auth.WINDOW - 60,
+                                  "until": time.time() + 600, "level": 3}
+    auth._note_failure("10.0.0.2")
+    assert "10.0.0.1" in auth._attempts, "a locked out address was let go early"
+    assert auth._wait_for("10.0.0.1") > 0
+    auth._attempts.clear()

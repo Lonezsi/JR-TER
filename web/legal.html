@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JR!TER: terms and privacy</title>
+<meta name="theme-color" content="#0F1311">
+<meta name="robots" content="noindex, nofollow">
+<!-- No webfont here, for the same reason the door has none.
+     This page is readable without signing in, so everyone who reaches the address can
+     open it, including people who will never be let in. A page whose whole subject is
+     what leaves your machine must not itself make a request to a third party in order
+     to be read. It uses what the machine already has. -->
+<link rel="stylesheet" href="/jriter.css">
+<style>
+/* Everything here is scoped under .notice, and the container is not called .sheet.
+ *
+ * This page wears /jriter.css, which is the whole application's stylesheet, so a bare
+ * class name here is a name shared with the app. The first version called this container
+ * .sheet, which is the app's modal dialog: it inherited max-height 84dvh and overflow-y
+ * auto, so the notice became an 806 pixel scroll box inside a page that did not scroll,
+ * and most of it could not be reached. Scoping the rest means the next class the app
+ * adds cannot do the same thing again.
+ *
+ * One column, no chrome. A page of prose wants a measure and a scroll, and the app's
+ * frame around it would only make it look like a feature. */
+body { padding: var(--s6) var(--s5) 20vh; }
+.notice { width: min(660px, 100%); margin: 0 auto; }
+.notice h1 {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--display); font-weight: 800; font-size: 30px;
+  letter-spacing: -0.03em; margin: 0 0 var(--s2);
+}
+.notice h1 .rest { flex: none; color: var(--accent); }
+.notice .kicker {
+  margin: 0 0 var(--s7); font-size: 11.5px; letter-spacing: 0.06em; color: var(--text-3);
+}
+.notice h2 {
+  font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em;
+  margin: var(--s7) 0 var(--s3);
+}
+.notice h3 {
+  font-size: 13px; font-weight: 700; color: var(--text-1);
+  margin: var(--s5) 0 var(--s2);
+}
+.notice p, .notice li {
+  color: var(--text-2); font-size: 14px; line-height: 1.75; margin: 0 0 var(--s3);
+}
+.notice ul { margin: 0 0 var(--s3); padding-left: var(--s5); }
+.notice li { margin-bottom: 6px; }
+.notice a { color: var(--accent); }
+.notice strong { color: var(--text-1); font-weight: 650; }
+.notice code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; color: var(--text-1);
+}
+.notice hr { border: 0; border-top: 1px solid var(--line); margin: var(--s7) 0; }
+/* The short version is the only part most people will read, so it is the part that is
+   styled to be read rather than the part that is styled to look official. */
+.notice .short {
+  background: var(--grad-raised); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: var(--s5) var(--s5) var(--s3);
+  box-shadow: var(--edge-top);
+}
+.notice .short h2 { margin-top: 0; }
+.notice .stamp { color: var(--text-3); font-size: 12px; margin-top: var(--s7); }
+.notice .back { display: inline-block; margin-bottom: var(--s6); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="notice">
+
+<a class="back" href="/">Back to the library</a>
+
+<h1><svg class="rest" viewBox="0 0 12 30" width="12" height="29"
+         aria-hidden="true" focusable="false">
+      <path d="M8.5 2 L3.5 9.5 L8.5 15 L3.5 21" fill="none" stroke="currentColor"
+            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3.5 21c3.2.6 4.9 2.4 4.9 4.6 0 1.6-1 2.6-2.4 2.6" fill="none"
+            stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>Terms and privacy</h1>
+<p class="kicker">please post for the world to see</p>
+
+<div class="short">
+  <h2>The short version</h2>
+  <p>
+    JR!TER is software you run yourself, on your own machine. There is no company behind
+    it, no account, no analytics and no server of ours that your library passes through.
+    Nobody but you can see what is in it, because it is on your disk.
+  </p>
+  <p>
+    Nothing here is asking you to agree to anything. You are not being tracked, so there is
+    no banner to dismiss. This page exists so the answers are written down somewhere you
+    can find them, and because the two things you might actually want, a copy of everything
+    and a way to get rid of it, are buttons in Settings rather than a request somebody has
+    to answer.
+  </p>
+  <p>
+    Three things leave your machine, and each only because you asked for it: publishing a
+    song to YouTube, fetching ffmpeg the first time you need it, and two typefaces the
+    library page loads from Google. All three are set out below.
+  </p>
+</div>
+
+<hr>
+
+<h2>Terms</h2>
+
+<h3>The licence</h3>
+<p>
+  JR!TER is released under the MIT licence, copyright 2026 Lonezsi. The full text is in the
+  file named <code>LICENSE</code> beside the source, and it is the licence that governs,
+  not this summary of it.
+</p>
+<p>
+  In plain words: you may use it, read it, change it, run it on as many machines as you
+  like and pass it on, for money or not, so long as the copyright notice and the licence
+  travel with it.
+</p>
+
+<h3>No warranty, said plainly</h3>
+<p>
+  The MIT licence provides the software as is, without warranty of any kind, and the
+  authors are not liable for any claim or damage arising from it. That is not a formality
+  here. This is a personal project that renders audio, deletes rows and uploads video, and
+  it can lose your work. Keep your own copies of anything you would be sorry to lose. The
+  Take a copy button in Settings is partly for that.
+</p>
+
+<h3>What you make with it stays yours</h3>
+<p>
+  Your recordings, lyrics, artwork, titles and notes are yours. Neither this project nor
+  its author receives any right in them, is sent any of them, or has any way to reach them.
+  Publishing is something you do, not something JR!TER does with your material.
+</p>
+
+<h3>What is yours to look after</h3>
+<ul>
+  <li>
+    Who can reach the address. If you put this copy on the public internet, the password is
+    the only thing between a stranger and your library. Choose one that is not guessable,
+    and do not hand the address to anyone you would not hand the library to.
+  </li>
+  <li>
+    What you publish. When you send a song to YouTube you need the rights to everything in
+    it, including any sample, any collaborator's part and the artwork. That is between you,
+    the people you made it with and YouTube.
+  </li>
+  <li>
+    YouTube's own terms apply to anything you send there and to the Google account you
+    connect. JR!TER is not a party to that and cannot vary it.
+  </li>
+</ul>
+
+<h3>Support</h3>
+<p>
+  None is promised. Nobody is obliged to fix a fault, answer a question, or keep any
+  feature working in a later version.
+</p>
+
+<h3>If part of this does not hold where you live</h3>
+<p>
+  Consumer law in your country may give you rights that cannot be signed away, and where it
+  does, those rights win: nothing here is meant to reduce them. If a single term turns out
+  to be unenforceable, the rest still stands.
+</p>
+
+<hr>
+
+<h2>Privacy</h2>
+
+<h3>Who is responsible for the data</h3>
+<p>
+  Whoever runs this copy of JR!TER. If that is you, on your own machine, for your own
+  music, then you are the only person who decides anything about this data and there is
+  nobody to write to about it. The author of the software is not involved: no copy of your
+  library reaches them, and they have no way to obtain one.
+</p>
+<p>
+  Under the GDPR, processing carried out by a person in the course of a purely personal or
+  household activity falls outside the regulation entirely (Article 2(2)(c)). Running your
+  own music library on your own machine is that activity. This notice is written anyway,
+  because the exemption stops applying the moment you give the address to other people and
+  hold their material in it, and because being able to check what a program does beats
+  assuming it.
+</p>
+
+<h3>What it holds</h3>
+<ul>
+  <li>Song titles, every earlier title, notes, and lyrics with their full revision history.</li>
+  <li>Audio: every version and render you add, kept whole.</li>
+  <li>Artwork, albums, playlists, sound presets and arrangements.</li>
+  <li>Records of anything published to YouTube: the video id, the title and the status.</li>
+  <li>Paths of any folders you asked it to watch, and a note of the files it has seen.</li>
+  <li>
+    For the door: a hash of your password and its salt, a secret used to sign your session,
+    and for each machine credential you create its name, its scope and a hash of it. The
+    password itself is never stored.
+  </li>
+  <li>Your settings, including any typeface you uploaded.</li>
+</ul>
+
+<h3>Where it is, and where it is not</h3>
+<p>
+  All of it sits in the data directory of the machine running the server, in a SQLite
+  database and a folder of files. JR!TER does not copy it anywhere else, back it up to
+  anything, or send it to any service. If that machine is backed up by something else, then
+  that something else has your library too.
+</p>
+
+<h3>Logs</h3>
+<p>
+  There is no access log. The server does not record who asked for what, or when, and the
+  line that would have written it was deliberately emptied. Two smaller things are true.
+  Failed sign in attempts are counted per address in memory, which is what lets a short
+  password survive being on the internet, and those counts are gone when the server stops.
+  And if you run it as a background service, whatever the server prints goes to a log file
+  on that machine, which holds startup messages and faults rather than requests.
+</p>
+
+<h3>Cookies</h3>
+<p>
+  One, and only once you sign in: the cookie that keeps you signed in. It holds a signed
+  token and nothing else. No identifier, no profile, nothing that could follow you
+  anywhere. There is no analytics cookie because there is no analytics.
+</p>
+<p>
+  That is why this page has no cookie banner. Consent under the ePrivacy rules is not
+  required for storage strictly necessary to provide the service the user asked for, and a
+  cookie whose entire job is to remember that you signed in is that. Asking you to click a
+  box about it would be theatre.
+</p>
+
+<h3>What reaches a third party</h3>
+<p>Named exactly, with when. Nothing else, ever.</p>
+<ul>
+  <li>
+    <strong>fonts.googleapis.com and fonts.gstatic.com.</strong> The library page requests
+    two typefaces from Google Fonts each time it loads, which means your address and your
+    browser reach Google. This is the only one of the four that happens without you asking
+    for anything. The sign in page deliberately does not do it, so nobody who has not been
+    let in ever makes that request. If you would rather the library did not either, upload
+    your own typeface in Settings.
+  </li>
+  <li>
+    <strong>i.ytimg.com.</strong> A song that has been published shows the video's
+    thumbnail, fetched from YouTube's image server when you open that panel.
+  </li>
+  <li>
+    <strong>oauth2.googleapis.com and www.googleapis.com.</strong> Only when you connect a
+    Google account and publish a song. What is sent is the video, its title and description,
+    the privacy you chose, and the token proving the account is yours. Google then holds
+    that video under its own terms and its own privacy policy.
+  </li>
+  <li>
+    <strong>github.com and api.github.com.</strong> Only when you ask JR!TER to fetch
+    ffmpeg, which it needs to turn a mix into a video. It downloads one pinned build and
+    checks it against a digest written into the source before unpacking it.
+  </li>
+</ul>
+
+<h3>Your data, as two buttons</h3>
+<p>
+  A notice describing how you could in principle request your data is worth less than a
+  button that hands it over, so these are in Settings:
+</p>
+<ul>
+  <li>
+    <strong>Take a copy</strong> gives you a zip holding every row JR!TER keeps, table by
+    table, plus your settings and a note saying where the audio lives, since gigabytes of it
+    through a browser is the wrong shape. Nothing that opens the door is in it. That is
+    access and portability, Articles 15 and 20, in one click.
+  </li>
+  <li>
+    <strong>Erase this library</strong> empties every table, removes every stored file and
+    deletes your settings, after you type the library's name. It tells you first what it
+    will take and how much of it there is, and afterwards it names the three things it
+    cannot reach: your password, left so the door still works; a connected Google account,
+    which is disconnected here but revoked only at Google; and the desktop agent's own copy
+    of its credential on whichever machine runs it. That is erasure, Article 17.
+  </li>
+</ul>
+
+<h3>How long it is kept</h3>
+<p>
+  For as long as you keep it. Nothing expires, nothing is tidied away on a schedule and
+  nothing is deleted behind your back. Deleting a song removes its rows, and its audio goes
+  when nothing else refers to it.
+</p>
+
+<h3>Children</h3>
+<p>
+  This is a tool for making records, not a service for the public, and it is not directed at
+  children.
+</p>
+
+<h3>If this page changes</h3>
+<p>
+  It carries the date below, and any change to it is written into the devlog with the
+  release it went out in, so you can see what changed and when rather than being told that
+  it did.
+</p>
+
+<p class="stamp">
+  This text last changed in JR!TER 2.3.0, on 6 September 2026.
+  <!-- The release this wording went out in, not the version running. What a page like
+       this has to answer is "which text am I reading", and a number fetched from the
+       server answers a different question while quietly going stale in the markup. -->
+</p>
+
+</div>
+
+</body>
+</html>

@@ -57,7 +57,12 @@ GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
 
 # Reachable without signing in: the door itself, the stylesheet it wears, and the calls
 # the door has to make. Everything else needs a session when the auth module is loaded.
-OPEN_PAGES = {"/login", "/jriter.css", "/favicon.ico"}
+#
+# /legal is open on purpose. A page saying what this program does with what you give it is
+# no use behind the thing you have to hand it over to first, and somebody deciding whether
+# to sign up to a library a friend has pointed them at is exactly the person it is for. It
+# says nothing about the library itself: no titles, no counts, not even its name.
+OPEN_PAGES = {"/login", "/legal", "/jriter.css", "/favicon.ico"}
 OPEN_API = {"/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/health",
             # the door wears the same typeface as the library behind it
             "/api/appearance/font"}
@@ -226,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(data, default=str).encode("utf-8")
         self._send(status, body, "application/json", {"Cache-Control": "no-store"})
 
-    def _file(self, path, content_type=None, download_name=None):
+    def _file(self, path, content_type=None, download_name=None, once=False):
         """Serve a file, honouring Range so the player can seek without refetching."""
         try:
             stat = os.stat(path)
@@ -241,10 +246,16 @@ class Handler(BaseHTTPRequestHandler):
         etag = '"%x-%x"' % (int(stat.st_mtime), size)
         if is_document and self._etag_hit(etag):
             return
+        # `once` is a file built for this one reply, which is never the same file twice and
+        # is gone straight afterwards. Holding it would be wrong in both directions: the
+        # export was served immutable for a day, so a second Take a copy after adding a
+        # song handed back the older zip out of the browser's cache without a request ever
+        # reaching the server, and the file the cache entry pointed at no longer existed.
+        keep = ("no-cache" if is_document else "private, max-age=86400, immutable")
         extra = {
             "Accept-Ranges": "bytes",
             "ETag": etag,
-            "Cache-Control": "no-cache" if is_document else "private, max-age=86400, immutable",
+            "Cache-Control": "no-store" if once else keep,
         }
         if download_name:
             extra["Content-Disposition"] = 'attachment; filename="%s"' % download_name
@@ -419,8 +430,19 @@ class Handler(BaseHTTPRequestHandler):
 
         if isinstance(result, Response):
             if getattr(result, "path", None):
-                return self._file(result.path, result.content_type,
-                                  result.headers.pop("download", None))
+                try:
+                    return self._file(result.path, result.content_type,
+                                      result.headers.pop("download", None),
+                                      once=getattr(result, "temporary", False))
+                finally:
+                    # Only when the whole thing went in one reply. A Range request is one
+                    # part of a download that is still happening, and removing the file
+                    # between two of them turns the rest of it into a 404.
+                    if getattr(result, "temporary", False) and not self.headers.get("Range"):
+                        try:
+                            os.remove(result.path)
+                        except OSError:
+                            pass
             if result.stream is not None:
                 self.send_response(result.status)
                 self.send_header("Content-Type", result.content_type)
@@ -459,6 +481,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/login":
             return self._file(os.path.join(config.WEB, "login.html"))
+        if path == "/legal":
+            return self._file(os.path.join(config.WEB, "legal.html"))
         rel = "index.html" if path == "/" else path.lstrip("/")
         full = os.path.normpath(os.path.join(config.WEB, rel))
         if not full.startswith(config.WEB):

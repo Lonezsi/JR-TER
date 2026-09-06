@@ -6,9 +6,14 @@
 <title>JR!TER</title>
 <meta name="theme-color" content="#0F1311">
 <meta name="robots" content="noindex, nofollow">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Manrope:wght@400;500;600;700&display=swap">
+<!-- No webfont on the door, deliberately.
+     This page is in front of the password, so everyone who reaches the address sees it,
+     including people who do not have the password and people who arrived by accident.
+     Asking fonts.googleapis.com for a stylesheet here meant every one of them made a
+     request to a third party carrying their address and their browser, before JR!TER had
+     decided whether to let them in at all, and there is nothing they could do about it.
+     The app behind the door still uses the faces: that is one person, their own copy,
+     after they have signed in. The door uses what the machine already has. -->
 <link rel="stylesheet" href="/jriter.css">
 <style>
 /* The door. It borrows the app's tokens and adds nothing of its own but a layout. */
@@ -52,6 +57,8 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 .note {
   margin: var(--s5) 0 0; font-size: 12.5px; color: var(--text-3); line-height: 1.6;
 }
+.note.legal { margin-top: var(--s3); font-size: 12px; }
+.note.legal a { color: var(--accent); }
 .problem {
   margin: 0 0 var(--s4); padding: 10px var(--s4);
   border-radius: var(--r-md);
@@ -119,6 +126,14 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 
   <p class="note" id="note">
     Guessing is limited to a few tries before this address has to wait.
+  </p>
+
+  <!-- Its own paragraph, outside #note on purpose: decideMode() rewrites that one's
+       textContent for the setup and sign in wordings, and a link inside it would be
+       thrown away the moment the page worked out which door it was. -->
+  <p class="note legal">
+    <a href="/legal">Terms and privacy</a>. Nothing here is tracked, and there is nothing
+    to agree to.
   </p>
 </form>
 

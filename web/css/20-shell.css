@@ -161,6 +161,8 @@
   border-top: 1px solid var(--line);
 }
 .rail-version { font-size: 11px; color: var(--text-3); }
+/* It is a link to the terms now, and a link nothing responds to reads as text. */
+.rail-version:hover { color: var(--text-1); }
 
 .rail-scrim { display: none; }
 

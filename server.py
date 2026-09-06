@@ -74,10 +74,22 @@ def main(argv=None):
         else:
             # Printed rather than chosen here. The first password is the owner's to
             # pick, and this code is what stops a stranger picking it first.
+            #
+            # Only to a terminal somebody is looking at. On the host this process is
+            # started by a scheduled task that redirects everything into
+            # data/host-jriter-out.log, which nothing rotates, so printing the code there
+            # put a working credential into a file inside the directory a backup copies,
+            # and left it there long after it had been spent. It is already written to
+            # setup-code.txt, which is deleted the moment a password is chosen, so there
+            # is somewhere to read it that tidies up after itself.
             code = auth.setup_code()
             print("\n  No password is set on this library yet.")
-            print("  Open %s/login and use this one time setup code:" % where)
-            print("\n      %s\n" % code)
+            print("  Open %s/login and use the one time setup code." % where)
+            if sys.stdout.isatty():
+                print("\n      %s\n" % code)
+            else:
+                print("  It is in %s, which goes when a password is chosen."
+                      % auth.SETUP_PATH)
             print("  It stops working the moment a password is chosen.")
 
     print("\nCtrl-C to stop.")

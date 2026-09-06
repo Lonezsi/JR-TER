@@ -345,6 +345,23 @@ J.views.settings = {
         </div>
 
         <div class="section">
+          <div class="section-head"><h2>Your data</h2></div>
+          <p class="faint" style="margin-top:0">
+            Everything is on this machine and nothing is sent anywhere on its own.
+            <a href="/legal" target="_blank" rel="noopener">Terms and privacy</a> says what
+            leaves it, when, and why.
+          </p>
+          <div class="row wrap">
+            <button class="btn sm" data-act="take-copy">Take a copy</button>
+            <button class="btn danger sm" data-act="erase">Erase this library</button>
+          </div>
+          <p class="faint" style="font-size:12px">
+            The copy is a zip of every row JR!TER keeps, plus your settings and a note
+            saying where the audio is. Nothing that opens the door is in it.
+          </p>
+        </div>
+
+        <div class="section">
           <div class="section-head"><h2>Modules</h2></div>
           <p class="faint" style="margin-top:0">
             Each feature is a module. Removing one from the MODULES list in jriter/config.py
@@ -396,6 +413,62 @@ J.views.settings = {
           J.applyLook(saved);
           J.emit("settings:changed");
         }
+      }
+
+      if (act.dataset.act === "take-copy") {
+        /* A tab rather than fetch and a blob URL.
+         *
+         * The zip is built on a temporary file on the server precisely so a big library
+         * is never held twice in memory, and reading it into the page to make a blob
+         * would undo that on the machine with less of it. The browser streams it to disk
+         * and the Content-Disposition names it. */
+        window.open("/api/export", "_blank");
+        return;
+      }
+
+      if (act.dataset.act === "erase") {
+        const said = await J.try(() => J.get("/api/export/erase"));
+        if (!said) return;
+        const rows = said.goes.map((g) => `
+          <div class="list-row">
+            <span class="grow">
+              <div style="font-family:ui-monospace,monospace;font-size:12px">${J.esc(g.path)}</div>
+              <div class="faint" style="font-size:12px">${J.esc(g.how)}</div>
+            </span>
+            <b>${J.bytes(g.bytes)}</b>
+          </div>`).join("");
+        /* Typed, not ticked. A tick here is the same gesture as every other tick on the
+         * page, and this one cannot be undone. The name has to match exactly. */
+        const values = await J.sheet({
+          title: "Erase this library",
+          sub: "Every song, every take, every lyric. There is no undo and no copy kept.",
+          confirm: "Erase it",
+          cancel: "Keep it",
+          danger: true,
+          wide: true,
+          body: `<div class="sheet-fields">
+            <div>${rows}</div>
+            <p class="faint" style="font-size:12px">
+              Your password is left alone, so the door still works afterwards. A connected
+              Google account is disconnected here but revoked only at Google. Take a copy
+              first if you want one.
+            </p>
+            <!-- The name in the placeholder rather than bolded inside the label.
+                 .sheet-label is a column flex, so any element in the label text becomes
+                 its own row and "Type / JR!TER / to confirm" arrived on three lines. -->
+            <label class="sheet-label">Type the library's name to confirm
+              <input class="field" name="confirm" autocomplete="off" spellcheck="false"
+                     placeholder="${J.esc(said.library)}"></label>
+          </div>`,
+        });
+        if (!values) return;
+        const done = await J.try(() => J.post("/api/export/erase",
+                                              { confirm: (values.confirm || "").trim() }));
+        if (!done) return;
+        // Straight to the library rather than a toast on a Settings page describing a
+        // library that is no longer there.
+        location.href = "/";
+        return;
       }
 
       if (act.dataset.act === "pick-font") { J.$("#fontPick", root).click(); return; }

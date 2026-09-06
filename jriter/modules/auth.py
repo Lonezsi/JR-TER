@@ -342,9 +342,25 @@ def _wait_for(ip):
         return 0
 
 
+def _forget_stale(now):
+    """Drop the addresses that have nothing left to say.
+
+    Called under the lock from the one place that adds an entry. Every distinct address
+    that ever guessed wrong used to stay in this dict for the life of the process, which
+    on an address that is on the internet is both a slow leak and a list of who knocked,
+    kept for no reason: an entry outside its window is the same as no entry at all, since
+    _note_failure starts a fresh one, and an entry whose lockout has passed and whose
+    window has closed cannot change any answer this module gives.
+    """
+    for ip in [ip for ip, e in _attempts.items()
+               if e["until"] < now and now - e["since"] > WINDOW]:
+        _attempts.pop(ip, None)
+
+
 def _note_failure(ip):
     with _lock:
         now = time.time()
+        _forget_stale(now)
         entry = _attempts.get(ip)
         if not entry or now - entry["since"] > WINDOW:
             entry = {"fails": 0, "since": now, "until": 0, "level": 0}

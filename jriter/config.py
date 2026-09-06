@@ -96,6 +96,9 @@ MODULES = [
     # filenames against titles.
     "search",
     "sync",
+    # A copy of the library as text, and getting rid of it. Off is a library with no way
+    # to take one out, which the privacy notice would then be wrong about.
+    "export",
     "updater",
     # What changed, and the note that appears once after an update. Off is a library that
     # still says which version it is and simply never mentions the rest.

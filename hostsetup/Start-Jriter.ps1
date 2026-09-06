@@ -21,7 +21,22 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $Log    = Join-Path $LogDir 'host-jriter.log'
 $Port   = 7900
 
+# Both logs are capped, because both live in the data directory and both were appended
+# to for ever. That directory is the one a backup copies, so an unbounded log is a file
+# that grows without limit inside every copy of the library, and one of them carries
+# whatever the server printed, including tracebacks with machine paths in them. Half a
+# megabyte is a few weeks of a machine nobody is sitting at, and one previous file is
+# kept so a crash is still readable the morning after.
+$LogCap = 512KB
+
+function Roll($path) {
+    if (-not (Test-Path $path)) { return }
+    if ((Get-Item $path).Length -lt $LogCap) { return }
+    Move-Item -Path $path -Destination ($path + '.1') -Force -ErrorAction SilentlyContinue
+}
+
 function Say($text) {
+    Roll $Log
     $line = "{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $text
     Add-Content -Path $Log -Value $line -Encoding utf8
 }
@@ -100,5 +115,8 @@ Say ("starting with {0}" -f $py)
 # pipe took the server with it, and there is nobody sitting at this machine to notice.
 # A redirect has nothing in the middle.
 $out = Join-Path $LogDir 'host-jriter-out.log'
+# Rolled before the server is started rather than while it runs: the redirect below holds
+# the file open for the life of the process, and this is the one moment nothing does.
+Roll $out
 & $py -u (Join-Path $Root 'server.py') *>> $out
 Say ("server exited with {0}" -f $LASTEXITCODE)

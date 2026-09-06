@@ -22,6 +22,31 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "2.3.0",
+        "date": "2026-09-06",
+        "name": JRITER,
+        "title": "Terms, a privacy notice, and your library as a zip",
+        "notes": [
+            "There are terms and a privacy notice now, at /legal, and they are as small "
+            "as they could honestly be: no banner, no box to tick, nothing to agree to. "
+            "The notice names every address this program can reach and says when and why, "
+            "and a test reads those addresses out of the source and fails until the page "
+            "names them, so it cannot go quietly out of date.",
+            "It is readable without signing in. The person it is most for is the one "
+            "deciding whether to hand anything over, and they do not have a password yet.",
+            "Take a copy, in Settings, gives you a zip of every row JR!TER keeps, table by "
+            "table, with your settings and a note saying where the audio is. What is in it "
+            "is a named list rather than everything minus what to hide, because the second "
+            "kind is wrong the day somebody adds a table. Nothing that opens the door is "
+            "in it.",
+            "Erase this library, beside it, empties everything after you type the "
+            "library's name. It says what it will take first and names afterwards the "
+            "three things it cannot reach. The first version deleted the database file, "
+            "which silently does nothing on Windows while another thread holds it open: it "
+            "reported success and erased nothing.",
+        ],
+    },
+    {
         "version": "2.2.0",
         "date": "2026-09-06",
         "name": JRITER,

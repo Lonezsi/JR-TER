@@ -19,7 +19,7 @@ class Response:
     """Anything that is not a plain JSON body: files, streams, redirects, no content."""
 
     def __init__(self, status=200, body=b"", content_type="application/octet-stream",
-                 headers=None, stream=None, length=None, path=None):
+                 headers=None, stream=None, length=None, path=None, temporary=False):
         self.status = status
         self.body = body
         self.content_type = content_type
@@ -29,6 +29,12 @@ class Response:
         # A path is served by the HTTP layer rather than read here, so that seeking in a
         # long render is a byte range rather than a fresh download of the whole file.
         self.path = path
+        # The file was built for this one reply and is nobody's afterwards, so the HTTP
+        # layer removes it once it has been sent. Without this a handler that builds a
+        # file has to choose between holding the whole thing in memory and leaving a copy
+        # in the temporary directory for ever, and the export is the case where that copy
+        # would be the entire library.
+        self.temporary = temporary
 
 
 class Request:
