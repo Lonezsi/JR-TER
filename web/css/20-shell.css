@@ -60,20 +60,18 @@
 }
 .rail-top { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--s2); }
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--display);
   font-weight: 800;
   font-size: 23px;
   letter-spacing: -0.03em;
 }
-.wordmark::after {
-  content: "";
-  display: inline-block;
-  width: 7px; height: 7px;
-  margin-left: 3px;
-  border-radius: 50%;
-  background: var(--accent);
-  vertical-align: 3px;
-}
+/* The accent lives in the rest now. There used to be a green dot after the name here,
+   which was only ever a way of getting the accent into the mark. The name ends in a
+   letter that already has a dot under it, so keeping both reads as a stray character. */
+.wordmark .rest { flex: none; color: var(--accent); }
 /* The rail buttons carry .icon-btn too, and .icon-btn sets display: grid from a later
    file. Two single class rules tie on specificity and file order decides, which is how
    both of these ended up permanently visible on desktop doing nothing. Two classes in the
@@ -241,17 +239,45 @@
   .rail {
     position: fixed; inset: var(--s2) auto var(--s2) var(--s2);
     width: var(--rail-w); z-index: 40;
+    /* One number says where the rail is, and the class below and the finger both write
+       it. The transform used to live only in the rail-shut rule, which is why a drag had
+       nothing to push: there were two positions and no way to be between them. */
+    --rail-x: 0px;
+    transform: translate3d(var(--rail-x), 0, 0);
     transition: transform var(--med);
     box-shadow: var(--shadow-3);
+    /* Sideways on the rail is ours, up and down still belongs to the browser. Without
+       this the browser claims the whole gesture and sends pointercancel partway through,
+       which is the same thing that stopped the swipe working on a phone until .view was
+       given its own. */
+    touch-action: pan-y;
   }
+  /* touch-action does not inherit, and this is the part that actually scrolls. */
+  .rail-section { touch-action: pan-y; }
+
   /* Narrow: shut means parked off screen rather than gone, so it can slide back. */
   .shell.rail-shut .rail {
     display: flex;
-    transform: translateX(calc(-100% - var(--s3)));
+    --rail-x: calc(-100% - var(--s3));
   }
+
   .rail-scrim {
     display: block; position: fixed; inset: 0; z-index: 30;
     background: rgba(0, 0, 0, 0.5);
+    transition: opacity var(--med);
+    /* Nothing behind a scrim should scroll while it is up, and a drag across it is how
+       the rail gets pushed back, so both directions come here. */
+    touch-action: none;
   }
-  .shell.rail-shut .rail-scrim { display: none; }
+  /* Shut is invisible and untouchable rather than absent. It was display: none, and a
+     rail being dragged open had no dim to bring with it: the room stayed bright until
+     the finger let go and then went dark all at once. */
+  .shell.rail-shut .rail-scrim { opacity: 0; pointer-events: none; }
+
+  /* While a finger is on it, the rail and the dim are wherever the finger put them. A
+     transition here is the browser animating towards a position that has already moved
+     again, which reads as lag rather than as a drag. */
+  .shell.rail-dragging .rail,
+  .shell.rail-dragging .rail-scrim { transition: none; }
+  .shell.rail-dragging .rail { will-change: transform; }
 }

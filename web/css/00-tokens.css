@@ -84,9 +84,9 @@
   --grad-accent-hi: var(--accent-hi);
 
   --font:  "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  /* "Jong Display" is whatever font has been uploaded in Settings, registered at runtime.
+  /* "Jriter Display" is whatever font has been uploaded in Settings, registered at runtime.
      Orbitron is the openly licensed stand in until one is. */
-  --display: "Jong Display", "Orbitron", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --display: "Jriter Display", "Orbitron", "Manrope", ui-sans-serif, system-ui, sans-serif;
 
   /* Rounder than before. Glass with tight corners looks like a cut tile. */
   --r-pill: 999px;

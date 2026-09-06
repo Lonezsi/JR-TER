@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""The J-ong desktop agent.
+"""The JR!TER desktop agent.
 
 Watches the folders your renders land in and puts new ones into the library. It reads
 those folders and never writes to them.
 
-    python jong_client.py add "C:\\Users\\you\\Music\\Renders"
-    python jong_client.py scan            what is new, without sending anything
-    python jong_client.py push            send what is new
-    python jong_client.py watch           keep doing that
-    python jong_client.py update          pull a newer J-ong from GitHub
-    python jong_client.py install         run at logon from now on
+    python jriter_client.py add "C:\\Users\\you\\Music\\Renders"
+    python jriter_client.py scan            what is new, without sending anything
+    python jriter_client.py push            send what is new
+    python jriter_client.py watch           keep doing that
+    python jriter_client.py update          pull a newer JR!TER from GitHub
+    python jriter_client.py install         run at logon from now on
 
 On sending only what changed: every file is hashed locally and the server is asked which
 of those hashes it already holds. Anything it has is skipped without a byte leaving the
@@ -23,6 +23,7 @@ import sys
 import json
 import time
 import hashlib
+import shutil
 import argparse
 import subprocess
 import urllib.error
@@ -31,8 +32,12 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-CONFIG_PATH = os.environ.get("JONG_CLIENT_CONFIG") or os.path.join(
-    os.environ.get("APPDATA") or os.path.expanduser("~/.config"), "jong", "client.json")
+_APP = os.environ.get("APPDATA") or os.path.expanduser("~/.config")
+CONFIG_PATH = (os.environ.get("JRITER_CLIENT_CONFIG")
+               or os.environ.get("JONG_CLIENT_CONFIG")
+               or os.path.join(_APP, "jriter", "client.json"))
+#: Where it lived before the rename.
+OLD_CONFIG_PATH = os.path.join(_APP, "jong", "client.json")
 
 AUDIO_EXT = (".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus")
 CHUNK = 1024 * 1024
@@ -43,6 +48,17 @@ DEFAULTS = {"server": "http://127.0.0.1:7900", "folders": [], "interval_minutes"
 # ── config ───────────────────────────────────────────────────────────────────
 def load_config():
     out = dict(DEFAULTS)
+    # The address, the watched folders and the token all live in that one file. Losing
+    # it does not fail, it falls back to localhost with nothing watched and no way in,
+    # which from the outside is an agent that runs every day and never sends anything
+    # again. Copied rather than moved, so an older client on the same machine keeps
+    # working until it is updated too.
+    if not os.path.exists(CONFIG_PATH) and os.path.exists(OLD_CONFIG_PATH):
+        try:
+            os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+            shutil.copyfile(OLD_CONFIG_PATH, CONFIG_PATH)
+        except OSError:
+            pass          # it will fall through to the defaults, which is what it did before
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             out.update(json.load(f))
@@ -75,7 +91,7 @@ class Server:
     def _headers(self, extra=None):
         head = dict(extra or {})
         if self.token:
-            head["X-Jong-Token"] = self.token
+            head["X-Jriter-Token"] = self.token
         return head
 
     def _open(self, request, timeout=120):
@@ -89,11 +105,11 @@ class Server:
                 message = json.loads(detail).get("error", detail)
             except ValueError:
                 message = detail
-            raise SystemExit("J-ong said no (%d): %s" % (e.code, message[:300]))
+            raise SystemExit("JR!TER said no (%d): %s" % (e.code, message[:300]))
         except urllib.error.URLError as e:
-            raise SystemExit("Cannot reach J-ong at %s: %s\n"
+            raise SystemExit("Cannot reach JR!TER at %s: %s\n"
                              "Start it with `python server.py`, or set the address with "
-                             "`jong_client.py server <url>`." % (self.base, e.reason))
+                             "`jriter_client.py server <url>`." % (self.base, e.reason))
 
     def get(self, path):
         return self._open(urllib.request.Request(
@@ -300,9 +316,9 @@ def cmd_push_file(cfg, server, args):
         print("There is no file at %s" % path)
         return 1
     if os.path.splitext(path)[1].lower() not in AUDIO_EXT:
-        print("%s is not audio J-ong handles." % os.path.basename(path))
+        print("%s is not audio JR!TER handles." % os.path.basename(path))
         return 1
-    print("J-ong at %s" % cfg["server"])
+    print("JR!TER at %s" % cfg["server"])
     return 0 if send_one(cfg, server, path, args.yes) else 1
 
 
@@ -319,7 +335,7 @@ def cmd_render(cfg, server, args):
     fl = flrender.find_fl(cfg.get("fl_path"))
     if not fl:
         print("FL Studio was not found. Set it once with:")
-        print(r'    jong_client.py flpath "C:\Program Files\Image-Line\FL Studio 2024\FL64.exe"')
+        print(r'    jriter_client.py flpath "C:\Program Files\Image-Line\FL Studio 2024\FL64.exe"')
         return 1
     print("Using %s" % fl)
     print("FL will open while it renders. It is not a silent process, and on some")
@@ -390,17 +406,17 @@ def cmd_flpath(cfg, server, args):
 
 def cmd_shell(cfg, server, args):
     """The right click menu."""
-    import jong_shell
+    import jriter_shell
     if os.name != "nt":
         print("The right click menu is a Windows thing.")
         return 0
     if args.action == "remove":
-        jong_shell.remove()
+        jriter_shell.remove()
         print("Removed.")
         return 0
-    written = jong_shell.install()
+    written = jriter_shell.install()
     print("Added %d entries under HKEY_CURRENT_USER." % len(written))
-    for parent, label, _ in jong_shell.installed():
+    for parent, label, _ in jriter_shell.installed():
         print("  %-46s %s" % (parent, label))
     return 0
 
@@ -446,7 +462,7 @@ def cmd_login(cfg, server, args):
     import getpass
 
     if not cfg.get("server"):
-        print("Set the address first: jong_client.py server <url>")
+        print("Set the address first: jriter_client.py server <url>")
         return 1
 
     password = args.password or getpass.getpass("Password for %s: " % cfg["server"])
@@ -463,7 +479,7 @@ def cmd_login(cfg, server, args):
         with urllib.request.urlopen(request, timeout=30) as response:
             cookie = response.headers.get("Set-Cookie", "").split(";")[0]
     except urllib.error.HTTPError as e:
-        print("J-ong said no (%d). Wrong password?" % e.code)
+        print("JR!TER said no (%d). Wrong password?" % e.code)
         return 1
     except urllib.error.URLError as e:
         print("Cannot reach %s: %s" % (cfg["server"], e.reason))
@@ -487,7 +503,7 @@ def cmd_login(cfg, server, args):
 
 
 def cmd_update(cfg, server, args):
-    """Pull a newer J-ong. Fast forward only, and never over local edits."""
+    """Pull a newer JR!TER. Fast forward only, and never over local edits."""
     def git(*parts):
         done = subprocess.run(("git",) + parts, cwd=ROOT, capture_output=True, text=True)
         return done.returncode, (done.stdout + done.stderr).strip()
@@ -510,24 +526,24 @@ def cmd_update(cfg, server, args):
     if before == after:
         print("Already up to date.")
     else:
-        print("Updated %s to %s.\nRestart J-ong and this client to run the new code."
+        print("Updated %s to %s.\nRestart JR!TER and this client to run the new code."
               % (before[:7], after[:7]))
     return 0
 
 
 def cmd_install(cfg, server, args):
-    """Make J-ong part of the machine.
+    """Make JR!TER part of the machine.
 
     Three things, none of which needs an administrator:
       the folder watcher runs at logon
       the right click menu appears on audio, on .flp files and on folders
-      a daily task pulls a newer J-ong from GitHub
+      a daily task pulls a newer JR!TER from GitHub
 
     Everything lands under the current user: a per user scheduled task and HKCU registry
     keys. Nothing is written to the machine wide hive, so removing it is complete.
 
     --server and --folder can be passed to set up in one line:
-      python jong_client.py install --server http://127.0.0.1:7900 --folder "~/Renders"
+      python jriter_client.py install --server http://127.0.0.1:7900 --folder "~/Renders"
     """
     # Apply any setup flags before installing.
     if args.server:
@@ -574,17 +590,26 @@ def cmd_install(cfg, server, args):
         print("  %s" % name)
         return True
 
+    # The tasks the old name registered, taken away before the new ones go in.
+    # schtasks /Create /F only replaces a task of the SAME name, so a rename leaves the
+    # previous pair in place: one more watcher at every logon and one more updater at
+    # five in the morning, both running a client script that is not there any more.
+    for old in ("J-ong watch", "J-ong update"):
+        subprocess.run(["schtasks", "/Delete", "/TN", old, "/F"],
+                       capture_output=True, text=True)
+
     print("Scheduled tasks:")
-    task("J-ong watch", "watch", ["/SC", "ONLOGON"])
+    # JRITER, not JR!TER: a task name is an identifier, and cmd treats ! as its own.
+    task("JRITER watch", "watch", ["/SC", "ONLOGON"])
     # Daily rather than at every start: an update that needs a restart should land at a
     # predictable moment, not in the middle of a session.
-    task("J-ong update", "update", ["/SC", "DAILY", "/ST", "05:00"])
+    task("JRITER update", "update", ["/SC", "DAILY", "/ST", "05:00"])
 
     print("Right click menu:")
     try:
-        import jong_shell
-        written = jong_shell.install()
-        for parent, label, _ in jong_shell.installed():
+        import jriter_shell
+        written = jriter_shell.install()
+        for parent, label, _ in jriter_shell.installed():
             print("  %-44s %s" % (parent, label))
         if not written:
             print("  nothing added")
@@ -593,8 +618,8 @@ def cmd_install(cfg, server, args):
 
     print("")
     print("Remove all of it with:")
-    print('  schtasks /Delete /TN "J-ong watch" /F')
-    print('  schtasks /Delete /TN "J-ong update" /F')
+    print('  schtasks /Delete /TN "JRITER watch" /F')
+    print('  schtasks /Delete /TN "JRITER update" /F')
     print("  %s shell remove" % quoted)
     return 0
 
@@ -608,7 +633,7 @@ COMMANDS = {
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="The J-ong desktop agent")
+    parser = argparse.ArgumentParser(description="The JR!TER desktop agent")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("scan", help="report what is new without sending it")
     push = sub.add_parser("push", help="send what is new")
@@ -620,11 +645,11 @@ def main(argv=None):
     login = sub.add_parser("login", help="give this machine a credential for the library")
     login.add_argument("--password", help="asked for if not given")
     login.add_argument("--name", help="what to call this machine in Settings")
-    where = sub.add_parser("server", help="set the J-ong address")
+    where = sub.add_parser("server", help="set the JR!TER address")
     where.add_argument("url")
-    sub.add_parser("update", help="pull a newer J-ong from GitHub")
+    sub.add_parser("update", help="pull a newer JR!TER from GitHub")
     install = sub.add_parser("install", help="run watch at logon, and add the right click menu")
-    install.add_argument("--server", help="set the J-ong server address")
+    install.add_argument("--server", help="set the JR!TER server address")
     install.add_argument("--folder", action="append", help="watch a folder (repeatable)")
     one = sub.add_parser("push-file", help="send one file, used by the right click menu")
     one.add_argument("path")

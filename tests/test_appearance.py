@@ -54,7 +54,7 @@ def test_an_uploaded_font_keeps_the_name_it_arrived_with(server, tmp_path):
 
 
 def test_the_file_on_disk_is_not_named_by_the_uploader(server, tmp_path):
-    from jong import config
+    from jriter import config
     upload(server, a_font(tmp_path), filename="../../../nice try.ttf")
     here = os.path.join(config.DATA, "appearance")
     written = sorted(os.listdir(here))
@@ -90,7 +90,7 @@ def test_something_that_is_not_a_font_format_is_refused(server, tmp_path):
 
 
 def test_only_one_display_font_at_a_time(server, tmp_path):
-    from jong import config
+    from jriter import config
     upload(server, a_font(tmp_path, "First.ttf"))
     status, second = upload(server, a_font(tmp_path, "Second.otf", kind="otf"))
     assert status == 200
@@ -102,7 +102,7 @@ def test_only_one_display_font_at_a_time(server, tmp_path):
 
 
 def test_removing_it_leaves_nothing_behind(server, tmp_path):
-    from jong import config
+    from jriter import config
     upload(server, a_font(tmp_path, "Orena.ttf"))
     status, cleared = server.delete("/api/appearance/font")
     assert status == 200
@@ -123,5 +123,5 @@ def test_the_font_route_is_reachable_without_signing_in(server, tmp_path):
     """The login page uses the same display face as the app. If the font were behind the
     door, the one screen you see before opening it would be the only screen not wearing
     the library's own type."""
-    from jong.http import OPEN_API
+    from jriter.http import OPEN_API
     assert "/api/appearance/font" in OPEN_API

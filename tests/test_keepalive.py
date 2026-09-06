@@ -7,7 +7,7 @@ request arrives, and the server parses them as that request's opening line.
 
 The symptom is horrible to chase. A perfectly good GET comes back 501, the failure lands
 on a request that did nothing wrong, and which request actually caused it depends on
-which connection the browser happened to reuse. It looked like "J-ong is not answering"
+which connection the browser happened to reuse. It looked like "JR!TER is not answering"
 at random.
 
 These go through http.client rather than urllib because urllib opens a fresh connection
@@ -91,7 +91,7 @@ def test_every_verb_leaves_the_connection_usable(server, wav):
 def test_a_body_too_large_to_swallow_closes_the_connection_instead(server, tmp_path):
     """A refused upload should not be read to the end just to be polite. Closing is the
     honest answer, and the browser simply opens another connection."""
-    from jong.http import Body
+    from jriter.http import Body
 
     junk = tmp_path / "notes.txt"
     junk.write_bytes(b"x" * (Body.DRAIN_LIMIT + 1024))
@@ -147,7 +147,7 @@ def test_a_second_server_cannot_take_a_port_that_is_already_served():
     constantly while every individual process was perfectly healthy.
     """
     import socket
-    from jong.http import Server, Handler
+    from jriter.http import Server, Handler
 
     first = Server(("127.0.0.1", 0), Handler)
     port = first.server_address[1]
@@ -182,7 +182,7 @@ def test_a_connection_that_goes_quiet_does_not_hold_its_thread_forever(tmp_path)
     import threading
     from http.server import ThreadingHTTPServer
 
-    from jong.http import Handler
+    from jriter.http import Handler
 
     assert Handler.timeout, "an idle connection must eventually be closed"
     assert Handler.timeout <= 300, "an idle connection held for minutes is the same bug"
@@ -214,6 +214,6 @@ def test_the_backlog_is_deeper_than_the_handful_the_stdlib_allows():
     """Opening the library fires a page, a stylesheet, a script and a dozen calls at
     once, several on new connections. A backlog of five overflows, and what overflows is
     dropped rather than refused, so the caller waits until it gives up."""
-    from jong.http import Server
+    from jriter.http import Server
 
     assert Server.request_queue_size >= 64,         "a backlog of %d is a handful of parallel requests" % Server.request_queue_size

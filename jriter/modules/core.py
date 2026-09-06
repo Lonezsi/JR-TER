@@ -17,6 +17,9 @@ _STARTED = time.time()
 def state(req):
     return {
         "name": config.settings()["library_name"],
+        # Not behind the devlog module. An app that cannot say which version it is is not
+        # something worth making optional, and the rail reads this on every load.
+        "version": __import__("jriter").__version__,
         "modules": registry.enabled(),
         "failed": registry.failures(),
         "summary": registry.summaries(),
@@ -80,7 +83,7 @@ def errors(req):
     """The tracebacks this server has produced since it started.
 
     Behind the door, unlike /api/health, because a traceback names paths on the machine
-    and the shape of the code. Not on disk: see jong/problems.py for why, and for what
+    and the shape of the code. Not on disk: see jriter/problems.py for why, and for what
     that costs.
     """
     return {"errors": problems.recent(int(req.q("limit") or 50)), **problems.count()}

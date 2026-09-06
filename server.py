@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start J-ong.
+"""Start JR!TER.
 
     python server.py              the library at http://127.0.0.1:7900
     python server.py --port 8080  somewhere else
@@ -12,27 +12,52 @@ import argparse
 import threading
 import webbrowser
 
-from jong import config, http, registry, db
+from jriter import config, http, registry, db
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="J-ong, a personal music workspace")
+    parser = argparse.ArgumentParser(description="JR!TER, a personal music workspace")
     parser.add_argument("--host", default=config.HOST)
     parser.add_argument("--port", type=int, default=config.PORT)
     parser.add_argument("--open", action="store_true", help="open a browser once it is up")
     args = parser.parse_args(argv)
+
+    # Before anything opens the database or reads a setting.
+    #
+    # This project used to be called J-ong, and a library made under that name keeps its
+    # data under that name: a database file, and a library name written into
+    # settings.json the first time anything was saved. Both are carried across here.
+    #
+    # It has to be before the bind, not after, even though after would mean only the
+    # process that won the port could touch the library. http.serve loads the modules,
+    # which creates the schema, which makes sqlite build an empty jriter.db: run this
+    # afterwards and it finds a database already at the new name, declines, and the real
+    # one sits beside it for ever holding every song. Two copies starting at once are
+    # safe anyway, because the second one finds the move already done, or fails the move
+    # and refuses to start rather than carrying on with nothing.
+    try:
+        if config.adopt_old_database():
+            print("  moved     the old jong.db to jriter.db")
+    except OSError as e:
+        # Refusing to start beats starting empty. Carrying on means sqlite makes a fresh
+        # library under the new name, the guard inside then keeps this from ever running
+        # again, and the songs sit in a file nothing opens any more.
+        print("JR!TER could not move the old library across: %s" % e)
+        print("  Something still has it open. Stop that and start again.")
+        return 1
+    config.adopt_old_name()
 
     try:
         server = http.serve(args.host, args.port)
     except OSError as e:
         # Almost always a copy that is already running. Saying so beats a stack trace,
         # and beats starting a second server that fights the first for requests.
-        print("J-ong could not take port %d: %s" % (args.port, e))
+        print("JR!TER could not take port %d: %s" % (args.port, e))
         print("Something is already serving it. Stop that first, or use --port.")
         return 1
     where = "http://%s:%d" % (args.host, args.port)
 
-    print("J-ong %s" % __import__("jong").__version__)
+    print("JR!TER %s" % __import__("jriter").__version__)
     print("  library   %s" % where)
     print("  data      %s" % config.DATA)
     print("  modules   %s" % ", ".join(registry.enabled()))
@@ -43,7 +68,7 @@ def main(argv=None):
         print("  FAILED    %s" % name)
         print("            " + detail.strip().splitlines()[-1])
     if registry.has("auth"):
-        from jong.modules import auth
+        from jriter.modules import auth
         if auth.has_password():
             print("  sign in    a password is set")
         else:

@@ -278,7 +278,7 @@ J.views.library = {
                 <span class="step-n">1</span>
                 <span class="step-body">
                   <b>Start a song</b>
-                  <span>Give it a name. You can rename it later and J-ong keeps the old
+                  <span>Give it a name. You can rename it later and JR!TER keeps the old
                         names, the way Steam does.</span>
                   <button class="btn sm primary" data-new-song>New song</button>
                 </span>
@@ -290,7 +290,7 @@ J.views.library = {
                   <span>${waiting
                     ? `${waiting} render${waiting === 1 ? " is" : "s are"} already waiting
                        to be told which song they belong to.`
-                    : "Upload a bounce, or point J-ong at the folder your exports land in "
+                    : "Upload a bounce, or point JR!TER at the folder your exports land in "
                       + "and it will notice them arriving."}</span>
                   ${waiting
                     ? '<a class="btn sm" href="#/renders" data-link>Open Renders</a>'

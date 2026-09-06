@@ -1,4 +1,4 @@
-# Start J-ong on a machine nobody is sitting at, and keep it started.
+# Start JR!TER on a machine nobody is sitting at, and keep it started.
 #
 # Run this on a repeating schedule. It is both the launcher and the watchdog: on a run
 # where the library is already answering it does nothing and exits, and on a run where it
@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $Root   = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $Root 'data'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
-$Log    = Join-Path $LogDir 'host-jong.log'
+$Log    = Join-Path $LogDir 'host-jriter.log'
 $Port   = 7900
 
 function Say($text) {
@@ -58,10 +58,15 @@ function Test-Serving {
     return $false
 }
 
-function Get-JongProcesses {
+function Get-JriterProcesses {
+    # Matched on this checkout's actual path, not on a word in the folder name. It used
+    # to look for '*J-ong*', which meant the watchdog could only recognise a wedged
+    # server while the directory happened to be called that. Rename the folder and the
+    # stale process is never killed, the new one cannot take the port, and the library
+    # stays down until somebody notices, which here is nobody.
+    $server = Join-Path $Root 'server.py'
     Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and $_.CommandLine -like '*server.py*' -and
-                       $_.CommandLine -like '*J-ong*' }
+        Where-Object { $_.CommandLine -and $_.CommandLine -like "*$server*" }
 }
 
 if (Test-Serving) { exit 0 }        # the common case: nothing to do, say nothing
@@ -75,7 +80,7 @@ if (-not $py) {
 # Not answering. If something is nevertheless sitting on the port, it is wedged or it is
 # a half dead copy, and leaving it there means the watchdog can never get the library
 # back: the new process would fail to bind and exit, forever.
-$stale = Get-JongProcesses
+$stale = Get-JriterProcesses
 if ($stale) {
     Say ("not answering but {0} process(es) present; stopping them" -f @($stale).Count)
     foreach ($p in $stale) {
@@ -84,8 +89,8 @@ if ($stale) {
     Start-Sleep -Seconds 3
 }
 
-$env:JONG_HOST = '0.0.0.0'
-$env:JONG_PORT = "$Port"
+$env:JRITER_HOST = '0.0.0.0'
+$env:JRITER_PORT = "$Port"
 
 Say ("starting with {0}" -f $py)
 
@@ -94,6 +99,6 @@ Say ("starting with {0}" -f $py)
 # Piping put a PowerShell process between the server and its log. Anything that upset the
 # pipe took the server with it, and there is nobody sitting at this machine to notice.
 # A redirect has nothing in the middle.
-$out = Join-Path $LogDir 'host-jong-out.log'
+$out = Join-Path $LogDir 'host-jriter-out.log'
 & $py -u (Join-Path $Root 'server.py') *>> $out
 Say ("server exited with {0}" -f $LASTEXITCODE)

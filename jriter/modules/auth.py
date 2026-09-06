@@ -45,7 +45,7 @@ SCHEMA = [
 #: laptop should not be able to. "upload" is every route the client actually calls;
 #: "full" exists for a token you deliberately make for something else.
 SCOPES = {
-    # Every route the client actually calls, checked against client/jong_client.py rather
+    # Every route the client actually calls, checked against client/jriter_client.py rather
     # than assumed: the first version of this list left out /api/versions/have and
     # /api/songs/match, which survey() calls on every pass, so a token carrying agent got
     # a 401 on its first request and the watcher swallowed it.
@@ -64,7 +64,14 @@ SCOPES = {
 
 AUTH_PATH = os.path.join(config.DATA, "auth.json")
 SETUP_PATH = os.path.join(config.DATA, "setup-code.txt")
-COOKIE = "jong_session"
+COOKIE = "jriter_session"
+#: What the cookie was called before the rename. Read, never written.
+#
+# A rename that signs everybody out on the morning they pull it is a rename that looks
+# like a bug. The value format is untouched: it is an HMAC over issued.nonce with the
+# server secret and no name in it, so a cookie issued under the old name verifies
+# perfectly well under the new one.
+LEGACY_COOKIE = "jong_session"
 SESSION_DAYS = 30
 
 # scrypt at these settings takes roughly a tenth of a second, which is nothing once a day
@@ -194,7 +201,7 @@ def check_password(password):
 def setup_code():
     """A code that has to be presented to set the first password.
 
-    Without it, the first stranger to find a freshly deployed J-ong could choose the
+    Without it, the first stranger to find a freshly deployed JR!TER could choose the
     password and lock the owner out. It is written next to the library and printed at
     startup, so it is available to whoever can already reach the machine, and it stops
     existing as soon as a password is set.
@@ -252,6 +259,11 @@ def valid(token):
 #: Tokens are stored the way passwords are: only a digest, so the file being read does
 #: not hand anybody the credential.
 def _token_digest(raw):
+    # The prefix still says jong, and it has to. It is mixed into the stored digest of
+    # every token ever minted, so changing it invalidates all of them at once, and the
+    # agent that stops being allowed in never says so: the watch loop swallows the 401
+    # and goes on pushing nothing, for ever. This string is not a name anybody reads,
+    # it is salt, and it does its one job just as well saying the old name.
     return hashlib.sha256(("jong-token:" + raw).encode("utf-8")).hexdigest()
 
 
@@ -267,13 +279,18 @@ def make_token(name, scope="upload"):
 
 
 def token_allows(headers, method, path):
-    """Does the X-Jong-Token on this request cover this route.
+    """Does the X-Jriter-Token on this request cover this route.
 
     Checked instead of a session, not as well as one, so a token can never be used to
     reach something the person who made it did not intend. An unknown token is simply not
     signed in, with no way to tell it from a wrong one.
     """
-    raw = (headers.get("X-Jong-Token") or "").strip()
+    # The old header is still accepted. An agent updates itself from a daily task, so
+    # an agent that has not run that task yet is the normal state of things for a day
+    # and longer if the laptop was off, and a client shut out this way says nothing:
+    # the watch loop swallows the 401 and goes on pushing nothing.
+    raw = (headers.get("X-Jriter-Token")
+           or headers.get("X-Jong-Token") or "").strip()
     if not raw or not db.table_exists("auth_tokens"):
         return False
     row = db.one("SELECT * FROM auth_tokens WHERE digest = ?", (_token_digest(raw),))
@@ -293,7 +310,7 @@ def signed_in(headers):
     raw = headers.get("Cookie") or ""
     for part in raw.split(";"):
         name, _, value = part.strip().partition("=")
-        if name == COOKIE and valid(value):
+        if name in (COOKIE, LEGACY_COOKIE) and valid(value):
             return True
     return False
 

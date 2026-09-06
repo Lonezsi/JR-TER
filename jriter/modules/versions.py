@@ -65,7 +65,7 @@ def _add_shape_columns():
     db.add_column_if_missing("versions", "trouble", "TEXT NOT NULL DEFAULT ''")
 
 
-#: Named steps, each run once ever and recorded by name. See jong/registry.py.
+#: Named steps, each run once ever and recorded by name. See jriter/registry.py.
 MIGRATE = [
     ("dates_from_the_render", _add_date_columns),
     ("shape_and_trouble", _add_shape_columns),
@@ -138,7 +138,7 @@ def upload(req):
     filename = (req.headers.get("X-Filename") or "render.mp3").strip()
     ext = os.path.splitext(filename)[1].lower()
     if ext not in config.AUDIO_EXT:
-        raise Error("%s is not an audio file J-ong handles" % (ext or filename))
+        raise Error("%s is not an audio file JR!TER handles" % (ext or filename))
 
     digest, size, _ = blobs.put_stream(req.rfile, length)
 

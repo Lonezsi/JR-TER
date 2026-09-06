@@ -3,8 +3,8 @@
 
 Four entries, all written under HKEY_CURRENT_USER:
 
-    an audio file   Upload to J-ong
-    an .flp         Render and send to J-ong
+    an audio file   Upload to JR!TER
+    an .flp         Render and send to JR!TER
     a folder        Render every FL project in here
     a folder        Watch this folder
 
@@ -23,15 +23,42 @@ AUDIO_EXT = (".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus")
 
 # name, where it hangs, the label, and the argument Windows substitutes
 ENTRIES = [
-    ("JongUpload", [r"SystemFileAssociations\%s\shell" % ext for ext in AUDIO_EXT],
-     "Upload to J-ong", "push-file", "%1"),
-    ("JongRenderFlp", [r"SystemFileAssociations\.flp\shell"],
-     "Render and send to J-ong", "render", "%1"),
-    ("JongRenderFolder", [r"Directory\shell", r"Directory\Background\shell"],
+    ("JriterUpload", [r"SystemFileAssociations\%s\shell" % ext for ext in AUDIO_EXT],
+     "Upload to JR!TER", "push-file", "%1"),
+    ("JriterRenderFlp", [r"SystemFileAssociations\.flp\shell"],
+     "Render and send to JR!TER", "render", "%1"),
+    ("JriterRenderFolder", [r"Directory\shell", r"Directory\Background\shell"],
      "Render every FL project in here", "render", "%V"),
-    ("JongWatchFolder", [r"Directory\shell"],
-     "Watch this folder with J-ong", "add", "%V"),
+    ("JriterWatchFolder", [r"Directory\shell"],
+     "Watch this folder with JR!TER", "add", "%V"),
 ]
+
+# What these were called before the rename, and where they hung.
+#
+# remove() walks these too, and install() sweeps them first. Without that a rename would
+# leave up to eleven orphaned entries in the right click menu for ever: still there,
+# still firing, pointing at a client script that no longer exists, and nothing left in
+# the world that knows their names to take them away.
+LEGACY = [
+    ("JongUpload", [r"SystemFileAssociations\%s\shell" % ext for ext in AUDIO_EXT]),
+    ("JongRenderFlp", [r"SystemFileAssociations\.flp\shell"]),
+    ("JongRenderFolder", [r"Directory\shell", r"Directory\Background\shell"]),
+    ("JongWatchFolder", [r"Directory\shell"]),
+]
+
+
+def _drop(winreg, name, parents):
+    """Take one entry away wherever it hangs. Missing is the ordinary case."""
+    gone = []
+    for parent in parents:
+        base = "%s\\%s\\%s" % (KEY_ROOT, parent, name)
+        for path in (base + r"\command", base):
+            try:
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
+            except OSError:
+                pass
+        gone.append(parent)
+    return gone
 
 
 def _winreg():
@@ -51,7 +78,7 @@ def _runner():
     registry entry. A bare python.exe path stops working the day the interpreter moves.
     """
     here = os.path.dirname(os.path.abspath(__file__))
-    client = os.path.join(here, "jong_client.py")
+    client = os.path.join(here, "jriter_client.py")
     launcher = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "py.exe")
     if os.path.isfile(launcher):
         return '"%s" -3 "%s"' % (launcher, client)
@@ -64,6 +91,10 @@ def install(keep_open=True):
     if not winreg:
         return []
     runner = _runner()
+    # Anything the old name left behind goes first, or installing on a machine that had
+    # the previous version leaves both sets in the menu at once.
+    for name, parents in LEGACY:
+        _drop(winreg, name, parents)
     written = []
     for name, parents, label, command, argument in ENTRIES:
         for parent in parents:
@@ -90,6 +121,10 @@ def remove():
     if not winreg:
         return []
     gone = []
+    # The old names first, so "shell remove" means take away everything this tool has
+    # ever written rather than everything it would write today.
+    for name, parents in LEGACY:
+        _drop(winreg, name, parents)
     for name, parents, _, _, _ in ENTRIES:
         for parent in parents:
             base = "%s\\%s\\%s" % (KEY_ROOT, parent, name)
@@ -136,6 +171,6 @@ if __name__ == "__main__":
     else:
         rows = installed()
         if not rows:
-            print("Not installed. Run: python jong_shell.py install")
+            print("Not installed. Run: python jriter_shell.py install")
         for parent, label, command in rows:
             print("  %-46s %s" % (parent, label))

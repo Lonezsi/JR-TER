@@ -1,4 +1,6 @@
-# J-ong
+# JR!TER
+
+*please post for the world to see*
 
 A personal, self-hosted music workspace where the thing you work with is a **song**, not a file.
 
@@ -34,7 +36,7 @@ looking at the library rather than at a console that is about to close. Play one
 list before deciding. Nothing is filed until you file it.
 
 **The exports folder is where the renders are and you do not want to carry them.**
-Point **Folders** at it. J-ong notices new bounces arriving, reads that folder and never
+Point **Folders** at it. JR!TER notices new bounces arriving, reads that folder and never
 writes to it, and imports nothing until you say so.
 
 **The mix sounds right on headphones and wrong in the car.**
@@ -43,7 +45,7 @@ a preset for each place you check mixes, then A and B two equalisers on the same
 Nothing is ever written into the file, so nothing here can damage a mix.
 
 **The words do not fit the section.**
-Open **Arrange**. J-ong listens to the render, works out the tempo and splits it into
+Open **Arrange**. JR!TER listens to the render, works out the tempo and splits it into
 sections, and lays it out as it already is. Drag an edge to take four bars out of the
 intro; double click a section to send the chorus round twice. One track, everything on a
 beat. It is not a DAW and does not want to be: it answers the question "what if that part
@@ -63,7 +65,7 @@ Give them **artwork**. The library is the only place you will ever scan quickly,
 picture is what you scan by.
 
 **The face used for titles is not the one you want.**
-Upload your own in **Settings**. J-ong ships Orbitron because a licensed or shareware font
+Upload your own in **Settings**. JR!TER ships Orbitron because a licensed or shareware font
 cannot live in a public repository; yours stays in your own data directory.
 
 ---
@@ -88,7 +90,7 @@ came out of, until you say which song it is a version of. The same bytes arrivin
 from two places are one entry, and attaching one to a song copies nothing: storage is
 content addressed, so a version is a row pointing at bytes that are already there.
 
-**The compositor.** One track, every edge on a beat. J-ong listens to the render, guesses
+**The compositor.** One track, every edge on a beat. JR!TER listens to the render, guesses
 the tempo, splits it into sections and lays it out as it already is, so switching it on
 changes nothing you can hear and the next edit does. Trim, move, duplicate, remove. While
 it is on, A and B compare two equalisers rather than two takes, because one set of
@@ -107,7 +109,7 @@ All of that is **playback processing**. Your uploaded render is never modified.
 **Albums.** Cover, year, ordered songs. A song can sit on several albums, and its position
 belongs to the album rather than to the song.
 
-**YouTube.** J-ong does not upload for you. It records which render went up, so six
+**YouTube.** JR!TER does not upload for you. It records which render went up, so six
 versions later you still know what is actually online.
 
 ---
@@ -116,10 +118,10 @@ versions later you still know what is actually online.
 
 ```
 cd client
-python jong_client.py install --server http://127.0.0.1:7900 --folder "C:\Users\you\Music\Renders"
-python jong_client.py scan      # what is new, without sending anything
-python jong_client.py push      # send it
-python jong_client.py watch     # keep doing that
+python jriter_client.py install --server http://127.0.0.1:7900 --folder "C:\Users\you\Music\Renders"
+python jriter_client.py scan      # what is new, without sending anything
+python jriter_client.py push      # send it
+python jriter_client.py watch     # keep doing that
 ```
 
 It reads those folders and never writes to them. When it finds something new it asks the
@@ -132,7 +134,7 @@ Every file is hashed locally and the server is asked which of those hashes it al
 holds. Anything it has is skipped without a byte leaving the machine, so a folder of two
 hundred unchanged renders costs one small request.
 
-What J-ong deliberately does **not** do is store binary deltas between renders. Two MP3s
+What JR!TER deliberately does **not** do is store binary deltas between renders. Two MP3s
 of the same song share essentially no bytes, because re-encoding rewrites the whole
 stream, so a delta would save close to nothing while making every read depend on a chain
 of patches. Deduplication by content is the honest version of the same idea, and it is
@@ -145,48 +147,48 @@ whichever song they belong to.
 
 ```
 cd client
-python jong_client.py install --server http://127.0.0.1:7900 --folder "C:\Users\you\Music\Renders"
+python jriter_client.py install --server http://127.0.0.1:7900 --folder "C:\Users\you\Music\Renders"
 ```
 
 That does three things, none of which needs an administrator:
 
 - the folder watcher runs at logon
 - a **right click menu** appears on audio files, on `.flp` projects, and on folders
-- a daily task pulls a newer J-ong from GitHub at 05:00
+- a daily task pulls a newer JR!TER from GitHub at 05:00
 
 You can also run it without the flags if you have already set the server and folders:
 
 ```
 cd client
-python jong_client.py install
+python jriter_client.py install
 ```
 
 The right click entries are:
 
 | where | what it says |
 |---|---|
-| an mp3, wav, flac, m4a, ogg | **Upload to J-ong** |
-| an `.flp` | **Render and send to J-ong** |
+| an mp3, wav, flac, m4a, ogg | **Upload to JR!TER** |
+| an `.flp` | **Render and send to JR!TER** |
 | a folder | **Render every FL project in here** |
-| a folder | **Watch this folder with J-ong** |
+| a folder | **Watch this folder with JR!TER** |
 
 All of it is written under `HKEY_CURRENT_USER`, so it belongs to you rather than the
 machine, no file associations are touched (an mp3 still opens with whatever opened it
-before), and `jong_client.py shell remove` takes it away completely.
+before), and `jriter_client.py shell remove` takes it away completely.
 
 ---
 
 ## Rendering FL Studio projects
 
 ```
-python jong_client.py render "C:\Users\you\Projects"
+python jriter_client.py render "C:\Users\you\Projects"
 ```
 
 **FL Studio's command line render is not headless, and this does not pretend otherwise.**
 FL takes a `/R` switch that renders a project, and it works, but launching it opens the
 application: you see its window, it loads the project, and on some versions the export
 dialog waits for Start to be pressed. Image-Line's own forum has people asking about
-exactly this and not getting a better answer. So J-ong tells you that before it starts
+exactly this and not getting a better answer. So JR!TER tells you that before it starts
 rather than leaving you to discover it.
 
 What it does do reliably: it finds FL for you, copies each project somewhere without
@@ -203,7 +205,7 @@ everywhere.
 If FL is somewhere unusual:
 
 ```
-python jong_client.py flpath "C:\Program Files\Image-Line\FL Studio 2024\FL64.exe"
+python jriter_client.py flpath "C:\Program Files\Image-Line\FL Studio 2024\FL64.exe"
 ```
 
 ---
@@ -218,7 +220,7 @@ reach GitHub instead of reporting that you are up to date.
 Python has already imported the running code, so after an update that touches `.py` files
 the app tells you to restart. It does not pretend a reload was enough.
 
-The client has the same thing: `python jong_client.py update`.
+The client has the same thing: `python jriter_client.py update`.
 
 ---
 
@@ -239,7 +241,7 @@ memory hungry, and only the result is kept, salted per library.
 
 **The first password.** A fresh library has none, and the server prints a one time setup
 code at startup. That code has to be presented to choose the first password, which is what
-stops the first stranger who finds a public J-ong from choosing it for you. The code stops
+stops the first stranger who finds a public JR!TER from choosing it for you. The code stops
 existing the moment a password is set.
 
 Changing the password signs every device out. Settings has both buttons.
@@ -251,7 +253,7 @@ To run with no door at all, which is what you want on a machine only you can rea
 
 ## Everything is a module
 
-Each feature is a file in `jong/modules/` listed in `jong/config.py`:
+Each feature is a file in `jriter/modules/` listed in `jriter/config.py`:
 
 ```python
 MODULES = [
@@ -269,10 +271,10 @@ A module that fails to load is named out loud at startup and in the interface, a
 rest of the library still opens.
 
 The browser side works the same way. `web/css/*.css` and `web/js/*.js` are concatenated in
-filename order into `/jong.css` and `/jong.js`, so a feature is a file, the numeric prefix
+filename order into `/jriter.css` and `/jriter.js`, so a feature is a file, the numeric prefix
 is the load order, and deleting the file removes the feature. There is no bundler.
 
-To add a feature, write `jong/modules/yours.py` with `SCHEMA` and `ROUTES()`, add a
+To add a feature, write `jriter/modules/yours.py` with `SCHEMA` and `ROUTES()`, add a
 `web/js/NN-view-yours.js` that registers `J.views.yours`, and put the name in the list.
 
 ---
@@ -281,13 +283,14 @@ To add a feature, write `jong/modules/yours.py` with `SCHEMA` and `ROUTES()`, ad
 
 ```
 server.py              start it
-jong/
+jriter/
   config.py            paths, and the module list
   db.py                sqlite, one connection per thread
   blobs.py             content addressed storage
   http.py              routing, static bundling, byte ranges for audio
   registry.py          loads whichever modules are switched on
   wire.py              what a route handler receives and returns
+  devlog.py            the release notes, and the version they name
   audio_meta.py        duration and bitrate, without a third party library
   modules/             one file per feature
 web/
@@ -295,7 +298,7 @@ web/
   css/                 bundled in filename order
   js/                  bundled in filename order
 client/
-  jong_client.py       the desktop agent
+  jriter_client.py       the desktop agent
 tests/                 111 tests, run with: python -m pytest tests -q
 data/                  your library. Not in git.
 ```
@@ -321,8 +324,8 @@ one directory.
 
 ## Settings
 
-`JONG_DATA` moves the library. `JONG_PORT` and `JONG_HOST` move the server.
-`JONG_REPO` and `JONG_BRANCH` point the updater somewhere else.
+`JRITER_DATA` moves the library. `JRITER_PORT` and `JRITER_HOST` move the server.
+`JRITER_REPO` and `JRITER_BRANCH` point the updater somewhere else.
 
 The accent colour and the library name are in Settings. Everything in the interface
 derives from the one accent value.

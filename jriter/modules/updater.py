@@ -1,4 +1,4 @@
-"""Keeping J-ong up to date from its own GitHub repository.
+"""Keeping JR!TER up to date from its own GitHub repository.
 
 The check is read only and says plainly when it cannot tell. Applying an update is a
 fast forward pull and nothing else: no reset, no force, no stash. If the working tree has
@@ -39,7 +39,7 @@ def _remote_head():
     """The newest commit on the tracked branch, straight from the GitHub API."""
     url = "https://api.github.com/repos/%s/commits/%s" % (config.REPO, config.BRANCH)
     request = urllib.request.Request(url, headers={
-        "Accept": "application/vnd.github+json", "User-Agent": "J-ong"})
+        "Accept": "application/vnd.github+json", "User-Agent": "JR!TER"})
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return {"sha": payload.get("sha", ""),
@@ -50,7 +50,7 @@ def _remote_head():
 def check(req):
     if not _is_repo():
         return {"can_update": False,
-                "why": "This copy of J-ong is not a git checkout, so it cannot update itself."}
+                "why": "This copy of JR!TER is not a git checkout, so it cannot update itself."}
     local, error = _git("rev-parse", "HEAD")
     if error:
         return {"can_update": False, "why": "git could not be read: " + error}
@@ -85,7 +85,7 @@ def apply(req):
     global _COMMIT
     _COMMIT = None      # the pull moves HEAD; read it again next time
     if not _is_repo():
-        raise Error("This copy of J-ong is not a git checkout, so it cannot update itself.", 409)
+        raise Error("This copy of JR!TER is not a git checkout, so it cannot update itself.", 409)
     dirty, _ = _git("status", "--porcelain")
     if dirty:
         raise Error("There are uncommitted changes here. Commit or discard them first, "
@@ -109,7 +109,7 @@ def apply(req):
         # not in memory. Saying this is the difference between an update that worked and
         # an update that looks like it did nothing.
         "restart_required": changed and any(n.endswith(".py") for n in names),
-        "message": ("Updated. Restart J-ong to run the new code."
+        "message": ("Updated. Restart JR!TER to run the new code."
                     if changed else "Already up to date."),
     }
 

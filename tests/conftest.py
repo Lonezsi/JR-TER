@@ -1,6 +1,6 @@
 """Test setup.
 
-JONG_DATA is redirected before anything imports jong, so a test run can never touch a
+JRITER_DATA is redirected before anything imports jriter, so a test run can never touch a
 real library. Getting this wrong once means a test suite that quietly edits the music
 you actually care about.
 """
@@ -13,10 +13,10 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-_TMP = tempfile.mkdtemp(prefix="jong-tests-")
-os.environ["JONG_DATA"] = _TMP
+_TMP = tempfile.mkdtemp(prefix="jriter-tests-")
+os.environ["JRITER_DATA"] = _TMP
 
-from jong import config, db, registry  # noqa: E402  (must come after the env var)
+from jriter import config, db, registry  # noqa: E402  (must come after the env var)
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ def fresh_library(tmp_path, monkeypatch):
     blobs.mkdir(parents=True)
     monkeypatch.setattr(config, "DATA", str(data))
     monkeypatch.setattr(config, "BLOBS", str(blobs))
-    monkeypatch.setattr(config, "DB_PATH", str(data / "jong.db"))
+    monkeypatch.setattr(config, "DB_PATH", str(data / "jriter.db"))
     monkeypatch.setattr(config, "SETTINGS_PATH", str(data / "settings.json"))
     db.close()
     # The door is loaded only by the tests that are about the door. Every other test is
@@ -64,13 +64,13 @@ def wav(tmp_path):
 
 @pytest.fixture
 def server():
-    """This J-ong on a real socket. Yields a small client."""
+    """This JR!TER on a real socket. Yields a small client."""
     import json
     import threading
     import urllib.error
     import urllib.request
     from http.server import ThreadingHTTPServer
-    from jong.http import Handler
+    from jriter.http import Handler
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     port = srv.server_address[1]

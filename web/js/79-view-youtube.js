@@ -308,7 +308,7 @@ J.views.youtube = {
         </div>
         <p class="faint yt-note">Google restricts uploads from an app it has not audited:
           until yours is reviewed, everything it uploads stays <b>private</b> whatever you
-          choose above. That is Google's rule, not J-ong's.</p>`;
+          choose above. That is Google's rule, not JR!TER's.</p>`;
     }
 
     async function connect() {
@@ -466,7 +466,7 @@ J.views.youtube = {
               <h2>Sending it</h2>
               <p>Everything above is finished and working: the file is rendered from the
                 sound and the cut you set here, and it can be auditioned and saved.
-                <b>J-ong cannot send it to YouTube yet.</b></p>
+                <b>JR!TER cannot send it to YouTube yet.</b></p>
               <p class="faint">YouTube takes video, not audio, so a rendered wav cannot be
                 uploaded as it is. Turning the audio and the artwork into a video is the
                 one piece still to build. Until then: render it, save the file, and put it

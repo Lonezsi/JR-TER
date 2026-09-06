@@ -162,7 +162,7 @@ def render(project, out_dir=None, fmt="wav", fl=None, timeout=1800, on_step=None
     os.makedirs(out_dir, exist_ok=True)
     stem = os.path.splitext(os.path.basename(project))[0]
 
-    work = tempfile.mkdtemp(prefix="jongfl")
+    work = tempfile.mkdtemp(prefix="jriterfl")
     try:
         staged = os.path.join(work, "project.flp")
         shutil.copyfile(project, staged)

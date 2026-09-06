@@ -114,7 +114,7 @@ def test_deleting_a_version_keeps_bytes_another_one_still_uses(server, wav):
 def test_the_server_says_which_files_it_already_holds(server, wav):
     """The client asks this before sending anything. It is what stops a folder of two
     hundred unchanged renders being uploaded on every scan."""
-    from jong import blobs
+    from jriter import blobs
     _, made = server.post("/api/songs", {"title": "Halfway Under"})
     path = wav()
     server.upload("/api/songs/%d/versions" % made["song"]["id"], path)
@@ -177,7 +177,7 @@ def test_health_separates_being_alive_from_being_whole(server):
 def test_health_says_so_when_a_module_did_not_load(server):
     """Otherwise a library that lost a feature to a bad migration is indistinguishable
     from a working one, and the only way to find out is to notice the feature is gone."""
-    from jong import registry
+    from jriter import registry
 
     registry._failed["pretend"] = "Traceback: it did not"
     try:
@@ -200,7 +200,7 @@ def test_the_write_ahead_log_is_folded_back_in_rather_than_growing_forever(serve
     """
     import os
 
-    from jong import config, db
+    from jriter import config, db
 
     for n in range(60):
         server.post("/api/songs", {"title": "Row %d" % n})
@@ -228,17 +228,17 @@ def test_two_modules_cannot_quietly_claim_the_same_route():
     import sys
     import types
 
-    from jong import registry
+    from jriter import registry
 
     def module_serving(name, pattern):
-        made = types.ModuleType("jong.modules." + name)
+        made = types.ModuleType("jriter.modules." + name)
         made.NAME = name
         made.SCHEMA = []
         made.ROUTES = lambda: {("GET", pattern): (lambda req: {"from": name})}
         return made
 
-    sys.modules["jong.modules.first_claim"] = module_serving("first_claim", "/api/claimed")
-    sys.modules["jong.modules.second_claim"] = module_serving("second_claim", "/api/claimed")
+    sys.modules["jriter.modules.first_claim"] = module_serving("first_claim", "/api/claimed")
+    sys.modules["jriter.modules.second_claim"] = module_serving("second_claim", "/api/claimed")
     try:
         registry.load(["first_claim", "second_claim"])
         assert registry.has("first_claim"), "the first to ask should have it"
@@ -247,8 +247,8 @@ def test_two_modules_cannot_quietly_claim_the_same_route():
         assert "/api/claimed" in why, why
     finally:
         for name in ("first_claim", "second_claim"):
-            sys.modules.pop("jong.modules." + name, None)
-        registry.load([m for m in __import__("jong.config", fromlist=["x"]).MODULES
+            sys.modules.pop("jriter.modules." + name, None)
+        registry.load([m for m in __import__("jriter.config", fromlist=["x"]).MODULES
                        if m != "auth"])
 
 
@@ -262,7 +262,7 @@ def test_a_handler_that_blows_up_leaves_its_traceback_behind(server):
     somebody reports and the traceback explaining it can be matched without guessing at
     timestamps.
     """
-    from jong import problems, registry
+    from jriter import problems, registry
 
     problems.clear()
 
@@ -297,7 +297,7 @@ def test_the_error_log_cannot_grow_without_bound(server):
     """In memory on a machine nobody is watching, so it has to be a fixed size. The
     oldest go and the count says how many, rather than quietly pretending it kept
     everything."""
-    from jong import problems
+    from jriter import problems
 
     problems.clear()
     for n in range(problems.LIMIT + 25):
@@ -333,7 +333,7 @@ def test_the_library_still_opens_with_any_one_feature_switched_off(server, witho
     neighbour's data would not be caught here. That needs a database built from a reduced
     module list, which is a fixture this does not have.
     """
-    from jong import config, registry
+    from jriter import config, registry
 
     keep = [m for m in config.MODULES if m not in ("auth", without)]
     try:
@@ -370,7 +370,7 @@ def test_the_library_still_opens_with_any_one_feature_switched_off(server, witho
 def test_a_song_page_can_be_built_with_every_optional_module_off(server):
     """The song page fetches from seven endpoints and mounts six blocks. With the optional
     modules off, the calls it guards must be the ones that are actually absent."""
-    from jong import config, registry
+    from jriter import config, registry
 
     core = ["core", "songs", "versions", "renders"]
     try:

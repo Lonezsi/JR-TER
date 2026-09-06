@@ -373,7 +373,7 @@ J.views.renders = {
               <h3>Nothing waiting</h3>
               <p>Renders land here first, keeping the name of the project they came out
                  of, and wait until you say which song they belong to. Right click an FL
-                 project and choose Render and send to J-ong, or take in a folder that is
+                 project and choose Render and send to JR!TER, or take in a folder that is
                  already full of them.</p>
               <button class="btn primary" data-act="ingest" style="margin-top:var(--s4)">
                 Take in a folder
@@ -448,7 +448,7 @@ J.views.renders = {
       if (act.dataset.act === "ingest") {
         const fields = await J.sheet({
           title: "Take in a folder of renders",
-          sub: "A path on the machine J-ong is running on. Nothing in it is moved or changed.",
+          sub: "A path on the machine JR!TER is running on. Nothing in it is moved or changed.",
           confirm: "Take them in",
           body: `<input class="field" name="path" placeholder="C:\\Users\\you\\Renders">`,
         });

@@ -62,7 +62,7 @@ def _add_shape_columns():
 def MIGRATE():
     """Two dates a library made before them will not have.
 
-    created_at is when J-ong first saw the bytes, which is a fact about this library
+    created_at is when JR!TER first saw the bytes, which is a fact about this library
     rather than about the music: re-import an old bounce today and it is dated today.
     These two are about the work. project_at is the age of the .flp it came out of, so a
     night's worth of takes group together however many times they were re-rendered
@@ -193,7 +193,7 @@ def upload(req):
     filename = (req.headers.get("X-Filename") or "render.wav").strip()
     ext = os.path.splitext(filename)[1].lower()
     if ext not in config.AUDIO_EXT:
-        raise Error("%s is not an audio file J-ong handles" % (ext or filename))
+        raise Error("%s is not an audio file JR!TER handles" % (ext or filename))
 
     digest, size, _ = blobs.put_stream(req.rfile, length)
     meta = audio_meta.probe(blobs.path_for(digest), ext)

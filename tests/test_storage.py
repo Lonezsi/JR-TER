@@ -5,7 +5,7 @@ one rather than against a mock.
 """
 import os
 
-from jong import blobs, audio_meta
+from jriter import blobs, audio_meta
 
 
 def test_the_same_bytes_are_stored_once():
@@ -81,7 +81,7 @@ def test_it_can_be_told_the_type_when_the_path_has_none(wav, tmp_path):
 
 
 def test_an_unreadable_file_is_not_an_error(tmp_path):
-    """A file J-ong cannot parse still uploads. The browser fills the duration in later."""
+    """A file JR!TER cannot parse still uploads. The browser fills the duration in later."""
     junk = tmp_path / "broken.mp3"
     junk.write_bytes(b"this is not an mp3 at all")
     meta = audio_meta.probe(str(junk))
@@ -110,7 +110,7 @@ def test_two_uploads_at_once_do_not_write_into_the_same_temporary_file(tmp_path)
     import io
     import threading
 
-    from jong import blobs
+    from jriter import blobs
 
     class Slow(io.RawIOBase):
         """A body that arrives in pieces, the way one off a socket does."""

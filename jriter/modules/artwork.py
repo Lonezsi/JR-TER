@@ -50,7 +50,7 @@ def upload(req):
     filename = (req.headers.get("X-Filename") or "cover.jpg").strip()
     ext = os.path.splitext(filename)[1].lower()
     if ext not in config.IMAGE_EXT:
-        raise Error("%s is not an image J-ong handles" % (ext or filename))
+        raise Error("%s is not an image JR!TER handles" % (ext or filename))
 
     digest, _, _ = blobs.put_stream(req.rfile, length)
     same = db.one("SELECT * FROM artwork WHERE song_id = ? AND digest = ?",

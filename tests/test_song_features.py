@@ -1,7 +1,7 @@
 """Lyrics, sound settings and albums."""
 import pytest
 
-from jong.modules import sound
+from jriter.modules import sound
 
 
 # ── lyrics ───────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 """The HTTP layer: routing, static files, and byte ranges for audio.
 
-The CSS and JS directories are concatenated in filename order into /jong.css and
-/jong.js, which is why the front end can be split into a file per feature with no build
+The CSS and JS directories are concatenated in filename order into /jriter.css and
+/jriter.js, which is why the front end can be split into a file per feature with no build
 step and no import graph to maintain. Delete a file from web/js and that feature stops
 being served, which is the browser side of the same swappability the module registry
 gives the server.
@@ -57,7 +57,7 @@ GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
 
 # Reachable without signing in: the door itself, the stylesheet it wears, and the calls
 # the door has to make. Everything else needs a session when the auth module is loaded.
-OPEN_PAGES = {"/login", "/jong.css", "/favicon.ico"}
+OPEN_PAGES = {"/login", "/jriter.css", "/favicon.ico"}
 OPEN_API = {"/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/health",
             # the door wears the same typeface as the library behind it
             "/api/appearance/font"}
@@ -170,7 +170,7 @@ class Body:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "J-ong"
+    server_version = "JR!TER"
     protocol_version = "HTTP/1.1"
 
     #: How long a connection may sit saying nothing before it is closed.
@@ -375,7 +375,7 @@ class Handler(BaseHTTPRequestHandler):
         # Before anything else, including the login page and the setup flow.
         broken = self._door_is_broken()
         if broken and path != "/api/health":
-            body = ("J-ong will not open. %s"
+            body = ("JR!TER will not open. %s"
                     "\n\nNothing has been changed or overwritten. Repair or restore "
                     "data/auth.json and this message goes away without a restart."
                     % broken)
@@ -444,8 +444,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(result)
 
     def _static(self, path):
-        for name, directory, ext in (("/jong.css", "css", ".css"),
-                                     ("/jong.js", "js", ".js")):
+        for name, directory, ext in (("/jriter.css", "css", ".css"),
+                                     ("/jriter.js", "js", ".js")):
             if path != name:
                 continue
             body = bundle(os.path.join(config.WEB, directory), ext)

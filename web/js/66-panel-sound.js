@@ -25,7 +25,7 @@ J.blockSound = async function (panel, ctx) {
       <div class="empty">
         <h3>Nothing to listen to yet</h3>
         <p>This is where you hear the same bounce through two different equalisers and
-           pick one. It is only ever applied while you listen: J-ong never writes it into
+           pick one. It is only ever applied while you listen: JR!TER never writes it into
            the file, so nothing here can damage a mix.</p>
       </div>`;
     return;
@@ -43,7 +43,7 @@ J.blockSound = async function (panel, ctx) {
    * instruments most visits never touch. They are one press away and they remember
    * whether you left them open, per browser, because that is a convenience rather than
    * anything the library should hold. */
-  const FOLD_KEY = "jong.sound.open";
+  const FOLD_KEY = "jriter.sound.open";
   let open = { eq: false, limiter: false };
   try {
     const kept = JSON.parse(localStorage.getItem(FOLD_KEY) || "null");

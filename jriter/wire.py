@@ -1,6 +1,6 @@
 """The shapes a route handler receives and returns.
 
-This module imports nothing from the rest of J-ong on purpose. Modules need Response and
+This module imports nothing from the rest of JR!TER on purpose. Modules need Response and
 the HTTP layer needs Response, and if either owned it the two would import each other.
 """
 import json

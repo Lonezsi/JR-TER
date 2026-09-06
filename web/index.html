@@ -3,18 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>J-ong</title>
+<title>JR!TER</title>
 <meta name="theme-color" content="#0F1311">
+<meta name="description" content="please post for the world to see">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Orbitron carries the titles: geometric and technical, and the closest openly
      licensed face to the one this was designed around. Upload your own in Settings and
-     it is registered as "Jong Display", which the stylesheet asks for first. Manrope
+     it is registered as "Jriter Display", which the stylesheet asks for first. Manrope
      does everything else: well used, not everywhere, and it holds its shape at twelve
      pixels in a dense track list. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/jong.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2354B37A'/><path d='M12 9v11.2a3.2 3.2 0 1 0 2 3V13l7-2v6.2a3.2 3.2 0 1 0 2 3V7z' fill='%230F1311'/></svg>">
+<link rel="stylesheet" href="/jriter.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2354B37A'/><g stroke='%230F1311' fill='none' stroke-linecap='round' stroke-linejoin='round'><path d='M15 7 L10.5 13 L15 17.5 L10.5 22' stroke-width='2.6'/><path d='M10.5 22c2.9.5 4.4 2.1 4.4 4 0 1.4-.9 2.3-2.2 2.3' stroke-width='2.2'/><path d='M22 7 V19' stroke-width='2.8'/></g><circle cx='22' cy='24.5' r='1.7' fill='%230F1311'/></svg>">
 </head>
 <body>
 
@@ -55,7 +56,20 @@
 
   <aside class="rail" id="rail">
     <div class="rail-top">
-      <a class="wordmark" href="#/" data-link>J-ong</a>
+      <a class="wordmark" href="#/" data-link aria-label="Home">
+        <!-- The quarter rest, drawn rather than typed: nothing in the display
+             stack carries U+1D13D, least of all a face somebody uploaded
+             themselves, so a text glyph is a notdef box on a machine you cannot
+             test. The name beside it is the library's own, which boot.js writes. -->
+        <svg class="rest" viewBox="0 0 12 30" width="9" height="22"
+             aria-hidden="true" focusable="false">
+          <path d="M8.5 2 L3.5 9.5 L8.5 15 L3.5 21" fill="none" stroke="currentColor"
+                stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3.5 21c3.2.6 4.9 2.4 4.9 4.6 0 1.6-1 2.6-2.4 2.6" fill="none"
+                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <span id="wordmarkName">JR!TER</span>
+      </a>
       <button class="icon-btn rail-close" id="railClose" aria-label="Close menu">&times;</button>
     </div>
 
@@ -95,6 +109,6 @@
 <div class="sheet-backdrop" id="modalBackdrop" hidden></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
 
-<script src="/jong.js"></script>
+<script src="/jriter.js"></script>
 </body>
 </html>

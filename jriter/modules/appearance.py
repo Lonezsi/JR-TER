@@ -1,6 +1,6 @@
 """The display face, when you would rather use your own.
 
-J-ong ships with an open licensed typeface and will happily use a different one, but it
+JR!TER ships with an open licensed typeface and will happily use a different one, but it
 never carries that file. You upload it, it lives in your data directory, and it is served
 only to your own library. That keeps a licensed or shareware font where its licence
 expects it to be: on your machine, rather than committed to a public repository and
@@ -79,7 +79,7 @@ def upload_font(req):
     filename = (req.headers.get("X-Filename") or "display.ttf").strip()
     ext = os.path.splitext(filename)[1].lower()
     if ext not in FONT_EXT:
-        raise Error("J-ong takes .ttf, .otf, .woff or .woff2, not %s" % (ext or filename))
+        raise Error("JR!TER takes .ttf, .otf, .woff or .woff2, not %s" % (ext or filename))
 
     body = req.rfile.read(length)
     # Enough of a check to catch a renamed zip or an html error page, without pretending

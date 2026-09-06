@@ -36,17 +36,17 @@ J.alpha = (hex, a) => {
 };
 
 /* Register an uploaded display face under one name, so the whole stylesheet can ask for
- * "Jong Display" and get either your font or the open one behind it. */
+ * "Jriter Display" and get either your font or the open one behind it. */
 J.wearFont = function (info) {
-  const already = document.getElementById("jong-display-face");
+  const already = document.getElementById("jriter-display-face");
   if (already) already.remove();
   if (!info || !info.custom_font) return;
   const format = { "font/ttf": "truetype", "font/otf": "opentype",
                    "font/woff": "woff", "font/woff2": "woff2" }[info.font_format] || "truetype";
   const style = document.createElement("style");
-  style.id = "jong-display-face";
+  style.id = "jriter-display-face";
   style.textContent = `@font-face {
-    font-family: "Jong Display";
+    font-family: "Jriter Display";
     src: url("/api/appearance/font?v=${Math.floor(info.uploaded_at || 0)}") format("${format}");
     font-display: swap;
   }`;
@@ -152,7 +152,7 @@ async function boot() {
   } catch (e) {
     document.body.innerHTML =
       `<div style="padding:48px;font-family:system-ui;color:#E8EDE9">
-         <h1 style="font-family:Syne,sans-serif">J-ong is not answering</h1>
+         <h1 style="font-family:Syne,sans-serif">JR!TER is not answering</h1>
          <p>${J.esc(e.message)}</p>
          <p style="color:#9BA8A0">Start it with <code>python server.py</code> and reload.</p>
        </div>`;
@@ -161,18 +161,29 @@ async function boot() {
 
   J.state = state;
   J.state.modules = state.modules || [];
-  document.title = state.name || "J-ong";
-  J.$(".wordmark").textContent = state.name || "J-ong";
+  document.title = state.name || "JR!TER";
+  // The name only. Setting textContent on the anchor itself would take the mark
+  // beside it with it: textContent replaces everything inside, so the rest would
+  // vanish the moment /api/state answered.
+  J.$("#wordmarkName").textContent = state.name || "JR!TER";
   J.applyAccent(state.settings && state.settings.accent);
   J.wearFont(state.summary && state.summary.appearance);
 
+  /* The version, not the commit it was built from.
+   *
+   * A short sha said which checkout this was and nothing whatever about what is in it,
+   * and it is not the thing the banner, the devlog or the popup name. The commit is
+   * still the useful half when something has to be reported, so it stays as the hover. */
   const version = J.$("#railVersion");
-  const commit = state.summary && state.summary.updater && state.summary.updater.commit;
-  if (version) version.textContent = commit ? commit : "";
+  if (version) {
+    version.textContent = state.version ? "v" + state.version : "";
+    const commit = state.summary && state.summary.updater && state.summary.updater.commit;
+    if (commit) version.title = "commit " + commit;
+  }
 
   for (const [name, detail] of Object.entries(state.failed || {})) {
     J.toast(`The ${name} module did not load, so that feature is missing.`, "bad");
-    console.warn(`[j-ong] module ${name} failed to load\n`, detail);
+    console.warn(`[jriter] module ${name} failed to load\n`, detail);
   }
 
   await buildRail(state);
@@ -183,10 +194,21 @@ async function boot() {
    * covers both, so the two buttons always do something rather than only doing something
    * below a breakpoint. */
   const shell = J.$("#app");
-  const RAIL_KEY = "jong.rail.shut";
+  const RAIL_KEY = "jriter.rail.shut";
   const narrow = () => window.matchMedia("(max-width: 900px)").matches;
 
+  /* The drag in progress, or null.
+   *
+   * Declared up here rather than beside the handlers, because setRail hands the rail
+   * back to the stylesheet and setRail is called once during boot before anything has
+   * been dragged. A let further down would still be in its dead zone at that moment and
+   * the app would not start at all. */
+  let drag = null;
+
   function setRail(shut) {
+    // Whatever a finger pinned the rail to has to go, or the class it is being handed
+    // back to has nothing to move it from.
+    if (drag) stopDrag();
     shell.classList.toggle("rail-shut", shut);
     // Only a deliberate choice on a wide screen is worth remembering. On a phone the
     // rail always starts out of the way.
@@ -194,17 +216,18 @@ async function boot() {
   }
   setRail(narrow() ? true : localStorage.getItem(RAIL_KEY) === "1");
 
-  /* Swiping sideways opens or closes the rail.
+  /* Sliding the rail.
    *
-   * Anywhere that does not already use a sideways drag, which on a phone is nearly
-   * everywhere: a list is mostly rows, and a row has no horizontal gesture of its own,
-   * so requiring genuinely blank space would have meant almost nowhere to do it. Only
-   * the handful of things that are dragged across on purpose are left out, and each is
-   * named below with the reason.
+   * It used to be a threshold: fifty five pixels sideways set a class and the stylesheet
+   * carried the rail the whole way by itself. That is a button pressed by accident
+   * rather than a drag, and it could only ever go all the way or not at all. Now the
+   * rail is under the thumb for as long as the thumb is down, it stops where the thumb
+   * stops, and only the last stretch is animated.
    *
-   * Vertical wins ties, because pages scroll up and down and a swipe even slightly more
-   * up than across was meant to scroll. Fifty five pixels is far enough that a press
-   * that wandered is not mistaken for one of these.
+   * The gesture starts almost anywhere, which on a phone is the point: a list is mostly
+   * rows, and a row has no horizontal gesture of its own, so asking for genuinely blank
+   * space would have meant almost nowhere to do it. Only the handful of things that are
+   * dragged across on purpose are left out, and each is named below with the reason.
    */
   const KEEPS_ITS_GESTURES = [
     // Things that are dragged sideways on purpose.
@@ -215,12 +238,20 @@ async function boot() {
     ".q-knob",
     // Things that scroll inside themselves.
     ".sheet", ".slot-menu", ".pick-list",
-    // And the rail, which is the thing being opened.
-    ".rail",
   ].join(", ");
 
-  //: How far across before it counts, in pixels.
+  //: How far one direction has to win by before the drag commits to it, in pixels.
+  const LOCK = 8;
+  //: A mouse does not track, it keeps the old threshold. How far across before it counts.
   const SWIPE = 55;
+  //: Past either end the rail moves this fraction of the finger, so an end feels like one.
+  const BAND = 0.32;
+  //: Pixels per millisecond that read as a throw rather than a push, about 450 a second.
+  const FLICK = 0.45;
+  //: A finger that has not moved for this long was resting, whatever it did before that.
+  const STILL = 80;
+  //: A drag is followed by a click nobody asked for. Ignore one for this long afterwards.
+  const AFTER_DRAG = 400;
 
   /* Empty means nothing here does anything when you press it.
    *
@@ -248,34 +279,173 @@ async function boot() {
     return false;
   }
 
-  let swipe = null;
+  const railNode = J.$("#rail");
+  const scrim = J.$("#railScrim");
+  let dragEndedAt = -1e9;
+
+  /* How far the rail moves between shut and open. Measured rather than written down a
+   * second time: the stylesheet parks it at its own width plus one gap off the left
+   * edge, and --s3 is that gap. */
+  function railTravel() {
+    const gap = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue("--s3"));
+    return railNode.getBoundingClientRect().width + (gap || 12);
+  }
+
+  /* Put the rail where the finger is. x is measured from open, so 0 is open and
+   * minus travel is shut. */
+  function railTo(x) {
+    let at = x;
+    // Past the ends it gives less than it is asked for, so open and shut feel like walls
+    // rather than like the drag having quietly stopped working.
+    if (at > 0) at = at * BAND;
+    else if (at < -drag.travel) at = -drag.travel + (at + drag.travel) * BAND;
+    railNode.style.setProperty("--rail-x", `${Math.round(at)}px`);
+    // The dim is driven off the same number, so the room darkens as the rail comes out
+    // instead of after it has arrived.
+    scrim.style.opacity = String(J.clamp(1 + at / drag.travel, 0, 1));
+  }
+
+  /* Hand the rail back to the stylesheet.
+   *
+   * The transition ban and the pinned position have to be lifted in the same breath as
+   * the class changes. A browser animates between the style before a change and the
+   * style after it, so doing all three at once gives it exactly one move to make, from
+   * wherever the thumb left the rail to wherever the class says it lives. Doing them a
+   * frame apart makes the rail jump first and then animate nothing. */
+  function stopDrag() {
+    drag = null;
+    shell.classList.remove("rail-dragging");
+    railNode.style.removeProperty("--rail-x");
+    scrim.style.removeProperty("opacity");
+  }
+
   document.addEventListener("pointerdown", (e) => {
-    swipe = null;
+    drag = null;
     if (e.button) return;                                   // a right or middle press
+    if (!narrow()) return;                                  // wide screens collapse, not slide
     if (e.target.closest(KEEPS_ITS_GESTURES)) return;       // something else owns this
-    if (hasAPressOfItsOwn(e.target)) return;                // it belongs to that instead
-    swipe = { x: e.clientX, y: e.clientY, id: e.pointerId, done: false,
-              mouse: e.pointerType === "mouse" };
+    /* The rail is not on that list any more.
+     *
+     * It was, on the grounds that it is the thing being opened, and the result was that
+     * once it was open there was nowhere to put a thumb to push it back: the one surface
+     * within reach was the one surface the gesture refused. Its links do not disqualify
+     * it either, because most of an open rail is album rows. Nothing moves until the
+     * finger has gone eight pixels sideways, so a press is still a press, and the click
+     * that follows a real drag is thrown away further down. */
+    const onRail = !!e.target.closest(".rail");
+    if (!onRail && hasAPressOfItsOwn(e.target)) return;
+    drag = {
+      id: e.pointerId, mouse: e.pointerType === "mouse",
+      x: e.clientX, y: e.clientY,
+      axis: false, at: 0, moved: false, travel: 0, base: 0,
+      // Where and when the last speed sample was taken.
+      px: e.clientX, t: e.timeStamp, v: 0,
+    };
   }, { passive: true });
 
   document.addEventListener("pointermove", (e) => {
-    if (!swipe || swipe.done || e.pointerId !== swipe.id) return;
-    const dx = e.clientX - swipe.x;
-    const dy = e.clientY - swipe.y;
-    if (Math.abs(dy) >= Math.abs(dx)) { swipe = null; return; }   // they are scrolling
-    if (Math.abs(dx) < SWIPE) return;
-    // A mouse drag that picked up words on the way was a selection after all.
-    if (swipe.mouse && !(window.getSelection() || { isCollapsed: true }).isCollapsed) {
-      swipe = null;
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+
+    /* Which way this gesture is going, decided once and then kept.
+     *
+     * The old rule threw the gesture away the moment vertical was merely larger than
+     * horizontal, and it asked that on the very first move event. A thumb does not
+     * travel in a straight line, so a swipe that started one pixel high was gone before
+     * it had said anything. Neither direction wins now until one of them has eight
+     * pixels, and after that the gesture is committed and the other one is ignored. */
+    if (!drag.axis) {
+      if (Math.abs(dy) >= LOCK && Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+      if (Math.abs(dx) < LOCK) return;
+      drag.axis = true;
+      /* A mouse keeps the old threshold and does not track.
+       *
+       * A mouse dragged sideways across text is selecting it, and for the first few
+       * pixels that looks exactly like this gesture. Eight pixels is far too early to
+       * tell them apart, and there is a button for this an inch away. */
+      if (drag.mouse) return;
+      // Measured here rather than on every press in the app: this is the first moment we
+      // know there is a drag at all, and reading a rect costs a layout.
+      drag.travel = railTravel();
+      drag.base = shell.classList.contains("rail-shut") ? -drag.travel : 0;
+      try { railNode.setPointerCapture(e.pointerId); } catch (err) { /* still works */ }
+      shell.classList.add("rail-dragging");
+    }
+
+    if (drag.mouse) {
+      if (Math.abs(dx) < SWIPE) return;
+      // A mouse drag that picked up words on the way was a selection after all.
+      if (!(window.getSelection() || { isCollapsed: true }).isCollapsed) { drag = null; return; }
+      drag = null;
+      setRail(dx < 0);                                      // right opens, left shuts
       return;
     }
-    swipe.done = true;
-    setRail(dx < 0);                                        // right opens, left shuts
+
+    /* Speed, taken from the events themselves.
+     *
+     * event.timeStamp is a high resolution stamp put on every pointer event by the same
+     * clock, so there is no clock of our own to disagree with it. Sampled at least a
+     * frame apart, because two events a fraction of a millisecond apart divide by nearly
+     * nothing and report a throw that never happened. */
+    if (e.timeStamp - drag.t >= 8) {
+      drag.v = (e.clientX - drag.px) / (e.timeStamp - drag.t);
+      drag.px = e.clientX;
+      drag.t = e.timeStamp;
+    }
+
+    drag.moved = true;
+    drag.at = drag.base + dx;
+    railTo(drag.at);
   }, { passive: true });
 
-  const endSwipe = () => { swipe = null; };
-  document.addEventListener("pointerup", endSwipe, { passive: true });
-  document.addEventListener("pointercancel", endSwipe, { passive: true });
+  document.addEventListener("pointerup", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.axis || drag.mouse) { drag = null; return; }
+    try { railNode.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+    /* How far it got, and how fast it was going when it was let go.
+     *
+     * Distance alone is wrong for a flick: a quick throw from the left edge is plainly
+     * open and has covered forty of the two hundred and fifty six pixels it would need.
+     * Speed alone is wrong the other way: a rail pushed nine tenths of the way shut and
+     * released is shut, at no speed at all. So speed decides when there is any and
+     * distance decides when there is not, and a finger that has been still for a moment
+     * has none, whatever it was doing before it stopped. That last part is what makes it
+     * stop where the thumb stopped. */
+    const speed = e.timeStamp - drag.t > STILL ? 0 : drag.v;
+    const shut = Math.abs(speed) >= FLICK ? speed < 0 : drag.at < -drag.travel / 2;
+    if (drag.moved) dragEndedAt = e.timeStamp;
+    setRail(shut);
+  }, { passive: true });
+
+  document.addEventListener("pointercancel", (e) => {
+    if (!drag) return;
+    const wasShut = drag.base < 0;
+    const tracking = drag.axis && !drag.mouse;
+    if (!tracking) { drag = null; return; }
+    // The system took the gesture back: a notification, a second finger, the browser
+    // deciding this was a scroll after all. Put the rail back where it started rather
+    // than guessing what was meant by half a gesture.
+    try { railNode.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+    setRail(wasShut);
+  }, { passive: true });
+
+  /* The click at the end of a drag.
+   *
+   * Wherever the finger let go is about to be clicked, and after a drag that means an
+   * album row navigating, or the scrim shutting the rail that was just pulled open. The
+   * gesture has already said what it meant, so the click after it says nothing.
+   *
+   * Timed rather than a listener added for one click and taken away again: a drag that
+   * ends over nothing clickable produces no click at all, and that listener would sit
+   * there armed, waiting to eat a real one much later. */
+  document.addEventListener("click", (e) => {
+    if (e.timeStamp - dragEndedAt > AFTER_DRAG) return;
+    dragEndedAt = -1e9;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
 
   J.$("#railOpen").addEventListener("click", () => setRail(false));
   J.$("#railClose").addEventListener("click", () => setRail(true));
@@ -316,9 +486,9 @@ async function boot() {
   /* Albums in the rail get the same menu as the cards in the library, because they are
    * the same album and a person should not have to remember which copy of a thing they
    * are pointing at. */
-  const rail = J.$("#railAlbums");
-  if (rail) {
-    J.menu.on(rail, ".rail-album", (node) => {
+  const railAlbums = J.$("#railAlbums");
+  if (railAlbums) {
+    J.menu.on(railAlbums, ".rail-album", (node) => {
       const href = node.getAttribute("href") || "";
       const id = href.split("/").pop();
       if (!id) return null;
@@ -437,6 +607,10 @@ async function boot() {
 
   J.emit("boot");
   J.router.start();
+
+  // Only when this copy changed under them. On a first visit it writes the version down
+  // and says nothing at all.
+  J.devlog.check(state);
 
   // A quiet check on startup, so the dot in the corner is the only nagging there is.
   if (J.state.modules.includes("updater") && state.settings.auto_update !== false) {

@@ -1,4 +1,4 @@
-/* Watched folders: where renders land, and what is in them that J-ong has not seen.
+/* Watched folders: where renders land, and what is in them that JR!TER has not seen.
  *
  * A scan never imports anything. It reports what it found and what each file looks like
  * a new render of, and you say yes.
@@ -46,7 +46,7 @@ J.views.sync = {
             </div>`).join("")
           : `<div class="empty">
                <h3>No folders watched yet</h3>
-               <p>Point J-ong at the folder your exports land in and it will notice new
+               <p>Point JR!TER at the folder your exports land in and it will notice new
                   bounces arriving, so a render reaches the library without you carrying
                   it there. It reads that folder and never writes to it, and nothing is
                   imported until you say so.</p>
@@ -125,7 +125,7 @@ J.views.sync = {
       if (what === "add") {
         const values = await J.sheet({
           title: "Watch a folder",
-          sub: "The full path on the machine running J-ong. It is only ever read.",
+          sub: "The full path on the machine running JR!TER. It is only ever read.",
           confirm: "Watch it",
           body: `<div class="sheet-fields"><label class="sheet-label">Folder
             <input class="field" name="path" placeholder="C:\\Users\\you\\Music\\Renders"></label></div>`,
@@ -184,6 +184,7 @@ J.views.settings = {
   async render(root) {
     const state = await J.get("/api/state");
     let update = null;
+    let log = null;
     let font = (state.summary && state.summary.appearance) || { custom_font: false };
 
     function draw() {
@@ -243,10 +244,21 @@ J.views.settings = {
             </div>` : '<p class="faint">Not checked yet.</p>'}
         </div>
 
+        ${state.modules.includes("devlog") ? `
+        <div class="section">
+          <div class="section-head"><h2>What is new</h2><span class="grow"></span>
+            <span class="tag">v${J.esc(state.version || "")}</span></div>
+          ${log
+            ? (log.length
+                ? log.map((release) => J.devlog.entry(release)).join("")
+                : '<p class="faint">Nothing written down yet.</p>')
+            : '<p class="faint">Reading the log.</p>'}
+        </div>` : ""}
+
         <div class="section">
           <div class="section-head"><h2>Display font</h2></div>
           <p class="faint" style="margin-top:0">
-            The face used for titles. J-ong does not ship the one you want, because a
+            The face used for titles. JR!TER does not ship the one you want, because a
             licensed or shareware font does not belong in a public repository. Upload it
             here instead and it stays in your own data directory, served only to you.
           </p>
@@ -281,7 +293,7 @@ J.views.settings = {
         <div class="section">
           <div class="section-head"><h2>Modules</h2></div>
           <p class="faint" style="margin-top:0">
-            Each feature is a module. Removing one from the MODULES list in jong/config.py
+            Each feature is a module. Removing one from the MODULES list in jriter/config.py
             takes it out of the server and out of this interface.
           </p>
           <div class="pills">
@@ -298,7 +310,7 @@ J.views.settings = {
 
       if (act.dataset.act === "save-settings") {
         const patch = {
-          library_name: J.$("#libName", root).value.trim() || "J-ong",
+          library_name: J.$("#libName", root).value.trim() || "JR!TER",
           accent: J.$("#accent", root).value,
         };
         const saved = await J.try(() => J.put("/api/settings", patch), "Saved");
@@ -356,7 +368,7 @@ J.views.settings = {
         draw();
         if (result.restart_required) {
           await J.sheet({
-            title: "Restart J-ong",
+            title: "Restart JR!TER",
             sub: "The new code is on disk. Python is still running the old version in memory, "
                + "so stop the server and start it again to pick it up.",
             confirm: "", cancel: "Got it",
@@ -380,5 +392,16 @@ J.views.settings = {
       J.toast("Titles are wearing " + file.name);
       draw();
     });
+
+    /* The whole log, only on the one screen that shows it.
+     *
+     * Fetched here rather than carried on /api/state, which every page load asks for and
+     * which would then be paying for a list that is read on one screen. Drawn twice on
+     * purpose: the screen is up straight away and the releases fill in. */
+    if (state.modules.includes("devlog")) {
+      const found = await J.try(() => J.devlog.all());
+      log = (found && found.entries) || [];
+      draw();
+    }
   },
 };

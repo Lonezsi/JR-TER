@@ -85,7 +85,7 @@ J.compositor = (function () {
           </div>`
         : `<div class="empty comp-empty">
              <h3>Nothing laid out yet</h3>
-             <p>J-ong can listen to this render, work out the tempo and split it into
+             <p>JR!TER can listen to this render, work out the tempo and split it into
                 sections. Everything it decides can be changed afterwards.</p>
              <button class="btn primary" data-act="redetect" style="margin-top:var(--s4)">
                Listen and lay it out

@@ -80,3 +80,32 @@ kbd {
   transition: background var(--fast), color var(--fast);
 }
 .rail-keys:hover { background: var(--hover); color: var(--text); }
+
+/* ── what changed ─────────────────────────────────────────────────────────── */
+
+/* A release, in the popup and again in Settings. One rule for both: a second copy of
+   these is where the two stop looking like the same thing. */
+.log-entry + .log-entry {
+  margin-top: var(--s5);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line);
+}
+.log-head { display: flex; align-items: baseline; gap: var(--s3); }
+.log-version {
+  font-family: var(--display); font-weight: 700; font-size: 13px;
+  color: var(--accent-hi);
+  font-variant-numeric: tabular-nums;
+}
+.log-title { font-weight: 600; color: var(--text); }
+.log-date { margin-left: auto; flex: none; font-size: 11.5px; color: var(--text-3); }
+/* The name the project had at the time. It was called J-ong for the whole of the 1.x
+   line, and a history that renames its own past is one you cannot use to work out what
+   you were running. */
+.log-name { margin-top: 2px; font-size: 11px; color: var(--text-3); letter-spacing: 0.04em; }
+.log-notes {
+  margin: var(--s2) 0 0; padding-left: var(--s4);
+  color: var(--text-2); font-size: 13.5px;
+}
+.log-notes li { margin-top: var(--s1); }
+.log-more { margin-top: var(--s4); }
+.log-earlier { margin-top: var(--s5); }

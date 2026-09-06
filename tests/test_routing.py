@@ -5,8 +5,8 @@ switching a module off actually removes it rather than leaving a dead button.
 """
 import pytest
 
-from jong import registry
-from jong.http import resolve, _match
+from jriter import registry
+from jriter.http import resolve, _match
 
 
 @pytest.mark.parametrize("pattern,path,expected", [
@@ -48,7 +48,7 @@ def test_an_unknown_path_resolves_to_nothing():
 
 # ── the registry ─────────────────────────────────────────────────────────────
 def test_every_configured_module_loads():
-    from jong import config
+    from jriter import config
     registry.load()
     assert not registry.failures(), registry.failures()
     assert set(registry.enabled()) == set(config.MODULES)
@@ -83,8 +83,8 @@ def test_a_broken_module_is_reported_rather_than_fatal():
 def test_songs_survives_versions_being_switched_off():
     """The library view asks the registry rather than importing, so a song row is just
     thinner when versions are gone instead of raising."""
-    from jong.modules import songs
-    from jong import db
+    from jriter.modules import songs
+    from jriter import db
     import time
 
     registry.load(["core", "songs"])

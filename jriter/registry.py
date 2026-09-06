@@ -1,6 +1,6 @@
 """Loading whichever features are switched on.
 
-A module is a file in jong/modules/ that may define:
+A module is a file in jriter/modules/ that may define:
 
     NAME     str, defaults to the file name
     SCHEMA   list of CREATE TABLE statements, run at startup, must be IF NOT EXISTS
@@ -9,7 +9,7 @@ A module is a file in jong/modules/ that may define:
     ROUTES   callable returning {(method, pattern): handler}
     SUMMARY  optional callable returning a small dict for /api/state
 
-Nothing else in J-ong imports a module directly. If a name is missing from
+Nothing else in JR!TER imports a module directly. If a name is missing from
 config.MODULES the code is still on disk and simply never runs.
 """
 import time
@@ -71,7 +71,7 @@ def load(names=None):
     _loaded, _routes, _failed = {}, {}, {}
     for name in (names if names is not None else config.MODULES):
         try:
-            module = importlib.import_module("jong.modules." + name)
+            module = importlib.import_module("jriter.modules." + name)
         except Exception:
             _failed[name] = traceback.format_exc(limit=3)
             continue

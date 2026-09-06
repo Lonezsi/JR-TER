@@ -5,6 +5,23 @@
  */
 "use strict";
 
+/* Carried over from the old name, once per browser.
+ *
+ * These are conveniences, not data: a sort order per list, whether the two sound panels
+ * are folded, whether the rail is put away. Renaming the prefix without this loses none
+ * of it in any way that matters, but it does leave three dead keys in every browser for
+ * ever and it resets everybody's rail on the morning they update, which reads as a bug.
+ * This is the first file in the bundle, so it runs before anything reads a key. */
+try {
+  for (const suffix of ["sort", "sound.open", "rail.shut"]) {
+    const kept = localStorage.getItem("jong." + suffix);
+    if (kept !== null && localStorage.getItem("jriter." + suffix) === null) {
+      localStorage.setItem("jriter." + suffix, kept);
+    }
+    localStorage.removeItem("jong." + suffix);
+  }
+} catch (e) { /* a private window: the defaults stand, which is fine */ }
+
 const J = {
   views: {},      // route name -> { title, render }
   state: {},
@@ -243,7 +260,7 @@ J.skeleton = (kind) => {
  * chose; offering to sort them is useful, opening them re-sorted is throwing that away.
  */
 J.sort = (function () {
-  const KEY = "jong.sort";
+  const KEY = "jriter.sort";
 
   function all() {
     try { return JSON.parse(localStorage.getItem(KEY) || "{}") || {}; }

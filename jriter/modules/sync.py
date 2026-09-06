@@ -157,7 +157,7 @@ def import_file(req):
     if not os.path.isfile(path):
         raise Error("there is no file at %s" % path)
     if os.path.splitext(path)[1].lower() not in config.AUDIO_EXT:
-        raise Error("that is not an audio file J-ong handles")
+        raise Error("that is not an audio file JR!TER handles")
 
     watched = db.query("SELECT path FROM sync_folders WHERE enabled = 1")
     real = os.path.abspath(path)

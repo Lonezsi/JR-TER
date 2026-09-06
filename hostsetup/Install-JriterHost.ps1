@@ -1,8 +1,8 @@
-# Make J-ong start at boot and be reachable from anywhere.
+# Make JR!TER start at boot and be reachable from anywhere.
 #
 # Run this once, elevated, on the machine that will hold the library.
 #
-#     powershell -ExecutionPolicy Bypass -File hostsetup\Install-JongHost.ps1
+#     powershell -ExecutionPolicy Bypass -File hostsetup\Install-JriterHost.ps1
 #
 # Two pieces:
 #   1. A scheduled task that starts the server at boot, bound to localhost.
@@ -19,13 +19,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
-$TaskName = 'J-ong Server'
+# JRITER, not JR!TER: a task name is an identifier, and cmd treats ! as its own.
+$TaskName = 'JRITER Server'
 
 function Note($text) { Write-Host "  $text" }
 
 # ── the task ─────────────────────────────────────────────────────────────────
-$script = Join-Path $PSScriptRoot 'Start-Jong.ps1'
-if (-not (Test-Path $script)) { throw "Start-Jong.ps1 is not next to this file." }
+$script = Join-Path $PSScriptRoot 'Start-Jriter.ps1'
+if (-not (Test-Path $script)) { throw "Start-Jriter.ps1 is not next to this file." }
 
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
     -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"' -f $script) `
@@ -37,7 +38,7 @@ $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
 # "it keeps crashing" looks like from the outside: not a process dying often, but one
 # dying once and nothing ever bringing it back.
 #
-# So there is also a check every few minutes, for ever. Start-Jong.ps1 is written to be
+# So there is also a check every few minutes, for ever. Start-Jriter.ps1 is written to be
 # run this way: on a run where the library answers it exits immediately and says nothing.
 $atBoot = New-ScheduledTaskTrigger -AtStartup
 $watchdog = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
@@ -49,6 +50,13 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
 
+# The task the old name registered, taken away before the new one goes in.
+# Register-ScheduledTask -Force only replaces a task of the SAME name, so a rename
+# leaves the previous one in place, and its repetition trigger has no end date: it
+# would go on starting a second server every three minutes, on a machine nobody is
+# sitting at, fighting this one for the port.
+Unregister-ScheduledTask -TaskName 'J-ong Server' -Confirm:$false -ErrorAction SilentlyContinue
+
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Principal $principal -Settings $settings -Force | Out-Null
 Note "scheduled task '$TaskName' registered"
@@ -57,7 +65,7 @@ Start-ScheduledTask -TaskName $TaskName
 Start-Sleep -Seconds 6
 $listening = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue
 if ($listening) { Note "serving on 127.0.0.1:$Port" }
-else { Note "NOT serving yet; check data\host-jong.log" }
+else { Note "NOT serving yet; check data\host-jriter.log" }
 
 # ── the funnel ───────────────────────────────────────────────────────────────
 if ($NoFunnel) {

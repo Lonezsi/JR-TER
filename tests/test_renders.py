@@ -8,7 +8,7 @@ bytes when either end of it is undone.
 """
 import os
 
-from jong import blobs
+from jriter import blobs
 
 
 def waiting(server):
@@ -106,7 +106,7 @@ def test_putting_one_back_leaves_the_version_alone(server, wav):
 def test_throwing_a_waiting_render_away_takes_its_bytes(server, wav):
     _, arrived = server.upload("/api/renders", wav(), filename="mistake.wav")
     digest = None
-    from jong import db
+    from jriter import db
     digest = db.one("SELECT digest FROM renders WHERE id = ?",
                     (arrived["render"]["id"],))["digest"]
     assert blobs.exists(digest)
@@ -336,7 +336,7 @@ def test_the_dates_survive_becoming_a_version(server, wav):
     "What have I not touched in six months" was measuring the wrong thing."""
     import time
 
-    from jong import db
+    from jriter import db
 
     made = time.time() - 86400 * 90
     bounced = time.time() - 86400 * 3
@@ -357,7 +357,7 @@ def test_a_migration_step_runs_once_and_is_written_down(server):
     """Six roadmap items add one of these and nothing recorded what had run, so the first
     migration that has to transform data rather than add a column would have run twice on
     a restore, silently."""
-    from jong import db, registry
+    from jriter import db, registry
 
     ran = []
     registry._migrate("pretend", [("a_step", lambda: ran.append(1))])
@@ -415,7 +415,7 @@ def test_a_file_that_will_not_play_is_flagged_rather_than_failing_the_upload(ser
 
 def test_renders_that_predate_the_shape_can_be_looked_at_afterwards(server, wav):
     """Nothing in normal use would ever give them one, so there is a way to ask."""
-    from jong import db
+    from jriter import db
 
     _, arrived = server.upload("/api/renders", wav("older.wav", seconds=0.8, level=0.4))
     render_id = arrived["render"]["id"]

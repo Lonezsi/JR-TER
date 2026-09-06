@@ -11,8 +11,8 @@ import urllib.error
 
 import pytest
 
-from jong import config, registry
-from jong.http import resolve
+from jriter import config, registry
+from jriter.http import resolve
 
 WEB = config.WEB
 JS_DIR = os.path.join(WEB, "js")
@@ -152,7 +152,7 @@ def test_the_page_asks_the_server_what_exists_before_drawing_it():
 def test_the_page_links_what_the_server_bundles():
     with open(os.path.join(WEB, "index.html"), encoding="utf-8") as f:
         page = f.read()
-    assert '"/jong.css"' in page and '"/jong.js"' in page
+    assert '"/jriter.css"' in page and '"/jriter.js"' in page
     # The stylesheet link itself, not merely a mention. This assertion used to pass on a
     # comment describing a typeface the page had stopped loading, which is a test that
     # cannot fail: deleting the link entirely would not have moved it.
@@ -165,7 +165,7 @@ def test_the_page_links_what_the_server_bundles():
 
 
 def test_the_bundles_are_not_empty():
-    from jong.http import bundle
+    from jriter.http import bundle
     css = bundle(CSS_DIR, ".css")
     js = bundle(JS_DIR, ".js")
     assert len(css) > 4000, "the stylesheet bundle is suspiciously small"
@@ -215,7 +215,7 @@ def test_the_hidden_attribute_beats_the_layout():
     Anything that carries the hidden attribute and also gets a display from its class
     depends on this one line.
     """
-    from jong.http import bundle
+    from jriter.http import bundle
     css = bundle(CSS_DIR, ".css").decode("utf-8")
     assert re.search(r"\[hidden\]\s*\{[^}]*display:\s*none\s*!important", css), \
         "nothing makes the hidden attribute win, so hidden elements with a display show"
@@ -362,7 +362,7 @@ def test_a_page_revalidates_instead_of_being_held_for_a_day(server):
     kept serving yesterday's markup for a day. That is how a corrected button stayed
     broken on screen long after it was fixed."""
     import urllib.request
-    for path in ("/login", "/jong.css"):
+    for path in ("/login", "/jriter.css"):
         with urllib.request.urlopen(server.base + path, timeout=10) as response:
             cache = response.headers.get("Cache-Control", "")
             etag = response.headers.get("ETag")
@@ -674,7 +674,7 @@ def test_a_key_pressed_on_a_nested_control_does_that_controls_job():
 def test_every_script_actually_parses():
     """One bad character takes the whole app down.
 
-    The JS files are concatenated into a single /jong.js, so a syntax error anywhere in
+    The JS files are concatenated into a single /jriter.js, so a syntax error anywhere in
     any of them means no J at all: every screen renders empty and nothing in the console
     points at which file. It has happened twice, both times from an escape mangled while
     editing rather than from the code being wrong.

@@ -12,7 +12,7 @@ import wave
 
 import pytest
 
-from jong import audio_meta
+from jriter import audio_meta
 
 
 def _write(path, frames, amp=12000, rate=44100, channels=1, width=2):
@@ -118,7 +118,7 @@ def test_a_take_gets_its_shape_on_arrival(server, wav):
 def test_examine_fills_in_takes_that_have_no_shape(server, wav):
     """Everything already in a library arrived before this existed. Nothing in ordinary
     use would give those a shape, so the song screen asks for a batch when it opens."""
-    from jong import db
+    from jriter import db
 
     song_id = _make_song_with_take(server, wav())
     # Exactly the state an older library is in: rows with no shape and no verdict.
@@ -136,7 +136,7 @@ def test_examine_fills_in_takes_that_have_no_shape(server, wav):
 
 
 def test_examine_says_which_takes_are_silent(server, wav):
-    from jong import db
+    from jriter import db
 
     song_id = _make_song_with_take(server, wav("quiet.wav", seconds=1.0, level=0.00002))
     db.run("UPDATE versions SET peaks = '', peak_db = NULL, trouble = ''")
@@ -152,7 +152,7 @@ def test_examine_says_which_takes_are_silent(server, wav):
 def test_examine_is_bounded_and_stops(server, wav):
     """Seven hundred files must not hold one request open for a minute, and the screen
     must be able to tell when there is nothing left to ask about."""
-    from jong import db
+    from jriter import db
 
     for n in range(4):
         _make_song_with_take(server, wav("take%d.wav" % n, seconds=0.4),
@@ -173,7 +173,7 @@ def test_examine_is_bounded_and_stops(server, wav):
 def test_examine_does_not_ask_about_the_same_file_forever(server, wav, tmp_path):
     """A file the server cannot decode has to be marked, or every pass looks at it again
     and the screen never stops asking."""
-    from jong import db
+    from jriter import db
 
     status, made = server.post("/api/songs", {"title": "Elsewhere"})
     song_id = made["song"]["id"]
@@ -201,7 +201,7 @@ def test_a_render_gets_its_shape_on_arrival(server, wav):
 
 
 def test_examine_flags_a_silent_render(server, wav):
-    from jong import db
+    from jriter import db
 
     server.upload("/api/renders", wav("hush.wav", seconds=1.0, level=0.00002),
                   filename="hush.wav")
@@ -216,7 +216,7 @@ def test_examine_flags_a_silent_render(server, wav):
 
 
 def test_render_examine_does_not_ask_about_the_same_file_forever(server, tmp_path):
-    from jong import db
+    from jriter import db
 
     mp3 = tmp_path / "elsewhere.mp3"
     mp3.write_bytes(b"\xff\xfb" + b"\x00" * 4000)

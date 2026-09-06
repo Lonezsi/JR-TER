@@ -187,7 +187,7 @@ def upload_cover(req):
     filename = (req.headers.get("X-Filename") or "cover.jpg").strip()
     ext = os.path.splitext(filename)[1].lower()
     if ext not in config.IMAGE_EXT:
-        raise Error("%s is not an image J-ong handles" % (ext or filename))
+        raise Error("%s is not an image JR!TER handles" % (ext or filename))
     digest, _, _ = blobs.put_stream(req.rfile, length)
     db.update("albums", album["id"],
               {"cover_digest": digest, "cover_ext": ext, "updated_at": time.time()})

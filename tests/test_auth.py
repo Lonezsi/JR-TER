@@ -10,8 +10,8 @@ import time
 
 import pytest
 
-from jong import config, registry
-from jong.modules import auth
+from jriter import config, registry
+from jriter.modules import auth
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def test_a_fresh_library_has_no_password_and_offers_a_setup_code(secured):
 
 
 def test_the_setup_code_is_needed_to_choose_the_first_password(secured):
-    """Without this, the first stranger to find a public J-ong picks the password and
+    """Without this, the first stranger to find a public JR!TER picks the password and
     locks the owner out of their own library."""
     status, answer = secured.post("/api/auth/setup",
                                   {"code": "not-the-code", "password": "whatever"})
@@ -128,7 +128,7 @@ def test_the_door_and_its_stylesheet_stay_open(secured):
     code = auth.setup_code()
     secured.post("/api/auth/setup", {"code": code, "password": "a"})
     assert secured.get("/login")[0] == 200
-    assert secured.get("/jong.css")[0] == 200
+    assert secured.get("/jriter.css")[0] == 200
     assert secured.get("/api/auth/state")[0] == 200
 
 
@@ -240,8 +240,8 @@ def test_a_damaged_auth_file_shuts_the_door_and_is_left_alone(secured):
     """
     import os
 
-    from jong import config
-    from jong.modules import auth
+    from jriter import config
+    from jriter.modules import auth
 
     path = os.path.join(config.DATA, "auth.json")
     with open(path, "w", encoding="utf-8") as f:
@@ -273,8 +273,8 @@ def test_a_missing_auth_file_is_still_just_a_fresh_library(secured):
     """The other half of the same distinction: absent is normal and must keep working."""
     import os
 
-    from jong import config
-    from jong.modules import auth
+    from jriter import config
+    from jriter.modules import auth
 
     path = os.path.join(config.DATA, "auth.json")
     if os.path.exists(path):
@@ -306,7 +306,7 @@ def test_a_token_gets_a_machine_in_where_a_session_would_not(secured):
     status, _ = secured.request("GET", "/api/state")
     assert status == 401, "a caller with no credential should be turned away"
 
-    status, _ = secured.request("GET", "/api/state", headers={"X-Jong-Token": raw})
+    status, _ = secured.request("GET", "/api/state", headers={"X-Jriter-Token": raw})
     assert status == 200, "the token did not open the door"
 
 
@@ -317,7 +317,7 @@ def test_a_token_cannot_reach_past_what_it_was_made_for(secured):
     owner = _as_owner(secured)
     _, made = secured.request("POST", "/api/auth/tokens", {"name": "the laptop"},
                               headers=owner)
-    machine = {"X-Jong-Token": made["token"]}
+    machine = {"X-Jriter-Token": made["token"]}
 
     _, song = secured.request("POST", "/api/songs", {"title": "Not Yours To Delete"},
                               headers=owner)
@@ -336,7 +336,7 @@ def test_the_token_itself_is_never_stored(secured):
     hand anybody a working credential."""
     import json as _json
 
-    from jong import db
+    from jriter import db
 
     owner = _as_owner(secured)
     _, made = secured.request("POST", "/api/auth/tokens", {"name": "the laptop"},
@@ -351,7 +351,7 @@ def test_a_revoked_token_stops_working(secured):
     owner = _as_owner(secured)
     _, made = secured.request("POST", "/api/auth/tokens", {"name": "gone soon"},
                               headers=owner)
-    machine = {"X-Jong-Token": made["token"]}
+    machine = {"X-Jriter-Token": made["token"]}
     assert secured.request("GET", "/api/state", headers=machine)[0] == 200
 
     _, listed = secured.request("GET", "/api/auth/tokens", headers=owner)
@@ -369,10 +369,10 @@ def test_an_upload_token_can_do_everything_the_client_actually_does(secured):
     import os
     import re
 
-    from jong.modules import auth
+    from jriter.modules import auth
 
     client = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                          "client", "jong_client.py")
+                          "client", "jriter_client.py")
     source = open(client, encoding="utf-8").read()
 
     wanted = set(re.findall(r'server\.(?:get|post|upload)\(\s*f?"(/api/[^"?]*)', source))

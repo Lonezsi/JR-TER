@@ -27,7 +27,7 @@ J.api = async function (path, options) {
       break;
     } catch (e) {
       if (attempt >= attempts) {
-        throw new Error("J-ong is not answering. It may be restarting; "
+        throw new Error("JR!TER is not answering. It may be restarting; "
                         + "give it a moment and try again.");
       }
       await new Promise((done) => setTimeout(done, attempt * 400));

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>J-ong</title>
+<title>JR!TER</title>
 <meta name="theme-color" content="#0F1311">
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Manrope:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/jong.css">
+<link rel="stylesheet" href="/jriter.css">
 <style>
 /* The door. It borrows the app's tokens and adds nothing of its own but a layout. */
 body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4); }
@@ -28,12 +28,19 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 }
 @media (prefers-reduced-motion: reduce) { .door { animation: none; } }
 .door h1 {
+  display: flex; align-items: center; gap: 7px;
   font-family: var(--display); font-weight: 800; font-size: 34px;
   letter-spacing: -0.03em; margin: 0 0 var(--s2);
 }
-.door h1::after {
-  content: ""; display: inline-block; width: 9px; height: 9px; margin-left: 4px;
-  border-radius: 50%; background: var(--accent); vertical-align: 5px;
+/* The rest carries the accent, where a green dot after the name used to. */
+.door h1 .rest { flex: none; color: var(--accent); }
+/* Quieter and smaller than the blurb under it, so it reads as a line about what this
+   is rather than as another instruction. Its own element, because the blurb is
+   rewritten on load and swaps between the setup and sign in wordings. */
+.slogan {
+  margin: 0 0 var(--s4);
+  font-size: 11.5px; letter-spacing: 0.06em;
+  color: var(--text-3);
 }
 .door p { color: var(--text-2); margin: 0 0 var(--s6); font-size: 14px; line-height: 1.6; }
 .door label {
@@ -85,7 +92,14 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 
 
 <form class="door" id="door" autocomplete="on">
-  <h1>J-ong</h1>
+  <h1><svg class="rest" viewBox="0 0 12 30" width="13" height="32"
+             aria-hidden="true" focusable="false">
+          <path d="M8.5 2 L3.5 9.5 L8.5 15 L3.5 21" fill="none" stroke="currentColor"
+                stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3.5 21c3.2.6 4.9 2.4 4.9 4.6 0 1.6-1 2.6-2.4 2.6" fill="none"
+                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>JR!TER</h1>
+  <p class="slogan">please post for the world to see</p>
   <p id="blurb">Signing in.</p>
   <div class="problem" id="problem" hidden></div>
 
@@ -138,14 +152,14 @@ async function decideMode() {
     if (state.custom_font) {
       // The same face the library wears, so the door is part of the same product.
       const face = document.createElement("style");
-      face.textContent = '@font-face{font-family:"Jong Display";'
+      face.textContent = '@font-face{font-family:"Jriter Display";'
         + 'src:url("/api/appearance/font");font-display:swap}';
       document.head.appendChild(face);
     }
     if (state.signed_in) { location.href = "/"; return; }
     mode = state.has_password ? "login" : "setup";
   } catch (e) {
-    problem("J-ong is not answering.");
+    problem("JR!TER is not answering.");
     return;
   }
 

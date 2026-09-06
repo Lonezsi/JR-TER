@@ -202,7 +202,7 @@ def test_albums_that_predate_playlists_get_one_without_being_opened(server):
     """The backfill has to happen where a playlist would first be noticed missing, not
     only when the album is opened: a rail that lists playlists would otherwise show
     nothing for an album nobody had visited yet."""
-    from jong import db
+    from jriter import db
     _, made = server.post("/api/albums", {"title": "Older"})
     album = made["album"]["id"]
     # Take its playlist away, standing in for an album made before this module existed.

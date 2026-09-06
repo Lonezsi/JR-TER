@@ -140,7 +140,7 @@ def test_the_arrangement_goes_when_the_song_does(server):
     server.put("/api/songs/%d/arrangement" % song_id, SHAPE)
     server.delete("/api/songs/%d" % song_id)
 
-    from jong import db
+    from jriter import db
     left = db.one("SELECT COUNT(*) AS n FROM arrangements WHERE song_id = ?", (song_id,))
     assert left["n"] == 0, "an arrangement outlived its song"
 

@@ -53,7 +53,7 @@ J.blockYouTube = async function (block, ctx) {
      * see and cannot take, so hand it over selected instead. */
     await J.sheet({
       title: "Here is the link",
-      sub: "This browser would not let J-ong reach the clipboard. It is selected ready to copy.",
+      sub: "This browser would not let JR!TER reach the clipboard. It is selected ready to copy.",
       confirm: "",
       cancel: "Done",
       body: `<input class="field" id="ytLink" value="${J.esc(text)}" readonly>`,
@@ -108,7 +108,7 @@ J.blockYouTube = async function (block, ctx) {
     if (!posts.length) {
       block.innerHTML = `${head}
         <p class="faint yt-none">Nothing of this song is on YouTube yet, or nothing that
-          J-ong has been told about. Upload renders the file through this song's sound and
+          JR!TER has been told about. Upload renders the file through this song's sound and
           its arrangement so you can save it and put it up, and keeps the link here against
           the version that went up.
           <button class="linkish" data-act="record">Or paste a link you already have</button>.</p>`;
@@ -166,7 +166,7 @@ J.blockYouTube = async function (block, ctx) {
       { label: "Forget this link", icon: "drop", danger: true,
         run: async () => {
           const sure = await J.confirm("Forget this link?",
-            "Nothing on YouTube changes. J-ong stops recording that it is there.",
+            "Nothing on YouTube changes. JR!TER stops recording that it is there.",
             "Forget it");
           if (!sure) return;
           await J.try(() => J.del(`/api/youtube/${post.id}`), "Forgotten");
