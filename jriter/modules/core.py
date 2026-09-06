@@ -36,11 +36,18 @@ def get_settings(req):
 
 def put_settings(req):
     patch = req.json()
-    allowed = {"library_name", "accent", "auto_update", "sync_interval_minutes"}
+    allowed = {"library_name", "accent", "auto_update", "sync_interval_minutes",
+               "ffmpeg_path"}
     unknown = set(patch) - allowed
     if unknown:
         raise Error("not a setting: " + ", ".join(sorted(unknown)))
-    return config.save_settings(patch)
+    saved = config.save_settings(patch)
+    if "ffmpeg_path" in patch:
+        # The lookup is cached for the same reason updater._COMMIT is, and somebody who
+        # has just typed a path in should not have to restart the server to be believed.
+        from .. import video
+        video.forget()
+    return saved
 
 
 def health(req):

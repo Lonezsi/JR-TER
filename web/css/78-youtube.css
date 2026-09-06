@@ -212,3 +212,40 @@
 
 /* When there is no arrangement to show. */
 .yt-nocomp { margin: 0; padding: var(--s4); font-size: 13px; max-width: 60ch; }
+
+/* ── sending it ───────────────────────────────────────────────────────────── */
+
+/* The bar while a video is being made and sent. Two states in one row: what it is doing
+   in words, because "encoding" and "uploading" are different waits and a bar alone
+   cannot say which, and how far along in a line. */
+.yt-progress { display: flex; align-items: center; gap: var(--s3); margin: var(--s3) 0; }
+.yt-status { flex: none; font-size: 12.5px; color: var(--text-2); }
+.yt-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--grad-sunken);
+  overflow: hidden;
+}
+.yt-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--grad-accent);
+  transition: width var(--med);
+}
+
+/* ffmpeg's own words when it refuses. Kept as it wrote them, because the error is nearly
+   always more use than anything written about it, and monospace is what makes a path or
+   a codec name readable. */
+.yt-log {
+  margin: var(--s3) 0 0;
+  padding: var(--s3);
+  max-height: 180px;
+  overflow: auto;
+  border-radius: var(--r-md);
+  background: var(--grad-sunken);
+  color: var(--text-3);
+  font: 11.5px/1.5 ui-monospace, monospace;
+  white-space: pre-wrap;
+}

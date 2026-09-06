@@ -37,15 +37,23 @@ J.views.youtube = {
       { key: "public", label: "Public", note: "listed and searchable" },
     ];
     let privacy = "private";
+    //: What the machine can do, asked once a load. There is no ffmpeg in this project's
+    //: dependencies because there cannot be: it is a program you install.
+    let ffmpeg = { found: false, why: "" };
+    //: The upload in flight, as the server sees it, or null.
+    let job = null;
+    let watching = null;
 
     async function load() {
-      const [song, versions, sound, art, connected] = await Promise.all([
+      const [song, versions, sound, art, connected, tool] = await Promise.all([
         J.get(`/api/songs/${songId}`),
         J.get(`/api/songs/${songId}/versions`),
         J.get(`/api/songs/${songId}/sound`).catch(() => ({ presets: [] })),
         J.get(`/api/songs/${songId}/artwork`).catch(() => ({ artwork: [] })),
         J.get("/api/youtube/account").catch(() => ({ accounts: [], chosen: null })),
+        J.get("/api/youtube/tool").catch(() => ({ found: false, why: "" })),
       ]);
+      ffmpeg = tool;
       const list = versions.versions || [];
       ctx = {
         song: song.song,
@@ -345,6 +353,138 @@ J.views.youtube = {
 
     // ── the page ─────────────────────────────────────────────────────────────
 
+    /* Sending it, which is two calls and then waiting.
+     *
+     * The wav goes up first, and it is the same Blob that is behind the audition player
+     * and behind Save the file. Not a second render on the server: the equaliser, the
+     * limiter and the arrangement live in one chain in the browser, J.bounce shares it
+     * with the player, and a Python copy of that chain would be a second implementation
+     * that agreed until it did not. What goes to YouTube is what you pressed play on. */
+    async function sendIt() {
+      if (!bounced) return;
+      const mix = await J.try(() => J.api(`/api/songs/${songId}/youtube/mix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: bounced.blob,
+      }));
+      if (!mix) return;
+      const started = await J.try(() => J.post(`/api/songs/${songId}/youtube/upload`, {
+        digest: mix.digest,
+        version_id: ctx.current.id,
+        title: (J.$("#ytName", root) || {}).value ? J.$("#ytName", root).value.trim()
+                                                  : ctx.song.title,
+        description: (J.$("#ytDesc", root) || {}).value || "",
+        privacy,
+      }));
+      if (!started) return;
+      job = started.job;
+      draw();
+      watch();
+    }
+
+    /* One GET a second while something is running, and none when nothing is.
+     *
+     * The server is a ThreadingHTTPServer with no websockets, so polling is the only way,
+     * and this is the shape the renders screen already uses to finish its examine passes.
+     * A second is well inside what a moving bar needs, and it stops the moment the job
+     * reaches a state it will not leave or the page goes. */
+    function watch() {
+      if (watching) return;
+      watching = setInterval(async () => {
+        if (!root.isConnected) { clearInterval(watching); watching = null; return; }
+        const now = await J.get("/api/youtube/job").catch(() => null);
+        if (!now) return;        // one missed poll is not worth saying anything about
+        job = now.job;
+        draw();
+        if (!job || (job.state !== "encoding" && job.state !== "uploading")) {
+          clearInterval(watching);
+          watching = null;
+        }
+      }, 1000);
+    }
+
+    /* The card, drawn from what is actually possible.
+     *
+     * There is deliberately no disabled button in here. A control that cannot work is a
+     * worse answer than a sentence saying why, because a sentence can say what to do
+     * about it, and this page spent its first version being a disabled button. */
+    function sendingCard() {
+      if (!ffmpeg.found) {
+        return `<section class="yt-card yt-last">
+          <h2>Sending it</h2>
+          <p>${J.esc(ffmpeg.why || "JR!TER cannot find ffmpeg on this machine.")}</p>
+          <p class="faint">Everything above still works. Render it, save the file, and put
+            it up by hand in the meantime.</p>
+        </section>`;
+      }
+      if (!((account && account.accounts) || []).length) {
+        return `<section class="yt-card yt-last">
+          <h2>Sending it</h2>
+          <p>No YouTube account is connected yet, so there is nowhere to send it. Connect
+            one below and this becomes a button.</p>
+        </section>`;
+      }
+      if (job && (job.state === "encoding" || job.state === "uploading")) {
+        const sent = job.total ? `${J.bytes(job.sent)} of ${J.bytes(job.total)}` : "";
+        return `<section class="yt-card yt-last">
+          <h2>Sending it</h2>
+          <div class="yt-progress">
+            <span class="yt-status">${J.esc(job.step)}</span>
+            <span class="yt-bar"><span style="width:${Math.round(job.at * 100)}%"></span></span>
+          </div>
+          <p class="faint">${J.esc(sent)}</p>
+          <div class="row wrap"><button class="btn sm ghost" data-act="stop">Stop</button></div>
+        </section>`;
+      }
+      if (job && job.state === "done") {
+        /* What YouTube did, not what the form asked for. Asking for public and being
+         * given private is the ordinary case until the Google project is audited, and a
+         * page that repeated the form back would be lying about who can see this. */
+        const forced = job.privacy_asked !== "private" && job.privacy_got === "private";
+        return `<section class="yt-card yt-last">
+          <h2>It is up</h2>
+          <p><a href="${J.esc(job.url)}" target="_blank" rel="noopener noreferrer"
+            >${J.esc(job.url)}</a></p>
+          <p class="faint">It is ${J.esc(job.privacy_got)} on YouTube.${forced
+            ? ` You asked for ${J.esc(job.privacy_asked)}. Google forces every upload from
+                a project it has not audited to private, so that is what it is. Change it
+                in YouTube Studio, or wait for the audit and this stops happening.` : ""}</p>
+          <p class="faint">The link is saved against v${ctx.current ? ctx.current.n : "?"}
+            on the song page.</p>
+        </section>`;
+      }
+      if (job && job.state === "failed") {
+        return `<section class="yt-card yt-last">
+          <h2>It did not go</h2>
+          <p>${J.esc(job.error)}</p>
+          ${job.fix ? `<p class="faint">${J.esc(job.fix)}</p>` : ""}
+          ${job.log && job.log.length
+            ? `<pre class="yt-log">${J.esc(job.log.join("\n"))}</pre>` : ""}
+          <div class="row wrap">
+            ${bounced ? '<button class="btn primary" data-act="send">Try again</button>' : ""}
+          </div>
+        </section>`;
+      }
+      if (!bounced) {
+        return `<section class="yt-card yt-last">
+          <h2>Sending it</h2>
+          <p class="faint">Render it above first. The file that goes up is the one you can
+            play here, so there is nothing to send until there is something to hear.</p>
+        </section>`;
+      }
+      const where = (account.accounts.find((a) => a.id === account.chosen) || {}).name
+        || "your channel";
+      return `<section class="yt-card yt-last">
+        <h2>Sending it</h2>
+        <p class="faint">JR!TER makes a video out of this mix and the artwork and sends it
+          to ${J.esc(where)}. About ${J.bytes(bounced.blob.size)} goes to the server, and
+          the video that goes to YouTube is a good deal smaller.</p>
+        <div class="row wrap">
+          <button class="btn primary" data-act="send">Send to YouTube</button>
+        </div>
+      </section>`;
+    }
+
     function draw() {
       const cover = ctx.artwork.length ? `/api/artwork/${ctx.artwork[0].id}/image` : null;
       const accounts = (account && account.accounts) || [];
@@ -462,20 +602,7 @@ J.views.youtube = {
                 a plain colour. Add a picture on the song page first if that matters.</p>`}
             </section>
 
-            <section class="yt-card yt-last">
-              <h2>Sending it</h2>
-              <p>Everything above is finished and working: the file is rendered from the
-                sound and the cut you set here, and it can be auditioned and saved.
-                <b>JR!TER cannot send it to YouTube yet.</b></p>
-              <p class="faint">YouTube takes video, not audio, so a rendered wav cannot be
-                uploaded as it is. Turning the audio and the artwork into a video is the
-                one piece still to build. Until then: render it, save the file, and put it
-                up by hand.</p>
-              <div class="row wrap">
-                <button class="btn primary" disabled title="Not built yet">Send to YouTube</button>
-                <span class="faint">the last step, not yet built</span>
-              </div>
-            </section>
+            ${sendingCard()}
 
             <section class="yt-card">
               <div class="yt-card-head">
@@ -592,9 +719,23 @@ J.views.youtube = {
     /* Cutting a clip changes the length of what goes out, so the summary follows it and
      * anything already rendered stops being the truth. Also the moment to notice the page
      * has gone and give back what it was holding. */
+    root.addEventListener("click", async (e) => {
+      const act = e.target.closest("[data-act]");
+      if (!act) return;
+      if (act.dataset.act === "send") return sendIt();
+      if (act.dataset.act === "stop") {
+        await J.try(() => J.post("/api/youtube/job/cancel", {}));
+        const now = await J.get("/api/youtube/job").catch(() => null);
+        if (now) { job = now.job; draw(); }
+      }
+    });
+
     J.on("arrange:change", function follow() {
       if (!root.isConnected) {
         J.bus.removeEventListener("arrange:change", follow);
+        // A job running when somebody navigates away must not leave a timer fetching for
+        // the life of the tab. The upload itself carries on: it is the server's.
+        if (watching) { clearInterval(watching); watching = null; }
         freeAudition();
         if (comp && comp.stop) comp.stop();
         return;

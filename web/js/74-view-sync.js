@@ -185,6 +185,8 @@ J.views.settings = {
     const state = await J.get("/api/state");
     let update = null;
     let log = null;
+    //: Whether this machine can make a video at all. Asked once, like the update check.
+    let tool = { found: false, why: "" };
     let font = (state.summary && state.summary.appearance) || { custom_font: false };
 
     function draw() {
@@ -203,6 +205,31 @@ J.views.settings = {
             </label>
             <div><button class="btn primary sm" data-act="save-settings">Save</button></div>
           </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Video</h2></div>
+          <p class="faint" style="margin-top:0">
+            Turning a mix and its artwork into a video needs ffmpeg, which is a separate
+            program. JR!TER does not carry it and does not install it. Without it the
+            upload page still renders the mix and hands you the file, it just cannot send
+            it.
+          </p>
+          ${tool.found ? `
+            <div class="list-row">
+              <span class="grow">
+                <div style="font-weight:600">${J.esc(tool.version)}</div>
+                <div class="faint" style="font-size:12px">${J.esc(tool.path)}</div>
+              </span>
+            </div>` : `
+            <div class="sheet-fields" style="max-width:520px">
+              <p class="faint">${J.esc(tool.why || "Looking for it.")}</p>
+              <label class="sheet-label">Where ffmpeg is
+                <input class="field" id="ffmpegPath" autocomplete="off"
+                       value="${J.esc(state.settings.ffmpeg_path || "")}"
+                       placeholder="C:\ffmpeg\bin\ffmpeg.exe"></label>
+              <div><button class="btn primary sm" data-act="save-settings">Save</button></div>
+            </div>`}
         </div>
 
         <div class="section">
@@ -313,6 +340,10 @@ J.views.settings = {
           library_name: J.$("#libName", root).value.trim() || "JR!TER",
           accent: J.$("#accent", root).value,
         };
+        // Only when the field is on screen, which it is not once ffmpeg has been found.
+        // Sending an empty string then would throw away a path somebody had typed in.
+        const where = J.$("#ffmpegPath", root);
+        if (where) patch.ffmpeg_path = where.value.trim();
         const saved = await J.try(() => J.put("/api/settings", patch), "Saved");
         if (saved) {
           state.settings = saved;
@@ -401,6 +432,11 @@ J.views.settings = {
     if (state.modules.includes("devlog")) {
       const found = await J.try(() => J.devlog.all());
       log = (found && found.entries) || [];
+      draw();
+    }
+
+    if (state.modules.includes("youtube")) {
+      tool = await J.get("/api/youtube/tool").catch(() => tool);
       draw();
     }
   },

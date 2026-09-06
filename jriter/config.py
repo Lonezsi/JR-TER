@@ -115,6 +115,10 @@ _DEFAULTS = {
     "accent": "#54B37A",
     "auto_update": True,
     "sync_interval_minutes": 5,
+    # Empty unless the machine hides it somewhere jriter/video.py does not look. A path
+    # rather than a switch, because ffmpeg is not a dependency: it is a program you
+    # install, and the only thing JR!TER needs from you is where it went.
+    "ffmpeg_path": "",
 }
 
 

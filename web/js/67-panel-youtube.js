@@ -108,9 +108,9 @@ J.blockYouTube = async function (block, ctx) {
     if (!posts.length) {
       block.innerHTML = `${head}
         <p class="faint yt-none">Nothing of this song is on YouTube yet, or nothing that
-          JR!TER has been told about. Upload renders the file through this song's sound and
-          its arrangement so you can save it and put it up, and keeps the link here against
-          the version that went up.
+          JR!TER has been told about. Upload renders the file through this song's sound
+          and its arrangement, turns it into a video, sends it, and keeps the link here
+          against the version that went up.
           <button class="linkish" data-act="record">Or paste a link you already have</button>.</p>`;
       return;
     }

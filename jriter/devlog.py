@@ -22,6 +22,26 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "2.1.0",
+        "date": "2026-09-06",
+        "name": JRITER,
+        "title": "It sends the video itself, and the box finds everything",
+        "notes": [
+            "The upload page makes an MP4 out of the mix and the artwork and sends it to "
+            "YouTube. It needs ffmpeg on the machine, which JR!TER does not carry and "
+            "will not install: without it the page still renders the mix and hands you "
+            "the file, and says so rather than showing a dead button.",
+            "The search box finds everything, in categories with a rule between them: "
+            "songs by any name they have ever had, the words themselves, albums, "
+            "playlists, takes, renders and captions.",
+            "Searching stopped being ASCII only, so a lower case accented title finds "
+            "itself, and a search for 100% stopped returning the whole library.",
+            "The rail and the player are glass that takes the colours apart slightly at "
+            "the edges.",
+            "A page with no artwork behind it has a very quiet drift of dust in it.",
+        ],
+    },
+    {
         "version": "2.0.0",
         "date": "2026-09-06",
         "name": JRITER,
