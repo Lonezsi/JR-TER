@@ -56,6 +56,46 @@ J.wearFont = function (info) {
   document.head.appendChild(style);
 };
 
+
+/* The two dials, applied.
+ *
+ * Both are numbers from nought to a hundred and both are set in one place, so "how strong
+ * is the glass" has a single answer rather than one in a stylesheet, one in a filter and
+ * one in a canvas that can drift apart.
+ *
+ * The aberration cannot be a CSS variable. An feDisplacementMap's scale is an SVG
+ * attribute and attributes do not read var(), so the three of them are written here. That
+ * is also why this runs on boot and not only when the setting is saved: the filter in the
+ * markup carries the shipped numbers and would otherwise ignore the setting entirely
+ * until somebody opened Settings and pressed Save.
+ */
+J.applyLook = function (settings) {
+  const said = settings || {};
+  const edge = J.clamp(Number(said.glass_edge === undefined ? 60 : said.glass_edge), 0, 100);
+
+  /* The middle scale is the refraction the glass has always had, and it does not move:
+   * changing it would change how much the glass bends things, which is a different
+   * decision from how far the colours come apart. Only the gap between the three moves.
+   * At a hundred that is plus or minus twenty two, which is about four pixels of red to
+   * blue separation over most of a panel and is very visible on a hard edge. */
+  const base = 26;
+  const spread = Math.round((edge / 100) * 22);
+  const scales = { rShift: base - spread, gShift: base, bShift: base + spread };
+  for (const [name, value] of Object.entries(scales)) {
+    const node = document.querySelector(`#glass-ca [result="${name}"]`);
+    if (node) node.setAttribute("scale", String(value));
+  }
+  /* Nought means off, and off means the plain glass rather than three displacements all
+   * at the same scale doing three times the work to look identical. */
+  document.documentElement.style.setProperty(
+    "--glass-filter-edge",
+    spread ? "url(#glass-ca) blur(22px) saturate(180%) brightness(1.06)"
+           : "var(--glass-filter)");
+
+  J.dust.strength(said.dust === undefined ? 55 : said.dust);
+};
+
+
 J.markNav = function (view) {
   J.$$("#nav a").forEach((link) => {
     link.classList.toggle("on", link.dataset.view === view);
@@ -170,6 +210,7 @@ async function boot() {
   // vanish the moment /api/state answered.
   J.$("#wordmarkName").textContent = state.name || "JR!TER";
   J.applyAccent(state.settings && state.settings.accent);
+  J.applyLook(state.settings);
   J.wearFont(state.summary && state.summary.appearance);
 
   /* The version, not the commit it was built from.

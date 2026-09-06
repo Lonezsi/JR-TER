@@ -203,6 +203,28 @@ J.views.settings = {
                 <span class="swatch-hex">${J.esc(state.settings.accent)}</span>
               </span>
             </label>
+
+            <label class="sheet-label">Dust
+              <span class="dial">
+                <input class="range" id="dust" type="range" min="0" max="100" step="5"
+                       value="${Number(state.settings.dust === undefined ? 55 : state.settings.dust)}">
+                <b id="dustSaid">${Number(state.settings.dust === undefined ? 55 : state.settings.dust)}</b>
+              </span>
+              <span class="faint dial-note">Specks drifting behind a page with no artwork
+                on it. Nought is none.</span>
+            </label>
+
+            <label class="sheet-label">Colour fringing on the glass
+              <span class="dial">
+                <input class="range" id="glassEdge" type="range" min="0" max="100" step="5"
+                       value="${Number(state.settings.glass_edge === undefined ? 60 : state.settings.glass_edge)}">
+                <b id="glassSaid">${Number(state.settings.glass_edge === undefined ? 60 : state.settings.glass_edge)}</b>
+              </span>
+              <span class="faint dial-note">How far the rail and the player split light
+                into colours at their edges. Nought is plain glass, and costs less to
+                draw.</span>
+            </label>
+
             <div><button class="btn primary sm" data-act="save-settings">Save</button></div>
           </div>
         </div>
@@ -331,6 +353,22 @@ J.views.settings = {
         </div>`;
     }
 
+    /* The dials do their thing while you drag them, before anything is saved.
+     *
+     * A slider you have to press Save to see the effect of is a slider you set by trial
+     * and error with a round trip in the middle. Nothing is written until Save: leaving
+     * this page without pressing it puts the saved setting back on the next load. */
+    root.addEventListener("input", (e) => {
+      const dial = e.target.closest("#dust, #glassEdge");
+      if (!dial) return;
+      const said = J.$(dial.id === "dust" ? "#dustSaid" : "#glassSaid", root);
+      if (said) said.textContent = dial.value;
+      J.applyLook({
+        dust: Number((J.$("#dust", root) || {}).value),
+        glass_edge: Number((J.$("#glassEdge", root) || {}).value),
+      });
+    });
+
     root.addEventListener("click", async (e) => {
       const act = e.target.closest("[data-act]");
       if (!act) return;
@@ -339,6 +377,8 @@ J.views.settings = {
         const patch = {
           library_name: J.$("#libName", root).value.trim() || "JR!TER",
           accent: J.$("#accent", root).value,
+          dust: Number(J.$("#dust", root).value),
+          glass_edge: Number(J.$("#glassEdge", root).value),
         };
         // Only when the field is on screen, which it is not once ffmpeg has been found.
         // Sending an empty string then would throw away a path somebody had typed in.
@@ -348,6 +388,7 @@ J.views.settings = {
         if (saved) {
           state.settings = saved;
           J.applyAccent(saved.accent);
+          J.applyLook(saved);
           J.emit("settings:changed");
         }
       }

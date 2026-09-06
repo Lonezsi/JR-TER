@@ -27,7 +27,14 @@ J.dust = (function () {
 
   //: One speck per this many square pixels: 35 on a 1080p screen, 22 on a 1440 by 900
   //: laptop, the floor of ten on a phone.
-  const AREA_PER = 34000, FEWEST = 14, MOST = 55;
+  //: At full strength. The dial scales the count and the brightness between nothing and
+  //: these, so a hundred is a room with visible dust in it and the old "you have to look
+  //: for it" setting is somewhere around thirty five.
+  const AREA_PER = 18000, FEWEST = 18, MOST = 90;
+
+  //: Nought to a hundred, from the settings. Kept here rather than read from the DOM on
+  //: every reseed, because it changes when somebody presses Save and at no other time.
+  let power = 0.55;
 
   //: The soft dot is drawn once at this size and stamped. Sixteen keeps the largest
   //: stamp a mild shrink and the smallest a four to one one, and a smooth gradient has
@@ -53,6 +60,14 @@ J.dust = (function () {
   let sprites = [];
   let specks = [];
   let hueNow = null;
+
+  /* Whether the PAGE wants dust, which is not the same as whether the loop is running.
+   *
+   * These were one thing, and taking the dial to nought tore the canvas down and left
+   * nothing that remembered the page had asked for it, so bringing the dial back up did
+   * nothing until you navigated. A song's artwork arriving is the page changing its mind;
+   * the dial going to nought is not. */
+  let wanted = false;
 
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -97,19 +112,24 @@ J.dust = (function () {
   }
 
   function seed() {
-    const many = J.clamp(Math.round(width * height / AREA_PER), FEWEST, MOST);
+    const room = width * height / AREA_PER;
+    const many = Math.round(J.clamp(room, FEWEST, MOST) * power);
     specks = [];
     for (let i = 0; i < many; i++) {
       specks.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: 5 + Math.random() * 9,          // the whole stamp; the core is about a third
-        /* Measured rather than guessed. The first pass ran at 0.045 to 0.13 and lit six
-         * hundredths of one per cent of the screen at a peak of seven per cent, which is
-         * not subtle, it is absent. This lights about half a per cent at a peak of
-         * sixteen: you see it if you look at an empty page for a moment, and never
-         * otherwise. */
-        peak: 0.07 + Math.random() * 0.16,    // 0.07 to 0.23 at its brightest
+        size: 5 + Math.random() * (9 + 5 * power),   // the stamp; the core is a third of it
+        /* Measured rather than guessed, and then put on a dial.
+         *
+         * The first pass ran at 0.045 to 0.13 and lit six hundredths of one per cent of
+         * the screen at a peak of seven per cent, which is not subtle, it is absent. At
+         * full strength this lights a couple of per cent at a peak of about a half, which
+         * is snow rather than dust. The dial is not linear: brightness is perceived
+         * roughly as a power law, so a straight multiply spends most of its travel doing
+         * nothing you can see at the bottom. */
+        peak: (0.05 + Math.random() * 0.12) + 0.55 * Math.pow(power, 1.6)
+              * (0.3 + Math.random() * 0.7),
         // All of them the same way. Dust in a room is air moving, and specks going in
         // every direction reads as noise rather than as a draught.
         vx: 3 + Math.random() * 6,
@@ -201,7 +221,8 @@ J.dust = (function () {
   // at the next navigation.
   const onMotion = () => { if (motion.matches) stop(); };
 
-  function stop() {
+  //: Take the loop and the canvas away, without forgetting that the page asked for it.
+  function halt() {
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     document.removeEventListener("visibilitychange", onShow);
     motion.removeEventListener("change", onMotion);
@@ -213,12 +234,23 @@ J.dust = (function () {
     specks = [];
     sprites = [];
     last = 0;
-    hueNow = null;
   }
 
-  function start(hue) {
+  //: The page has changed its mind: a song's artwork is up, so there is nothing to draw
+  //: and nothing to come back to.
+  function stop() {
+    wanted = false;
+    hueNow = null;
+    halt();
+  }
+
+  function begin(hue) {
     // The whole idea is movement, so there is nothing to degrade to. Off is the answer.
     if (motion.matches) return;
+    // And nought on the dial is somebody saying they do not want it, which is the same
+    // answer arrived at from the other direction. The page's ask is remembered either
+    // way, so turning the dial back up starts it without needing a navigation.
+    if (!power) return;
     const next = (hue === null || hue === undefined) ? null : Number(hue);
     if (canvas) {
       // Already drifting. A different song without artwork only changes the colour.
@@ -253,11 +285,31 @@ J.dust = (function () {
     requestAnimationFrame(() => { if (canvas) canvas.classList.add("on"); });
   }
 
+  /* What the page calls. It records the ask and then does whatever the dial allows. */
+  function start(hue) {
+    wanted = true;
+    hueNow = (hue === null || hue === undefined) ? null : Number(hue);
+    begin(hue);
+  }
+
   return {
     start,
     stop,
     /* The accent changed under us. A no op unless something is actually drifting. */
     retint() { if (canvas) tint(); },
+    /* How much of it there is, nought to a hundred. Nought stops it outright rather than
+     * drawing an empty canvas under the glass for ever, which would be the compositor
+     * paying for something with nothing in it. */
+    strength(value) {
+      const next = J.clamp(Number(value) || 0, 0, 100) / 100;
+      if (next === power) return;
+      power = next;
+      if (!power) { halt(); return; }
+      // Back up from nought, on a page that still wants it. begin() is what knows how to
+      // build a canvas; calling seed() here would reseed one that is not there.
+      if (!canvas) { if (wanted) begin(hueNow); return; }
+      seed();
+    },
     /* For a trace: J.dust.running is what you turn off to get the second measurement. */
     get running() { return !!raf; },
   };

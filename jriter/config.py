@@ -115,6 +115,12 @@ _DEFAULTS = {
     "accent": "#54B37A",
     "auto_update": True,
     "sync_interval_minutes": 5,
+    # Two dials, nought to a hundred, for the two things on this page that are taste
+    # rather than function. Nought is off in both cases and is a real answer: a machine
+    # that struggles with either has one place to turn it off, and reduced motion and
+    # reduced transparency still override both whatever these say.
+    "dust": 55,
+    "glass_edge": 60,
     # Empty unless the machine hides it somewhere jriter/video.py does not look. A path
     # rather than a switch, because ffmpeg is not a dependency: it is a program you
     # install, and the only thing JR!TER needs from you is where it went.

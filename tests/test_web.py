@@ -785,12 +785,17 @@ def test_the_dust_stops_completely():
     a 22px blur over the rail and the player for ever.
     """
     text = pathlib.Path(JS_DIR, "18-dust.js").read_text(encoding="utf-8")
-    stop = text[text.index("function stop()"):text.index("function start(")]
+    # halt() is the teardown. stop() is the page saying it no longer wants any, and the
+    # dial going to nought is the other caller: both end here, and this is the one place
+    # that has to give everything back.
+    halt = text[text.index("function halt()"):text.index("function stop()")]
     for gone in ("cancelAnimationFrame",
                  'removeEventListener("visibilitychange"',
                  'removeEventListener("change"',
                  "canvas.remove()"):
-        assert gone in stop, "18-dust.js stop() does not do %s" % gone
+        assert gone in halt, "18-dust.js halt() does not do %s" % gone
+    stop = text[text.index("function stop()"):text.index("function begin(")]
+    assert "halt()" in stop, "stop() no longer tears anything down"
     assert "if (motion.matches) return" in text, \
         "18-dust.js starts the loop without checking prefers-reduced-motion"
 
