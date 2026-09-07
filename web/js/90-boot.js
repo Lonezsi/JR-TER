@@ -107,32 +107,56 @@ J.applyLook = function (settings) {
 
 /* Who is signed in, at the foot of the rail.
  *
- * Absent rather than empty when nothing is connected. A grey circle with no picture and no
- * name in it is a thing people press to find out what it is, and the answer would be
- * nothing.
+ * Always there, because "which library am I looking at" is a question a server with more
+ * than one account on it can always be asked, and a row that appears only sometimes is a
+ * row nobody learns to look for. It used to be hidden until a Google account was connected,
+ * which meant the JR!TER account it is actually about was never shown at all.
+ *
+ * Two lines, and which is which depends on what is connected:
+ *
+ *   connected      the channel's picture and name, with the JR!TER account underneath
+ *   not connected  a plain circle and the JR!TER account, with why underneath
+ *
+ * The big line is whoever you are to the outside world, because that is the one you would
+ * check before posting something. The small line is the rest.
  *
  * The picture comes from this server, not from Google. See youtube.avatar for why: the
  * short version is that putting Google's own URL in the page would mean a request to a
- * Google host every time anybody opens the library. If there is no picture the circle
- * carries the first letter of the name, which is what it does for a channel that never
- * had one.
+ * Google host every time anybody opens the library.
  */
 async function showAccount(state) {
   const row = J.$("#railAccount");
   if (!row) return;
+  const big = J.$("#railAccountName");
+  const small = J.$("#railAccountSub");
+  const face = J.$("#railAvatar");
+
+  // Who this is on this server. Comes back on /api/state, so it costs nothing.
+  const mine = (state.summary && state.summary.auth && state.summary.auth.who) || null;
+  const jriter = (mine && mine.name) || state.name || "JR!TER";
+
+  const letter = (name) => (String(name || "?").trim()[0] || "?").toUpperCase();
+
+  // The state before anything is asked, so the row is right even if the next call fails.
+  big.textContent = jriter;
+  small.textContent = state.modules.includes("youtube")
+    ? "not logged into google" : "";
+  face.textContent = letter(jriter);
+  face.style.removeProperty("background-image");
+  row.hidden = false;
+
   if (!(state.modules || []).includes("youtube")) return;
 
   // Caught rather than J.try'd. J.try raises a toast, and "your account could not be
-  // looked up" is not news worth interrupting somebody with on the way into the app: the
-  // row simply does not appear, which is what it does when nothing is connected anyway.
+  // looked up" is not news worth interrupting somebody with on the way into the app.
   const said = await J.get("/api/youtube/account").catch(() => null);
   const chosen = said && (said.accounts || []).find((a) => a.id === said.chosen);
   const account = chosen || (said && (said.accounts || [])[0]);
-  if (!account) return;                       // stays hidden, which is the honest state
+  if (!account) return;                       // the not connected wording above stands
 
-  J.$("#railAccountName").textContent = account.name || "";
-  const face = J.$("#railAvatar");
-  face.textContent = (account.name || "?").trim()[0].toUpperCase();
+  big.textContent = account.name || jriter;
+  small.textContent = jriter;
+  face.textContent = letter(account.name || jriter);
   if (account.has_avatar) {
     /* Only once it has loaded.
      *
@@ -146,7 +170,6 @@ async function showAccount(state) {
     };
     picture.src = "/api/youtube/avatar";
   }
-  row.hidden = false;
 }
 
 
@@ -169,14 +192,13 @@ async function buildRail(state) {
   const items = [["library", "Library"]];
   if (state.modules.includes("renders")) items.push(["renders", "Renders"]);
   if (state.modules.includes("sync")) items.push(["sync", "Folders"]);
-  /* Only when somebody has actually shared something.
+  /* Always, when the module is on.
    *
-   * A permanent "Shared with me" on a server with one person on it is a nav item that is
-   * empty for ever. The count comes off /api/state, which every page load already asks
-   * for, so this costs nothing. */
-  if ((state.summary && state.summary.sharing || {}).shared_with_me) {
-    items.push(["shared", "Shared with me"]);
-  }
+   * It used to appear only once somebody had actually shared something, on the reasoning
+   * that an empty list is a nav item that never does anything. That is backwards: nobody
+   * can be told "it will turn up under Shared with me" about a place that does not exist
+   * yet, and the empty screen is where that promise is made. */
+  if (state.modules.includes("sharing")) items.push(["shared", "Shared with me"]);
   items.push(["settings", "Settings"]);
   nav.innerHTML = items.map(([view, label]) =>
     `<a href="#/${view === "library" ? "" : view}" data-link data-view="${view}">
@@ -407,6 +429,12 @@ async function boot() {
   const AFTER_DRAG = 400;
   //: Holding the rail past its open stop for this long offers the page behind it.
   const HOLD = 1000;
+  //: And it waits this long to be pressed before taking itself away.
+  //:
+  //: Counted from letting go rather than from appearing, because while a thumb is still on
+  //: the rail the offer has not been made yet: you cannot press a thing you are holding
+  //: the screen down with.
+  const OFFERED = 2000;
   //: How far past open counts as holding it there rather than merely having opened it.
   //: Under the overscroll band, which moves the rail a third of the finger, so this is
   //: about fifty pixels of actual thumb travel past the stop: far enough that nobody
@@ -455,6 +483,7 @@ async function boot() {
    */
   const bubble = J.$("#edgeBubble");
   let holdTimer = null;
+  let fadeTimer = null;
   let armed = false;
 
   function offerAbout() {
@@ -463,14 +492,76 @@ async function boot() {
     if (navigator.vibrate) {
       try { navigator.vibrate(18); } catch (err) { /* refused, and it does not matter */ }
     }
-    if (bubble) bubble.classList.add("on");
+    if (!bubble) return;
+    bubble.classList.add("on");
+    // Reachable while it is being offered, and neither read out nor tabbable otherwise.
+    bubble.removeAttribute("aria-hidden");
+    bubble.tabIndex = 0;
+  }
+
+  /* Start the clock on an offer nobody has taken.
+   *
+   * Called when the thumb comes off, not when the bubble appears. An offer you are still
+   * holding the screen down on has not been made yet, and a two second timer that started
+   * while the finger was down would run out under it.
+   */
+  function letAboutFade() {
+    if (!armed) return;
+    clearTimeout(fadeTimer);
+    fadeTimer = setTimeout(withdrawAbout, OFFERED);
   }
 
   function withdrawAbout() {
     if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
     if (!armed) return;
     armed = false;
-    if (bubble) bubble.classList.remove("on");
+    if (!bubble) return;
+    bubble.classList.remove("on");
+    bubble.setAttribute("aria-hidden", "true");
+    bubble.tabIndex = -1;
+  }
+
+  /* Going there: both things leave the way they came, then the page changes.
+   *
+   * Was inline in the pointerup handler, because letting go was the only way to reach it.
+   * The bubble is a button now, so there are two ways in and one of them happens long after
+   * the gesture is over.
+   */
+  function goToAbout() {
+    withdrawAbout();
+    shell.classList.add("leaving");
+    /* setRail with the drag still in hand, where there is one.
+     *
+     * It calls stopDrag itself, and only `if (drag)`. Clearing drag first, which is what
+     * the first version did out of tidiness, skipped that: the inline --rail-x the finger
+     * had pinned the rail to survived and outranked the class, and rail-dragging was still
+     * on the shell suppressing the transition. The bubble slid away on its own and the rail
+     * sat exactly where it had been let go. */
+    setRail(true);
+
+    /* The navigation waits for them. Setting the hash straight away redrew the screen
+     * underneath while the slide was still running, which is a jump cut with an animation
+     * playing over the top of it. The wait is read from the stylesheet rather than written
+     * here, so it cannot drift from the transition it is waiting for, and reduced motion
+     * collapses --med to a millisecond and this collapses with it. */
+    const med = getComputedStyle(document.documentElement).getPropertyValue("--med");
+    const ms = Math.max(0, parseFloat(med) || 220);
+    setTimeout(() => {
+      shell.classList.remove("leaving");
+      location.hash = "#/about";
+    }, ms + 40);
+  }
+
+  if (bubble) {
+    bubble.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      goToAbout();
+    });
+    // A thumb resting on it should not have it vanish mid press.
+    bubble.addEventListener("pointerdown", () => clearTimeout(fadeTimer));
+    bubble.addEventListener("pointerleave", letAboutFade);
   }
 
   /* How far the rail moves between shut and open. Measured rather than written down a
@@ -616,38 +707,29 @@ async function boot() {
      * Before the distance and speed test below, because those would read a rail held
      * hard against its stop as plainly open and leave it open behind the new screen. The
      * rail goes away: it was the gesture, not the destination. */
+    /* Let go while it is offered and the offer stands, rather than being taken.
+     *
+     * This used to navigate on release, which made the bubble an announcement of something
+     * already decided rather than a thing you could choose. Two problems with that, and the
+     * second is the one that showed up on a phone.
+     *
+     * It cannot be pressed, because pressing needs a finger and the finger is what is
+     * holding the gesture open. So an arrow appears saying About, and tapping it does
+     * nothing, because by the time you can tap it the moment it belonged to is gone.
+     *
+     * And it depends on the pointer surviving. A thumb held still for a second near the
+     * left edge is exactly what a browser cancels when it decides the gesture was a scroll
+     * or an edge swipe after all, and a cancelled pointer never reaches here.
+     *
+     * So letting go leaves the bubble up, and pressing it is what opens the page. It takes
+     * itself away after OFFERED if nobody does.
+     */
     if (armed) {
-      /* Both things leave, then the page changes.
-       *
-       * They go the same way, which is why the bubble is on the same edge as the rail:
-       * taking its class off slides it back out to the left and shutting the rail sends
-       * the rail after it, both on the same duration and the same easing, so it reads as
-       * one object leaving rather than two things animating.
-       *
-       * The navigation waits for them. Setting the hash straight away redrew the screen
-       * underneath while the slide was still running, which is a jump cut with an
-       * animation playing over the top of it. The wait is read from the stylesheet rather
-       * than written here, so it cannot drift from the transition it is waiting for, and
-       * reduced motion collapses --med to a millisecond and this collapses with it.
-       */
-      withdrawAbout();
       dragEndedAt = e.timeStamp;
-      shell.classList.add("leaving");
-      /* setRail, with the drag still in hand.
-       *
-       * It calls stopDrag itself, and only `if (drag)`. Clearing drag on the line above
-       * this, which is what the first version did out of tidiness, skipped that: the
-       * inline --rail-x the finger had pinned the rail to survived and outranked the
-       * class, and rail-dragging was still on the shell suppressing the transition. The
-       * bubble slid away on its own and the rail sat exactly where it had been let go. */
-      setRail(true);
-
-      const med = getComputedStyle(document.documentElement).getPropertyValue("--med");
-      const ms = Math.max(0, parseFloat(med) || 220);
-      setTimeout(() => {
-        shell.classList.remove("leaving");
-        location.hash = "#/about";
-      }, ms + 40);
+      // The rail stays where the gesture put it: open, with the offer beside it. Shutting
+      // it here would take the thing being offered off the screen along with the offer.
+      setRail(false);
+      letAboutFade();
       return;
     }
 
@@ -659,9 +741,18 @@ async function boot() {
 
   document.addEventListener("pointercancel", (e) => {
     if (!drag) return;
-    // The system took the gesture, so the offer goes with it rather than being left on
-    // screen with nothing holding it.
-    withdrawAbout();
+    /* A cancelled gesture no longer throws the offer away.
+     *
+     * This is most likely why the arrow did nothing on a phone. The offer is made by
+     * holding a thumb still, near the left edge, for a second: which is also precisely
+     * what a browser decides was an edge swipe or a scroll after all, and it takes the
+     * pointer back by sending pointercancel. The bubble would appear, the buzz would land,
+     * and then the whole thing would be quietly undone with the thumb still on the glass.
+     *
+     * The offer has already been made by then, and it is a button now rather than
+     * something only a clean release could take, so it survives and simply times out like
+     * any other. What the cancel still does is put the rail back, below. */
+    letAboutFade();
     const wasShut = drag.base < 0;
     const tracking = drag.axis && !drag.mouse;
     if (!tracking) { drag = null; return; }
@@ -683,6 +774,13 @@ async function boot() {
    * there armed, waiting to eat a real one much later. */
   document.addEventListener("click", (e) => {
     if (e.timeStamp - dragEndedAt > AFTER_DRAG) return;
+    /* Except the one thing whose whole purpose is to be clicked just after a drag.
+     *
+     * This listener is on the document in the capture phase, so it runs before anything
+     * it is suppressing, including the bubble's own handler. Crossing the screen back to
+     * the left edge takes longer than AFTER_DRAG most of the time, which is worse than it
+     * failing outright: it would work, and then now and again not. */
+    if (bubble && bubble.contains(e.target)) return;
     dragEndedAt = -1e9;
     e.preventDefault();
     e.stopPropagation();

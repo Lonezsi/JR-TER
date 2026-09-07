@@ -144,8 +144,8 @@ J.views.song = {
               </span>
             </div>
 
-            ${versions.length ? `
-              <div class="ab-inline" id="abInline">
+            <div class="ab-inline" id="abInline">
+              ${versions.length ? `
                 <button class="slot-pick" data-slot="A"><span class="k">A</span><span class="v">not set</span>
                   <svg class="caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
@@ -173,8 +173,24 @@ J.views.song = {
                       <rect x="16" y="6" width="5" height="12" rx="1.4"/>
                     </svg>
                     <span class="comp-toggle-label">Arrange</span>
+                  </button>` : ""}` : ""}
+                ${has("sharing") ? `
+                  <!-- A button, not a menu item.
+                       Sharing was on the title's context menu, which is where the once per
+                       song things live and is also where nobody looks: a thing you have
+                       never done is a thing you cannot know is hiding under a long press. -->
+                  <button class="btn sm ghost" data-act="share"
+                          title="Let somebody else work on this song">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                         stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+                         stroke-linejoin="round">
+                      <circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/>
+                      <circle cx="18" cy="19" r="2.6"/>
+                      <path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>
+                    </svg>
+                    Share
                   </button>` : ""}
-              </div>` : ""}
+            </div>
           </div>
         </div>
       </div>
@@ -852,6 +868,10 @@ function wireHero(root, ctx) {
     const act = e.target.closest("[data-act]");
     if (!act) return;
     if (act.dataset.act === "upload") J.$("#renderPick", root).click();
+
+    // The same sheet the title's menu opens, so there is one way of sharing rather than
+    // two that can drift apart.
+    if (act.dataset.act === "share") share();
 
     /* The plus beside the render count. Two ways in, because a render either comes off
      * this machine or is already waiting in the list. */

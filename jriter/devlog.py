@@ -22,6 +22,50 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.1.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "A share button you can see, and a shorter player",
+        "notes": [
+            "Sharing is a button on the song, next to Compare and Arrange, instead of an "
+            "item hiding in the menu on the title. It is there on every song, including "
+            "ones with no renders yet.",
+            "Shared with me is always in the sidebar now rather than appearing only once "
+            "somebody has shared something. Nobody can be told to look somewhere that "
+            "does not exist yet.",
+            "The foot of the sidebar always says who you are. Signed into Google it shows "
+            "that account's picture and name with your JR!TER account underneath; "
+            "otherwise your JR!TER account and a note that Google is not connected. It "
+            "gets the whole width, because two lines beside a button had eighty eight "
+            "pixels and the second line needed a hundred and nine.",
+            "Swiping the lyrics follows your finger again. The card is what a thumb lands "
+            "on and it had never been told that sideways belongs to it, so the browser "
+            "took the gesture a moment in and decided it was a scroll.",
+            "The player is shorter. Repeat and keep playing moved out of the transport, "
+            "which is for the three things you press while listening rather than the two "
+            "you set once. On a phone it is one row with the position as a line along the "
+            "top edge: sixty six pixels instead of a hundred and sixteen.",
+        ],
+    },
+    {
+        "version": "3.0.2",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "The about arrow is a button now",
+        "notes": [
+            "Hold the panel out past its stop, the arrow appears, press it. It used to "
+            "open the page when you let go instead, which meant the arrow itself could "
+            "not be pressed: pressing needs a finger, and the finger was the one holding "
+            "the gesture open.",
+            "It also only ever worked on a clean release, and holding a thumb still near "
+            "the left edge is exactly what a phone browser decides was an edge swipe: it "
+            "took the gesture back and the arrow vanished with the thumb still down. The "
+            "offer survives that now.",
+            "It takes itself away after two seconds if you do not press it, counted from "
+            "when you let go rather than from when it appears.",
+        ],
+    },
+    {
         "version": "3.0.1",
         "date": "2026-09-07",
         "name": JRITER,

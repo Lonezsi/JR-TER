@@ -140,12 +140,14 @@
       <!-- The connected Google account, if there is one. Written by boot.js from what
            the YouTube module already knows, and absent rather than empty when nothing
            is connected: a grey circle with no picture in it is a thing to wonder about. -->
-      <a class="rail-account" id="railAccount" href="#/settings" data-link hidden>
+      <a class="rail-account" id="railAccount" href="#/settings" data-link>
         <span class="rail-avatar" id="railAvatar" aria-hidden="true"></span>
-        <span class="rail-account-name truncate" id="railAccountName"></span>
+        <span class="rail-who">
+          <span class="rail-account-name truncate" id="railAccountName"></span>
+          <span class="rail-account-sub truncate" id="railAccountSub"></span>
+        </span>
       </a>
 
-      <button class="btn sm" id="newSong">New song</button>
     </div>
 
     <!-- The small print, on its own line under the account. Two hundred and eighteen
@@ -153,8 +155,9 @@
          terms in one row: the button alone is eighty seven of them. So the row you use
          is one line and the row you read is the next. -->
     <div class="rail-meta">
-      <button class="rail-keys" id="railKeys" title="Keyboard shortcuts">?</button>
+      <button class="btn sm" id="newSong">New song</button>
       <span class="grow"></span>
+      <button class="rail-keys" id="railKeys" title="Keyboard shortcuts">?</button>
       <span class="rail-end">
         <span class="rail-version" id="railVersion"></span>
         <!-- A sheet of paper with a folded corner, beside the version because that is
@@ -218,14 +221,22 @@
      it, and by then the thumb is nowhere near this. On the left, beside the rail, because
      it is a label on the thing in your hand and the two of them leave together. The arrow
      points the way they both go. -->
-<div class="edge-bubble" id="edgeBubble" aria-hidden="true">
+<!-- A button rather than a div, because it is pressed now.
+     It used to be neither pressed nor reachable: letting the rail go was what opened the
+     page, and this only announced that. Which is fine when you already know, and on a
+     phone it reads as an arrow that does not work. -->
+<!-- aria-hidden rather than hidden, and toggled with the class.
+     hidden is display:none, and you cannot transition out of that: the bubble slides in
+     and out, so it has to stay in the layout the whole time and be invisible by opacity.
+     What it must not do is sit in the tab order or get read out while it is not there. -->
+<button class="edge-bubble" id="edgeBubble" type="button" aria-hidden="true" tabindex="-1">
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
        aria-hidden="true" focusable="false">
     <path d="M19 12H6M13 5l-7 7 7 7"/>
   </svg>
   <span>About</span>
-</div>
+</button>
 
 <!-- Over everything, including the dialogs, because a step in a gradient does not stop
      being a step when a sheet is open. pointer-events: none, so it is only ever paint. -->

@@ -81,8 +81,9 @@
  * goes, and when you let go the two of them leave together in the same direction. Sitting
  * on the far side made them two separate objects doing two separate things.
  *
- * pointer-events: none because it is never pressed. Letting go is what presses it, and by
- * then the thumb is most of a screen away.
+ * Pressable while it is up and inert otherwise. Inert matters: this sits over the left edge
+ * of every screen, which on a phone is where the browser's own back gesture starts, so a
+ * bubble that could be hit while invisible would be a dead strip down the side of the app.
  */
 .edge-bubble {
   position: fixed;
@@ -101,6 +102,13 @@
   font-size: 13px; font-weight: 650;
   white-space: nowrap;
   pointer-events: none;
+  /* It is a button element now, so it has to be told the things a button assumes: its own
+     font, and a pointer. The border above already says what it should look like. */
+  font-family: inherit;
+  cursor: pointer;
+  /* Reachable by a thumb rather than by a fingertip. The drawing is small; the target is
+     not, because this arrives under a thumb that has just crossed the screen. */
+  min-height: 46px;
   /* Off the edge and out of the way until it is armed. translate carries both the slide
      and the vertical centring, so there is one transform and not two fighting.
      Off to the LEFT now, which means taking the class away is already the exit: it slides
@@ -112,7 +120,11 @@
 .edge-bubble.on {
   transform: translate(0, -50%);
   opacity: 1;
+  pointer-events: auto;
 }
+.edge-bubble.on:hover,
+.edge-bubble.on:focus-visible { background: var(--glass-2); }
+.edge-bubble.on:active { transform: translate(2px, -50%); }
 .edge-bubble svg { color: var(--accent); flex: none; }
 
 @media (prefers-reduced-motion: reduce) {

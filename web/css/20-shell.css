@@ -181,12 +181,15 @@
   border-top: 1px solid var(--line);
 }
 
-/* Who is signed in, next to the one button that makes something.
+/* Who is signed in, on a line of its own.
  *
- * Its own line rather than squeezed in beside the version and the ?. Measured: the rail is
- * 244 wide and 218 of that is content, and New song alone is 87 of those. An avatar, a
- * name, a button, a ?, a version and the terms do not go in one line, and the version
- * being the thing that gets cut is the wrong answer. */
+ * Measured, twice. The rail is 244 wide and 218 of that is content. New song is 90 of
+ * those, so an account sharing the line with it had 88 pixels for two lines of text, and
+ * "not logged into google" wants 109: it arrived as "not logged into ...", which is a
+ * subtitle that has been cut exactly where the information was.
+ *
+ * So the identity gets the width and the button moves down to the row with the ? and the
+ * version, where it is still the only thing in that row anybody presses. */
 .rail-account {
   display: flex; align-items: center; gap: var(--s2);
   min-width: 0;
@@ -209,7 +212,24 @@
   font-size: 11px; font-weight: 700;
   color: var(--text-3);
 }
-.rail-account-name { font-size: 12px; font-weight: 600; }
+/* Two lines in the space one used to take.
+ *
+ * min-width: 0 on both the column and the lines inside it, or the truncation never fires:
+ * a flex item's floor is its content, so a long channel name pushes New song off the rail
+ * instead of ellipsing. */
+.rail-who {
+  display: flex; flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.rail-account-name { font-size: 12px; font-weight: 600; min-width: 0; }
+/* Whichever of the two identities is not the headline. Small and dim, because it is the
+   answer to a question you are not currently asking. */
+.rail-account-sub {
+  font-size: 10.5px;
+  color: var(--text-3);
+  min-width: 0;
+}
 
 .rail-meta {
   display: flex; align-items: center; gap: var(--s2);

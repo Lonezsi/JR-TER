@@ -144,11 +144,61 @@
   .stage-grid .cover { max-width: 220px; }
 }
 
+/* Where the standing choices live: repeat, what plays next, A and B, the volume. */
+.player-modes { display: flex; align-items: center; gap: 2px; }
+
 @media (max-width: 760px) {
-  .player { grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: var(--s2) var(--s3); height: auto; padding: var(--s3) var(--s4); }
-  .player .transport { grid-column: 1 / -1; order: 3; }
+  /* One row, with the scrubber as a hairline along the top edge.
+   *
+   * It was two rows: everything, and then the transport underneath with the scrubber
+   * under that. 116 pixels of a phone screen, and it grew every time a button was added,
+   * which is what "the player got too tall" was.
+   *
+   * The scrubber is the thing that gives up its row. It is the one part that reads
+   * perfectly well as a line rather than as a control with numbers on either side: the
+   * position is the length of the fill, and the numbers are a luxury you can get by
+   * without on a screen this size. Dragging it still works, and its hit area is taller
+   * than the line, which is the same trick the full size one uses.
+   */
+  .player {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto;
+    align-items: center;
+    gap: var(--s2);
+    height: auto;
+    padding: var(--s3) var(--s3);
+    position: relative;
+    overflow: hidden;          /* so the hairline is clipped by the rounded corner */
+  }
+  .player .transport {
+    /* Out of the flow it used to have a row of. The buttons stay in the row; the
+       scrubber goes to the top edge, absolutely, full width. */
+    display: contents;
+  }
+  .player .transport-row { order: 2; }
+  .player .scrubber {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    width: auto;
+    gap: 0;
+  }
+  /* The numbers go. On a phone they are two five character columns either side of the
+     only part that matters, and what they say is also on the song's own page. */
+  .player .scrubber .t { display: none; }
+  .player .bar { height: 12px; }
+  .player .bar .track-line, .player .bar .buffered, .player .bar .fill {
+    height: 3px; border-radius: 0;
+  }
+  /* A knob on a two pixel line is a dot floating in space, and the line is at the very
+     edge of the screen where a thumb cannot land on it precisely anyway. */
+  .player .knob { display: none; }
+
+  .now-playing .cover { width: 40px; height: 40px; }
+  .player-right { gap: var(--s2); }
   .player-right .volume { display: none; }
-  :root { --player-h: 116px; }
+  /* The compositor's progress needs a row of its own; it is text and a bar. */
+  .player .preparing { grid-column: 1 / -1; order: 4; }
+  :root { --player-h: 66px; }
 }
 
 

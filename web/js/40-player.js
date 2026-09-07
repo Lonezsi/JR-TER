@@ -267,6 +267,30 @@ J.player = (function () {
           <button class="icon-btn" data-act="next" title="Next" aria-label="Next">
             <svg viewBox="0 0 24 24" width="18" height="18"><path d="M17 6v12M5 6l9 6-9 6z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
           </button>
+        </div>
+        ${state.preparing !== null && state.preparing !== undefined ? `
+          <div class="preparing" title="Reading the render so it can be played as arranged">
+            <span>Preparing the arrangement</span>
+            <span class="preparing-bar"><span class="preparing-fill"></span></span>
+            <span class="preparing-pct">0%</span>
+          </div>` : `
+        <div class="scrubber">
+          <span class="t now">0:00</span>
+          <div class="bar" data-act="seek">
+            <span class="track-line"></span><span class="buffered"></span>
+            <span class="fill"></span><span class="knob"></span>
+          </div>
+          <span class="t right total">0:00</span>
+        </div>`}
+      </div>
+
+      <div class="player-right">
+        <!-- Repeat and what plays next live here rather than in the transport.
+             They are settings, not controls: you set them once and then listen, and
+             sitting them beside prev/play/next made a row of five where three of them
+             answer "now" and two answer "from now on". The right hand side is already
+             where the standing choices are, next to A/B and the volume. -->
+        <div class="player-modes">
           <button class="icon-btn mode ${state.repeat ? "on" : ""}" data-act="repeat"
                   title="${state.repeat ? "Repeating this one" : "Repeat this one"}"
                   aria-pressed="${state.repeat}" aria-label="Repeat this one">
@@ -289,23 +313,6 @@ J.player = (function () {
             </svg>
           </button>
         </div>
-        ${state.preparing !== null && state.preparing !== undefined ? `
-          <div class="preparing" title="Reading the render so it can be played as arranged">
-            <span>Preparing the arrangement</span>
-            <span class="preparing-bar"><span class="preparing-fill"></span></span>
-            <span class="preparing-pct">0%</span>
-          </div>` : `
-        <div class="scrubber">
-          <span class="t now">0:00</span>
-          <div class="bar" data-act="seek">
-            <span class="track-line"></span><span class="buffered"></span>
-            <span class="fill"></span><span class="knob"></span>
-          </div>
-          <span class="t right total">0:00</span>
-        </div>`}
-      </div>
-
-      <div class="player-right">
         ${hasB ? `
           <div class="ab-chips" title="Compare two takes. Press X to swap.">
             <button class="ab-chip ${state.active === "A" ? "on" : ""}" data-act="slot" data-slot="A">A</button>
