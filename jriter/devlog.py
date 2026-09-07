@@ -22,6 +22,27 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.0.1",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "Updating actually updates",
+        "notes": [
+            "A folder of backups sitting beside the code counted as somebody having edited "
+            "JR!TER, so every update since the day it was made had been refused. Only "
+            "changes to files git is tracking count now. An untracked file is not work a "
+            "pull can throw away.",
+            "Settings asks about updates when you open it, rather than waiting to be "
+            "asked. Pressing \"Update ready\" in the top bar used to land you on a screen "
+            "that said it had not checked, with nothing on it to press.",
+            "When an update cannot be applied, the reason is on the screen next to it. It "
+            "was only ever shown when there was no release name to show instead, which is "
+            "never.",
+            "There is a Restart the server button. An update lands on disk while the "
+            "running server keeps the code it started with, so until something restarts "
+            "it a perfectly successful update looks exactly like nothing happening.",
+        ],
+    },
+    {
         "version": "3.0.0",
         "date": "2026-09-07",
         "name": JRITER,

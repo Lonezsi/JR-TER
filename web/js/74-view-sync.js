@@ -268,7 +268,7 @@ J.views.sync = {
 
 J.views.settings = {
   title: "Settings",
-  async render(root) {
+  async render(root, params) {
     const state = await J.get("/api/state");
     let update = null;
     //: Invites and the people on this server. Only the owner is allowed to ask, so this
@@ -396,10 +396,27 @@ J.views.settings = {
                   ${update.local ? `here ${update.local.slice(0, 7)}` : ""}
                   ${update.remote ? ` &middot; github ${update.remote.slice(0, 7)}` : ""}
                 </div>
+                ${/* Why there is no button, when there is a reason and no button.
+                    *
+                    * This line used to be "message or why", which meant why was only ever
+                    * shown when there was no commit message to show instead, and there
+                    * always is one. So a checkout with uncommitted changes in it said
+                    * "update ready", named the release, offered nothing to press, and
+                    * explained nothing. From the outside that is exactly what "it does not
+                    * update" looks like. */
+                  update.why && update.message
+                    ? `<div class="bad-text" style="font-size:12px">${J.esc(update.why)}</div>`
+                    : ""}
               </span>
               ${update.can_update
                 ? '<button class="btn sm primary" data-act="apply">Update now</button>' : ""}
-            </div>` : '<p class="faint">Not checked yet.</p>'}
+            </div>` : '<p class="faint">Could not check. Is this machine online?</p>'}
+          <p class="faint" style="font-size:12px">
+            An update lands on disk; the running server keeps the code it loaded at
+            startup until it is restarted.
+            <button class="btn ghost sm" data-act="restart"
+                    style="margin-left:var(--s2)">Restart the server</button>
+          </p>
         </div>
 
         <!-- The release notes moved to the front door. They were the sixth section of
@@ -715,6 +732,21 @@ J.views.settings = {
         if (done) J.toast("Password changed. Other devices will have to sign in again.");
       }
 
+      if (act.dataset.act === "restart") {
+        const sure = await J.confirm(
+          "Restart JR!TER now?",
+          "It stops and starts again on the code that is on disk. Anything playing stops "
+          + "with it. On the machine that hosts your library a task starts it again within "
+          + "a few minutes; if you are running it by hand in a window, you will have to.",
+          "Restart it");
+        if (!sure) return;
+        const said = await J.try(() => J.post("/api/update/restart"));
+        if (!said) return;
+        J.toast("Restarting. This page will reconnect on its own.");
+        waitForItToComeBack();
+        return;
+      }
+
       if (act.dataset.act === "check") {
         update = await J.try(() => J.get("/api/update/check"));
         draw();
@@ -727,12 +759,32 @@ J.views.settings = {
         update = null;
         draw();
         if (result.restart_required) {
-          await J.sheet({
-            title: "Restart JR!TER",
-            sub: "The new code is on disk. Python is still running the old version in memory, "
-               + "so stop the server and start it again to pick it up.",
-            confirm: "", cancel: "Got it",
+          /* Offered rather than described.
+           *
+           * This used to say "stop the server and start it again", which is a fine thing to
+           * read at a keyboard in front of the machine and useless on a host in another
+           * room with nobody logged into it. That gap is most of what "the update did not
+           * work" means: the pull succeeded, the process kept running the code it had
+           * already imported, and the version in the rail never moved. */
+          const now = await J.sheet({
+            title: "Restart to finish",
+            sub: "The new code is on disk. Python is still running the version it loaded at "
+               + "startup, so nothing changes until the server starts again.",
+            confirm: "Restart now",
+            cancel: "I will do it myself",
+            body: `<p class="faint" style="font-size:13px">
+                     On the machine that hosts your library this is safe: it is started by a
+                     task that checks every few minutes, so it comes back on its own. If you
+                     are running it by hand in a window, stop it and start it again there.
+                   </p>`,
           });
+          if (now) {
+            const said = await J.try(() => J.post("/api/update/restart"));
+            if (said) {
+              J.toast("Restarting. This page will reconnect on its own.");
+              waitForItToComeBack();
+            }
+          }
         }
       }
     });
@@ -752,6 +804,50 @@ J.views.settings = {
       J.toast("Titles are wearing " + file.name);
       draw();
     });
+
+    /* Poll health until it answers, then reload.
+     *
+     * A restart takes a couple of seconds by hand and up to three minutes on the host,
+     * where a task notices it is gone and starts it again. Either way the page is sitting
+     * on a server that is not there, and the honest thing is to say so and then simply
+     * come back rather than leaving somebody pressing refresh.
+     */
+    function waitForItToComeBack() {
+      const bar = J.$("#navBar");
+      if (bar) { bar.hidden = false; bar.classList.add("running"); }
+      const started = Date.now();
+      const knock = async () => {
+        try {
+          const answer = await fetch("/api/health", { cache: "no-store" });
+          if (answer.ok) { location.reload(); return; }
+        } catch (e) { /* still down, which is the expected answer for a while */ }
+        // Four minutes: the host's watchdog runs every three, so this outlasts one full
+        // cycle of it and then stops rather than knocking for ever.
+        if (Date.now() - started > 240000) {
+          J.toast("It has not come back yet. Start it on the machine it runs on.", "bad");
+          if (bar) { bar.hidden = true; bar.classList.remove("running"); }
+          return;
+        }
+        setTimeout(knock, 2000);
+      };
+      // A moment first, so the knock does not land on the server that is still answering.
+      setTimeout(knock, 1500);
+    }
+
+    /* Checked on the way in, rather than waiting to be asked.
+     *
+     * The banner in the top bar says "Update ready" and links here, and this screen used to
+     * open on "Not checked yet" with no button on it. So the one path anybody actually
+     * takes to an update ended in a dead end: press the thing that says an update is ready,
+     * arrive somewhere that says it does not know, and have to work out that a second
+     * button does the same check the banner already did.
+     *
+     * Same call the banner made, so this costs one request on a screen that already makes
+     * four, and only when the module is on. */
+    if (state.modules.includes("updater")) {
+      update = await J.get("/api/update/check").catch(() => null);
+      draw();
+    }
 
     /* Only the owner may ask, and a 403 here is the ordinary answer for everybody else.
      *

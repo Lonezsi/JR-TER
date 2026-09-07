@@ -1,6 +1,11 @@
 # Your library: the database and every file you have uploaded.
 data/
 
+# Copies of it made by hand before something risky. Ignored so that leaving one lying
+# about does not make the checkout look modified, which the updater used to read as
+# "somebody has edited JR!TER" and refuse to pull.
+data-backup*/
+
 # Python
 __pycache__/
 *.py[cod]
