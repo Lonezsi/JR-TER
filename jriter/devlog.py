@@ -22,7 +22,7 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
-        "version": "2.5.1",
+        "version": "2.5.2",
         "date": "2026-09-07",
         "name": JRITER,
         "title": "The whole panel is glass, and the renders are in columns",
@@ -30,8 +30,9 @@ ENTRIES = [
             "The main panel is glass now, not just the rail and the player. On a song "
             "page the artwork bends through it instead of stopping dead at its edge.",
             "The renders list is in real columns. The name is the only thing that "
-            "stretches, so the duration, the size and the date start at the same place "
-            "on every row and you can read down them.",
+            "stretches, so the duration and the size start at the same place on every "
+            "row and you can read down them, and the date sits under the name in small "
+            "text as year, month, day, which is the order that sorts by eye.",
             "The waveform is behind the row again, filling it, in the render's own "
             "colour instead of grey. It is under the glass rather than on it now, so the "
             "row blurs and bends it: it is in the pane rather than painted on it, and "

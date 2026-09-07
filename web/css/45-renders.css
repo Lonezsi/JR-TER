@@ -88,20 +88,54 @@
  * duration, the size and the date trailed the name, which is a different length on every
  * render, so the one thing a list of bounces is for could not be done by looking.
  */
-.r-name {
+/* The name and its date, stacked. The pair is the flexible column; inside it the name is
+   the line you read and the date is the line you compare. The row does not get taller for
+   it: the play button is 34 and these two lines come to about 33. */
+.r-main {
   flex: 1 1 auto;
   min-width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+}
+.r-name {
   font-weight: 650;
   cursor: text;
+  /* Sized to the text rather than the column, so the rename underline is as wide as the
+     name and clicking the empty space beside a short one does not open an editor you did
+     not aim at. */
+  align-self: flex-start;
+  max-width: 100%;
   border-bottom: 1px solid transparent;
 }
 .r-name:hover { border-bottom-color: var(--line-2); }
+
+/* Under the name, and small. Tabular and zero padded, so a column of them sorts by eye:
+   that is the whole reason this one date is written year first while every other date in
+   the app is written the way the reader's machine writes dates. */
+.r-sub {
+  /* A flex row with a real gap, rather than two spans separated by whatever whitespace
+     survives in the template. HTML collapses that to a single space and this line is
+     nowrap, so the arrow ended up sitting against the last digit of the date. */
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.r-day { flex: none; }
+.r-sub .r-went { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* Fixed widths, right aligned, tabular figures. Right aligned so the ends of the numbers
    line up, which is what makes two durations comparable at a glance; tabular so the
    digits inside them line up too, since proportional figures put the colon of 1:23 and
    2:07 in different places. */
-.r-time, .r-size, .r-when {
+.r-time, .r-size {
   flex: none;
   font-size: 12px;
   color: var(--text-2);
@@ -113,10 +147,28 @@
 }
 .r-time { width: 42px; }
 .r-size { width: 62px; }
-.r-when { width: 96px; }
-/* Where a render ended up, in the date column, because a row that has found its song has
-   stopped being one you are deciding about. */
+/* Where a render ended up, beside its date rather than in a column of its own. The date
+   column went with it: a fixed 96 pixels holding one short word was the widest thing on
+   the row doing the least, and both facts belong on the quiet line under the name. */
 .r-went { color: var(--text-2); font-weight: 650; }
+/* No hard space after the arrow now: the gap on .r-sub does that job, and doing it twice
+   put the song title a space and a half away from its own arrow. */
+.r-went::before {
+  /* The arrow itself, not an escape for it.
+   *
+   * This said content with a CSS escape for U+2192 in it and shipped as a control
+   * character followed by a literal "92", which rendered on the row as a stray glyph
+   * and two digits in front of the song name. The escape was eaten on the way in:
+   * backslash-2-1 is a valid octal escape in the language that wrote this file, so it
+   * became chr(17) and "92" before CSS ever saw it. The character is unambiguous,
+   * this file is UTF-8, and nothing in the chain can mistranslate it. */
+  content: "→";
+  color: var(--text-3);
+  font-weight: 400;
+  /* The gap on .r-sub separates the date from the song; this separates the arrow
+     from the name it points at. */
+  margin-right: 3px;
+}
 /* One that has found its song stays readable but stops asking for attention. */
 .render-row.used { opacity: 0.62; }
 .render-row.used:hover { opacity: 1; }
@@ -387,7 +439,6 @@
   .r-size { display: none; }
 }
 @media (max-width: 560px) {
-  .r-when { display: none; }
   /* The tools stop reserving a gap they do not need once there are three of them in a
      315 pixel row. */
   .row-tools { padding-left: var(--s2); }

@@ -70,6 +70,25 @@ J.when = (epochSeconds) => {
   });
 };
 
+/* Year, month, day, in that order and zero padded.
+ *
+ * Not toLocaleDateString. Every other date in this app is written the way the reader's
+ * machine writes dates, which is right for a sentence: "started 3 Sept". This one sits in
+ * a column of dates being compared with each other, and for that the only thing that
+ * matters is that they sort by eye, which needs the biggest unit first and a fixed width.
+ * A locale gives neither, and on a machine set to en-US it gives month first, which is
+ * the one order that reads wrong next to a duration.
+ *
+ * Built from the local parts rather than sliced off toISOString, which would be UTC: a
+ * render made at eleven at night would show tomorrow's date to the person who made it.
+ */
+J.ymd = (epochSeconds) => {
+  if (!epochSeconds) return "";
+  const at = new Date(epochSeconds * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}/${pad(at.getMonth() + 1)}/${pad(at.getDate())}`;
+};
+
 J.date = (epochSeconds) => epochSeconds
   ? new Date(epochSeconds * 1000).toLocaleString(undefined,
       { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })

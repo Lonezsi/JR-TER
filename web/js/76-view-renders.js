@@ -300,15 +300,20 @@ J.views.renders = {
           <button class="cut play ${sounding ? "sounding" : ""}" data-act="play"
                   aria-label="${sounding ? "Pause" : "Play"} ${J.esc(render.name)}"></button>
 
-          <span class="r-name truncate" data-act="rename" title="Rename this render"
-            >${J.esc(render.name)}</span>
+          <span class="r-main">
+            <span class="r-name truncate" data-act="rename" title="Rename this render"
+              >${J.esc(render.name)}</span>
+            <span class="r-sub truncate">
+              <span class="r-day" title="Added ${J.esc(J.date(render.created_at))}"
+                >${J.esc(J.ymd(render.created_at))}</span>
+              ${used ? `<span class="r-went">${J.esc(render.song_title || "a song")}</span>`
+                     : ""}
+            </span>
+          </span>
           ${J.trouble(render)}
 
           <span class="r-time">${render.duration ? J.time(render.duration) : ""}</span>
           <span class="r-size">${J.bytes(render.size)}</span>
-          <span class="r-when">${used
-            ? `<span class="r-went">${J.esc(render.song_title || "a song")}</span>`
-            : J.esc(J.when(render.created_at))}</span>
 
           <span class="row-tools">
             ${used

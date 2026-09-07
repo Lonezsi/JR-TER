@@ -1069,3 +1069,37 @@ def test_a_media_query_is_not_undone_by_a_rule_written_after_it():
         "these media queries set display on a selector that a later rule outside every "
         "media block sets display on again, so the media query silently loses on source "
         "order: %s" % trouble)
+
+
+def test_no_web_asset_carries_a_stray_control_character():
+    """An escape that was eaten before it reached the browser.
+
+    A rule meant to put an arrow before a song name was written with a CSS escape for
+    U+2192, and what landed in the file was chr(17) followed by a literal "92". The tool
+    that wrote it reads backslash-2-1 as an octal escape, so the mangling happened before
+    CSS was ever involved. It shipped, and on the page it read as a stray glyph and two
+    digits sitting in front of the song title.
+
+    Nothing else would have caught it. The file parses, the rule is valid, the property
+    applies, and the value is simply the wrong characters. A control character in a web
+    asset is never intentional here, so its presence is the whole test.
+    """
+    allowed = {"\t", "\n", "\r"}
+    trouble = {}
+    for folder in (CSS_DIR, JS_DIR, WEB):
+        for name in sorted(os.listdir(folder)):
+            path = os.path.join(folder, name)
+            if not os.path.isfile(path):
+                continue
+            if os.path.splitext(name)[1] not in (".css", ".js", ".html", ".svg"):
+                continue
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            for at, ch in enumerate(text):
+                if ord(ch) < 32 and ch not in allowed:
+                    line = text.count("\n", 0, at) + 1
+                    trouble.setdefault(name, []).append(
+                        "line %d: %r" % (line, ch))
+    assert not trouble, (
+        "these web assets carry control characters, which is always an escape that was "
+        "eaten on the way in rather than anything anybody typed: %s" % trouble)
