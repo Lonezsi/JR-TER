@@ -319,6 +319,13 @@ async function boot() {
   const STILL = 80;
   //: A drag is followed by a click nobody asked for. Ignore one for this long afterwards.
   const AFTER_DRAG = 400;
+  //: Holding the rail past its open stop for this long offers the page behind it.
+  const HOLD = 1000;
+  //: How far past open counts as holding it there rather than merely having opened it.
+  //: Under the overscroll band, which moves the rail a third of the finger, so this is
+  //: about fifty pixels of actual thumb travel past the stop: far enough that nobody
+  //: arrives here by opening the rail briskly.
+  const PAST = 16;
 
   /* Empty means nothing here does anything when you press it.
    *
@@ -349,6 +356,41 @@ async function boot() {
   const railNode = J.$("#rail");
   const scrim = J.$("#railScrim");
   let dragEndedAt = -1e9;
+
+  /* Pull the rail past its stop, hold, and let go somewhere else.
+   *
+   * The rail already tracks the thumb and already has a soft end past fully open. This
+   * gesture lives in that end: keep pushing after the rail has run out of travel and,
+   * a second later, the page behind it is offered. It is deliberately not discoverable.
+   * Nothing in the library is behind it, so nobody needs to find it by accident, and the
+   * cost of missing it is nothing.
+   *
+   * A timer rather than a distance, because a thumb that is holding still fires no move
+   * events at all: the last move sets the clock and the stillness is what runs it down.
+   *
+   * The buzz is a courtesy and not the signal. navigator.vibrate is absent on iOS and
+   * refused by any browser the page has not been interacted with, so the bubble is what
+   * everybody gets and the buzz is what some people also get.
+   */
+  const bubble = J.$("#edgeBubble");
+  let holdTimer = null;
+  let armed = false;
+
+  function offerAbout() {
+    holdTimer = null;
+    armed = true;
+    if (navigator.vibrate) {
+      try { navigator.vibrate(18); } catch (err) { /* refused, and it does not matter */ }
+    }
+    if (bubble) bubble.classList.add("on");
+  }
+
+  function withdrawAbout() {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (!armed) return;
+    armed = false;
+    if (bubble) bubble.classList.remove("on");
+  }
 
   /* How far the rail moves between shut and open. Measured rather than written down a
    * second time: the stylesheet parks it at its own width plus one gap off the left
@@ -465,6 +507,16 @@ async function boot() {
     drag.moved = true;
     drag.at = drag.base + dx;
     railTo(drag.at);
+
+    /* Past the stop starts the clock; coming back off it stops the clock.
+     *
+     * Only set when there is no timer already, or every move event inside the band would
+     * push the deadline out and a thumb that trembles would never get there. */
+    if (drag.at >= PAST) {
+      if (!holdTimer && !armed) holdTimer = setTimeout(offerAbout, HOLD);
+    } else {
+      withdrawAbout();
+    }
   }, { passive: true });
 
   document.addEventListener("pointerup", (e) => {
@@ -480,6 +532,20 @@ async function boot() {
      * distance decides when there is not, and a finger that has been still for a moment
      * has none, whatever it was doing before it stopped. That last part is what makes it
      * stop where the thumb stopped. */
+    /* Let go while it is offered and that is the answer, whatever the rail was doing.
+     *
+     * Before the distance and speed test below, because those would read a rail held
+     * hard against its stop as plainly open and leave it open behind the new screen. The
+     * rail goes away: it was the gesture, not the destination. */
+    if (armed) {
+      withdrawAbout();
+      dragEndedAt = e.timeStamp;
+      drag = null;
+      setRail(true);
+      location.hash = "#/about";
+      return;
+    }
+
     const speed = e.timeStamp - drag.t > STILL ? 0 : drag.v;
     const shut = Math.abs(speed) >= FLICK ? speed < 0 : drag.at < -drag.travel / 2;
     if (drag.moved) dragEndedAt = e.timeStamp;
@@ -488,6 +554,9 @@ async function boot() {
 
   document.addEventListener("pointercancel", (e) => {
     if (!drag) return;
+    // The system took the gesture, so the offer goes with it rather than being left on
+    // screen with nothing holding it.
+    withdrawAbout();
     const wasShut = drag.base < 0;
     const tracking = drag.axis && !drag.mouse;
     if (!tracking) { drag = null; return; }

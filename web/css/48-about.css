@@ -1,0 +1,89 @@
+/* ── the page behind the rail ──────────────────────────────────────────────── */
+
+/* One column, generous, and nothing in it that looks like a feature of the library.
+   This is the only screen in the app that is about the app rather than about a song. */
+.about { max-width: 560px; }
+
+.about-mark { color: var(--accent); margin-bottom: var(--s4); }
+
+.about-title {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(34px, 9vw, 52px);
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+.about-slogan {
+  margin: var(--s2) 0 var(--s7);
+  font-size: 12px; letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+
+/* The placeholder, dressed as a placeholder.
+   A dashed edge and the accent say "not finished" in a way a paragraph of grey text
+   cannot, so nobody has to wonder whether this is the copy or a note to self. */
+.about-dragons {
+  border: 1.5px dashed var(--accent-line);
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  padding: var(--s5);
+  margin-bottom: var(--s6);
+}
+.about-dragons h2 {
+  font-family: var(--display); font-weight: 700; font-size: 18px;
+  color: var(--accent-hi);
+  margin: 0 0 var(--s2);
+}
+.about-dragons p { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.7; }
+
+.about-later h3 {
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 var(--s2);
+}
+.about-later p {
+  margin: 0 0 var(--s6);
+  color: var(--text-2); font-size: 14px; line-height: 1.7;
+}
+
+/* ── the bubble that says the shortcut is armed ────────────────────────────── */
+
+/* Anchored to the right edge and pushed off it, so it arrives from outside the screen.
+ *
+ * The far edge on purpose: the gesture is a thumb travelling left to right, and the
+ * thing it is reaching for should be ahead of the thumb rather than under it. It is
+ * pointer-events: none because it is never pressed. Letting go is what presses it, and
+ * the thumb is a hundred and fifty pixels away when that happens.
+ */
+.edge-bubble {
+  position: fixed;
+  right: 0; top: 50%;
+  z-index: 120;
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 13px var(--s4) 13px var(--s3);
+  border: 1px solid var(--glass-line);
+  border-right: 0;
+  border-radius: var(--r-pill) 0 0 var(--r-pill);
+  background: var(--glass-2);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  box-shadow: var(--glass-shadow);
+  color: var(--text);
+  font-size: 13px; font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+  /* Off the edge and out of the way until it is armed. translate carries both the slide
+     and the vertical centring, so there is one transform and not two fighting. */
+  transform: translate(100%, -50%);
+  opacity: 0;
+  transition: transform 240ms var(--ease), opacity 160ms var(--ease);
+}
+.edge-bubble.on {
+  transform: translate(0, -50%);
+  opacity: 1;
+}
+.edge-bubble svg { color: var(--accent); flex: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .edge-bubble { transition: opacity 160ms linear; transform: translate(0, -50%); }
+  .edge-bubble:not(.on) { opacity: 0; }
+}

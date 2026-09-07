@@ -193,6 +193,17 @@
   <footer class="player" id="player" hidden></footer>
 </div>
 
+<!-- Armed by holding the rail past its stop. Never pressed: letting go is what presses
+     it, and by then the thumb is nowhere near this. -->
+<div class="edge-bubble" id="edgeBubble" aria-hidden="true">
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+       aria-hidden="true" focusable="false">
+    <path d="M5 12h13M12 5l7 7-7 7"/>
+  </svg>
+  <span>About</span>
+</div>
+
 <!-- Over everything, including the dialogs, because a step in a gradient does not stop
      being a step when a sheet is open. pointer-events: none, so it is only ever paint. -->
 <div class="grain" id="grain" aria-hidden="true"></div>
