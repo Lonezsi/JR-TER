@@ -217,3 +217,72 @@
 
 /* What is inside, without opening it. */
 .fold-sub { margin-left: auto; font-size: 12px; color: var(--text-3); }
+
+/* ── the chain: which deck, then which preset, then what the preset holds ──── */
+
+/* Two rows that read as a sentence going down. The preset row used to sit in the block
+   head beside the word Sound, level with a title, which said nothing about the two folds
+   under it belonging to it. */
+.sound-chain {
+  display: flex; flex-direction: column; gap: var(--s2);
+  margin-bottom: var(--s4);
+}
+.chain-step { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.chain-label {
+  flex: none; min-width: 62px;
+  font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* The A and B from the hero, again, smaller.
+   Same state, either set moves both, because both read J.deckSelected. */
+.deck-mini { display: flex; align-items: center; gap: var(--s2); }
+.deck-chip {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  height: 30px; padding: 0 var(--s3) 0 4px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-2);
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: background var(--fast), border-color var(--fast), color var(--fast);
+}
+.deck-chip .k {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; flex: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  font-family: var(--display); font-weight: 800; font-size: 11px;
+}
+.deck-chip .held { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-chip:hover { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+/* The one being shaped. The same treatment the hero's chip gets when it is live, so the
+   two controls are visibly the same state and not two similar looking things. */
+.deck-chip.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.deck-chip.on .k { background: var(--accent); color: var(--text-on-accent); }
+
+/* What the preset holds. The rule down the left is the whole point: it makes the
+   equaliser and the limiter two parts of the thing chosen above rather than two more
+   siblings of it, which is what made a preset read as an equaliser setting. */
+.preset-holds {
+  padding-left: var(--s4);
+  border-left: 2px solid var(--accent-line);
+  border-radius: 2px;
+}
+.holds-note {
+  margin: 0 0 var(--s3);
+  font-size: 12px; line-height: 1.55;
+  color: var(--text-3);
+}
+.holds-note b { color: var(--text-2); font-weight: 650; }
+
+@media (max-width: 720px) {
+  /* The label goes above its control rather than shrinking it. */
+  .chain-step { align-items: flex-start; }
+  .preset-holds { padding-left: var(--s3); }
+}

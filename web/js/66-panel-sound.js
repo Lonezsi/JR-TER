@@ -170,9 +170,29 @@ J.blockSound = async function (panel, ctx) {
     panel.innerHTML = `
       <div class="block-head">
         <h2>Sound</h2>
-        <span class="grow"></span>
-        <span class="preset-row" id="presetRow"></span>
       </div>
+
+      <!-- The two questions this panel answers, in the order they depend on each other:
+           which deck you are shaping, and which preset is on it. The preset row used to
+           sit up in the head beside the word Sound, which put it level with a title and
+           gave no clue that the two folds underneath belonged to it. -->
+      <div class="sound-chain">
+        <div class="chain-step">
+          <span class="chain-label">Shaping</span>
+          <span class="deck-mini" id="deckMini"></span>
+        </div>
+        <div class="chain-step">
+          <span class="chain-label">Preset</span>
+          <span class="preset-row" id="presetRow"></span>
+        </div>
+      </div>
+
+      <!-- Everything from here down is inside the preset chosen above, and the rule down
+           the left is the only thing that says so. Before this, the equaliser and the
+           limiter were two siblings of the preset row rather than two parts of it, and
+           the reasonable reading was that a preset is an equaliser setting. -->
+      <div class="preset-holds">
+        <p class="holds-note" id="holdsNote"></p>
 
       <button class="fold-head" data-fold="eq" aria-expanded="${open.eq}">
         ${chevron(open.eq)}
@@ -219,16 +239,46 @@ J.blockSound = async function (panel, ctx) {
         <div class="limiter-hint">drag the two lines</div>
       </div>
       <div class="limiter-knobs" id="limiterKnobs" ${open.limiter ? "" : "hidden"}></div>
+      </div>
 
       <div class="row wrap" style="margin-top:var(--s5)" id="presetActions"></div>
       <p class="sound-note" id="soundNote"></p>`;
 
     mountEditor();
     mountLimiter();
+    renderDeckMini();
     renderPresets();
     renderBands();
     renderKnobs();
     syncChrome();
+  }
+
+  /* The same A and B that are up in the hero, repeated here.
+   *
+   * Not decoration. Choosing a preset does not merely highlight it, it puts it on the
+   * selected deck, and the selected deck was named forty lines further up the page in a
+   * different control. So you could press a preset here, hear nothing change, and have
+   * no way of knowing that the reason is that B is the one you are listening to. These
+   * chips are the same state as the ones in the hero and either set of them moves both,
+   * because they are both reading J.deckSelected.
+   *
+   * Redrawn rather than patched: it is two buttons, and deck:change already brings the
+   * whole panel's chrome back into line.
+   */
+  function renderDeckMini() {
+    const holder = J.$("#deckMini", panel);
+    if (!holder) return;
+    const at = editingSlot();
+    holder.innerHTML = ["A", "B"].map((slot) => {
+      const held = J.deckPreset(ctx, slot);
+      const version = (ctx.deck.version || {})[slot];
+      return `<button class="deck-chip ${slot === at ? "on" : ""}" data-deck="${slot}"
+                      aria-pressed="${slot === at}"
+                      title="Shape deck ${slot}">
+        <span class="k">${slot}</span>
+        <span class="held">${held ? J.esc(held.name || "a preset") : "no preset"}</span>
+      </button>`;
+    }).join("");
   }
 
   /* The presets, and the two things you can do to the chosen one. */
@@ -385,6 +435,16 @@ J.blockSound = async function (panel, ctx) {
     }
     const sw = J.$("#limiterSwitch", panel);
     if (sw) sw.classList.toggle("on", !!(active.data.limiter || {}).on);
+
+    // Said in words as well as drawn, because the rule down the left says "these belong
+    // to that" and this says which of them, which is the part that was being guessed.
+    const holds = J.$("#holdsNote", panel);
+    if (holds) {
+      holds.innerHTML = `<b>${J.esc(active.name || "This preset")}</b> holds the
+        equaliser and the limiter together. Changing either one changes this preset, on
+        deck ${editingSlot()}.`;
+    }
+    renderDeckMini();
   }
 
   function mountEditor() {
@@ -547,6 +607,15 @@ J.blockSound = async function (panel, ctx) {
   });
 
   panel.addEventListener("click", async (e) => {
+    /* Before the preset tabs, because a deck chip is not a preset and both live in the
+     * same chain. deckSelect emits deck:change, which brings this panel round to whatever
+     * that deck is holding, so there is nothing to redraw here. */
+    const deckChip = e.target.closest("[data-deck]");
+    if (deckChip) {
+      await J.deckSelect(ctx, deckChip.dataset.deck);
+      return;
+    }
+
     const presetTab = e.target.closest("[data-preset]");
     if (presetTab) {
       choose(presets.find((p) => String(p.id) === presetTab.dataset.preset));
