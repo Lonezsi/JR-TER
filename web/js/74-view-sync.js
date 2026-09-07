@@ -271,7 +271,6 @@ J.views.settings = {
   async render(root) {
     const state = await J.get("/api/state");
     let update = null;
-    let log = null;
     //: Whether this machine can make a video at all. Asked once, like the update check.
     let tool = { found: false, why: "" };
     let font = (state.summary && state.summary.appearance) || { custom_font: false };
@@ -400,16 +399,11 @@ J.views.settings = {
             </div>` : '<p class="faint">Not checked yet.</p>'}
         </div>
 
-        ${state.modules.includes("devlog") ? `
-        <div class="section">
-          <div class="section-head"><h2>What is new</h2><span class="grow"></span>
-            <span class="tag">v${J.esc(state.version || "")}</span></div>
-          ${log
-            ? (log.length
-                ? log.map((release) => J.devlog.entry(release)).join("")
-                : '<p class="faint">Nothing written down yet.</p>')
-            : '<p class="faint">Reading the log.</p>'}
-        </div>` : ""}
+        <!-- The release notes moved to the front door. They were the sixth section of
+             Settings, between the display font and the module list, which is a strange
+             place to read about what changed: Settings is where you go to alter
+             something, and a release note is not a setting. J.views.home carries them
+             now, and the popup on an update is unchanged. -->
 
         <div class="section">
           <div class="section-head"><h2>Display font</h2></div>
@@ -653,17 +647,6 @@ J.views.settings = {
       J.toast("Titles are wearing " + file.name);
       draw();
     });
-
-    /* The whole log, only on the one screen that shows it.
-     *
-     * Fetched here rather than carried on /api/state, which every page load asks for and
-     * which would then be paying for a list that is read on one screen. Drawn twice on
-     * purpose: the screen is up straight away and the releases fill in. */
-    if (state.modules.includes("devlog")) {
-      const found = await J.try(() => J.devlog.all());
-      log = (found && found.entries) || [];
-      draw();
-    }
 
     if (state.modules.includes("youtube")) {
       tool = await J.get("/api/youtube/tool").catch(() => tool);

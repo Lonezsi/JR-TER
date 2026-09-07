@@ -19,10 +19,40 @@ J.player = (function () {
     position: 0,
     volume: 0.9,
     preparing: null,      // 0..1 while a render is being read for the compositor
+    /* Play the same thing again when it ends. */
+    repeat: false,
+    /* Keep going when the queue runs out, by asking the library what is next.
+     *
+     * On by default, because stopping dead at the end of a list is what it used to do and
+     * that is the behaviour somebody would come looking for a switch to change. The switch
+     * exists either way, and both of these are remembered per browser. */
+    autoplay: true,
+    /* The last few songs autoplay has chosen, so a small library does not loop three of
+     * them. Ids only, never written down anywhere but this tab's memory. */
+    lately: [],
   };
+
+  //: How much of the recent past autoplay refuses to repeat.
+  //:
+  //: Eight. Enough that a library of twenty does not feel like a loop, small enough that a
+  //: library of ten still has somewhere to go.
+  const LATELY = 8;
+  const REMEMBER = "jriter.player.modes";
 
   let ticking = null;
   let seeking = false;
+
+  /* The two switches, as this browser last left them.
+   *
+   * Read once, here, before anything draws. Reading it inside render() would be a
+   * localStorage hit on every repaint of the player, which is every second while something
+   * is playing. Anything unreadable leaves the defaults alone: repeat off, keep playing on.
+   */
+  try {
+    const kept = JSON.parse(localStorage.getItem(REMEMBER) || "{}");
+    if (typeof kept.repeat === "boolean") state.repeat = kept.repeat;
+    if (typeof kept.autoplay === "boolean") state.autoplay = kept.autoplay;
+  } catch (e) { /* a private window, or something that is not JSON */ }
 
   const el = () => J.$("#player");
   const audioOf = (slot) => J.audio.deck(slot).element;
@@ -228,6 +258,27 @@ J.player = (function () {
           </button>
           <button class="icon-btn" data-act="next" title="Next" aria-label="Next">
             <svg viewBox="0 0 24 24" width="18" height="18"><path d="M17 6v12M5 6l9 6-9 6z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="icon-btn mode ${state.repeat ? "on" : ""}" data-act="repeat"
+                  title="${state.repeat ? "Repeating this one" : "Repeat this one"}"
+                  aria-pressed="${state.repeat}" aria-label="Repeat this one">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 3l3 3-3 3"/><path d="M20 6H8a4 4 0 0 0-4 4v1"/>
+              <path d="M7 21l-3-3 3-3"/><path d="M4 18h12a4 4 0 0 0 4-4v-1"/>
+            </svg>
+          </button>
+          <!-- The switch for the algorithm. Off is a player that stops at the end of the
+               list, which is what it did before there was one. -->
+          <button class="icon-btn mode ${state.autoplay ? "on" : ""}" data-act="autoplay"
+                  title="${state.autoplay
+                    ? "Keeps playing when the queue runs out"
+                    : "Stops when the queue runs out"}"
+                  aria-pressed="${state.autoplay}" aria-label="Keep playing">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 7h7M4 12h5M4 17h5"/><path d="M13 10l7 4-7 4z" fill="currentColor"/>
+            </svg>
           </button>
         </div>
         ${state.preparing !== null && state.preparing !== undefined ? `
@@ -525,6 +576,40 @@ J.player = (function () {
       else J.playSong(entry, state.queue);
     },
 
+    /* Remembered per browser, so the two switches survive a reload.
+     *
+     * localStorage and not a setting on the server: which way somebody likes their player
+     * to behave is a property of the machine they are sitting at, and a phone and a laptop
+     * are allowed to disagree about it. */
+    modes(patch) {
+      Object.assign(state, patch);
+      try {
+        localStorage.setItem(REMEMBER, JSON.stringify(
+          { repeat: state.repeat, autoplay: state.autoplay }));
+      } catch (e) { /* a private window */ }
+      render();
+    },
+
+    /* The end of the queue, and the switch is on.
+     *
+     * The choosing happens on the server, which can see the whole library; this side knows
+     * only whatever list the current screen happened to load. What comes back is one song,
+     * and it is played as a queue of one so that the next end lands here again.
+     */
+    async keepGoing() {
+      const from = state.song && state.song.kind !== "render" ? state.song.id : 0;
+      if (from) {
+        state.lately = [from, ...state.lately.filter((id) => id !== from)].slice(0, LATELY);
+      }
+      const asked = await J.get("/api/songs/up-next?after=" + (from || 0)
+        + "&not=" + state.lately.join(",")).catch(() => null);
+      const song = asked && asked.song;
+      // Nothing to go to is a player that stops, quietly. A toast here would fire at the
+      // end of every listen in a library with one song in it.
+      if (!song) return;
+      await J.playSong(song, [song]);
+    },
+
     render,
   };
 
@@ -573,6 +658,13 @@ J.player = (function () {
       const act = hit.dataset.act;
       if (act === "toggle") api.toggle();
       if (act === "next") api.step(1);
+      if (act === "repeat") api.modes({ repeat: !state.repeat });
+      if (act === "autoplay") {
+        api.modes({ autoplay: !state.autoplay });
+        J.toast(state.autoplay
+          ? "Keeps playing when the queue runs out."
+          : "Stops when the queue runs out.");
+      }
       if (act === "prev") { if (state.position > 3) api.seek(0); else api.step(-1); }
       if (act === "slot") api.switchTo(hit.dataset.slot);
       if (act === "mute") { api.setVolume(state.volume > 0 ? 0 : 0.9); render(); }
@@ -615,10 +707,25 @@ J.player = (function () {
       const audio = J.audio.deck(slot).element;
       audio.addEventListener("ended", () => {
         if (slot !== state.active) return;
+        /* Repeat wins over everything, including a queue with more in it.
+         *
+         * Straight back to nought on the same element rather than reloading the source:
+         * the file is decoded and buffered already, so this is the one gapless thing the
+         * player can honestly do. */
+        if (state.repeat) {
+          audio.currentTime = 0;
+          audio.play().catch(() => { /* a tab that has not been touched yet */ });
+          return;
+        }
         state.playing = false;
         stopTicking();
         render();
-        api.step(1);
+        // Something after this in the queue is always the answer if there is one.
+        if (state.index >= 0 && state.index + 1 < state.queue.length) {
+          api.step(1);
+          return;
+        }
+        if (state.autoplay) api.keepGoing();
       });
       audio.addEventListener("error", () => {
         if (slot === state.active && state.slots[slot].version) {

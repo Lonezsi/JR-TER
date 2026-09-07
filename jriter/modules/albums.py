@@ -66,8 +66,32 @@ def list_albums(req):
     return {"albums": rows}
 
 
+def MIGRATE():
+    """How often each album has been opened. Zero for everything already here: see the
+    same note in the songs module for why a seeded guess is worse than nothing."""
+    db.add_column_if_missing("albums", "opened", "INTEGER NOT NULL DEFAULT 0")
+
+
+def most_opened(req):
+    """The albums this library gets opened the most. Exact route, so it is found before
+    /api/albums/<id> can claim it."""
+    rows = db.query(
+        "SELECT * FROM albums WHERE opened > 0 ORDER BY opened DESC, updated_at DESC "
+        "LIMIT ?", (as_int(req.q("limit"), 6),))
+    out = []
+    for album in rows:
+        album = dict(album)
+        album.update(_counts(album["id"]))
+        album["has_cover"] = bool(album["cover_digest"])
+        out.append(album)
+    return {"albums": out}
+
+
 def get_album(req):
     album = get(req.params["id"])
+    # Counted on the read, for the reason set out in songs.get_song: this is the only
+    # place that knows an album was opened.
+    db.run("UPDATE albums SET opened = opened + 1 WHERE id = ?", (album["id"],))
     # Albums that existed before playlists did get theirs the first time they are
     # opened, which is cheaper and safer than a migration that rewrites every row.
     pl = _playlists()
@@ -245,6 +269,7 @@ def SEARCH(term, limit):
 def ROUTES():
     return {
         ("GET", "/api/albums"): list_albums,
+        ("GET", "/api/albums/most-opened"): most_opened,
         ("POST", "/api/albums"): create_album,
         ("GET", "/api/albums/<id>"): get_album,
         ("PATCH", "/api/albums/<id>"): update_album,

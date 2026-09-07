@@ -156,10 +156,64 @@
 .rail-album .t { font-weight: 600; font-size: 13px; }
 .rail-album .s { font-size: 11.5px; color: var(--text-3); }
 
+/* The way to the about page on a machine with a pointer.
+ *
+ * That page is reached by holding the rail out past its stop, which is a thumb gesture and
+ * therefore no gesture at all on a laptop: the page existed and nothing on a desktop could
+ * open it. So a word, in the smallest type in the app, sitting just above the rule that
+ * closes the rail, where the things that are about the app rather than about a song live.
+ * Hidden on a phone, which has the gesture and does not need to be told twice. */
+.rail-about {
+  align-self: flex-start;
+  margin-bottom: calc(var(--s4) * -1 + var(--s1));
+  padding: 2px var(--s3);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  color: var(--text-3);
+  transition: color var(--fast);
+}
+.rail-about:hover,
+.rail-about:focus-visible { color: var(--text); }
+
 .rail-foot {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
   padding-top: var(--s3);
   border-top: 1px solid var(--line);
+}
+
+/* Who is signed in, next to the one button that makes something.
+ *
+ * Its own line rather than squeezed in beside the version and the ?. Measured: the rail is
+ * 244 wide and 218 of that is content, and New song alone is 87 of those. An avatar, a
+ * name, a button, a ?, a version and the terms do not go in one line, and the version
+ * being the thing that gets cut is the wrong answer. */
+.rail-account {
+  display: flex; align-items: center; gap: var(--s2);
+  min-width: 0;
+  flex: 1;
+  color: var(--text-2);
+  transition: color var(--fast);
+}
+.rail-account:hover,
+.rail-account:focus-visible { color: var(--text); }
+/* The picture, or the first letter of the name when the account has none. background-image
+   is written by boot.js and is simply absent when there is nothing to show, which is why
+   the letter underneath it is drawn either way rather than conditionally. */
+.rail-avatar {
+  flex: none;
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-line);
+  background: var(--elevated) center / cover no-repeat;
+  font-size: 11px; font-weight: 700;
+  color: var(--text-3);
+}
+.rail-account-name { font-size: 12px; font-weight: 600; }
+
+.rail-meta {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-top: calc(var(--s4) * -1 + var(--s2));
 }
 /* The gap is small because the paper carries its own, see below. */
 .rail-end { display: flex; align-items: center; gap: 2px; }
@@ -283,7 +337,10 @@
   border-radius: var(--r-pill);
   padding: 0 var(--s4);
   height: 40px;
-  width: min(360px, 46vw);
+  /* Named, because the phone rule below has to be able to say "that, times nothing". */
+  --search-w: min(360px, 46vw);
+  width: var(--search-w);
+  flex: none;
   color: var(--text-3);
   transition: border-color var(--fast), background var(--fast);
 }
@@ -396,6 +453,38 @@
   .shell.rail-dragging .rail,
   .shell.rail-dragging .rail-scrim { transition: none; }
   .shell.rail-dragging .rail { will-change: transform; }
+
+  /* The gesture already reaches this page, so the word above the rule would be a second
+     way to the same place taking up room on the screen with the least of it. */
+  .rail-about { display: none; }
+
+  /* The search gets out of the way as the rail arrives.
+   *
+   * On a phone the rail comes over the top of the screen and the search sits behind it,
+   * half covered, still focusable, and still a text field the keyboard can be summoned
+   * into from under a scrim. It shrinks to nothing instead.
+   *
+   * Driven by a number rather than by the class, so it tracks the finger. --rail-open goes
+   * from 0 to 1 and 90-boot.js writes it in both places the rail moves: setRail, where it
+   * is one or the other, and the drag, where it is wherever the thumb is. A custom property
+   * cannot itself be transitioned, but a width computed from one can, which is what makes
+   * the two ends of a tap smooth and the middle of a drag exact.
+   *
+   * This rule is after the plain .search above and at the same specificity, which is the
+   * only reason it wins: a media query adds nothing to specificity, so source order is the
+   * whole story and moving either one of these would silently undo it. */
+  .search {
+    width: calc(var(--search-w) * (1 - var(--rail-open, 0)));
+    padding-inline: calc(var(--s4) * (1 - var(--rail-open, 0)));
+    opacity: calc(1 - var(--rail-open, 0));
+    overflow: hidden;
+    transition: border-color var(--fast), background var(--fast),
+                width var(--med), padding var(--med), opacity var(--med);
+  }
+  /* Under a thumb it is exactly where the thumb says, the same as the rail itself. */
+  .shell.rail-dragging .search {
+    transition: border-color var(--fast), background var(--fast);
+  }
 }
 
 /* The dither.

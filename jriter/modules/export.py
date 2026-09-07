@@ -40,7 +40,8 @@ SCHEMA = []
 #: Table, then the columns handed over. Named rather than derived, so a column added to a
 #: table later is not exported until somebody has looked at it and said so.
 TAKEN = {
-    "songs": ("id", "title", "notes", "current_version_id", "created_at", "updated_at"),
+    "songs": ("id", "title", "notes", "current_version_id", "created_at", "updated_at",
+              "opened"),
     "song_titles": ("id", "song_id", "title", "changed_at"),
     "versions": ("id", "song_id", "n", "digest", "ext", "size", "duration", "bitrate",
                  "label", "filename", "source_path", "created_at", "project_at",
@@ -51,7 +52,7 @@ TAKEN = {
     "lyric_sheets": ("id", "song_id", "name", "position", "is_current", "created_at"),
     "lyric_revisions": ("id", "sheet_id", "text", "created_at"),
     "albums": ("id", "title", "year", "notes", "cover_digest", "cover_ext",
-               "created_at", "updated_at"),
+               "created_at", "updated_at", "opened"),
     "album_songs": ("album_id", "song_id", "position"),
     "playlists": ("id", "title", "album_id", "created_at", "updated_at"),
     "playlist_items": ("id", "playlist_id", "position", "song_id", "render_id", "added_at"),

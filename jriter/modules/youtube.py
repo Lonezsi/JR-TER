@@ -260,6 +260,8 @@ def _public(entry):
     """What the browser is allowed to know. Never the secret, never the tokens."""
     return {"name": entry.get("name") or entry.get("channel") or "a channel",
             "channel": entry.get("channel"),
+            # Whether there is a picture, never where it is.
+            "has_avatar": bool(entry.get("avatar_url")),
             "connected_at": entry.get("connected_at")}
 
 
@@ -273,6 +275,93 @@ def account_state(req):
         # Said here as well as on the page, because it changes what "public" means.
         "unaudited": True,
     }
+
+
+#: How long a cached channel picture is trusted before it is fetched again.
+#:
+#: A day. The picture almost never changes and re-fetching it on every page load would be
+#: a request to Google every time somebody opens the library, which is exactly what serving
+#: it from here is meant to avoid.
+AVATAR_MAX_AGE = 86400
+
+
+#: Where Google actually serves channel pictures from.
+#:
+#: Checked before the server fetches anything, because this is the one place in JR!TER that
+#: opens a URL read out of a file. The account key is derived from a channel title, and a
+#: channel title is whatever somebody typed into YouTube, so neither the address nor the
+#: filename below is trusted just because it came from our own data directory.
+AVATAR_HOSTS = ("ggpht.com", "googleusercontent.com")
+
+
+def _avatar_cache(key):
+    # The key comes from a channel name, so it is scrubbed to letters and digits before it
+    # is any part of a path. A channel called "../../auth" is a perfectly legal channel.
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(key))[:60] or "one"
+    return os.path.join(config.DATA, "youtube", "avatar-%s" % safe)
+
+
+def _may_fetch(url):
+    """Is this an address a channel picture is actually served from."""
+    try:
+        bits = urllib.parse.urlsplit(url or "")
+    except ValueError:
+        return False
+    if bits.scheme != "https" or not bits.hostname:
+        return False
+    host = bits.hostname.lower()
+    return any(host == good or host.endswith("." + good) for good in AVATAR_HOSTS)
+
+
+def avatar(req):
+    """The chosen channel's picture, fetched by JR!TER and served from JR!TER.
+
+    The obvious way to do this is to put Google's own URL in the page and let the browser
+    fetch it. That would mean every load of the library is a request to a Google host from
+    the person's own browser, carrying their address and the fact that they are using this
+    app, for a 32 pixel circle. So the server fetches it, keeps it next to the account it
+    belongs to, and the browser only ever talks to this library.
+
+    A missing picture is a 404 and not an error: the rail draws a letter instead, which is
+    what it does for an account that never had one.
+    """
+    key, entry = _chosen()
+    if not entry or not entry.get("avatar_url"):
+        raise Error("no picture for this account", 404)
+    if not _may_fetch(entry["avatar_url"]):
+        # Not an error worth showing anybody: the rail falls back to a letter. But it is
+        # emphatically not a URL this server is going to open.
+        raise Error("no picture for this account", 404)
+
+    cached = _avatar_cache(key)
+    fresh = (os.path.isfile(cached)
+             and time.time() - os.path.getmtime(cached) < AVATAR_MAX_AGE)
+    if not fresh:
+        try:
+            config.ensure_dirs()
+            os.makedirs(os.path.dirname(cached), exist_ok=True)
+            request = urllib.request.Request(
+                entry["avatar_url"], headers={"User-Agent": "JR!TER"})
+            with urllib.request.urlopen(request, timeout=15) as response:
+                blob = response.read(2 * 1024 * 1024)
+            tmp = cached + ".tmp"
+            with open(tmp, "wb") as f:
+                f.write(blob)
+            os.replace(tmp, cached)
+        except Exception:
+            # A stale picture beats no picture, and no picture beats a 500.
+            if not os.path.isfile(cached):
+                raise Error("the picture could not be fetched", 404)
+
+    # Sniffed from the bytes rather than taken from the URL, which carries a size and no
+    # extension. The three letters rather than the whole four byte signature: the first of
+    # those bytes is 0x89, and a non ASCII escape written through a shell heredoc arrives
+    # as the character U+0089, which is not a byte and will not compile.
+    with open(cached, "rb") as f:
+        head = f.read(4)
+    kind = "image/png" if head[1:4] == b"PNG" else "image/jpeg"
+    return Response(path=cached, content_type=kind,
+                    headers={"Cache-Control": "private, max-age=3600"})
 
 
 def choose_account(req):
@@ -432,7 +521,7 @@ def _land_account(held, waiting, said):
     Shared by both flows, because past the token exchange there is no difference between
     them: the same three values arrive and the same entry is written.
     """
-    channel = _channel_name(said.get("access_token"))
+    channel, picture = _channel(said.get("access_token"))
     entry = {
         "client_id": waiting["client_id"], "client_secret": waiting["client_secret"],
         "refresh_token": said["refresh_token"],
@@ -441,6 +530,10 @@ def _land_account(held, waiting, said):
         "connected_at": time.time(),
         "channel": channel,
         "name": waiting.get("name") or channel or "a channel",
+        # Where the picture lives, kept server side and never handed to the browser. The
+        # page asks JR!TER for the image and JR!TER is the only thing that talks to Google
+        # about it, so opening the library does not tell Google you opened it.
+        "avatar_url": picture,
     }
     # Keyed by the channel where there is one, so signing the same channel in twice
     # replaces it rather than leaving two entries that look identical.
@@ -505,17 +598,32 @@ def finish(req):
     return {"connected": True, "channel": channel, "id": key}
 
 
-def _channel_name(access_token):
+def _channel(access_token):
+    """The channel's name and the address of its picture, or (None, None).
+
+    One call for both, because the request already asks for part=snippet and the picture
+    was sitting in the answer being thrown away.
+    """
     if not access_token:
-        return None
+        return None, None
     request = urllib.request.Request(CHANNEL_URL, headers={
         "Authorization": "Bearer " + access_token})
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             items = json.loads(response.read().decode("utf-8")).get("items") or []
-        return items[0]["snippet"]["title"] if items else None
+        if not items:
+            return None, None
+        snippet = items[0].get("snippet") or {}
+        thumbs = snippet.get("thumbnails") or {}
+        picture = ((thumbs.get("default") or {}).get("url")
+                   or (thumbs.get("medium") or {}).get("url"))
+        return snippet.get("title"), picture
     except Exception:
-        return None          # a name is a nicety; not having it is not a failure
+        return None, None    # a name is a nicety; not having it is not a failure
+
+
+def _channel_name(access_token):
+    return _channel(access_token)[0]
 
 
 def _forget_access_token():
@@ -1194,6 +1302,7 @@ def ROUTES():
         ("POST", "/api/youtube/job/cancel"): cancel_job,
         ("GET", "/api/youtube/tool"): tool_state,
         ("GET", "/api/youtube/account"): account_state,
+        ("GET", "/api/youtube/avatar"): avatar,
         # The browser sign in, and the two the device flow already had.
         ("GET", "/api/youtube/auth/addresses"): auth_addresses,
         ("POST", "/api/youtube/auth/start"): auth_start,

@@ -1,0 +1,84 @@
+/* ── the front door ────────────────────────────────────────────────────────── */
+
+/* Reached by pressing the name in the rail, which used to land on the library.
+ *
+ * The library is a list of everything, and it is the right screen when you already know
+ * what you are after. This is the one for arriving: a sentence saying what this is, the
+ * few things you keep coming back to, and what has changed lately. */
+.home { max-width: 880px; }
+
+/* The one screen in the app where a paragraph is the point, so it is allowed the room a
+   paragraph needs and the list pages are not. */
+.home-hero {
+  padding: var(--s6) 0 var(--s7);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s6);
+}
+.home-eyebrow {
+  margin: 0 0 var(--s3);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.home-title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 800;
+  /* Big, but not a poster. It has to sit above a paragraph without shouting over it, and
+     it has to survive a phone, which is what the clamp is for. */
+  font-size: clamp(28px, 5.4vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+.home-lede {
+  margin: var(--s4) 0 0;
+  max-width: 54ch;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.home-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-top: var(--s6);
+}
+
+/* Cards rather than rows, because this screen is about recognising something at a glance
+   and a row is a thing you read. auto-fill so the count follows the width instead of a
+   breakpoint deciding it: six songs land as three across on a laptop and two on a phone
+   without either number being written down anywhere. */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--s4);
+}
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s3);
+  border-radius: var(--r-lg);
+  color: var(--text);
+  transition: background var(--fast), transform var(--fast);
+}
+.home-card:hover,
+.home-card:focus-visible { background: var(--glass); transform: translateY(-2px); }
+.home-card-name { font-weight: 650; font-size: 13.5px; }
+.home-card-sub { font-size: 12px; color: var(--text-3); }
+
+/* Square, whatever the picture is, so a grid of them is a grid and not a staircase. */
+.home-art {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--r-md);
+  margin-bottom: var(--s3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-card:hover,
+  .home-card:focus-visible { transform: none; }
+}

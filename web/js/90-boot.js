@@ -105,6 +105,51 @@ J.applyLook = function (settings) {
 };
 
 
+/* Who is signed in, at the foot of the rail.
+ *
+ * Absent rather than empty when nothing is connected. A grey circle with no picture and no
+ * name in it is a thing people press to find out what it is, and the answer would be
+ * nothing.
+ *
+ * The picture comes from this server, not from Google. See youtube.avatar for why: the
+ * short version is that putting Google's own URL in the page would mean a request to a
+ * Google host every time anybody opens the library. If there is no picture the circle
+ * carries the first letter of the name, which is what it does for a channel that never
+ * had one.
+ */
+async function showAccount(state) {
+  const row = J.$("#railAccount");
+  if (!row) return;
+  if (!(state.modules || []).includes("youtube")) return;
+
+  // Caught rather than J.try'd. J.try raises a toast, and "your account could not be
+  // looked up" is not news worth interrupting somebody with on the way into the app: the
+  // row simply does not appear, which is what it does when nothing is connected anyway.
+  const said = await J.get("/api/youtube/account").catch(() => null);
+  const chosen = said && (said.accounts || []).find((a) => a.id === said.chosen);
+  const account = chosen || (said && (said.accounts || [])[0]);
+  if (!account) return;                       // stays hidden, which is the honest state
+
+  J.$("#railAccountName").textContent = account.name || "";
+  const face = J.$("#railAvatar");
+  face.textContent = (account.name || "?").trim()[0].toUpperCase();
+  if (account.has_avatar) {
+    /* Only once it has loaded.
+     *
+     * Setting the background straight away means a broken fetch leaves a circle with a
+     * letter behind a failed image, and on a slow link an empty circle for as long as it
+     * takes. The letter is the resting state and the picture replaces it or does not. */
+    const picture = new Image();
+    picture.onload = () => {
+      face.style.backgroundImage = `url("/api/youtube/avatar")`;
+      face.textContent = "";
+    };
+    picture.src = "/api/youtube/avatar";
+  }
+  row.hidden = false;
+}
+
+
 J.markNav = function (view) {
   J.$$("#nav a").forEach((link) => {
     link.classList.toggle("on", link.dataset.view === view);
@@ -246,6 +291,7 @@ async function boot() {
   if (box) box.hidden = !state.modules.includes("search");
 
   await buildRail(state);
+  showAccount(state);
 
   // ── shell wiring ─────────────────────────────────────────────────────────
   /* The rail can be put away at any width. On a wide screen its column collapses and
@@ -269,6 +315,10 @@ async function boot() {
     // back to has nothing to move it from.
     if (drag) stopDrag();
     shell.classList.toggle("rail-shut", shut);
+    // The same number the drag writes, at whichever end it landed on. Written rather than
+    // removed, because the property is what the search is sized from and a missing one
+    // would fall back to its default of nought, which is the open state.
+    shell.style.setProperty("--rail-open", shut ? "0" : "1");
     // Only a deliberate choice on a wide screen is worth remembering. On a phone the
     // rail always starts out of the way.
     if (!narrow()) localStorage.setItem(RAIL_KEY, shut ? "1" : "0");
@@ -434,7 +484,12 @@ async function boot() {
     railNode.style.setProperty("--rail-x", `${Math.round(at)}px`);
     // The dim is driven off the same number, so the room darkens as the rail comes out
     // instead of after it has arrived.
-    scrim.style.opacity = String(J.clamp(1 + at / drag.travel, 0, 1));
+    const open = J.clamp(1 + at / drag.travel, 0, 1);
+    scrim.style.opacity = String(open);
+    // And so is the search, which shrinks to nothing as the rail covers it. One number
+    // for the whole gesture: 0 is shut, 1 is open, and the stylesheet decides what that
+    // means. Anything else that has to get out of the rail's way can read it too.
+    shell.style.setProperty("--rail-open", open.toFixed(3));
   }
 
   /* Hand the rail back to the stylesheet.
@@ -449,6 +504,8 @@ async function boot() {
     shell.classList.remove("rail-dragging");
     railNode.style.removeProperty("--rail-x");
     scrim.style.removeProperty("opacity");
+    // Not removed: setRail writes the end state a line later, and a gap between the two
+    // would be one frame of a full width search box appearing over a closing rail.
   }
 
   document.addEventListener("pointerdown", (e) => {

@@ -35,6 +35,26 @@
 .transport { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
 .transport-row { display: flex; align-items: center; gap: var(--s2); }
 
+/* Repeat, and the switch for what plays next.
+ *
+ * Smaller and dimmer than the transport they sit beside, because they are not things you
+ * press while listening: they are two settings that happen to belong here rather than in
+ * Settings, since what they change is what this row does next. Off is genuinely off
+ * looking, and on is the accent, so the state is readable without hovering for a title.
+ *
+ * There is no status dot on either of them. Whether a mode is on is said by the control
+ * itself, which is the whole reason a light beside a button was the wrong answer. */
+.icon-btn.mode {
+  width: 30px; height: 30px;
+  color: var(--text-3);
+}
+.icon-btn.mode:hover { color: var(--text-2); }
+.icon-btn.mode.on { color: var(--accent); }
+/* A quiet wash behind the on state, so it reads at a glance in a row of six controls
+   rather than only once you are looking for it. */
+.icon-btn.mode.on { background: var(--accent-soft); }
+
+
 .scrubber { display: flex; align-items: center; gap: var(--s3); width: 100%; }
 .scrubber .t { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; width: 38px; flex: none; }
 .scrubber .t.right { text-align: right; }
