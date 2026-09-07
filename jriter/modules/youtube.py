@@ -9,11 +9,20 @@ way to ship one inside an app, and a client secret in a public repository is a s
 name only. You make a Google Cloud project, switch on the YouTube Data API, and paste the
 two values in. They are stored on your own server.
 
-The sign in is the device flow, the one a television uses: a short code you type into
-google.com on any device. That is deliberate. The ordinary browser flow needs a redirect
-address registered in advance, and this library is reached at a different address
-depending on whether you are at the machine, on the tailnet, or on a phone through the
-funnel. A flow with no redirect works from all three.
+There are two ways to sign in and both are here.
+
+The first is the one the rest of the web uses: press a button, pick an account in
+Google's own chooser, come back signed in. It needs a redirect address registered on the
+client in advance, and this library answers at a different address depending on whether
+you are at the machine, on the tailnet, or on a phone through the funnel. That is why it
+was not here at first. It works now because the address is derived from the request that
+started the sign in rather than written down, so whichever of the three you are on is the
+one Google is told, and the page shows you all of them to register.
+
+The second is the device flow, the one a television uses: a short code you type into
+google.com on any device. It is kept, and not only as a fallback. It is the right answer
+whenever the browser is not on the same machine as the server, which on a headless host
+is every time, and it needs no redirect address registered at all.
 
 One limit that is Google's and not ours, and which cannot be worked around: until they
 have audited your project, everything it uploads is forced to private whatever you ask
@@ -23,16 +32,19 @@ import os
 import json
 import time
 import shutil
+import secrets
 import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from .. import db, config, blobs, registry, video, audio_meta, problems
-from ..wire import Error, need, as_int
+from ..wire import Error, Response, need, as_int
 from . import songs
 
-#: Google's endpoints. The device flow, then the token, then the upload.
+#: Google's endpoints. The browser flow and the device flow, then the token, then the
+#: upload.
+AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 DEVICE_URL = "https://oauth2.googleapis.com/device/code"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 UPLOAD_URL = ("https://www.googleapis.com/upload/youtube/v3/videos"
@@ -273,8 +285,178 @@ def choose_account(req):
     return account_state(req)
 
 
+#: The path Google is told to come back to. One path, whatever address you reached this
+#: library at; the address itself is worked out per request below.
+RETURN_PATH = "/api/youtube/auth/return"
+
+
+def _return_to(req):
+    """The address the browser making this request would come back to.
+
+    Built from the Host header rather than written down, because this library answers on
+    three addresses and which one you are on decides which one Google has to be told:
+    127.0.0.1 at the machine, the tailnet name from another of your own devices, and the
+    funnel name from a phone. A redirect address is registered in advance and matched
+    exactly, so one hard coded value would work from one of those and fail from the other
+    two. That is the reason the device flow was the only flow here for a while.
+
+    The Host header is somebody else's to set, and it is safe here for one reason worth
+    stating plainly: this value is only ever handed to Google, who compares it against
+    the list on your own OAuth client and refuses anything not on it. It is never used to
+    build a URL this server sends a browser to.
+    """
+    host = (req.headers.get("Host") or "").strip()
+    if not host or "/" in host or "\\" in host:
+        raise Error("This request carried no usable address to come back to.")
+    # A proxy that has already terminated TLS says so. Otherwise the loopback is plain
+    # and anything else is not.
+    said = (req.headers.get("X-Forwarded-Proto") or "").lower()
+    if said in ("http", "https"):
+        scheme = said
+    else:
+        bare = host.split(":")[0].lower()
+        scheme = "http" if bare in ("127.0.0.1", "localhost", "[::1]") else "https"
+    return "%s://%s%s" % (scheme, host, RETURN_PATH)
+
+
+def auth_addresses(req):
+    """The addresses to put on the OAuth client, and the one this request would use.
+
+    Handed to the page so it can show them rather than describe them. Getting one
+    character wrong here is the likeliest way for this to fail, and the message Google
+    gives names the address it expected, which is the one thing it cannot know.
+    """
+    here = _return_to(req)
+    port = config.PORT
+    register = [here]
+    for guess in ("http://127.0.0.1:%d%s" % (port, RETURN_PATH),
+                  "http://localhost:%d%s" % (port, RETURN_PATH)):
+        if guess not in register:
+            register.append(guess)
+    return {"here": here, "register": register, "path": RETURN_PATH}
+
+
+def auth_start(req):
+    """Begin the browser sign in. Returns the Google URL to send the person to.
+
+    The flow the rest of the web uses: one press, Google's own account chooser, and back
+    here signed in. The device flow underneath is still there and is still the right
+    answer when the browser is not on the same machine as the server, which on a headless
+    host is every time.
+    """
+    data = req.json()
+    client_id = need(data, "client_id").strip()
+    client_secret = need(data, "client_secret").strip()
+    back = _return_to(req)
+
+    held = _all()
+    # Single use, and checked on the way back in. Without it, anybody who can get your
+    # browser to load this server's return path carrying a code of their own has attached
+    # their account to your library.
+    state = secrets.token_urlsafe(24)
+    held["pending"] = {"kind": "redirect", "state": state,
+                       "client_id": client_id, "client_secret": client_secret,
+                       "redirect_uri": back, "started_at": time.time(),
+                       "name": (data.get("name") or "").strip()}
+    _save_account(held)
+
+    where = AUTH_URL + "?" + urllib.parse.urlencode({
+        "client_id": client_id,
+        "redirect_uri": back,
+        "response_type": "code",
+        "scope": SCOPE,
+        "state": state,
+        # Without these two, Google hands back an access token and no refresh token on
+        # every sign in after the first, and this library has to be able to upload next
+        # week without asking again.
+        "access_type": "offline",
+        "prompt": "consent",
+        "include_granted_scopes": "true",
+    })
+    return {"url": where, "redirect_uri": back}
+
+
+def auth_return(req):
+    """Where Google sends the browser back to. A person lands here, not a script.
+
+    Behind the door like everything else, which works because the session cookie is
+    SameSite=Lax and this is a top level GET navigation, the one cross site case Lax
+    still sends a cookie for. It has to be behind the door: completing this attaches an
+    account that can post to a channel.
+    """
+    held = _all()
+    waiting = held.get("pending") or {}
+
+    def back_to_page(message):
+        # The path is written here rather than built from anything in the request.
+        return Response(status=302, headers={
+            # The library, not the upload page. That one is a screen of one song and
+            # this return knows nothing about a song; boot reads the message off the
+            # query wherever it lands and clears it.
+            "Location": "/#/?connect=" + urllib.parse.quote(message)})
+
+    if waiting.get("kind") != "redirect":
+        return back_to_page("Nothing was waiting to be connected. Start again.")
+
+    said = req.q("state") or ""
+    code = req.q("code") or ""
+    refused = req.q("error") or ""
+    # Spent either way: a state that has been answered once cannot be answered again.
+    held.pop("pending", None)
+    _save_account(held)
+
+    ok = bool(waiting.get("state")) and secrets.compare_digest(said, waiting["state"])
+    if not ok:
+        return back_to_page("That sign in did not match the one this library started.")
+    if refused:
+        return back_to_page("Google refused: " + refused)
+    if not code:
+        return back_to_page("Google came back without a code.")
+
+    got = _post_form(TOKEN_URL, {
+        "client_id": waiting["client_id"], "client_secret": waiting["client_secret"],
+        "code": code, "grant_type": "authorization_code",
+        "redirect_uri": waiting["redirect_uri"]})
+    if "refresh_token" not in got:
+        # Never the response itself: when it carries anything it carries a token.
+        return back_to_page(got.get("error_description")
+                            or got.get("error") or "that did not complete")
+
+    _land_account(held, waiting, got)
+    return back_to_page("connected")
+
+
+def _land_account(held, waiting, said):
+    """Store a completed sign in.
+
+    Shared by both flows, because past the token exchange there is no difference between
+    them: the same three values arrive and the same entry is written.
+    """
+    channel = _channel_name(said.get("access_token"))
+    entry = {
+        "client_id": waiting["client_id"], "client_secret": waiting["client_secret"],
+        "refresh_token": said["refresh_token"],
+        "access_token": said.get("access_token"),
+        "expires_at": time.time() + said.get("expires_in", 3600) - 60,
+        "connected_at": time.time(),
+        "channel": channel,
+        "name": waiting.get("name") or channel or "a channel",
+    }
+    # Keyed by the channel where there is one, so signing the same channel in twice
+    # replaces it rather than leaving two entries that look identical.
+    key = (channel or ("account-%d" % int(time.time()))).lower().replace(" ", "-")[:60]
+    held["accounts"][key] = entry
+    held["chosen"] = key
+    held.pop("pending", None)
+    _save_account(held)
+    return key, channel
+
+
 def connect(req):
-    """Start signing in another account. Returns the code to type into google.com."""
+    """Start signing in with a code instead.
+
+    The fallback, and still the only one that works when the browser is not on the same
+    machine as the server, which on a headless host is every time."""
     data = req.json()
     client_id = need(data, "client_id").strip()
     client_secret = need(data, "client_secret").strip()
@@ -303,6 +485,10 @@ def finish(req):
     waiting = held.get("pending")
     if not waiting:
         raise Error("Nothing is waiting to be connected. Start again.")
+    # A browser sign in leaves a pending entry too, and it has no device code in it.
+    # Without this the next poll of this endpoint is a KeyError rather than a sentence.
+    if waiting.get("kind") == "redirect":
+        raise Error("That sign in is happening in the browser. Finish it there.", 409)
 
     said = _post_form(TOKEN_URL, {
         "client_id": waiting["client_id"], "client_secret": waiting["client_secret"],
@@ -315,23 +501,7 @@ def finish(req):
         raise Error("That did not complete: %s"
                     % (said.get("error_description") or said.get("error", "no reason")))
 
-    channel = _channel_name(said.get("access_token"))
-    entry = {
-        "client_id": waiting["client_id"], "client_secret": waiting["client_secret"],
-        "refresh_token": said["refresh_token"],
-        "access_token": said.get("access_token"),
-        "expires_at": time.time() + said.get("expires_in", 3600) - 60,
-        "connected_at": time.time(),
-        "channel": channel,
-        "name": waiting.get("name") or channel or "a channel",
-    }
-    # Keyed by the channel where there is one, so signing the same channel in twice
-    # replaces it rather than leaving two entries that look identical.
-    key = (channel or ("account-%d" % int(time.time()))).lower().replace(" ", "-")[:60]
-    held["accounts"][key] = entry
-    held["chosen"] = key
-    held.pop("pending", None)
-    _save_account(held)
+    key, channel = _land_account(held, waiting, said)
     return {"connected": True, "channel": channel, "id": key}
 
 
@@ -1024,6 +1194,10 @@ def ROUTES():
         ("POST", "/api/youtube/job/cancel"): cancel_job,
         ("GET", "/api/youtube/tool"): tool_state,
         ("GET", "/api/youtube/account"): account_state,
+        # The browser sign in, and the two the device flow already had.
+        ("GET", "/api/youtube/auth/addresses"): auth_addresses,
+        ("POST", "/api/youtube/auth/start"): auth_start,
+        ("GET", RETURN_PATH): auth_return,
         ("POST", "/api/youtube/connect"): connect,
         ("POST", "/api/youtube/finish"): finish,
         ("DELETE", "/api/youtube/account"): disconnect,

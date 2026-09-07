@@ -769,6 +769,21 @@ async function boot() {
   document.addEventListener("pointerdown", warmAudio, true);
   document.addEventListener("keydown", warmAudio, true);
 
+  /* A message from a sign in that has just come back from Google.
+   *
+   * The return handler on the server has no song and no screen to go back to, so it
+   * lands on the library with one word on the query. Read and cleared here rather than
+   * in the upload view, because that view is a screen of one song and this arrives
+   * without one.
+   */
+  const landed = new URLSearchParams((location.hash.split("?")[1] || "")).get("connect");
+  if (landed) {
+    J.toast(landed === "connected" ? "That account is connected." : landed,
+            landed === "connected" ? "" : "bad");
+    // Replace rather than assign, so Back does not walk into the message again.
+    history.replaceState(history.state, "", location.pathname + "#/");
+  }
+
   J.emit("boot");
   J.router.start();
 

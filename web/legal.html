@@ -97,9 +97,10 @@ body { padding: var(--s6) var(--s5) 20vh; }
     to answer.
   </p>
   <p>
-    Three things leave your machine, and each only because you asked for it: publishing a
-    song to YouTube, fetching ffmpeg the first time you need it, and two typefaces the
-    library page loads from Google. All three are set out below.
+    Four things leave your machine, and only one of them happens without you asking:
+    connecting a Google account, publishing a song to YouTube, fetching ffmpeg the first
+    time you need it, and two typefaces the library page loads from Google. That last one
+    is the one that is not your choice. All four are set out below.
   </p>
 </div>
 
@@ -246,6 +247,16 @@ body { padding: var(--s6) var(--s5) 20vh; }
   <li>
     <strong>i.ytimg.com.</strong> A song that has been published shows the video's
     thumbnail, fetched from YouTube's image server when you open that panel.
+  </li>
+  <li>
+    <strong>accounts.google.com.</strong> Only when you press Sign in with Google to
+    connect an account. Your browser goes to Google's own sign in page, you choose an
+    account there, and Google sends you back here. Nothing about your library goes with
+    you: what is sent is the id of the OAuth client you made, what is being asked for
+    (permission to upload), and a one time code so this server can tell your answer from
+    anybody else's. There is a second way to connect that skips this, a code you type into
+    google.com yourself, and it is the one to use if you would rather not be sent there
+    from here.
   </li>
   <li>
     <strong>oauth2.googleapis.com and www.googleapis.com.</strong> Only when you connect a

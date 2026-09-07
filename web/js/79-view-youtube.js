@@ -22,6 +22,8 @@ J.views.youtube = {
     const songId = Number(params.id);
     let ctx = null;
     let account = null;
+    //: The redirect addresses to register, read once with everything else.
+    let addresses = { register: [], here: "" };
     let bounced = null;            // { buffer, blob, peak, seconds }
     let working = false;
     let editor = null;
@@ -45,13 +47,14 @@ J.views.youtube = {
     let watching = null;
 
     async function load() {
-      const [song, versions, sound, art, connected, tool] = await Promise.all([
+      const [song, versions, sound, art, connected, tool, where] = await Promise.all([
         J.get(`/api/songs/${songId}`),
         J.get(`/api/songs/${songId}/versions`),
         J.get(`/api/songs/${songId}/sound`).catch(() => ({ presets: [] })),
         J.get(`/api/songs/${songId}/artwork`).catch(() => ({ artwork: [] })),
         J.get("/api/youtube/account").catch(() => ({ accounts: [], chosen: null })),
         J.get("/api/youtube/tool").catch(() => ({ found: false, why: "" })),
+        J.get("/api/youtube/auth/addresses").catch(() => ({ register: [], here: "" })),
       ]);
       ffmpeg = tool;
       const list = versions.versions || [];
@@ -68,6 +71,7 @@ J.views.youtube = {
       const current = ctx.presets.find((p) => p.is_current) || ctx.presets[0];
       chosenPresetId = current ? current.id : null;
       account = connected;
+      addresses = where || addresses;
 
       // The arrangement, so the compositor has something to draw and the bounce has
       // something to lay out.
@@ -284,20 +288,49 @@ J.views.youtube = {
     // ── the account ──────────────────────────────────────────────────────────
 
     /* What connecting involves, said plainly rather than behind a button that fails.
-     * Uploading acts as you, so it needs an OAuth client that belongs to you: there is
-     * no way for an app to ship one. */
+     *
+     * The one thing that cannot be removed: uploading acts as you, so it needs an OAuth
+     * client that belongs to you. There is no way for an app to ship one, and a client
+     * secret in a public repository is a secret in name only. So the project and the two
+     * values stay, however much nicer it would be if they did not.
+     *
+     * What did change is everything after that. It used to be a code you read off one
+     * screen and typed into another; now it is the button the rest of the web has, and
+     * the code is still there for the case it is genuinely better at, which is a server
+     * on a different machine from the browser.
+     *
+     * The two paths need different client types, which is a detail Google enforces and
+     * nothing here can paper over, so it is said out loud rather than discovered from an
+     * error. A Web application client has redirect addresses and can do the button; a TV
+     * and Limited Input client has none and can only do the code.
+     */
     function drawConnect() {
       const node = J.$("#ytConnect", root);
       if (!node) return;
       node.hidden = false;
+      const here = (addresses.register || []);
       node.innerHTML = `
         <ol class="yt-steps">
           <li>Make a project at <a href="https://console.cloud.google.com/" target="_blank"
               rel="noopener noreferrer">console.cloud.google.com</a> and switch on the
               <b>YouTube Data API v3</b>.</li>
-          <li>Under Credentials, make an <b>OAuth client ID</b> of type <b>TV and Limited
-              Input</b>. That kind needs no redirect address, which is what lets this work
-              on a machine reached over a tunnel.</li>
+          <li>Under Credentials, make an <b>OAuth client ID</b>. Which type depends on
+              which way you would rather sign in:
+              <div class="yt-choice">
+                <div>
+                  <b>Web application</b>, for the button. Add these as
+                  <b>Authorised redirect URIs</b>, all of them, since this library
+                  answers on more than one address:
+                  <ul class="yt-uris">
+                    ${here.map((one) => `<li><code>${J.esc(one)}</code></li>`).join("")}
+                  </ul>
+                </div>
+                <div>
+                  <b>TV and Limited Input</b>, for the code. It needs no redirect address
+                  at all, which is what makes it the one that works when this server is
+                  on a different machine from the browser you are reading this on.
+                </div>
+              </div></li>
           <li>Paste the two values below. They are stored on your own server, beside the
               library rather than in it, and go nowhere except Google.</li>
         </ol>
@@ -311,13 +344,34 @@ J.views.youtube = {
           <input class="field" id="ytClientSecret" type="password" autocomplete="off"
                  required></label>
         <div class="row wrap">
-          <button class="btn sm primary" data-act="connect">Connect</button>
+          <button class="btn sm primary" data-act="sign-in">Sign in with Google</button>
+          <button class="btn sm ghost" data-act="connect">Use a code instead</button>
           ${(account.accounts || []).length
             ? '<button class="btn sm ghost" data-act="cancel-connect">Never mind</button>' : ""}
         </div>
         <p class="faint yt-note">Google restricts uploads from an app it has not audited:
           until yours is reviewed, everything it uploads stays <b>private</b> whatever you
           choose above. That is Google's rule, not JR!TER's.</p>`;
+    }
+
+    /* The button. One press, Google's own account chooser, and back here.
+     *
+     * A whole page navigation rather than a popup, because a popup that is blocked is a
+     * button that does nothing and this library is opened on a phone as often as not.
+     * The page comes back to the library with a message on the query, which boot reads
+     * and clears: see the return handler in jriter/modules/youtube.py.
+     */
+    async function signIn() {
+      const id = J.$("#ytClientId", root).value.trim();
+      const secret = J.$("#ytClientSecret", root).value.trim();
+      const name = J.$("#ytAccountName", root).value.trim();
+      if (!id || !secret) { J.toast("Both values are needed.", "bad"); return; }
+
+      const started = await J.try(() => J.post("/api/youtube/auth/start", {
+        client_id: id, client_secret: secret, name,
+      }));
+      if (!started || !started.url) return;
+      location.href = started.url;
     }
 
     async function connect() {
@@ -686,6 +740,7 @@ J.views.youtube = {
       const what = act.dataset.act;
 
       if (what === "render") return makeTheFile();
+      if (what === "sign-in") return signIn();
       if (what === "connect") return connect();
       if (what === "add-account") { drawConnect(); return; }
       if (what === "cancel-connect") { J.$("#ytConnect", root).hidden = true; return; }
