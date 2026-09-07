@@ -319,7 +319,20 @@ J.blockLyrics = async function (block, ctx) {
       const text = (viewing && i === at) ? viewing.text : s.text;
       const title = J.mdTitle(text, s.name);
       const body = J.mdBody(text);
-      return `<article class="lyric-card ${i === at ? "on" : ""} ${viewing && i === at ? "reading" : ""}"
+      /* A slab around every card, and the card is only its front face.
+       *
+       * The two have to be different elements and the reason is measurable: an element
+       * with a backdrop-filter flattens its children, whatever its transform-style says.
+       * Measured, because the computed value lies about it: a child at translateZ(200)
+       * under perspective 600 projects to 150 pixels inside a plain preserve-3d parent
+       * and to 100 inside one carrying a backdrop-filter, which is what flat means. The
+       * card is the glass and cannot hold the sides; the slab holds the sides and cannot
+       * be glass.
+       */
+      return `<div class="lyric-slab ${i === at ? "on" : ""}" data-slab="${i}">
+      <span class="slab-edge slab-left" aria-hidden="true"></span>
+      <span class="slab-edge slab-right" aria-hidden="true"></span>
+      <article class="lyric-card ${i === at ? "on" : ""} ${viewing && i === at ? "reading" : ""}"
                data-sheet="${s.id}">
         <h3 class="card-title">${J.esc(title)}</h3>
         <div class="card-body ${text ? "" : "empty-words"}"
@@ -336,7 +349,8 @@ J.blockLyrics = async function (block, ctx) {
               </svg>
             </button>` : ""}
         </span>
-      </article>`;
+      </article>
+      </div>`;
     }).join("");
     place(false);
   }
@@ -364,12 +378,52 @@ J.blockLyrics = async function (block, ctx) {
     });
   }
 
-  /* Where the track sits. One card per step, so the maths is the index. */
+  /* Where the front card sits while a thumb is on it.
+   *
+   * Three rotations rather than a slide, and each one is doing a different job.
+   *
+   * rotateZ is the tilt, and it is the part that reads as a physical card being pushed:
+   * a hand moving a card sideways on a table pivots it, because the push and the friction
+   * are not at the same point. Small, a degree per thirty pixels.
+   *
+   * rotateY is what makes the thickness visible at all. A card tilted in its own plane is
+   * still a flat shape; turning it a little about the vertical axis brings one of its side
+   * walls into view, and the side walls are the whole reason the slab exists.
+   *
+   * translateZ lifts it off the ones behind, so the stack opens as the front card leaves
+   * rather than the front card sliding out of a flat pile.
+   */
+  const tilt = (dx, width) => {
+    const share = J.clamp(dx / (width || 1), -1, 1);
+    return `translate3d(${dx.toFixed(1)}px, ${Math.abs(share * 14).toFixed(1)}px, 40px)`
+      + ` rotateZ(${(share * 9).toFixed(2)}deg)`
+      + ` rotateY(${(-share * 16).toFixed(2)}deg)`;
+  };
+
+  /* And where it goes when it is let go past the threshold: onward, off the frame, still
+   * turning. 130 per cent clears the window at any width. */
+  const flung = (onward) =>
+    `translate3d(${onward * 130}%, 24px, 60px) rotateZ(${onward * 14}deg)`
+    + ` rotateY(${-onward * 24}deg)`;
+
+  /* Hand the front card back to the stylesheet.
+   *
+   * There is nothing to position any more. The deck was a row translated by one card
+   * width per step, and the maths was the index; it is a stack now, and where each card
+   * belongs is a rule keyed off which one carries .on. All this does is drop whatever
+   * the finger left on the front card, and decide whether it springs back or snaps.
+   */
   function place(animate) {
-    const track = J.$("#deckTrack", block);
-    if (!track) return;
-    track.style.transition = animate ? "transform 320ms cubic-bezier(0.22,0.7,0.3,1)" : "none";
-    track.style.transform = `translate3d(${-at * 100}%, 0, 0)`;
+    const slab = J.$(".lyric-slab.on", block);
+    if (!slab) return;
+    slab.classList.toggle("nudging", !animate);
+    slab.style.transform = "";
+    if (!animate) {
+      // Read the layout back, so the browser has the untransformed position as the
+      // starting point of the next animation rather than folding the two together.
+      void slab.offsetWidth;
+      slab.classList.remove("nudging");
+    }
   }
 
   function go(index, animate) {
@@ -392,23 +446,22 @@ J.blockLyrics = async function (block, ctx) {
    * keyboard kept working because they are delegated here, and only the drag was not. */
   function wireDrag() {
     let startX = 0, startY = 0, dragging = false, decided = false, width = 1;
-    let win = null, track = null;
+    let win = null, slab = null;
 
     block.addEventListener("pointerdown", (e) => {
       if (editing || sheets.length < 2) return;
       if (e.target.closest("a, button, textarea")) return;
       // Resolved per gesture, because the element that was there last time is gone.
       win = e.target.closest("#deckWindow");
-      track = win && J.$("#deckTrack", block);
-      if (!win || !track) { win = track = null; return; }
+      slab = win && J.$(".lyric-slab.on", block);
+      if (!win || !slab) { win = slab = null; return; }
       dragging = true; decided = false;
       startX = e.clientX; startY = e.clientY;
       width = win.getBoundingClientRect().width || 1;
-      track.style.transition = "none";
     });
 
     block.addEventListener("pointermove", (e) => {
-      if (!dragging || !track) return;
+      if (!dragging || !slab) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       if (!decided) {
@@ -416,24 +469,52 @@ J.blockLyrics = async function (block, ctx) {
         if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) { dragging = false; return; }
         if (Math.abs(dx) < 6) return;
         decided = true;
+        slab.classList.add("nudging");
         try { win.setPointerCapture(e.pointerId); } catch (err) { /* gone already */ }
       }
       // Resist at the ends, so the deck feels like it has edges.
       const edge = (at === 0 && dx > 0) || (at === sheets.length - 1 && dx < 0);
       const shift = edge ? dx * 0.32 : dx;
-      track.style.transform = `translate3d(calc(${-at * 100}% + ${shift}px), 0, 0)`;
+      slab.style.transform = tilt(shift, width);
     });
 
     const release = (e) => {
       if (!dragging) return;
       dragging = false;
-      const held = win;
-      win = track = null;
+      const held = win, card = slab;
+      win = slab = null;
       if (!decided) return;
       try { held.releasePointerCapture(e.pointerId); } catch (err) { /* already */ }
       const dx = e.clientX - startX;
-      if (Math.abs(dx) > width * 0.28) go(at + (dx < 0 ? 1 : -1));
-      else place(true);
+      const far = Math.abs(dx) > width * 0.24;
+      const onward = dx < 0 ? 1 : -1;
+      const stays = (at + onward) < 0 || (at + onward) > sheets.length - 1;
+
+      if (!far || stays) { place(true); return; }
+
+      /* Thrown, not stepped.
+       *
+       * The card carries on the way it was going and leaves the frame, and only then does
+       * the index move. Changing it here instead would redraw the deck under a card that
+       * is still mid air, which is the jump cut this gesture is meant to replace. */
+      card.classList.remove("nudging");
+      card.style.transform = flung(onward);
+
+      /* Waited out rather than listened for.
+       *
+       * transitionend would be the obvious thing and it is the wrong thing twice over. It
+       * bubbles, so any transition on anything inside the card fires it, and the card is
+       * full of things with transitions. And it would be a listener on an element that
+       * drawCards is about to throw away, which is the rule this panel already learned
+       * the hard way: the swipe used to be bound to the deck window and stopped working
+       * after the first redraw.
+       *
+       * The duration is read off the element rather than written here, so it cannot drift
+       * from the stylesheet, and reduced motion collapsing it to nothing collapses this
+       * with it. */
+      const spent = getComputedStyle(card).transitionDuration.split(",")[0];
+      const ms = Math.max(0, (parseFloat(spent) || 0) * (/ms/.test(spent) ? 1 : 1000));
+      setTimeout(() => go(at + onward), ms + 30);
     };
     block.addEventListener("pointerup", release);
     block.addEventListener("pointercancel", release);

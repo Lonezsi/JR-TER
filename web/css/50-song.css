@@ -347,6 +347,9 @@
   justify-content: center;
 }
 .deck-window {
+  /* How thick a card is. One number, because the walls are the only thing that reads it
+     and a second copy of it is a second thing to forget. */
+  --slab-thick: 18px;
   flex: 1;
   /* Wide enough that a long line of a verse is a line rather than a wrap. The cards are
      the middle of the page, so they get the room the page has. */
@@ -356,18 +359,109 @@
   touch-action: pan-y;          /* vertical scrolling still belongs to the page */
   /* The room the cards turn in. Without a perspective on an ancestor a rotateY is an
      affine squash with no vanishing point, which reads as a card getting thinner rather
-     than as a card turning away. 1100 is shallow enough to be a solid object and not a
-     fisheye. */
-  perspective: 1100px;
-  perspective-origin: 50% 45%;
+     than as a card turning away. 1400 is shallow enough to be a solid object and not a
+     fisheye, and deeper than the 1100 the row used because a stack has real depth behind
+     the front card and needed the room. */
+  perspective: 1400px;
+  perspective-origin: 50% 42%;
 }
-/* The track still slides sideways, and that is on purpose: the swipe tracks the thumb by
-   translating this, and that arithmetic is one card per hundred per cent. What changed is
-   that the cards are no longer flat in it. */
+
+/* A stack, not a row.
+ *
+ * The deck was a flex row translated by one card width per step, which is a strip of
+ * cards sliding past a window. Now they are on top of one another and the front one is
+ * thrown off, which is the gesture this was asked to feel like.
+ *
+ * The front card stays in flow and the rest are taken out of it, so the window is still
+ * as tall as whatever is being read. Absolutely positioning all of them would leave the
+ * window with no height of its own and the panel would collapse. */
 .deck-track {
-  display: flex;
+  position: relative;
   transform-style: preserve-3d;
-  will-change: transform;
+}
+
+/* The slab. This is the object with thickness; the card inside it is only its front.
+ *
+ * They cannot be one element. A backdrop-filter flattens its children whatever
+ * transform-style says, so an element carrying the glass cannot also carry side walls in
+ * 3D. Measured rather than assumed: a child at translateZ(200) under perspective 600
+ * projects to 150 pixels inside a plain preserve-3d parent and 100 inside one with a
+ * backdrop-filter, and 100 is what flat means. */
+.lyric-slab {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 420ms cubic-bezier(0.2, 0.8, 0.26, 1), opacity var(--med);
+}
+/* The one being read holds the window open. */
+.lyric-slab.on {
+  position: relative;
+  inset: auto;
+  z-index: 3;
+}
+/* While a thumb is on it, it goes exactly where the thumb is and nowhere smoothly. */
+.lyric-slab.nudging { transition: none; }
+
+/* The two side walls, which are the thickness.
+ *
+ * A rectangle as wide as the slab is thick, stood on its edge at the side of the card and
+ * rotated a quarter turn so it runs backwards into the screen. Only these two: the top and
+ * bottom walls are never visible, because this gesture only ever turns the card about the
+ * vertical axis, and a face nobody can see is a face not worth compositing.
+ *
+ * Lit from above, like everything else in this app, which is the honest version of what
+ * the card used to fake with an inset highlight along its top border. That highlight is
+ * gone: a drawn on bevel and a real rotation disagree the moment the card turns, and the
+ * disagreement is what read as wrong. */
+.slab-edge {
+  position: absolute;
+  top: 1px; bottom: 1px;
+  width: var(--slab-thick, 18px);
+  background: linear-gradient(180deg,
+              rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 22%,
+              rgba(0, 0, 0, 0.5));
+  border-radius: 2px;
+  pointer-events: none;
+}
+.slab-left {
+  left: 0;
+  transform-origin: 0 50%;
+  transform: rotateY(90deg);
+}
+.slab-right {
+  right: 0;
+  transform-origin: 100% 50%;
+  transform: rotateY(-90deg);
+  /* The right wall faces away from the light, so it is the darker of the two. */
+  filter: brightness(0.72);
+}
+
+/* Where the cards that are not being read sit.
+ *
+ * Behind and slightly below, so the stack is visible as a stack: that is the cue that
+ * says there is more than one of these, and the row had no way of saying it. Two deep is
+ * enough; a third would be four pixels of nothing. */
+.lyric-slab.on ~ .lyric-slab {
+  transform: translate3d(0, 14px, -80px) scale(0.972);
+  opacity: 0.55;
+  z-index: 2;
+}
+.lyric-slab.on ~ .lyric-slab ~ .lyric-slab {
+  transform: translate3d(0, 26px, -160px) scale(0.945);
+  opacity: 0.26;
+  z-index: 1;
+}
+/* And the ones already read are off the left of the frame, turned, waiting to come back
+   if you go the other way. :has(~ .on) is every slab before the front one, which is the
+   previous sibling selector CSS never had until :has. */
+.lyric-slab:has(~ .lyric-slab.on) {
+  transform: translate3d(-130%, 24px, 60px) rotateZ(-14deg) rotateY(24deg);
+  opacity: 0;
+  z-index: 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyric-slab { transition: opacity var(--med); }
 }
 
 /* Glass, over the song's own wash.
@@ -381,15 +475,21 @@
  * chrome floats over the library and this floats over one song's artwork, and a white
  * veil over that would wash the colour out of the thing it is meant to be showing. */
 .lyric-card {
-  flex: 0 0 100%;
-  min-width: 100%;
+  /* The front face of the slab, and nothing else: no place in a flex row any more, no
+     transform of its own, and no 3D, since the glass on it forbids that anyway. */
+  position: relative;
   padding: var(--s6);
   border-radius: var(--r-lg);
   background: rgba(18, 18, 20, 0.2);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
   border: 1px solid var(--glass-line);
-  box-shadow: var(--edge-top), var(--glass-shadow);
+  /* No --edge-top. That token draws a lit line inside the top border, which is a bevel
+     painted on a flat surface, and it was the thing that broke: a drawn highlight stays
+     exactly where it was drawn while the card turns, so the light it implies and the
+     light the real rotation implies point different ways. The slab has actual walls now
+     and they are lit for real. */
+  box-shadow: var(--glass-shadow);
   isolation: isolate;
 
   /* Turning, not sliding past.
@@ -409,38 +509,14 @@
    * :has(~ .on) is everything before it, which is the previous sibling selector CSS
    * never had until :has arrived.
    */
-  transform-origin: 50% 50%;
-  transform: translateZ(-150px) rotateY(0deg);
-  opacity: 0.42;
-  transition: opacity var(--med), transform 420ms cubic-bezier(0.22, 0.7, 0.3, 1);
+  /* Where a card is in space is the slab's business now, so there is nothing here about
+     depth or rotation and nothing for the two of them to disagree about. */
 }
-.lyric-card:has(~ .lyric-card.on) {
-  transform-origin: 100% 50%;
-  transform: translateZ(-150px) rotateY(34deg);
-}
-.lyric-card.on ~ .lyric-card {
-  transform-origin: 0% 50%;
-  transform: translateZ(-150px) rotateY(-34deg);
-}
-.lyric-card.on { opacity: 1; transform: translateZ(0) rotateY(0deg); }
 .lyric-card.reading { border-color: var(--accent-line); }
-/* Editing is not a place to be looking at a turned card. */
-.lyric-card.editing { opacity: 1; transform: translateZ(0) rotateY(0deg); }
 
-/* One card is not a deck, so it does not need a stage. A lone card sat 150px back with
-   nothing to compare it to, which is just a slightly smaller card. */
-.deck-track:not(:has(.lyric-card + .lyric-card)) .lyric-card {
-  transform: translateZ(0) rotateY(0deg);
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* The depth stays, the turn goes: a rotation is the part that reads as motion. */
-  .lyric-card,
-  .lyric-card:has(~ .lyric-card.on),
-  .lyric-card.on ~ .lyric-card { transform: none; }
-  .lyric-card.on { transform: none; }
-}
+/* One card is not a deck, so it gets no walls: there is nothing to be thick beside, and a
+   lone slab with its sides showing is a card with two grey stripes on it. */
+.deck-track:not(:has(.lyric-slab + .lyric-slab)) .slab-edge { display: none; }
 
 .card-title {
   font-family: var(--display);

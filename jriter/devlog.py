@@ -22,6 +22,30 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "2.6.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "Cards with thickness, and two kinds of watched folder",
+        "notes": [
+            "The lyrics are a stack now and the front one is thrown off rather than slid "
+            "past. It tilts under your thumb, turns enough to bring one of its side walls "
+            "into view, and the cards behind it show through as a stack. The walls are "
+            "real faces, not a drawn bevel: the old lit line along the top border stayed "
+            "put while the card turned, which is what looked wrong about it.",
+            "Watched folders are two things: a render collector for the folders your "
+            "bounces land in, and simple sync for sample libraries. A library is never "
+            "offered as a render now, even when it sits inside a collector, which it did "
+            "and which is how a folder of one shots ended up as a list of new versions.",
+            "Simple sync takes stock of what a library holds so two machines can be "
+            "compared. It does not move files between them yet, and the screen says so.",
+            "Dust starts at what used to be the top of its dial and reaches two hundred, "
+            "the same as the chromatic aberration.",
+            "One soft blob of light on the black behind everything, so the glass has "
+            "something to bend on the screens with no artwork.",
+            "The white buttons on a render row are softer and a little smaller.",
+        ],
+    },
+    {
         "version": "2.5.2",
         "date": "2026-09-07",
         "name": JRITER,
