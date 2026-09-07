@@ -109,3 +109,25 @@ kbd {
 .log-notes li { margin-top: var(--s1); }
 .log-more { margin-top: var(--s4); }
 .log-earlier { margin-top: var(--s5); }
+
+/* The mark on a field you cannot leave empty.
+ *
+ * On the required ones, which is the way round the whole web reads it, and the reason is
+ * that a form is mostly optional fields: marking those means marking nearly everything,
+ * and a mark on nearly everything says nothing. This marks the few.
+ *
+ * It replaces the other way of saying it, which was the word "optional" sitting in the
+ * placeholder. A placeholder is the worst place for anything you need after you start
+ * typing, because that is exactly when it disappears, and it was competing for the one
+ * slot that should hold an example of what to type.
+ *
+ * aria-hidden on the glyph and `required` on the input, so a screen reader hears the
+ * state from the field itself rather than hearing a lone asterisk read out as
+ * punctuation after the label.
+ */
+.sheet-label .req,
+.req {
+  color: var(--accent-hi);
+  font-weight: 700;
+  margin-left: 2px;
+}

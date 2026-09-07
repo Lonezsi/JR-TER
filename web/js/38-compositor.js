@@ -59,8 +59,8 @@ J.compositor = (function () {
 
           <span class="grow"></span>
           <div class="comp-zoom">
-            <button class="icon-btn sm" data-act="out" aria-label="Zoom out">&minus;</button>
-            <button class="icon-btn sm" data-act="in" aria-label="Zoom in">+</button>
+            <button class="icon-btn sm" data-act="out" aria-label="Zoom out">${J.minus(15)}</button>
+            <button class="icon-btn sm" data-act="in" aria-label="Zoom in">${J.plus(15)}</button>
           </div>
           <button class="btn sm ghost" data-act="redetect" title="Guess the tempo and sections again">
             Detect again

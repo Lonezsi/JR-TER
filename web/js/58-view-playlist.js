@@ -174,7 +174,7 @@ J.addToPlaylist = async function (what) {
     cancel: "Not now",
     body: `<div class="pick-list">
       <button class="pick-row new" data-new="1">
-        <span class="pick-plus">+</span>
+        <span class="pick-plus">${J.plus(20)}</span>
         <span class="grow truncate"><span class="t truncate">A new playlist</span>
         <span class="s">Named after this to start with</span></span>
       </button>

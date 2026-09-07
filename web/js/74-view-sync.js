@@ -127,7 +127,7 @@ J.views.sync = {
           title: "Watch a folder",
           sub: "The full path on the machine running JR!TER. It is only ever read.",
           confirm: "Watch it",
-          body: `<div class="sheet-fields"><label class="sheet-label">Folder
+          body: `<div class="sheet-fields"><label class="sheet-label">${J.req("Folder")}
             <input class="field" name="path" placeholder="C:\\Users\\you\\Music\\Renders"></label></div>`,
         });
         if (!values || !values.path.trim()) return;
@@ -474,9 +474,9 @@ J.views.settings = {
             <!-- The name in the placeholder rather than bolded inside the label.
                  .sheet-label is a column flex, so any element in the label text becomes
                  its own row and "Type / JR!TER / to confirm" arrived on three lines. -->
-            <label class="sheet-label">Type the library's name to confirm
+            <label class="sheet-label">${J.req("Type the library's name to confirm")}
               <input class="field" name="confirm" autocomplete="off" spellcheck="false"
-                     placeholder="${J.esc(said.library)}"></label>
+                     placeholder="${J.esc(said.library)}" required></label>
           </div>`,
         });
         if (!values) return;
@@ -511,10 +511,12 @@ J.views.settings = {
           sub: "Anything you like. Every signed in device is signed out when it changes.",
           confirm: "Change it",
           body: `<div class="sheet-fields">
-            <label class="sheet-label">Current password
-              <input class="field" name="current" type="password" autocomplete="current-password"></label>
-            <label class="sheet-label">New password
-              <input class="field" name="next" type="password" autocomplete="new-password"></label>
+            <label class="sheet-label">${J.req("Current password")}
+              <input class="field" name="current" type="password"
+                     autocomplete="current-password" required></label>
+            <label class="sheet-label">${J.req("New password")}
+              <input class="field" name="next" type="password" autocomplete="new-password"
+                     required></label>
           </div>`,
         });
         if (!values) return;

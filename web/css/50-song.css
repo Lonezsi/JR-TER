@@ -206,7 +206,28 @@
 .block:hover .block-tools, .block:focus-within .block-tools { opacity: 1; }
 
 /* ── A and B, in the header ───────────────────────────────────────────────── */
-.ab-inline { display: flex; align-items: stretch; gap: var(--s2); flex-wrap: wrap; }
+/* One height for everything in this row.
+ *
+ * It read as unfinished because it was three heights. align-items: stretch was supposed
+ * to settle it, and it does for anything that does not state a height of its own, which
+ * left the A and B chips at the 38 their padding and their 22px letter add up to, the
+ * swap button stretched to match, and Compare and Arrange at .btn.sm's flat 30. Two
+ * pixels would be a rounding error; eight is a step you can see, and it was between the
+ * chips and the buttons immediately beside them.
+ *
+ * So the row states the height once and every child takes it, .btn.sm included. Centred
+ * rather than stretched now, because a stated height and a stretch are two answers to
+ * the same question and the stated one is the one that has to win. */
+.ab-inline {
+  --ab-h: 38px;
+  display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+}
+/* Named rather than a universal child selector, which lost. `.ab-inline > *` is one
+   class and `.btn.sm` is two, so the 30 pixel height won on specificity and the row
+   still came out in three heights. */
+.ab-inline > .btn,
+.ab-inline > .slot-pick,
+.ab-inline > .ab-switch { height: var(--ab-h); }
 .slot-pick {
   position: relative;
   display: inline-flex; align-items: center; gap: var(--s2);
@@ -251,6 +272,7 @@
 .ab-switch {
   display: grid; place-items: center;
   width: 40px; flex: none;
+  padding: 0;
   border: 1px solid var(--line-2);
   border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.06);
@@ -297,6 +319,10 @@
 .menu-row .tagline {
   font-family: var(--display); font-weight: 800; font-size: 12px;
   min-width: 30px; flex: none;
+  /* A centring box, because some of these hold a version number as text and others hold
+     a drawn glyph. An inline SVG in a plain span sits on the text baseline, which is
+     lower than the middle of the row it is in. */
+  display: grid; place-items: center;
 }
 .menu-row .grow { flex: 1; min-width: 0; }
 .menu-row .when { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }

@@ -553,7 +553,7 @@ function openSlotMenu(anchor, slot, ctx, done) {
         </button>
       </div>`).join("")}
     <button class="menu-row add" data-upload>
-      <span class="tagline">+</span><span class="grow">Upload a render</span>
+      <span class="tagline">${J.plus(13)}</span><span class="grow">Upload a render</span>
     </button>
     ${J.state.modules.includes("renders") ? `
       <button class="menu-row add" data-fromlist>

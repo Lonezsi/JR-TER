@@ -173,7 +173,7 @@ J.wireTracks = function (root, songs) {
 async function renameAlbum(id) {
   const fields = await J.sheet({
     title: "Rename the album", confirm: "Rename",
-    body: `<input class="field" name="title" placeholder="Album name">`,
+    body: `<input class="field" name="title" placeholder="Late Bloomer">`,
   });
   if (!fields || !fields.title.trim()) return;
   await J.try(() => J.patch(`/api/albums/${id}`, { title: fields.title.trim() }), "Renamed");
@@ -377,8 +377,9 @@ J.newSong = async function () {
     sub: "A song holds every render, lyric and setting from here on.",
     confirm: "Create",
     body: `<div class="sheet-fields">
-      <label class="sheet-label">Title
-        <input class="field" name="title" placeholder="What is it called?" autocomplete="off">
+      <label class="sheet-label">${J.req("Title")}
+        <input class="field" name="title" placeholder="Ordinary Weather" autocomplete="off"
+               required>
       </label></div>`,
   });
   if (!values || !values.title.trim()) return;
@@ -392,8 +393,10 @@ J.newAlbum = async function () {
     title: "New album",
     confirm: "Create",
     body: `<div class="sheet-fields">
-      <label class="sheet-label">Title<input class="field" name="title" autocomplete="off"></label>
-      <label class="sheet-label">Year<input class="field" name="year" inputmode="numeric" placeholder="optional"></label>
+      <label class="sheet-label">${J.req("Title")}<input class="field" name="title"
+             placeholder="Late Bloomer" autocomplete="off" required></label>
+      <label class="sheet-label">Year<input class="field" name="year" inputmode="numeric"
+             placeholder="2026"></label>
     </div>`,
   });
   if (!values || !values.title.trim()) return;

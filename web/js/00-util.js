@@ -485,3 +485,43 @@ document.addEventListener("pointerdown", (e) => {
 }, true);
 
 J.pressIsLeaving = () => pressLeaves;
+
+/* A cross and a bar, drawn rather than typed.
+ *
+ * A "+" character centred by flex or grid lands low, and the amount is not a rounding
+ * error you can argue with: the box is centred on the LINE box, and the glyph's ink is
+ * not centred in its own line box. Measured in this app's own faces, the ink sits half a
+ * pixel below the middle at 20px and a whole pixel below it at 12px in the display face,
+ * which is exactly the "slightly off" that is impossible to unsee once noticed and
+ * impossible to fix by nudging, because the offset changes with the font and the size.
+ *
+ * Two strokes in a viewBox are centred because their coordinates say so, at every size,
+ * in every face. `−` has the same problem for the same reason and gets the same
+ * treatment, so the pair still lines up with each other.
+ */
+J.plus = (px) => `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none"
+     stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+     aria-hidden="true" focusable="false"><path d="M12 5.6v12.8M5.6 12h12.8"/></svg>`;
+
+J.minus = (px) => `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none"
+     stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+     aria-hidden="true" focusable="false"><path d="M5.6 12h12.8"/></svg>`;
+
+/* A field label with the mark that says it cannot be left empty.
+ *
+ * The wrapper is the whole point. .sheet-label is a column flex, so every element inside
+ * it becomes its own row with the label's 6px gap above it: a bare <span> holding the
+ * asterisk came out as a small green dot on a line of its own under the word, which
+ * reads as a bullet, not as a mark on the label. The text and the mark have to be one
+ * flex item with the mark inline inside it.
+ *
+ * aria-hidden on the glyph, and the caller puts `required` on the input. A screen reader
+ * should hear the state from the field, not hear "asterisk" read out after the name.
+ */
+J.req = (label) =>
+  `<span>${label}<span class="req" aria-hidden="true">*</span></span>`;
+
+/* The outer span carries no class on purpose. Its whole job is to be one flex item so
+ * the text and the mark share a line, and there is nothing for a stylesheet to say about
+ * it: a class with no rule is either a typo or a rule somebody forgot, and there is a
+ * test that says so. This is neither. */

@@ -304,11 +304,12 @@ J.views.youtube = {
         <label class="sheet-label">A name for this account
           <input class="field" id="ytAccountName" autocomplete="off"
                  placeholder="my channel"></label>
-        <label class="sheet-label">Client ID
+        <label class="sheet-label">${J.req("Client ID")}
           <input class="field" id="ytClientId" autocomplete="off"
                  placeholder="000000000000-xxxxxxxx.apps.googleusercontent.com"></label>
-        <label class="sheet-label">Client secret
-          <input class="field" id="ytClientSecret" type="password" autocomplete="off"></label>
+        <label class="sheet-label">${J.req("Client secret")}
+          <input class="field" id="ytClientSecret" type="password" autocomplete="off"
+                 required></label>
         <div class="row wrap">
           <button class="btn sm primary" data-act="connect">Connect</button>
           ${(account.accounts || []).length
@@ -579,8 +580,8 @@ J.views.youtube = {
 
             <section class="yt-card">
               <h2>What YouTube is told</h2>
-              <label class="sheet-label">Title
-                <input class="field" id="ytName" value="${J.esc(ctx.song.title)}">
+              <label class="sheet-label">${J.req("Title")}
+                <input class="field" id="ytName" value="${J.esc(ctx.song.title)}" required>
               </label>
               <label class="sheet-label">Description
                 <textarea class="field yt-desc" id="ytDesc" rows="5"></textarea>

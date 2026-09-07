@@ -41,7 +41,7 @@ J.renders = {
       cancel: "Not now",
       body: `
         <button class="pick-row new" data-new="1">
-          <span class="pick-plus">+</span>
+          <span class="pick-plus">${J.plus(20)}</span>
           <span class="grow truncate">
             <span class="t truncate">New song called ${J.esc(render.name)}</span>
             <span class="s">This render becomes its v1</span>
