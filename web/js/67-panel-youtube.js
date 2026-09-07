@@ -106,12 +106,19 @@ J.blockYouTube = async function (block, ctx) {
       </div>`;
 
     if (!posts.length) {
+      /* One line and a mark, rather than four lines of how it works.
+       *
+       * What somebody needs from this panel when it is empty is the fact that it is empty
+       * and the two ways out of that. How uploading works is worth reading once and is
+       * behind the question mark from then on. */
       block.innerHTML = `${head}
-        <p class="faint yt-none">Nothing of this song is on YouTube yet, or nothing that
-          JR!TER has been told about. Upload renders the file through this song's sound
-          and its arrangement, turns it into a video, sends it, and keeps the link here
-          against the version that went up.
-          <button class="linkish" data-act="record">Or paste a link you already have</button>.</p>`;
+        <p class="faint yt-none">Nothing here yet.
+          ${J.hint("Upload renders the file through this song's sound and its "
+                 + "arrangement, turns it into a video, sends it, and keeps the link here "
+                 + "against the version that went up. This panel only knows about videos "
+                 + "JR!TER has been told about, so anything you posted by hand is missing "
+                 + "until you paste its link.")}
+          <button class="linkish" data-act="record">Paste a link you already have</button></p>`;
       return;
     }
 

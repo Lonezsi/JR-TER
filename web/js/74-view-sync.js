@@ -54,67 +54,69 @@ J.views.sync = {
       const libraries = folders.filter((f) => f.kind === "sync");
 
       root.innerHTML = `
-        <div class="section">
-          <div class="section-head">
-            <h2>Render collector</h2><span class="grow"></span>
-            <button class="btn sm ghost" data-act="add" data-kind="collector">Add folder</button>
-            <button class="btn sm primary" data-act="scan" ${collectors.length ? "" : "disabled"}>
-              ${scanning ? "Scanning…" : "Scan now"}
-            </button>
+        <div class="folder-pair">
+          <div class="section pane">
+            <div class="section-head">
+              <h2>Render collector</h2>
+              ${J.hint("Folders your bounces land in. JR!TER notices new ones arriving so "
+                     + "a render reaches the library without you carrying it there. It "
+                     + "reads these and never writes to them, and nothing is imported "
+                     + "until you say so.")}
+              <span class="grow"></span>
+              <button class="btn sm ghost" data-act="add" data-kind="collector">Add</button>
+              <button class="btn sm primary" data-act="scan" ${collectors.length ? "" : "disabled"}>
+                ${scanning ? "Scanning…" : "Scan"}
+              </button>
+            </div>
+
+            ${collectors.length ? `<div class="folder-list">${
+              collectors.map(folderRow).join("")}</div>`
+            : `<div class="empty quiet">
+                 <h3>Nothing collecting yet</h3>
+                 <p>Point this at the folder your exports land in.</p>
+                 <button class="btn primary" data-act="add" data-kind="collector"
+                         style="margin-top:var(--s4)">Add a folder</button>
+               </div>`}
           </div>
-          <p class="faint" style="margin-top:0">
-            Folders your bounces land in. JR!TER notices new ones arriving so a render
-            reaches the library without you carrying it there. It reads these and never
-            writes to them, and nothing is imported until you say so.
-          </p>
 
-          ${collectors.length ? collectors.map(folderRow).join("")
-          : `<div class="empty">
-               <h3>Nothing collecting yet</h3>
-               <p>Point this at the folder your exports land in.</p>
-               <button class="btn primary" data-act="add" data-kind="collector"
-                       style="margin-top:var(--s4)">Add a folder</button>
-             </div>`}
-        </div>
+          <div class="section pane">
+            <div class="section-head">
+              <h2>Simple sync</h2>
+              ${J.hint("Sample libraries, meant to be the same on every machine you work "
+                     + "from. These are never offered as renders, which is the whole "
+                     + "reason they are a separate kind: a folder of one shots is not a "
+                     + "folder of bounces. What it does today is take stock: it counts "
+                     + "what a library holds so two machines can be compared. It does not "
+                     + "move files between them yet.")}
+              <span class="grow"></span>
+              <button class="btn sm ghost" data-act="add" data-kind="sync">Add</button>
+              <button class="btn sm ghost" data-act="stock" ${libraries.length ? "" : "disabled"}>
+                ${stocking ? "Looking…" : "Take stock"}
+              </button>
+            </div>
 
-        <div class="section">
-          <div class="section-head">
-            <h2>Simple sync</h2><span class="grow"></span>
-            <button class="btn sm ghost" data-act="add" data-kind="sync">Add folder</button>
-            <button class="btn sm ghost" data-act="stock" ${libraries.length ? "" : "disabled"}>
-              ${stocking ? "Looking…" : "Take stock"}
-            </button>
+            ${libraries.length ? `<div class="folder-list">${
+              libraries.map(folderRow).join("")}</div>`
+            : `<div class="empty quiet">
+                 <h3>No libraries yet</h3>
+                 <p>Point this at your samples.</p>
+                 <button class="btn primary" data-act="add" data-kind="sync"
+                         style="margin-top:var(--s4)">Add a folder</button>
+               </div>`}
+
+            ${stock.libraries && stock.libraries.length ? `
+              <div class="stock">
+                ${stock.libraries.map((lib) => `
+                  <div class="list-row">
+                    <span class="grow truncate">
+                      <div class="truncate" style="font-weight:600">${J.esc(lib.path)}</div>
+                      <div class="faint" style="font-size:12px">
+                        ${lib.files.toLocaleString()} files &middot; ${J.bytes(lib.bytes)}
+                      </div>
+                    </span>
+                  </div>`).join("")}
+              </div>` : ""}
           </div>
-          <p class="faint" style="margin-top:0">
-            Sample libraries, meant to be the same on every machine you work from. These
-            are never offered as renders, which is the whole reason they are a separate
-            kind: a folder of one shots is not a folder of bounces.
-          </p>
-          <p class="faint" style="margin-top:0">
-            <b>What this does today:</b> takes stock. It counts what a library holds so two
-            machines can be compared. It does not move files between them yet.
-          </p>
-
-          ${libraries.length ? libraries.map(folderRow).join("")
-          : `<div class="empty">
-               <h3>No libraries yet</h3>
-               <p>Point this at your samples.</p>
-               <button class="btn primary" data-act="add" data-kind="sync"
-                       style="margin-top:var(--s4)">Add a folder</button>
-             </div>`}
-
-          ${stock.libraries && stock.libraries.length ? `
-            <div class="stock">
-              ${stock.libraries.map((lib) => `
-                <div class="list-row">
-                  <span class="grow truncate">
-                    <div class="truncate" style="font-weight:600">${J.esc(lib.path)}</div>
-                    <div class="faint" style="font-size:12px">
-                      ${lib.files.toLocaleString()} files &middot; ${J.bytes(lib.bytes)}
-                    </div>
-                  </span>
-                </div>`).join("")}
-            </div>` : ""}
         </div>
 
         ${summary ? `

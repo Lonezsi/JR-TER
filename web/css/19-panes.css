@@ -1,0 +1,158 @@
+/* ── glass, on the things inside the main panel ────────────────────────────── */
+
+/* The shell was already glass: the rail, the top bar, the player, the panel behind the
+ * page. Everything *on* that panel was flat, so a screen was a sheet of glass with a stack
+ * of matte rectangles laid on it, and the rectangles were the part you actually read.
+ *
+ * .pane is the surface those become. One class, used by the song's side column, the two
+ * folder panes and anything else that is a container rather than a page.
+ *
+ * Thin filter rather than the full one, and that is not only about taste. Every
+ * backdrop-filter is a separate offscreen pass over whatever is behind it, and these are
+ * nested inside a panel that already has one. The thin variant blurs 14 rather than 22 and
+ * skips the heavier displacement map, which is what keeps a page of six of them costing
+ * about what one of the old ones did.
+ *
+ * What must never carry one: an ancestor of the lyric deck. A backdrop-filter flattens its
+ * children whatever transform-style says, measured rather than assumed, and the cards in
+ * that deck are a real 3D stack. That is why .song-main below is left alone and only the
+ * side column is panelled. */
+.pane {
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  box-shadow: var(--edge-top), var(--shadow-1);
+  isolation: isolate;
+  padding: var(--s5);
+}
+
+/* An empty state inside a pane is already inside a box, so it stops drawing its own. It was
+   a bordered rectangle inside a bordered rectangle saying the same thing twice. */
+.pane > .empty,
+.empty.quiet {
+  border: 0;
+  background: none;
+  padding: var(--s6) var(--s4);
+}
+
+/* ── the song, as two columns ──────────────────────────────────────────────── */
+.song-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(280px, 1fr);
+  gap: var(--s6);
+  align-items: start;
+}
+.song-main { min-width: 0; }
+.song-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  min-width: 0;
+  /* It follows you down the page, because what is in it is reference rather than reading:
+     which album, what is on YouTube, the artwork. Its own scroll if it outgrows the
+     window, so a song with nine playlists does not pin the column open. */
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - var(--player-h) - var(--s8));
+  overflow: auto;
+}
+/* Tighter inside the narrow column: the headings there are labels, not chapter openings. */
+.song-side .block { margin-bottom: 0; }
+.song-side .block-head { margin-bottom: var(--s3); }
+.song-acts { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+/* ── folders, as a pair ────────────────────────────────────────────────────── */
+.folder-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--s5);
+  align-items: start;
+}
+/* The vertical rhythm of a stack does not apply to a row.
+ *
+ * .section carries margin-top: var(--s7) so that stacked sections breathe, with the first
+ * one exempted. In a grid that exemption only reaches the first child, so the second pane
+ * sat forty pixels lower than the one beside it: two cards meant to be a pair, one of them
+ * dropped, for a reason that is invisible until you measure the margins. */
+.folder-pair > .section,
+.folder-pair > .section:first-child { margin: 0; }
+.folder-list { display: flex; flex-direction: column; gap: 2px; }
+
+@media (max-width: 1000px) {
+  /* One column, in the order they were in. The side column stops following, because on a
+     narrow screen it is simply the second half of the page. */
+  .song-grid { grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
+  .song-side { position: static; max-height: none; overflow: visible; }
+}
+
+/* Reduced transparency is a system setting, and it means it. 10-base.css already turns the
+   shell's glass off; these have to go the same way or the app half honours it. */
+@media (prefers-reduced-transparency: reduce) {
+  .pane {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ── glass on the rest of it ───────────────────────────────────────────────── */
+
+/* The empty state was the last opaque rectangle anybody actually reads.
+ *
+ * It is a panel with a light on it, which is exactly what glass already is here, so it
+ * stops painting a surface of its own and lets the page through. The little green wash at
+ * the top stays: it is what stops an empty screen reading as a broken one. */
+.empty:not(.quiet) {
+  border-color: var(--glass-line);
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(84, 179, 122, 0.06), transparent 62%),
+    var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  box-shadow: var(--edge-top), var(--shadow-1);
+  isolation: isolate;
+}
+
+/* An album is a picture with two lines under it, and hovering it used to swap the
+   background for a flat raised grey. Glass instead, so the thing that lifts under the
+   pointer is the same material as everything else that lifts. */
+.album-card:hover,
+.album-card:focus-within {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  box-shadow: var(--edge-top), var(--shadow-1);
+}
+
+/* A row in a list of folders, tokens, invites or stock. Faint until it is pointed at, so a
+   list of eight does not read as eight separate panels. */
+.list-row {
+  border-radius: var(--r-md);
+  transition: background var(--fast);
+}
+.list-row:hover {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+}
+
+/* The home page's cards, which were the same transparent-until-hover shape. */
+.home-card:hover,
+.home-card:focus-visible {
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  box-shadow: var(--edge-top), var(--shadow-1);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .empty:not(.quiet),
+  .album-card:hover, .album-card:focus-within,
+  .list-row:hover,
+  .home-card:hover, .home-card:focus-visible {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

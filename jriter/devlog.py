@@ -22,6 +22,33 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.2.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "Two columns, glass all the way down, and a question mark",
+        "notes": [
+            "The song page is two columns. On the left the two things you work in, the "
+            "words and the sound. On the right the facts about it: artwork, playlists, "
+            "YouTube, and what you can do to the song. It used to be six full width "
+            "sections stacked in whatever order the modules loaded, most of them empty "
+            "and each explaining itself in a paragraph. Eighteen hundred pixels of scroll "
+            "on a nine hundred pixel screen; it is twelve hundred now.",
+            "Folders is two panes side by side rather than two tall sections, each of "
+            "which said the same thing twice: once in a paragraph and again in the empty "
+            "state underneath it.",
+            "Nothing was cut. The explanations moved behind a small question mark next to "
+            "the heading they belong to. Press it and the paragraph appears where you are "
+            "looking. It is worth reading once and it was in the way every time after.",
+            "The main panel is properly glass now. It always had the blur, but the ground "
+            "under it was 78 per cent, so beside a rail and a player made of white at 5 "
+            "it read as the one solid thing on the screen. It is about half that now: not "
+            "all the way, because everything you read sits on it and a pale cover behind "
+            "clear glass takes the small print with it.",
+            "Empty states, album cards, list rows and the home page's cards are glass too, "
+            "rather than matte rectangles laid on a sheet of it.",
+        ],
+    },
+    {
         "version": "3.1.0",
         "date": "2026-09-07",
         "name": JRITER,

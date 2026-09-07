@@ -436,13 +436,18 @@ J.blockSound = async function (panel, ctx) {
     const sw = J.$("#limiterSwitch", panel);
     if (sw) sw.classList.toggle("on", !!(active.data.limiter || {}).on);
 
-    // Said in words as well as drawn, because the rule down the left says "these belong
-    // to that" and this says which of them, which is the part that was being guessed.
+    /* Which preset is being edited, and where the rest of the sentence went.
+     *
+     * It used to be a full line under the controls on every visit: the name, what a preset
+     * holds, and which deck the edit lands on. Two of those three never change, so they
+     * are behind the mark and what is left is the part that does: which one, and where. */
     const holds = J.$("#holdsNote", panel);
     if (holds) {
-      holds.innerHTML = `<b>${J.esc(active.name || "This preset")}</b> holds the
-        equaliser and the limiter together. Changing either one changes this preset, on
-        deck ${editingSlot()}.`;
+      holds.innerHTML = `Editing <b>${J.esc(active.name || "this preset")}</b> on deck `
+        + `${editingSlot()}.`
+        + J.hint("A preset holds the equaliser and the limiter together, so changing "
+               + "either one changes the preset. It applies as you listen and is never "
+               + "written into the file, so nothing here can damage a mix.");
     }
     renderDeckMini();
   }

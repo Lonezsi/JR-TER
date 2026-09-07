@@ -19,10 +19,10 @@
 }
 .page-wash.on { opacity: 0.32; }
 
-/* With a song open the pane thins, so more of the artwork comes through it. The panel is
-   glass on every screen now, so this is a difference of degree rather than the switch
-   from opaque to translucent it used to be. */
-.page-wash.on ~ .shell .main { background: var(--pane-thin); }
+/* The panel used to thin when a song was open, so more of the artwork came through it.
+   It is that thin on every screen now, which is what this rule was asking for, so asking
+   again here would be a rule that never changes anything and one more place to keep in
+   step with the other one. */
 .page-wash.flat {
   background-image:
     radial-gradient(80% 60% at 25% 10%, hsl(var(--hue) 45% 30%), transparent 70%),
@@ -320,8 +320,19 @@
    * It has the filter now, so what is behind it bends: the blurred artwork on a song
    * page, and on the library screens the black ground and the specks drifting over it.
    * What everything else is glass against is the room, not this panel.
+   *
+   * At --pane-thin rather than --pane, which is the second half of the same argument. The
+   * filter was there and the ground under it was still 78 per cent, so the panel had the
+   * refraction of glass and the opacity of a wall: beside a rail and a player made of
+   * white at 5 per cent it read as the one solid thing on the screen. 53 lets the wash
+   * through properly.
+   *
+   * Not all the way to --glass, though, and this is the line. Everything anybody actually
+   * reads sits on this panel, and --glass over a pale cover puts --text-3 on a bright
+   * ground. A dark plate at half strength is what keeps the small print legible whatever
+   * the artwork is doing.
    */
-  background: var(--pane);
+  background: var(--pane-thin);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
   transition: background var(--slow);

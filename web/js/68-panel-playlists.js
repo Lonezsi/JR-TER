@@ -46,8 +46,10 @@ J.blockSongPlaylists = async function (block, ctx) {
         <div class="block-head"><h2>Playlists</h2><span class="grow"></span>
           <button class="btn ghost sm" data-act="add">Add to a playlist</button>
         </div>
-        <p class="faint in-none">Not in any running order yet. A playlist can hold songs
-          and loose renders together, and an album has one of its own.</p>`;
+        <p class="faint in-none">Not in any running order yet.
+          ${J.hint("A playlist can hold songs and loose renders together, so a set list "
+                 + "and a record can be the same kind of thing. An album has a running "
+                 + "order of its own.")}</p>`;
       return;
     }
 

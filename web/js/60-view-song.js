@@ -200,17 +200,35 @@ J.views.song = {
           <div class="comp-inner"><div class="comp-body" id="compBody"></div></div>
         </div>` : ""}
 
-      ${has("lyrics") ? '<div class="block" id="lyricsBlock"></div>' : ""}
-      ${has("sound") ? '<div class="block" id="soundBlock"></div>' : ""}
-      ${has("artwork") ? '<div class="block" id="artworkBlock"></div>' : ""}
-      ${has("playlists") ? '<div class="block" id="songPlaylistsBlock"></div>' : ""}
-      ${has("youtube") ? '<div class="block" id="youtubeBlock"></div>' : ""}
+      <!-- Two columns rather than six stacked blocks.
+           The song used to be one column of full width sections in the order the modules
+           happened to load: the words, the sound, the artwork, the playlists, YouTube, and
+           a row of buttons, each with its own paragraph, most of them empty on a new song.
+           Eighteen hundred pixels of scroll on a nine hundred pixel screen, and two thirds
+           of it explaining things that were not there.
+           The split is by what you are doing rather than by module. On the left, the two
+           you work in and come back to. On the right, the facts about the song and the
+           places it goes: narrower, because a list of albums does not need the width the
+           words do. Under a thousand pixels they stack in the same order. -->
+      <div class="song-grid">
+        <div class="song-main">
+          ${has("lyrics") ? '<div class="block" id="lyricsBlock"></div>' : ""}
+          ${has("sound") ? '<div class="block" id="soundBlock"></div>' : ""}
+        </div>
 
-      <div class="block">
-        <div class="block-head"><h2>Song</h2><span class="grow"></span>
-          ${has("versions") ? '<button class="btn ghost sm" data-act="upload">Upload a render</button>' : ""}
-          <button class="btn ghost sm" data-act="albums">Albums</button>
-          <button class="btn ghost sm danger" data-act="delete">Delete</button>
+        <div class="song-side">
+          ${has("artwork") ? '<div class="block pane" id="artworkBlock"></div>' : ""}
+          ${has("playlists") ? '<div class="block pane" id="songPlaylistsBlock"></div>' : ""}
+          ${has("youtube") ? '<div class="block pane" id="youtubeBlock"></div>' : ""}
+
+          <div class="block pane">
+            <div class="block-head"><h2>Song</h2><span class="grow"></span></div>
+            <div class="song-acts">
+              ${has("versions") ? '<button class="btn ghost sm" data-act="upload">Upload a render</button>' : ""}
+              <button class="btn ghost sm" data-act="albums">Albums</button>
+              <button class="btn ghost sm danger" data-act="delete">Delete</button>
+            </div>
+          </div>
         </div>
       </div>
 

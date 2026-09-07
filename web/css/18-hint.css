@@ -1,0 +1,71 @@
+/* ── the question mark, and the note it opens ──────────────────────────────── */
+
+/* Small enough to sit inside a heading without changing its weight, and big enough to be
+   pressed by a thumb. Those two want different numbers, so the drawing is 16 and the target
+   is 26: the box is padded out around a mark that stays small. */
+.hint {
+  position: relative;            /* the ring below is drawn against this */
+  display: inline-grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  margin: -6px 0 -6px -2px;      /* the slack goes back to the line it sits on */
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: color var(--fast), background var(--fast);
+}
+/* The ring is what makes it read as a mark rather than as a stray character. Drawn with a
+   shadow rather than a border so it does not take part in the 26 pixel box above. */
+.hint::before {
+  content: "";
+  position: absolute;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  transition: box-shadow var(--fast);
+}
+.hint:hover,
+.hint:focus-visible { color: var(--text); background: var(--hover); }
+.hint:hover::before { box-shadow: inset 0 0 0 1px var(--accent-line); }
+.hint[aria-expanded="true"] { color: var(--accent); }
+.hint[aria-expanded="true"]::before { box-shadow: inset 0 0 0 1px var(--accent-line); }
+
+/* What it says.
+ *
+ * On the body and fixed, because the things hints live in clip their overflow or carry a
+ * backdrop-filter, and a note inside either of those is a note with a corner cut off. */
+.hint-pop {
+  position: fixed;
+  z-index: 200;
+  max-width: min(340px, calc(100vw - 24px));
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-md);
+  background: var(--pane);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--shadow-3);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 140ms var(--ease), transform 140ms var(--ease);
+  pointer-events: none;
+}
+.hint-pop.on { opacity: 1; transform: none; }
+.hint-pop.above { transform: translateY(4px); }
+.hint-pop.above.on { transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-pop { transition: opacity 140ms linear; transform: none; }
+  .hint-pop.above { transform: none; }
+}
