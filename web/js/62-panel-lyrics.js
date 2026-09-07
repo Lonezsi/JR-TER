@@ -400,11 +400,10 @@ J.blockLyrics = async function (block, ctx) {
       + ` rotateY(${(-share * 16).toFixed(2)}deg)`;
   };
 
-  /* And where it goes when it is let go past the threshold: onward, off the frame, still
-   * turning. 130 per cent clears the window at any width. */
-  const flung = (onward) =>
-    `translate3d(${onward * 130}%, 24px, 60px) rotateZ(${onward * 14}deg)`
-    + ` rotateY(${-onward * 24}deg)`;
+  /* Where a card goes when it is let go past the threshold used to be written here, as a
+   * transform this file set by hand. It is two rules in 50-song.css now, one for the cards
+   * before the front one and one for the cards after it: the same answer said once rather
+   * than twice, in the place that already had to know it. */
 
   /* Hand the front card back to the stylesheet.
    *
@@ -426,15 +425,50 @@ J.blockLyrics = async function (block, ctx) {
     }
   }
 
+  /* Which card is the front one, said to the cards that are already there.
+   *
+   * The whole animation is now a consequence of this one class. A slab is centred when it
+   * has .on, off to the left when it is before the one that has it, and off to the right
+   * when it is after: moving the class moves two cards at once, the outgoing one leaving
+   * the way it was thrown and the next arriving from the other side, both on the same
+   * transition. There is nothing to time and nothing to wait for.
+   */
+  function markCurrent() {
+    J.$$(".lyric-slab", block).forEach((slab, i) => {
+      // Whatever the finger pinned it to goes, so the stylesheet is what positions it.
+      slab.style.transform = "";
+      slab.classList.remove("nudging");
+      slab.classList.toggle("on", i === at);
+      const card = J.$(".lyric-card", slab);
+      if (card) {
+        card.classList.toggle("on", i === at);
+        card.classList.toggle("reading", viewing && i === at);
+      }
+    });
+  }
+
   function go(index, animate) {
     const to = J.clamp(index, 0, sheets.length - 1);
     if (to === at) { place(true); return; }
     at = to;
     viewing = null;
-    place(animate !== false);
-    // The chrome around the deck changes with the card, but only after it has landed,
-    // so the redraw never interrupts the slide.
-    setTimeout(() => { if (block.isConnected) draw(); }, 320);
+
+    /* Straight away, rather than after the card has finished leaving.
+     *
+     * It used to fling the card, wait four hundred and twenty milliseconds for it to get
+     * out of the frame, move the index, and then redraw three hundred more later: most of
+     * a second after a flick during which nothing arrived, because the deck only knew
+     * which card was the front one after a full rebuild. Measured at seven hundred to
+     * eleven hundred milliseconds from letting go to the next card being there.
+     *
+     * The cards are all present and positioned by class, so the swap is free and both of
+     * them animate at once.
+     */
+    markCurrent();
+
+    // The chrome around the deck, which is the title, the dots and the count. After the
+    // cards have settled, so a rebuild never interrupts the one thing being looked at.
+    setTimeout(() => { if (block.isConnected) draw(); }, 460);
   }
 
   /* Dragging. The track follows the pointer and settles either back or onward.
@@ -492,29 +526,16 @@ J.blockLyrics = async function (block, ctx) {
 
       if (!far || stays) { place(true); return; }
 
-      /* Thrown, not stepped.
+      /* Thrown, and the throw is the stylesheet's.
        *
-       * The card carries on the way it was going and leaves the frame, and only then does
-       * the index move. Changing it here instead would redraw the deck under a card that
-       * is still mid air, which is the jump cut this gesture is meant to replace. */
+       * The transition has to be back on before the class changes, or the card jumps to
+       * its new place instead of travelling there: .nudging is transition: none, which is
+       * what makes it follow a finger exactly. Taking that off and reading a layout value
+       * flushes the style with the card still where the thumb left it, so the change on
+       * the next line has somewhere to animate from. */
       card.classList.remove("nudging");
-      card.style.transform = flung(onward);
-
-      /* Waited out rather than listened for.
-       *
-       * transitionend would be the obvious thing and it is the wrong thing twice over. It
-       * bubbles, so any transition on anything inside the card fires it, and the card is
-       * full of things with transitions. And it would be a listener on an element that
-       * drawCards is about to throw away, which is the rule this panel already learned
-       * the hard way: the swipe used to be bound to the deck window and stopped working
-       * after the first redraw.
-       *
-       * The duration is read off the element rather than written here, so it cannot drift
-       * from the stylesheet, and reduced motion collapsing it to nothing collapses this
-       * with it. */
-      const spent = getComputedStyle(card).transitionDuration.split(",")[0];
-      const ms = Math.max(0, (parseFloat(spent) || 0) * (/ms/.test(spent) ? 1 : 1000));
-      setTimeout(() => go(at + onward), ms + 30);
+      void card.offsetWidth;
+      go(at + onward);
     };
     block.addEventListener("pointerup", release);
     block.addEventListener("pointercancel", release);

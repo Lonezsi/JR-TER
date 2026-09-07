@@ -222,12 +222,15 @@
   --ab-h: 38px;
   display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
 }
-/* Named rather than a universal child selector, which lost. `.ab-inline > *` is one
+/* The two halves: which take, and what to do with it. */
+.ab-slots,
+.ab-acts { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+/* Named rather than a universal child selector, which lost. `.ab-inline *` is one
    class and `.btn.sm` is two, so the 30 pixel height won on specificity and the row
    still came out in three heights. */
-.ab-inline > .btn,
-.ab-inline > .slot-pick,
-.ab-inline > .ab-switch { height: var(--ab-h); }
+.ab-inline .btn,
+.ab-inline .slot-pick,
+.ab-inline .ab-switch { height: var(--ab-h); }
 .slot-pick {
   position: relative;
   display: inline-flex; align-items: center; gap: var(--s2);
@@ -445,29 +448,37 @@
   filter: brightness(0.72);
 }
 
-/* Where the cards that are not being read sit.
+/* Where the cards you are not reading are: off the frame, on the side they came from.
  *
- * Behind and slightly below, so the stack is visible as a stack: that is the cue that
- * says there is more than one of these, and the row had no way of saying it. Two deep is
- * enough; a third would be four pixels of nothing. */
+ * They used to sit behind the front one, a little lower and a little smaller, at 55 and 26
+ * per cent. The idea was that a stack should look like a stack. What it actually did was
+ * put two other sets of words underneath the one you were trying to read, at exactly the
+ * size and position of the lines you were reading, so every card had somebody else's verse
+ * ghosting through it. A page of words is not a thing to be translucent about.
+ *
+ * So they are out of the frame and fully invisible, and which side depends on which way
+ * you would have to go to reach them: the ones already read are off to the left, the ones
+ * still to come are off to the right. Swiping is then the obvious thing rather than a
+ * reveal: this one is thrown out that way, the next one arrives from the other.
+ *
+ * They keep their rotations because that is what makes the leaving and the arriving read
+ * as a card turning out of the room rather than a rectangle sliding sideways. */
 .lyric-slab.on ~ .lyric-slab {
-  transform: translate3d(0, 14px, -80px) scale(0.972);
-  opacity: 0.55;
-  z-index: 2;
-}
-.lyric-slab.on ~ .lyric-slab ~ .lyric-slab {
-  transform: translate3d(0, 26px, -160px) scale(0.945);
-  opacity: 0.26;
+  transform: translate3d(130%, 24px, 60px) rotateZ(14deg) rotateY(-24deg);
+  opacity: 0;
   z-index: 1;
 }
-/* And the ones already read are off the left of the frame, turned, waiting to come back
-   if you go the other way. :has(~ .on) is every slab before the front one, which is the
-   previous sibling selector CSS never had until :has. */
+/* :has(~ .on) is every slab before the front one, which is the previous sibling selector
+   CSS never had until :has. */
 .lyric-slab:has(~ .lyric-slab.on) {
   transform: translate3d(-130%, 24px, 60px) rotateZ(-14deg) rotateY(24deg);
   opacity: 0;
-  z-index: 4;
+  z-index: 1;
 }
+/* The one being read is the only one in front, and the only one you can touch. A card at
+   opacity 0 still takes presses, and an invisible sheet of words over the top of the real
+   one is why a tap sometimes did nothing. */
+.lyric-slab:not(.on) { pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .lyric-slab { transition: opacity var(--med); }
@@ -488,6 +499,13 @@
      transform of its own, and no 3D, since the glass on it forbids that anyway. */
   position: relative;
   touch-action: pan-y;
+  /* Lyrics are the point of this page and they were sized like a caption: a two line verse
+     made a card two lines tall, so the whole block changed height on every swipe and a song
+     with one short chorus had a strip of glass where its words go. A floor rather than a
+     height, so a long set of words still grows past it.
+     On the card and not on the window: the window is only the frame, and a floor there
+     leaves a small card floating in the middle of an empty box. */
+  min-height: 320px;
   padding: var(--s6);
   border-radius: var(--r-lg);
   background: rgba(18, 18, 20, 0.2);
@@ -797,14 +815,19 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
   .song-title { font-size: clamp(30px, 11vw, 46px); }
   .song-title-input { font-size: clamp(30px, 11vw, 46px); }
 
-  /* A and B go full width, so neither is a squeezed chip.
+  /* Two rows: which take, then what to do with it.
    *
-   * Not a three column grid any more. That said "there are exactly three things in this
-   * row", which stopped being true the moment anything else joined them: Share is here on
-   * every song, including the ones with no renders and therefore no A or B at all, and a
-   * fourth child in a three column grid wraps into a row of its own with a hole beside it. */
-  .ab-inline { width: 100%; }
-  .ab-inline > .slot-pick { flex: 1 1 0; min-width: 0; }
+   * They shared one before, and there is not room. Measured at 375: A came out 67 pixels
+   * with "v1 · Wide master" squeezed out of it, Compare 87, Arrange 48, Share 91, and the
+   * gaps between them. The picker is the one carrying information and it was the one that
+   * lost, because it is the only one that can shrink.
+   *
+   * Stacked, the picker gets the width it needs to say what is loaded and the three
+   * actions sit under it at their own size. */
+  .ab-inline { width: 100%; flex-direction: column; align-items: stretch; }
+  .ab-slots > .slot-pick { flex: 1 1 0; min-width: 0; }
+  .ab-acts { flex-wrap: wrap; }
+  .ab-acts > .btn { flex: 1 1 auto; }
   .slot-menu { left: 0; right: auto; min-width: min(280px, 84vw); }
   .slot-pick[data-slot="B"] .slot-menu { left: auto; right: 0; }
 

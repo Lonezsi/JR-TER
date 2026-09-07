@@ -22,6 +22,29 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.2.1",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "Lyrics that are actually readable",
+        "notes": [
+            "Nothing shows through the card you are reading. The other sets of words used "
+            "to sit behind it at 55 and 26 per cent, at the same size and place as the "
+            "lines you were reading, so every card had somebody else's verse ghosting "
+            "through it. They are off the frame now: the ones you have read to the left, "
+            "the ones still to come to the right.",
+            "A card has a floor of 320 pixels, so a two line chorus is still a card rather "
+            "than a strip, and the block stops changing height every time you swipe.",
+            "Swiping lands straight away. It used to throw the card, wait for it to leave, "
+            "then rebuild the whole deck: measured at seven hundred to eleven hundred "
+            "milliseconds between letting go and the next card being there. Now the card "
+            "you threw carries on out of the frame while the next one arrives from the "
+            "other side, both at once, and the index moves the moment you let go.",
+            "On a phone the take and preset picker gets its own row. It was sharing one "
+            "with Compare, Arrange and Share, which left it 67 pixels wide with \"v1 · "
+            "Wide master\" squeezed out of it entirely.",
+        ],
+    },
+    {
         "version": "3.2.0",
         "date": "2026-09-07",
         "name": JRITER,
