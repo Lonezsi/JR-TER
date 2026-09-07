@@ -2,65 +2,41 @@
 
 .render-row {
   display: flex; align-items: center; gap: var(--s3);
-  flex-wrap: wrap;              /* so the arrangement strip gets a line of its own */
+  /* One line. It used to wrap so the arrangement strip could have its own, and the name
+     column carried the size on a second line and the dates on a third, which made a
+     three deck row for what is one object with one action. Everything reads across now
+     and the name is the only thing that gives way. */
+  flex-wrap: nowrap;
   padding: var(--s3);
   border-radius: var(--r-md);
-  background: var(--grad-surface);
-  border: 1px solid transparent;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  border: 1px solid var(--glass-line);
   margin-bottom: var(--s2);
+  /* So the waveform's blend has this row's own glass as its backdrop and not the page
+     behind it. Without this the carve blends straight through to the wallpaper. */
+  isolation: isolate;
   transition: border-color var(--fast), background var(--fast);
 }
 /* The row is the button. Forty four copies of the same green pill down a list is a wall
    of shouting, and the thing you are choosing between is the render, not the pill. */
 .render-row[role="button"] { cursor: pointer; }
 .render-row:hover {
-  border-color: var(--line-2);
-  background: var(--grad-raised);
+  border-color: var(--glass-line);
+  background: var(--glass-2);
 }
 .render-row:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
 
-/* Says what pressing the row does.
-
-   It used to rest on --elevated with --text-3 on it, which is the pairing the meta line
-   uses and close enough to a disabled control that it was read as one. On a phone that
-   was permanent: the accent only arrived on hover and a finger cannot hover.
-
-   So it rests in the quiet green .pick-row.new already uses for "you can press this,
-   said quietly", and fills in only when the pointer is on the row or a finger is on it.
-   Still not forty four filled pills down a list, which is the thing that was rejected.
-
-   Its height is .btn.sm's height, so a waiting row and a row with Put back on it line up
-   down a mixed list rather than sitting two pixels apart. */
-.row-go {
-  flex: none;
-  display: inline-flex; align-items: center;
-  height: 30px;
-  padding: 0 var(--s4);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--r-pill);
-  background: var(--accent-soft);
-  color: var(--accent-hi);
-  font-size: 12.5px; font-weight: 650;
-  white-space: nowrap;
-  transition: background var(--fast), color var(--fast), border-color var(--fast);
-}
-.render-row:hover .row-go,
-.render-row:focus-visible .row-go,
-.render-row[role="button"]:active .row-go {
-  background: var(--grad-accent);
-  border-color: var(--accent);
-  color: var(--text-on-accent);
-}
-
-/* The action and the tools, held together only so that a phone can put them on one line.
-
-   On a wide row this wrapper is not there at all: display: contents hands its children
-   straight to the row, so the layout is the flat one the rule describes and the tools'
-   auto margin still measures against the whole row. On a narrow one it becomes a real
-   box asking for the full width, which is what forces the break. Without it the name
-   column shrank just enough to let the pill stay up on the first line and the two icons
-   wrapped on their own, which is a tall row with a hole in it. */
-.row-actions { display: contents; }
+/* The green "Add to a song" pill and its wrapper both went.
+ *
+ * The pill was the row's action written out in the middle of the row, on a row that is
+ * itself the button for that action, so it said the same thing twice and took the width
+ * to do it. The action is now a white circle with a plus taken out of it, in the group of
+ * controls at the right edge where the rest of the row's tools already were. And the
+ * wrapper only existed to make the row wrap onto two lines on a phone, which is the thing
+ * this row no longer does.
+ */
 
 /* The two things a row can do that are not the row's own job, kept together at the right
    edge so they read as a pair of tools rather than as two more steps in the sentence.
@@ -82,7 +58,17 @@
 /* Throwing a render away is the one thing in this row that cannot be taken back, so it
    is last and it is the only icon that changes colour under the pointer. */
 .row-tools [data-act="dismiss"]:hover { color: var(--bad-hi); }
-.render-row .grow { min-width: 0; flex: 1; display: block; }
+/* Name and meta across, not stacked.
+ *
+ * This was display: block with the meta on its own line under the name and the dates on
+ * a third, which is a three deck row. Baseline rather than centre, so the twelve pixel
+ * meta sits on the same line as the name instead of floating half a line above it. The
+ * name gives way first and the meta second: which bounce this is matters more than how
+ * many megabytes it is. */
+.render-row .grow {
+  min-width: 0; flex: 1;
+  display: flex; align-items: baseline; gap: var(--s3);
+}
 /* One that has found its song stays readable but stops asking for attention. */
 .render-row.used { opacity: 0.62; }
 .render-row.used:hover { opacity: 1; }
@@ -95,6 +81,8 @@
    vertical-align stops an inline-block leaving a gap under the text. */
 .render-name {
   display: inline-block;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 100%;
   vertical-align: bottom;
   font-weight: 650;
@@ -103,20 +91,61 @@
 }
 .render-name:hover { border-bottom-color: var(--line-2); }
 .render-row .s {
-  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-3);
-  margin-top: 1px;
 }
 .render-row .s b { color: var(--text-2); font-weight: 650; }
 
-.icon-btn.play {
-  background: var(--elevated);
-  color: var(--text);
+/* White, with the glyph taken out of the white.
+ *
+ * A real hole, not a dark glyph on a light disc. The white is the button's background and
+ * a mask is laid over it whose alpha is solid everywhere and nought on the shape, so what
+ * shows through the triangle is the glass behind the row: blur, colour fringing and all.
+ * On a surface that is genuinely transparent that is a different object from a printed
+ * icon, and this is the one control on the row that should look pressed out of the
+ * material rather than placed on it.
+ *
+ * A data URI rather than an SVG <mask> in the markup, because a mask in the markup needs
+ * an id and there is one of these per row.
+ */
+.cut {
   flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border: 0; padding: 0;
+  border-radius: 50%;
+  background: #FFFFFF;
+  cursor: pointer;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  transition: transform var(--fast), opacity var(--fast);
 }
-.icon-btn.play:hover { background: var(--accent); color: var(--text-on-accent); }
-.icon-btn.play.sm { width: 30px; height: 30px; }
+/* The picker sheet's copy, which sits in a tighter row. */
+.cut.sm { width: 28px; height: 28px; }
+.cut:hover { transform: scale(1.06); }
+.cut:active { transform: scale(0.97); }
+/* Drawn outside the mask, or the mask eats the ring. */
+.cut:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 3px; }
+
+.cut.play {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill-rule%3D%27evenodd%27%20fill%3D%27black%27%20d%3D%27M0%200h24v24H0Z%20M9%205.8%2019.5%2012%209%2018.2Z%27%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill-rule%3D%27evenodd%27%20fill%3D%27black%27%20d%3D%27M0%200h24v24H0Z%20M9%205.8%2019.5%2012%209%2018.2Z%27%2F%3E%3C%2Fsvg%3E");
+}
+.cut.play.sounding {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill-rule%3D%27evenodd%27%20fill%3D%27black%27%20d%3D%27M0%200h24v24H0Z%20M8.5%206h3.2v12H8.5Z%20M13.3%206h3.2v12h-3.2Z%27%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill-rule%3D%27evenodd%27%20fill%3D%27black%27%20d%3D%27M0%200h24v24H0Z%20M8.5%206h3.2v12H8.5Z%20M13.3%206h3.2v12h-3.2Z%27%2F%3E%3C%2Fsvg%3E");
+}
+.cut.add {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill-rule%3D%27evenodd%27%20fill%3D%27black%27%20d%3D%27M0%200h24v24H0Z%20M10.7%206.6h2.6v4.1h4.1v2.6h-4.1v4.1h-2.6v-4.1H6.6v-2.6h4.1Z%27%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill-rule%3D%27evenodd%27%20fill%3D%27black%27%20d%3D%27M0%200h24v24H0Z%20M10.7%206.6h2.6v4.1h4.1v2.6h-4.1v4.1h-2.6v-4.1H6.6v-2.6h4.1Z%27%2F%3E%3C%2Fsvg%3E");
+}
+/* A row that has found its song has nothing to add, so the plus goes rather than sitting
+   there greyed out: this row has controls that are there and controls that are not. */
+.render-row.used .cut.add { display: none; }
 
 /* ── picking: a song for a render, or a render for a song ─────────────────── */
 
@@ -188,22 +217,16 @@
 }
 
 @media (max-width: 900px) {
-  /* On a phone the row wraps on purpose. The name asks for sixty per cent so the break
-     happens after it: cover, play and name take the first line, the action and the tools
-     take the second.
-
-     The buttons used to be told to grow into whatever was left on that second line,
-     which is how Put back ended up as a two hundred pixel pill with two icons stuck on
-     the end of it. They keep their own size now, and .row-tools' auto margin is what
-     puts the space between them. Wrapping itself is unconditional, up at the top of the
-     file, so it is not restated here. */
-  .render-row .grow { flex: 1 1 60%; }
-  .row-actions {
-    display: flex; align-items: center; gap: var(--s3);
-    flex: 1 1 100%;
-  }
+  /* Still one line. What gives way on a narrow screen is the meta, then the name, and
+     the controls keep their size: a row you cannot read the name of is still useful and
+     a row you cannot press is not. The old rule here made the row wrap into two lines on
+     purpose, which is exactly what this row stopped doing. */
+  /* The meta truncates rather than going. It carries the date, which is the thing you
+     came to the list to compare, and hiding the whole run to save width threw that away
+     on exactly the screen where the list is longest. */
+  .render-row { gap: var(--s2); }
+  .render-row .grow { gap: var(--s2); }
 }
-
 
 /* The render's own square. It is a generated letter tile, never artwork, and it is not a
    control. It used to be a button that made a song out of the render, which meant the
@@ -217,13 +240,10 @@
    line, so a long name never pushes them out of the row and nothing here is the first
    thing to be clipped. This used to say flex: 0 0 100%, which did nothing at all: its
    parent is a block, and the line it gets is ordinary block flow. */
-.render-dates {
-  display: flex; align-items: center; gap: var(--s2);
-  margin-top: 2px;
-  font-size: 11.5px; color: var(--text-3);
-  overflow: hidden;
-}
-.render-dates span { overflow: hidden; text-overflow: ellipsis; }
+/* The separator between meta facts. Its own element rather than a bare dot in the text,
+   so it can be dimmer than what it separates and so an empty fact cannot leave one
+   stranded at the start of the line. */
+.render-row .sep { opacity: 0.45; }
 .render-dates .dot {
   width: 3px; height: 3px; border-radius: 50%;
   background: currentColor; opacity: 0.5; flex: none;
@@ -242,22 +262,42 @@
 .wave { display: block; }
 .wave polygon { fill: currentColor; }
 
+/* Carved into the glass.
+ *
+ * It was the accent at thirteen per cent, painted under the row and reading as a faint
+ * green stain. Three things make it a groove instead. It is grey, so it is a shape in
+ * the surface rather than a colour on it. It blends with overlay, so it does not sit on
+ * the glass, it modulates it: where the wave is loud the glass goes darker in its own
+ * hue, which is what a recess does to a material rather than what paint does. And it
+ * carries one pixel of near white directly underneath, which is the lit lower lip every
+ * engraved edge has, and the single cue that separates "below the surface" from "on top
+ * of it".
+ *
+ * Still behind the text. z-index 0 puts it above the row's own background and under
+ * every sibling, which is in front of the glass and behind the words: the thing to see
+ * at a glance is the shape, and the thing to read is the name. */
 .render-wave {
   position: absolute;
   inset: 0;
   width: 100%; height: 100%;
   z-index: 0;
-  color: var(--accent);
-  opacity: 0.13;
+  color: #8E949B;
+  opacity: 0.22;
+  mix-blend-mode: overlay;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.13));
   pointer-events: none;
   transition: opacity var(--fast);
 }
-.render-row:hover .render-wave { opacity: 0.2; }
-.render-row.used .render-wave { color: var(--text-3); opacity: 0.1; }
+.render-row:hover .render-wave { opacity: 0.34; }
+.render-row.used .render-wave { opacity: 0.14; }
 
 /* Something is wrong with this file, said before anything is played. */
 .render-row.in-trouble { border-color: var(--bad); }
-.render-row.in-trouble .render-wave { color: var(--bad); opacity: 0.16; }
+/* Trouble is the one case the groove takes a colour, and it stops blending: a fault is a
+   thing on the surface demanding to be read, not part of it. */
+.render-row.in-trouble .render-wave {
+  color: var(--bad); opacity: 0.4; mix-blend-mode: normal; filter: none;
+}
 
 .trouble {
   display: inline-flex; align-items: center; gap: 4px;

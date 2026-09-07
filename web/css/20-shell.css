@@ -281,10 +281,31 @@
 .search input::placeholder { color: var(--text-3); }
 .search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
-.update-dot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
+/* It says what it is, and it is the thing you press.
+ *
+ * This was a nine pixel green circle whose only explanation was a title attribute, which
+ * is to say: no explanation on a phone, none for a keyboard, and none for anybody who
+ * did not think to hover a dot. A light tells you that something is true without telling
+ * you what, and then you have to go and find out. Every one of those is better as the
+ * sentence it stands for, and better still when the sentence is also the way to act on
+ * it, which is why this is a link to the screen with the button on it rather than a
+ * label beside one. */
+.update-ready {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  font-size: 12px; font-weight: 650;
+  white-space: nowrap;
+  transition: background var(--fast);
+}
+.update-ready:hover { background: var(--accent-line); }
+/* The name still fits at 380px, so it is the label that goes rather than the control. */
+@media (max-width: 520px) {
+  .update-ready span { display: none; }
+  .update-ready { padding: 0 7px; }
 }
 
 .view {
@@ -362,3 +383,37 @@
   .shell.rail-dragging .rail-scrim { transition: none; }
   .shell.rail-dragging .rail { will-change: transform; }
 }
+
+/* The dither.
+ *
+ * One fixed layer over the whole app. A 22px blur quantises its output to eight bits, so
+ * a smooth gradient comes out as a staircase, and the cure is noise: a speck per pixel
+ * pushes each one to whichever side of the boundary it lands on, and the eye integrates
+ * the ramp back. Banding shows up in the page wash and inside the glass alike, and there
+ * are a dozen glass surfaces but only ever one screen, so it goes on the screen.
+ *
+ * overlay rather than a plain low alpha. Normal blending lerps everything towards the
+ * middle grey of the tile, which lifts true black into haze; overlay leaves black alone
+ * and swings hardest through the mid tones, which is exactly where a step is visible.
+ *
+ * The tile is an feTurbulence rendered by the browser, stitchTiles so it repeats with no
+ * seam and desaturated so it moves luminance rather than adding colour. No file, and
+ * nothing fetched: the whole texture is these few hundred characters.
+ */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  opacity: var(--dither, 0.048);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27140%27%20height%3D%27140%27%3E%3Cfilter%20id%3D%27n%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.75%27%20numOctaves%3D%273%27%20stitchTiles%3D%27stitch%27%20result%3D%27t%27%2F%3E%3CfeColorMatrix%20in%3D%27t%27%20type%3D%27saturate%27%20values%3D%270%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27140%27%20height%3D%27140%27%20filter%3D%27url%28%23n%29%27%2F%3E%3C%2Fsvg%3E");
+  background-repeat: repeat;
+  /* Half the tile, so the grain is fine rather than a visible cloud pattern. */
+  background-size: 70px 70px;
+}
+/* A dial at nought hides the element outright, so the compositor is not blending a
+   fully transparent full screen layer on every frame for nothing. No rule needed: this
+   sets no display of its own, so the global [hidden] guard in 10-base.css already wins.
+   It had one, and it was worse than useless: it satisfied the test that checks the global
+   guard exists, so deleting that guard went unnoticed. */

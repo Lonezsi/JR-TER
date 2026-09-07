@@ -123,7 +123,16 @@ _DEFAULTS = {
     # that struggles with either has one place to turn it off, and reduced motion and
     # reduced transparency still override both whatever these say.
     "dust": 55,
-    "glass_edge": 60,
+    # Shown as "Chromatic aberration". The key keeps its old name because it is what
+    # every settings.json already on disk calls it, and a rename buys a migration for a
+    # word only this file ever reads.
+    #
+    # A hundred is what the dial used to top out at, and it is the default now: the dial
+    # goes to two hundred so there is somewhere to go past it.
+    "glass_edge": 100,
+    # Fine noise over everything, to break up the steps a 22px blur leaves in a smooth
+    # gradient. Nought is off.
+    "dither": 40,
     # Empty unless the machine hides it somewhere jriter/video.py does not look. A path
     # rather than a switch, because ffmpeg is not a dependency: it is a program you
     # install, and the only thing JR!TER needs from you is where it went.

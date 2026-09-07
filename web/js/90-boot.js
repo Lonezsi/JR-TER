@@ -71,7 +71,7 @@ J.wearFont = function (info) {
  */
 J.applyLook = function (settings) {
   const said = settings || {};
-  const edge = J.clamp(Number(said.glass_edge === undefined ? 60 : said.glass_edge), 0, 100);
+  const edge = J.clamp(Number(said.glass_edge === undefined ? 100 : said.glass_edge), 0, 200);
 
   /* The middle scale is the refraction the glass has always had, and it does not move:
    * changing it would change how much the glass bends things, which is a different
@@ -91,6 +91,23 @@ J.applyLook = function (settings) {
     "--glass-filter-edge",
     spread ? "url(#glass-ca) blur(22px) saturate(180%) brightness(1.06)"
            : "var(--glass-filter)");
+
+  /* The dither, which is one number on one element.
+   *
+   * A 22px blur over a smooth gradient quantises to eight bits and leaves visible steps,
+   * and the fix for that is and always has been noise: a speck of it per pixel moves each
+   * one across the boundary between two levels at random, so the eye integrates a smooth
+   * ramp instead of finding an edge. It is a single fixed layer over the whole app rather
+   * than one per glass surface, because the banding is in the wash and the panels alike
+   * and there are a dozen surfaces but only ever one screen.
+   *
+   * Twelve per cent at the top of the dial. Dithering wants one or two levels of noise,
+   * which is about three per cent, so the useful range is the bottom third and the rest
+   * is there for anyone who wants the grain as a look. */
+  const grain = J.clamp(Number(said.dither === undefined ? 40 : said.dither), 0, 100);
+  document.documentElement.style.setProperty("--dither", String((grain / 100) * 0.12));
+  const grainLayer = J.$("#grain");
+  if (grainLayer) grainLayer.hidden = grain === 0;
 
   J.dust.strength(said.dust === undefined ? 55 : said.dust);
 };
@@ -669,14 +686,22 @@ async function boot() {
   // and says nothing at all.
   J.devlog.check(state);
 
-  // A quiet check on startup, so the dot in the corner is the only nagging there is.
+  // A quiet check on startup. Nothing interrupts: it puts a small "Update ready" in the
+  // top bar, which is a link to the screen the button is on, and says nothing otherwise.
   if (J.state.modules.includes("updater") && state.settings.auto_update !== false) {
     setTimeout(async () => {
       try {
         const info = await J.get("/api/update/check");
         if (info.update_available) {
-          J.$("#updateDot").hidden = false;
-          J.$("#updateDot").title = "An update is ready. Settings has the button.";
+          const ready = J.$("#updateReady");
+          if (ready) {
+            ready.hidden = false;
+            // What the update actually is, from the remote commit's own subject line,
+            // rather than the bare fact that one exists. There is no version number in
+            // this payload: the check compares commits, so the message is the only thing
+            // in it that means anything to a person.
+            if (info.message) ready.title = info.message;
+          }
         }
       } catch (e) { /* offline is not worth a toast on every start */ }
     }, 2500);

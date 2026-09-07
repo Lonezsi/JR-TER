@@ -176,7 +176,15 @@
         <input id="search" type="search" placeholder="Search your songs" aria-label="Search songs" autocomplete="off">
       </div>
       <span class="grow"></span>
-      <span class="update-dot" id="updateDot" hidden></span>
+      <a class="update-ready" id="updateReady" href="#/settings" data-link hidden>
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"
+             focusable="false">
+          <path d="M12 20V5m0 0l-5 5m5-5l5 5" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                transform="rotate(180 12 12)"/>
+        </svg>
+        <span>Update ready</span>
+      </a>
     </header>
 
     <div class="view" id="view"></div>
@@ -184,6 +192,10 @@
 
   <footer class="player" id="player" hidden></footer>
 </div>
+
+<!-- Over everything, including the dialogs, because a step in a gradient does not stop
+     being a step when a sheet is open. pointer-events: none, so it is only ever paint. -->
+<div class="grain" id="grain" aria-hidden="true"></div>
 
 <div class="sheet-backdrop" id="modalBackdrop" hidden></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>

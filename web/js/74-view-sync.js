@@ -214,15 +214,26 @@ J.views.settings = {
                 on it. Nought is none.</span>
             </label>
 
-            <label class="sheet-label">Colour fringing on the glass
+            <label class="sheet-label">Chromatic aberration
               <span class="dial">
-                <input class="range" id="glassEdge" type="range" min="0" max="100" step="5"
-                       value="${Number(state.settings.glass_edge === undefined ? 60 : state.settings.glass_edge)}">
-                <b id="glassSaid">${Number(state.settings.glass_edge === undefined ? 60 : state.settings.glass_edge)}</b>
+                <input class="range" id="glassEdge" type="range" min="0" max="200" step="5"
+                       value="${Number(state.settings.glass_edge === undefined ? 100 : state.settings.glass_edge)}">
+                <b id="glassEdgeSaid">${Number(state.settings.glass_edge === undefined ? 100 : state.settings.glass_edge)}</b>
               </span>
               <span class="faint dial-note">How far the rail and the player split light
-                into colours at their edges. Nought is plain glass, and costs less to
-                draw.</span>
+                into colours at their edges. A hundred is where the dial used to stop and
+                is the normal amount. Nought is plain glass, and costs less to draw.</span>
+            </label>
+
+            <label class="sheet-label">Dither
+              <span class="dial">
+                <input class="range" id="dither" type="range" min="0" max="100" step="5"
+                       value="${Number(state.settings.dither === undefined ? 40 : state.settings.dither)}">
+                <b id="ditherSaid">${Number(state.settings.dither === undefined ? 40 : state.settings.dither)}</b>
+              </span>
+              <span class="faint dial-note">Fine noise over everything. A blur this wide
+                leaves visible steps in a smooth gradient, and noise is what breaks them
+                up. The useful range is the bottom third; past that it is a look.</span>
             </label>
 
             <div><button class="btn primary sm" data-act="save-settings">Save</button></div>
@@ -386,13 +397,14 @@ J.views.settings = {
      * and error with a round trip in the middle. Nothing is written until Save: leaving
      * this page without pressing it puts the saved setting back on the next load. */
     root.addEventListener("input", (e) => {
-      const dial = e.target.closest("#dust, #glassEdge");
+      const dial = e.target.closest("#dust, #glassEdge, #dither");
       if (!dial) return;
-      const said = J.$(dial.id === "dust" ? "#dustSaid" : "#glassSaid", root);
+      const said = J.$("#" + dial.id + "Said", root);
       if (said) said.textContent = dial.value;
       J.applyLook({
         dust: Number((J.$("#dust", root) || {}).value),
         glass_edge: Number((J.$("#glassEdge", root) || {}).value),
+        dither: Number((J.$("#dither", root) || {}).value),
       });
     });
 
@@ -406,6 +418,7 @@ J.views.settings = {
           accent: J.$("#accent", root).value,
           dust: Number(J.$("#dust", root).value),
           glass_edge: Number(J.$("#glassEdge", root).value),
+          dither: Number(J.$("#dither", root).value),
         };
         // Only when the field is on screen, which it is not once ffmpeg has been found.
         // Sending an empty string then would throw away a path somebody had typed in.

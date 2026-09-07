@@ -37,7 +37,7 @@ def get_settings(req):
 def put_settings(req):
     patch = req.json()
     allowed = {"library_name", "accent", "auto_update", "sync_interval_minutes",
-               "ffmpeg_path", "dust", "glass_edge"}
+               "ffmpeg_path", "dust", "glass_edge", "dither"}
     unknown = set(patch) - allowed
     if unknown:
         raise Error("not a setting: " + ", ".join(sorted(unknown)))

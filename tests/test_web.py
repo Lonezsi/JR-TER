@@ -217,7 +217,11 @@ def test_the_hidden_attribute_beats_the_layout():
     """
     from jriter.http import bundle
     css = bundle(CSS_DIR, ".css").decode("utf-8")
-    assert re.search(r"\[hidden\]\s*\{[^}]*display:\s*none\s*!important", css), \
+    # A bare [hidden], not anything-[hidden]. A rule scoped to one class satisfied this
+    # and hid the fact that the global guard had been deleted: .grain[hidden] was written
+    # for a layer that needed no rule of its own, and its only effect was to make this
+    # test unable to fail.
+    assert re.search(r"(?:\A|\n)\s*\[hidden\]\s*\{[^}]*display:\s*none\s*!important", css), \
         "nothing makes the hidden attribute win, so hidden elements with a display show"
 
     with open(os.path.join(WEB, "login.html"), encoding="utf-8") as f:
@@ -227,17 +231,40 @@ def test_the_hidden_attribute_beats_the_layout():
 
 
 def test_everything_that_starts_hidden_can_actually_hide():
-    """Each element carrying the attribute, checked against the rules that style it."""
+    """Every element in the shell that starts hidden, found rather than listed.
+
+    This used to name the three of them, which meant it failed the day one of them was
+    replaced and reported that the shell was broken when what had happened is that a
+    status dot became a labelled link. Reading them out of the markup checks the property
+    rather than the inventory: an author rule setting `display` on a class beats the
+    browser's own [hidden] rule, so anything given both needs the guard, and a new one is
+    covered the moment somebody writes it.
+    """
     with open(os.path.join(WEB, "index.html"), encoding="utf-8") as f:
         page = f.read()
     css = "\n".join(open(os.path.join(CSS_DIR, n), encoding="utf-8").read()
                     for n in sorted(os.listdir(CSS_DIR)) if n.endswith(".css"))
 
-    # Elements that start hidden, by the class they are styled through.
-    for element_class in ("player", "sheet-backdrop", "update-dot"):
-        assert element_class in page, "%s is no longer in the shell" % element_class
-    # The guard has to be present, since two of those three are given a display.
-    assert "[hidden]" in css
+    starts_hidden = re.findall(r"<\w+([^>]*\bhidden\b[^>]*)>", page)
+    assert len(starts_hidden) >= 3, (
+        "found almost nothing in the shell that starts hidden, so this is looking in the "
+        "wrong place: %s" % starts_hidden)
+
+    named = []
+    for attrs in starts_hidden:
+        found = re.search(r'class="([^"]+)"', attrs)
+        if found:
+            named.extend(found.group(1).split())
+    assert named, "nothing that starts hidden is styled through a class"
+    for element_class in named:
+        assert "." + element_class in css, (
+            "%s starts hidden and nothing styles it, so either the class is a typo or the "
+            "rule it needs is gone" % element_class)
+
+    # The guard itself, without which every one of those that is given a display ignores
+    # the attribute completely. A bare [hidden], for the reason spelled out in
+    # test_the_hidden_attribute_beats_the_layout above.
+    assert re.search(r"(?:\A|\n)\s*\[hidden\]\s*\{[^}]*display:\s*none\s*!important", css)
 
 
 # ── the silent CSS failures ──────────────────────────────────────────────────
@@ -837,3 +864,38 @@ def test_the_dust_is_white():
     assert "rgba(255, 255, 255" in tint
     assert "--accent" not in tint and "hsla(" not in tint, \
         "the dust is taking a colour from somewhere again"
+
+
+def test_every_dial_in_settings_is_a_setting_the_server_will_take(server):
+    """put_settings has an allowlist, and a key missing from it is rejected outright.
+
+    Which sounds safe, and is the opposite: the Settings screen sends one patch with every
+    field in it, so one unlisted key fails the whole save. Add a dial, forget the
+    allowlist, and Save stops working for the accent colour too. Nearly shipped exactly
+    that with the dither dial.
+
+    The keys are read out of the view rather than listed here, so a new dial is covered
+    the moment it exists.
+    """
+    import re
+
+    view = os.path.join(config.WEB, "js", "74-view-sync.js")
+    with open(view, encoding="utf-8") as f:
+        source = f.read()
+
+    # The one object the Save button sends. Read from the source so this cannot drift.
+    block = source[source.index("const patch = {"):]
+    block = block[:block.index("};")]
+    keys = set(re.findall(r"^\s*(\w+):", block, re.M))
+    # ffmpeg_path is added conditionally below that object, and is a setting too.
+    keys.add("ffmpeg_path")
+    assert "glass_edge" in keys and "dust" in keys, "the dials moved; this test is stale"
+
+    status, before = server.get("/api/settings")
+    assert status == 200
+    # Sent as one patch, exactly as the Save button sends it, so an unlisted key fails
+    # here the same way it would fail there.
+    patch = {k: before.get(k) for k in keys if before.get(k) is not None}
+    assert len(patch) >= 4, "read almost nothing out of the view: %s" % sorted(keys)
+    status, said = server.put("/api/settings", patch)
+    assert status == 200, said

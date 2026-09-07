@@ -124,7 +124,7 @@ J.dust = (function () {
       specks.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: 5 + Math.random() * (9 + 5 * power),   // the stamp; the core is a third of it
+        size: 8 + Math.random() * (15 + 8 * power),  // the stamp; the core is a third of it
         /* Measured rather than guessed, and then put on a dial.
          *
          * The first pass ran at 0.045 to 0.13 and lit six hundredths of one per cent of
@@ -174,6 +174,17 @@ J.dust = (function () {
   /* Clip to whatever glass is on screen. Returns false when there is none, which is a
    * sheet open over everything or a layout with no player yet, and means there is nothing
    * to draw rather than nothing to clip. */
+  /* How far inside each pane the dust is allowed.
+   *
+   * A clip is a hard cut, so a speck straddling the border came out as a sliced half
+   * circle sitting exactly on the line the border draws your eye to, which is the one
+   * place it cannot be missed. Pulling the edge inwards does not stop specks being cut,
+   * it moves the cut somewhere nobody is looking, and the sprite does the rest: it is a
+   * radial gradient that is already down to a fifth of its alpha two thirds of the way
+   * out, so a cut through that skirt is not a straight line anybody can see. A cut
+   * through the core is. Twelve is about a third of the biggest speck. */
+  const INSET = 12;
+
   function clipToGlass() {
     ctx2d.beginPath();
     let any = false;
@@ -187,9 +198,18 @@ J.dust = (function () {
         radius = parseFloat(getComputedStyle(pane).borderTopLeftRadius) || 0;
         corners.set(pane, radius);
       }
+      // Never more than a third of the smaller side. The top bar is about fifty pixels
+      // tall and a flat twelve off each edge would leave it a scratch to draw in.
+      const room = Math.min(box.width, box.height) / 3;
+      const in_ = Math.min(INSET, room);
+      const w = box.width - in_ * 2, h = box.height - in_ * 2;
+      if (w < 1 || h < 1) continue;
       any = true;
-      if (ctx2d.roundRect) ctx2d.roundRect(box.left, box.top, box.width, box.height, radius);
-      else ctx2d.rect(box.left, box.top, box.width, box.height);
+      // The radius comes in with the edge, or a tight corner turns into a wide one and
+      // the dust rounds off inside a square corner.
+      const r = Math.max(0, radius - in_);
+      if (ctx2d.roundRect) ctx2d.roundRect(box.left + in_, box.top + in_, w, h, r);
+      else ctx2d.rect(box.left + in_, box.top + in_, w, h);
     }
     return any;
   }

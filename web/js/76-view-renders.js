@@ -122,10 +122,11 @@ J.renders = {
           </button>` : ""}
         ${waiting.map((render) => `
         <div class="pick-row" data-render="${render.id}">
-          <button class="icon-btn play sm" data-hear="${render.id}"
-                  aria-label="Play ${J.esc(render.name)}">
-            <svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor"/></svg>
-          </button>
+          <!-- The same knocked out disc as the list. The sheet is glass as well, so the
+               triangle shows the blurred page through it here too. No glyph inside it:
+               the mask is the glyph. -->
+          <button class="cut play sm" data-hear="${render.id}"
+                  aria-label="Play ${J.esc(render.name)}"></button>
           <span class="grow truncate">
             <span class="t truncate">${J.esc(render.name)} ${J.trouble(render)}</span>
             <span class="s">${render.duration ? J.time(render.duration) + " · " : ""}${J.bytes(render.size)}</span>
@@ -270,6 +271,24 @@ J.views.renders = {
      * everywhere in this library, and J.when draws nothing for it. */
     function dates(render) {
       const bits = [];
+      /* When it arrived leads.
+       *
+       * The two below are better facts and they are usually absent: a render only carries
+       * them if it came through the FL client or was taken in from a folder with the
+       * project still beside it. Everything else, which is anything you dragged in, had
+       * no date at all, so the one question you actually ask of a list of bounces, which
+       * of these is the recent one, could not be answered from the row. created_at is
+       * always there because the row could not exist without it.
+       *
+       * First in the line rather than last, and this is the whole reason the meta is
+       * built as a list here instead of written out in the template: the row is one line
+       * now, so on a narrow screen the end of that line is what goes. Whatever matters
+       * most has to be at the front, and it is the date.
+       */
+      if (render.created_at) {
+        bits.push(`<span title="When this render arrived here">added ${
+          J.esc(J.when(render.created_at))}</span>`);
+      }
       if (render.rendered_at) {
         bits.push(`<span title="When this audio was rendered">rendered ${
           J.esc(J.when(render.rendered_at))}</span>`);
@@ -278,8 +297,23 @@ J.views.renders = {
         bits.push(`<span title="When the project it came out of was made">project ${
           J.esc(J.when(render.project_at))}</span>`);
       }
-      if (!bits.length) return "";
-      return `<span class="render-dates">${bits.join('<span class="dot"></span>')}</span>`;
+      return bits;
+    }
+
+    /* The whole meta line, in one order, joined once.
+     *
+     * It was three fragments interpolated into the template with their own separators
+     * hanging off them, which is how you get a line that starts with a stray dot the day
+     * one of them is empty. */
+    function meta(render, used) {
+      const bits = dates(render);
+      if (render.duration) bits.push(J.time(render.duration));
+      bits.push(J.bytes(render.size));
+      if (render.origin === "fl" || render.origin === "import") {
+        bits.push(J.esc(render.ext.replace(".", "").toUpperCase()));
+      }
+      if (used) bits.push(`went to <b>${J.esc(render.song_title || "a song")}</b>`);
+      return bits.join(' <span class="sep">·</span> ');
     }
 
     /* One row, read left to right: what it is, then the one thing this row is for, then
@@ -295,35 +329,28 @@ J.views.renders = {
      */
     function card(render) {
       const used = !render.waiting;
+      const sounding = J.player.state.playing && isSounding(render);
       return `
         <div class="render-row ${used ? "used" : ""} ${render.trouble ? "in-trouble" : ""}" data-id="${render.id}"
              ${used ? "" : 'data-act="attach" role="button" tabindex="0"'}
              ${used ? "" : `aria-label="Add ${J.esc(render.name)} to a song"`}>
           ${J.waveform(render.shape, { className: "render-wave" })}
           ${J.cover({ title: render.name, className: "render-art" })}
-          <button class="icon-btn play" data-act="play" aria-label="Play ${J.esc(render.name)}">
-            ${J.player.state.playing && isSounding(render)
-              ? `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 6h3v12H8zM13 6h3v12h-3z" fill="currentColor"/></svg>`
-              : `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor"/></svg>`}
-          </button>
+          <button class="cut play ${sounding ? "sounding" : ""}" data-act="play"
+                  aria-label="${sounding ? "Pause" : "Play"} ${J.esc(render.name)}"></button>
           <span class="grow truncate">
             <span class="render-name truncate" data-act="rename"
                   title="Rename this render"
               >${J.esc(render.name)}</span>
-            <span class="s truncate">
-              ${render.duration ? J.time(render.duration) + " · " : ""}${J.bytes(render.size)}
-              ${render.origin === "fl" || render.origin === "import"
-                ? ` · ${J.esc(render.ext.replace(".", "").toUpperCase())}` : ""}
-              ${used ? ` · went to <b>${J.esc(render.song_title || "a song")}</b>` : ""}
-              ${J.trouble(render)}
-            </span>
-            ${dates(render)}
+            <span class="s truncate">${meta(render, used)}${J.trouble(render)}</span>
           </span>
-          <span class="row-actions">
-          ${used
-            ? `<button class="btn sm ghost" data-act="unattach">Put back</button>`
-            : `<span class="row-go">Add to a song</span>`}
+          ${shape(render)}
           <span class="row-tools">
+            ${used
+              ? `<button class="btn sm ghost" data-act="unattach">Put back</button>`
+              : `<button class="cut add" data-act="attach"
+                         title="Add ${J.esc(render.name)} to a song"
+                         aria-label="Add ${J.esc(render.name)} to a song"></button>`}
             ${J.state.modules.includes("playlists") ? `
               <button class="icon-btn" data-act="playlist"
                       title="Add ${J.esc(render.name)} to a playlist"
@@ -335,8 +362,6 @@ J.views.renders = {
               <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
             </button>
           </span>
-          </span>
-          ${shape(render)}
         </div>`;
     }
 
