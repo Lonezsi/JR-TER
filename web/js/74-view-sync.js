@@ -347,11 +347,16 @@ J.views.settings = {
         <div class="section">
           <div class="section-head"><h2>Your data</h2></div>
           <p class="faint" style="margin-top:0">
-            Everything is on this machine and nothing is sent anywhere on its own.
-            <a href="/legal" target="_blank" rel="noopener">Terms and privacy</a> says what
-            leaves it, when, and why.
+            Everything is on this machine and nothing is sent anywhere on its own. The
+            terms and the privacy notice say what leaves it, when, and why.
           </p>
           <div class="row wrap">
+            <!-- A control rather than a phrase underlined inside a sentence, which is
+                 easy to read straight past when it is the thing you came here for.
+                 In a new tab, and on this screen the reason is right here: every field
+                 above it is unsaved until Save is pressed, and leaving would throw the
+                 lot away for a link somebody meant to glance at. -->
+            <a class="btn sm" href="/legal" target="_blank" rel="noopener">Terms and privacy</a>
             <button class="btn sm" data-act="take-copy">Take a copy</button>
             <button class="btn danger sm" data-act="erase">Erase this library</button>
           </div>

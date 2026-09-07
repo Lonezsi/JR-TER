@@ -160,9 +160,62 @@
   padding-top: var(--s3);
   border-top: 1px solid var(--line);
 }
+/* The gap is small because the paper carries its own, see below. */
+.rail-end { display: flex; align-items: center; gap: 2px; }
 .rail-version { font-size: 11px; color: var(--text-3); }
-/* It is a link to the terms now, and a link nothing responds to reads as text. */
-.rail-version:hover { color: var(--text-1); }
+/* The paper. Dim as the version beside it until it is pointed at, because it is a way
+   out of the app rather than anything you need while you are working.
+   A twelve pixel icon is a twelve pixel target, and this rail slides out on a phone
+   where twelve pixels next to a line of text is a thing you miss and hit nothing. So the
+   drawing stays small and the box around it is the size of the ? beside it. The negative
+   margin gives the box's right hand slack back to the rail's edge, so the icon sits
+   where it looks like it should rather than inset from the corner. */
+.rail-legal {
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  margin-right: -6px;
+  color: var(--text-3);
+  transition: color var(--fast);
+}
+.rail-legal:hover,
+.rail-legal:focus-visible { color: var(--text); }
+
+/* The end of the page.
+ *
+ * Inside the scroller rather than under it: a link below #view would be a bar pinned to
+ * the bottom of the window on every screen, which is the opposite of staying out of the
+ * way. Inside, it is simply where the page stops, and you only meet it having read
+ * everything above it. Faint until it is pointed at, so finding it twice is easy. */
+.page-foot {
+  margin-top: var(--s8);
+  padding-top: var(--s4);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  /* --text-3 and no opacity on top of it.
+   *
+   * It was --text-3 at opacity .5, which composites to #3B3C40 on this surface: 1.79 to
+   * one against it. Quiet was the point, but that is not quiet, it is barely there, and
+   * it was the resting state on every screen. The lift was on :hover alone, which a
+   * phone never fires, so on a touch screen the only pointer to the terms sat at 1.79
+   * for good. --text-3 on its own is 3.85, which is what the version number beside it in
+   * the rail has always been: the level this app already uses for text that is meant to
+   * recede, rather than a new one below it. */
+  color: var(--text-3);
+  transition: color var(--fast);
+}
+/* Padded for a thumb and pulled back by the same amount, so the target is taller than
+   the eleven pixel line without anything moving. */
+.page-foot a {
+  color: inherit;
+  display: inline-block;
+  padding: 6px 0;
+  margin: -6px 0;
+}
+/* Focus as well as hover. The pattern in this file is that a thing which brightens
+   under a pointer brightens under the keyboard too, and a link nobody can point at is
+   exactly the one that needs it. */
+.page-foot a:hover,
+.page-foot a:focus-visible { color: var(--text); }
 
 .rail-scrim { display: none; }
 

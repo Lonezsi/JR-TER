@@ -222,10 +222,9 @@ async function boot() {
   if (version) {
     version.textContent = state.version ? "v" + state.version : "";
     const commit = state.summary && state.summary.updater && state.summary.updater.commit;
-    // Both, since it is a link now. Overwriting the title with the commit alone left the
-    // one clickable thing in the rail with no clue about where it goes.
-    version.title = commit ? "Terms and privacy. Built from commit " + commit
-                           : "Terms and privacy";
+    // The commit again. The paper beside it is the link now and carries its own title,
+    // so this one is free to say the thing it is actually useful for.
+    if (commit) version.title = "commit " + commit;
   }
 
   for (const [name, detail] of Object.entries(state.failed || {})) {

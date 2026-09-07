@@ -444,3 +444,44 @@ J.trouble = function (render) {
     <span>${J.esc(what === "silent" ? "silent" : "will not play")}</span>
   </span>`;
 };
+
+/* Is the press happening right now on a link that leaves this document.
+ *
+ * Anything that steers the browser's history out of a blur has to ask, and until there
+ * was a page to leave to, nothing did. Every other link in this app is a hash: the
+ * router handles it, no document unloads, and code that runs afterwards is running in
+ * the same page it started in.
+ *
+ * A real navigation is not like that, and the order is the trap. Focus leaves the moment
+ * a press goes down, so a blur handler starts its work while the button is still held,
+ * and the link does not begin navigating until the press comes back up. A
+ * history.back() called in between is queued rather than immediate, and the queued
+ * traversal executes after the navigation has begun and cancels it. The visible result
+ * is that you click Terms and privacy while writing lyrics and simply stay where you
+ * were. Holding the button longer does not help: the traversal still wins.
+ *
+ * Read at the start of every press rather than cleared at the end of one, so it always
+ * describes the press that caused the blur rather than some earlier one, and so a press
+ * dragged off a link leaves nothing stale behind for the next.
+ */
+J.leavesTheDocument = (link) => {
+  const href = link.getAttribute("href");
+  if (!href || href.startsWith("#")) return false;
+  let url;
+  try {
+    url = new URL(href, location.href);
+  } catch (e) {
+    return false;
+  }
+  return url.origin !== location.origin
+    || url.pathname !== location.pathname
+    || url.search !== location.search;
+};
+
+let pressLeaves = false;
+document.addEventListener("pointerdown", (e) => {
+  const link = e.target && e.target.closest && e.target.closest("a[href]");
+  pressLeaves = !!link && J.leavesTheDocument(link);
+}, true);
+
+J.pressIsLeaving = () => pressLeaves;

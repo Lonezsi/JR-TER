@@ -101,6 +101,9 @@ J.router = (function () {
     if (!inPlace) J.pageWash(null);
     if (inPlace) root.innerHTML = old.innerHTML;
     old.replaceWith(root);
+    // After the in place copy above, which serialises the previous screen's foot into
+    // this one's markup: attaching here is what clears that stray and takes ownership.
+    J.pageFoot.attach(root);
     if (inPlace) root.scrollTop = wasScrolled;
 
     const settle = () => {

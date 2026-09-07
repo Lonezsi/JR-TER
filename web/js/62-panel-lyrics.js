@@ -55,6 +55,19 @@ J.blockLyrics = async function (block, ctx) {
     backCaught = false;
     const now = window.history.state;
     if (!block.isConnected || !now || now.stop !== BACK_STOP) return;
+    /* And not while a press on a link out of this document is still held.
+     *
+     * The check above was enough while every link in the app was a hash: those re-render
+     * the view, the panel comes off the page, and isConnected is already false by the
+     * time this runs. A real navigation leaves the document standing until the new one
+     * commits, so that guard passes, and the back() queued here executes after the link
+     * has begun navigating and cancels it. Clicking Terms and privacy while writing did
+     * nothing at all, twice out of two.
+     *
+     * Nothing is needed instead. Leaving the document abandons the entry, exactly as the
+     * guard above does, and it is a duplicate of the URL the editor was opened on, so
+     * Back from the page you arrived at lands on the song you left. */
+    if (J.pressIsLeaving()) return;
     ourOwnPop = true;
     window.history.back();
   }
