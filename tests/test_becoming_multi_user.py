@@ -137,11 +137,16 @@ def test_it_does_not_run_twice(before):
         assert len(db.query("SELECT id FROM songs")) == 3
 
 
-def test_a_library_with_no_password_is_left_alone(tmp_path, monkeypatch):
-    """A local only install has no door and therefore nothing to make an account from.
+def test_a_library_with_no_password_still_moves(tmp_path, monkeypatch):
+    """A local only install has no door, and its library still has to end up where the
+    code looks for it.
 
-    Inventing a password here would be choosing somebody's credential for them, and
-    creating an account with no password would be worse.
+    This is the case that nearly shipped broken. No account is made without a password,
+    because inventing one would be choosing somebody's credential for them, and the first
+    version of this therefore returned early and moved nothing at all. The files then sat
+    flat in data/ while everything that opens a library looked in data/accounts/1/: no
+    error, no log line, just a library that opens empty with every song still on disk one
+    directory away.
     """
     root = tmp_path / "nodoor"
     root.mkdir()
@@ -151,11 +156,48 @@ def test_a_library_with_no_password_is_left_alone(tmp_path, monkeypatch):
     _old_library(str(root))
 
     who.unbind()
-    assert accounts.adopt_single_library({}) is None
-    assert accounts.count() == 0
-    assert os.path.exists(os.path.join(str(root), "jriter.db")), \
-        "it moved a library it had decided not to adopt"
+    landed = accounts.adopt_single_library({})
     who.bind(accounts.OWNER)
+
+    assert landed and landed["account"] is None, "an account was made with no password"
+    assert accounts.count() == 0
+
+    home = config.home(accounts.OWNER)
+    assert os.path.isfile(os.path.join(home, "jriter.db")), "the library did not move"
+    assert not os.path.exists(os.path.join(str(root), "jriter.db"))
+    assert os.path.isfile(os.path.join(home, "blobs", "ab", "some-audio"))
+
+    # And it opens as that account, which is what the server does a moment later.
+    with who.acting_as(accounts.OWNER):
+        titles = [r["title"] for r in db.query("SELECT title FROM songs ORDER BY id")]
+    assert titles == ["Song 0", "Song 1", "Song 2"], \
+        "the library moved but does not open: %s" % titles
+
+
+def test_setting_a_password_later_finds_the_library_already_there(tmp_path, monkeypatch):
+    """The other half: a local install that is put behind a door afterwards.
+
+    Account 1 is made by the setup flow, and its directory is the one the move already
+    filled, so nothing has to move a second time.
+    """
+    root = tmp_path / "later"
+    root.mkdir()
+    monkeypatch.setattr(config, "DATA", str(root))
+    db.close()
+    accounts.reset_for_tests()
+    _old_library(str(root))
+
+    who.unbind()
+    accounts.adopt_single_library({})
+    who.bind(accounts.OWNER)
+
+    accounts.create("owner", "chosen later", account_id=accounts.OWNER)
+    with who.acting_as(accounts.OWNER):
+        assert len(db.query("SELECT id FROM songs")) == 3, \
+            "setting a password lost the library"
+    # The agent's credential is still good: it was carried with the files rather than
+    # with the account, so it did not need one to exist yet.
+    assert accounts.token_for("digest-0")["account_id"] == accounts.OWNER
 
 
 def test_a_fresh_install_has_nothing_to_move(tmp_path, monkeypatch):

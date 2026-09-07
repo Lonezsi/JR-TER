@@ -47,8 +47,17 @@ def main(argv=None):
         from jriter.modules import auth
         landed = accounts.adopt_single_library(auth._read())
         if landed:
-            print("  accounts  your library is now account %d (%s)"
-                  % (landed["account"], ", ".join(landed["moved"]) or "nothing to move"))
+            where = ", ".join(landed["moved"]) or "nothing to move"
+            if landed["account"]:
+                print("  accounts  your library is now account %d (%s)"
+                      % (landed["account"], where))
+            else:
+                # Moved, but no account made: nothing to make one from. Said out loud
+                # because "your files are in a new place and there is nobody to own them"
+                # is exactly the state somebody would want to know they are in.
+                print("  accounts  your library moved into accounts/1 (%s)" % where)
+                print("            no password was set, so no account was made. Set one "
+                      "and it becomes yours.")
             if landed.get("tokens"):
                 print("            %d machine credential(s) carried across"
                       % landed["tokens"])

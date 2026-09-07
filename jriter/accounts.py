@@ -447,15 +447,20 @@ def adopt_single_library(auth_data):
     """Turn the library that was here before accounts into account 1.
 
     Called once, on the way up, and only when there is no accounts.db yet and the old
-    single library exists. Two things move:
+    single library exists. Three things move:
 
       the files      data/jriter.db, data/blobs, data/settings.json and the rest go to
                      data/accounts/1/, which is where everything now looks for them
       the password   the scrypt salt and hash out of auth.json become account 1's, so the
                      password that worked yesterday works today
+      the tokens     out of the library and into accounts.db, so the agent on a laptop
+                     keeps working
 
     The handle is "owner" and the sign in page treats an empty handle as meaning the owner,
     so somebody who has only ever typed a password carries on typing only a password.
+
+    The files move whether or not there is a password; only the account waits for one. See
+    the note below, which is about the way this was wrong the first time.
 
     Returns what it did, or None when there was nothing to do. Nothing here is caught: a
     half moved library is worse than a server that refuses to start and says why.
@@ -466,10 +471,19 @@ def adopt_single_library(auth_data):
     if count():
         return None                     # accounts already exist; this has happened
 
-    if not (auth_data or {}).get("hash"):
-        # A library with no password cannot become an account with a password, and
-        # inventing one would be choosing somebody's credential for them.
-        return None
+    # Whether there is a password to carry, which decides whether an account row is made.
+    #
+    # The files move either way, and that distinction is the whole of this function's
+    # subtlety. A library with no password is a real configuration: run the script on your
+    # own machine and there is no door and nothing to sign in to. The first version of this
+    # returned early in that case, which left the library flat in data/ while everything
+    # that reads one looked in data/accounts/1/. Nothing failed and nothing was logged; the
+    # library simply opened empty, with every song still on disk a directory away.
+    #
+    # An account is not made without a password, because inventing one would be choosing
+    # somebody's credential for them. Setting one later makes account 1, whose directory is
+    # already sitting there holding the library.
+    has_password = bool((auth_data or {}).get("hash"))
 
     # The directory, and deliberately not ensure_home, which also makes blobs/.
     #
@@ -520,11 +534,16 @@ def adopt_single_library(auth_data):
             pass
 
     # The account itself, carrying the existing salt and hash rather than a new password.
-    _run("INSERT INTO accounts (id, handle, name, salt, hash, created_at, secret) "
-         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-         (OWNER, "owner", "", auth_data["salt"], auth_data["hash"],
-          auth_data.get("set_at") or time.time(), secrets.token_hex(32)))
+    if has_password:
+        _run("INSERT INTO accounts (id, handle, name, salt, hash, created_at, secret) "
+             "VALUES (?, ?, ?, ?, ?, ?, ?)",
+             (OWNER, "owner", "", auth_data["salt"], auth_data["hash"],
+              auth_data.get("set_at") or time.time(), secrets.token_hex(32)))
+    # The tokens either way, addressed to account 1 whether or not it exists yet. A machine
+    # credential belongs to a library rather than to a password, and this library is going
+    # to be account 1's whenever somebody gets round to setting one.
     carried = adopt_old_tokens(old_tokens, OWNER)
     # Now that nothing is being moved on top of, make anything that did not exist to move.
     config.ensure_home(OWNER)
-    return {"account": OWNER, "moved": moved, "tokens": carried}
+    return {"account": OWNER if has_password else None,
+            "moved": moved, "tokens": carried, "password": has_password}

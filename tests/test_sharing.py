@@ -259,6 +259,14 @@ def test_a_revoked_share_stops_opening(pair):
     with who.acting_as(friend["id"]):
         with pytest.raises(Error):
             sharing.open_share(Ask(params={"id": share_id}))
+        # The audio too, which is the one route here that hands over a file and therefore
+        # the one where "still works after it was taken back" would matter most.
+        with pytest.raises(Error):
+            sharing.shared_audio(Ask(params={"id": share_id}))
+        # And saving, so a revoked share cannot go on writing into their copy either.
+        with pytest.raises(Error):
+            sharing.save_preset(Ask(params={"id": share_id},
+                                    body={"name": "after", "data": {"bands": []}}))
         assert sharing.shared_with_me(Ask())["shared"] == []
 
 
