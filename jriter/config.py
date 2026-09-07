@@ -130,9 +130,11 @@ _DEFAULTS = {
     # A hundred is what the dial used to top out at, and it is the default now: the dial
     # goes to two hundred so there is somewhere to go past it.
     "glass_edge": 100,
-    # Fine noise over everything, to break up the steps a 22px blur leaves in a smooth
-    # gradient. Nought is off.
-    "dither": 40,
+    # Per pixel noise over everything, to break up the steps a 22px blur leaves in a
+    # smooth gradient. Nought is off. Sixty rather than something modest, because a
+    # blurred photograph behind glass bands far worse than a synthetic ramp does and the
+    # amount that fixes it is the amount that fixes it.
+    "dither": 60,
     # Empty unless the machine hides it somewhere jriter/video.py does not look. A path
     # rather than a switch, because ffmpeg is not a dependency: it is a program you
     # install, and the only thing JR!TER needs from you is where it went.

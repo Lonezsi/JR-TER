@@ -386,31 +386,37 @@
 
 /* The dither.
  *
- * One fixed layer over the whole app. A 22px blur quantises its output to eight bits, so
- * a smooth gradient comes out as a staircase, and the cure is noise: a speck per pixel
- * pushes each one to whichever side of the boundary it lands on, and the eye integrates
- * the ramp back. Banding shows up in the page wash and inside the glass alike, and there
- * are a dozen glass surfaces but only ever one screen, so it goes on the screen.
+ * One fixed layer over the whole app, carrying a texture generated per device pixel in
+ * 19-dither.js. Read the note at the top of that file for why the noise has to be per
+ * pixel and what the first attempt got wrong.
  *
- * overlay rather than a plain low alpha. Normal blending lerps everything towards the
- * middle grey of the tile, which lifts true black into haze; overlay leaves black alone
- * and swings hardest through the mid tones, which is exactly where a step is visible.
+ * plus-lighter, which adds. That is the property that matters: the amount of dither has
+ * to be the same wherever it lands, and this app is almost black, so a multiplicative
+ * blend gives almost nothing exactly where the banding is worst. Measured on a near black
+ * ramp, overlay at a sane opacity left half the bands standing while two levels of
+ * addition left none. overlay stays as the fallback because there is no other blend mode
+ * that adds, and the module picks between them.
  *
- * The tile is an feTurbulence rendered by the browser, stitchTiles so it repeats with no
- * seam and desaturated so it moves luminance rather than adding colour. No file, and
- * nothing fetched: the whole texture is these few hundred characters.
+ * image-rendering: pixelated is not a style choice here, it is the whole mechanism. A
+ * browser resamples a background image with a bilinear filter by default, and a bilinear
+ * filter is a low pass filter: it averages each texel with its neighbours and destroys
+ * exactly the per pixel variation the dither is made of. The size is set from JavaScript
+ * to the tile's own device pixel size for the same reason.
  */
 .grain {
   position: fixed;
   inset: 0;
   z-index: 200;
   pointer-events: none;
-  opacity: var(--dither, 0.048);
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27140%27%20height%3D%27140%27%3E%3Cfilter%20id%3D%27n%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.75%27%20numOctaves%3D%273%27%20stitchTiles%3D%27stitch%27%20result%3D%27t%27%2F%3E%3CfeColorMatrix%20in%3D%27t%27%20type%3D%27saturate%27%20values%3D%270%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27140%27%20height%3D%27140%27%20filter%3D%27url%28%23n%29%27%2F%3E%3C%2Fsvg%3E");
+  opacity: var(--dither, 0.0282);
+  /* Set from 19-dither.js, which knows whether this browser can add. overlay is the
+     fallback and it is a poor one: see the note in that file. */
+  mix-blend-mode: var(--dither-blend, overlay);
+  background-image: var(--dither-tile, none);
   background-repeat: repeat;
-  /* Half the tile, so the grain is fine rather than a visible cloud pattern. */
-  background-size: 70px 70px;
+  background-size: var(--dither-size, 192px) var(--dither-size, 192px);
+  /* Never resampled. See above. */
+  image-rendering: pixelated;
 }
 /* A dial at nought hides the element outright, so the compositor is not blending a
    fully transparent full screen layer on every frame for nothing. No rule needed: this

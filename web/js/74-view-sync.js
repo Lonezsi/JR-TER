@@ -228,12 +228,14 @@ J.views.settings = {
             <label class="sheet-label">Dither
               <span class="dial">
                 <input class="range" id="dither" type="range" min="0" max="100" step="5"
-                       value="${Number(state.settings.dither === undefined ? 40 : state.settings.dither)}">
-                <b id="ditherSaid">${Number(state.settings.dither === undefined ? 40 : state.settings.dither)}</b>
+                       value="${Number(state.settings.dither === undefined ? 60 : state.settings.dither)}">
+                <b id="ditherSaid">${Number(state.settings.dither === undefined ? 60 : state.settings.dither)}</b>
               </span>
-              <span class="faint dial-note">Fine noise over everything. A blur this wide
-                leaves visible steps in a smooth gradient, and noise is what breaks them
-                up. The useful range is the bottom third; past that it is a look.</span>
+              <span class="faint dial-note">One speck of noise per pixel of your screen,
+                which is what stops a wide blur turning a smooth gradient into a
+                staircase. Turn it up until the bands go. Past about eighty the grain
+                itself starts to show, which is the point at which it is a look rather
+                than a fix.</span>
             </label>
 
             <div><button class="btn primary sm" data-act="save-settings">Save</button></div>

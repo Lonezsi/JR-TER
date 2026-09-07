@@ -22,7 +22,7 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
-        "version": "2.4.0",
+        "version": "2.4.1",
         "date": "2026-09-07",
         "name": JRITER,
         "title": "Renders on one line, a deck that turns, and a way out of the library",
@@ -53,6 +53,13 @@ ENTRIES = [
             "code is still there and is still the better one when the server is on "
             "another machine. You still need your own Google client; that part cannot be "
             "removed.",
+            "The dither is a real dither now. The first one blended with overlay, which "
+            "multiplies, so the amount of noise was proportional to how bright a pixel "
+            "already was: on a near black app that is almost nothing, exactly where the "
+            "banding is worst. Measured against a dark ramp it left half the bands "
+            "standing. It adds now, so two levels is two levels in the darkest corner "
+            "and on the brightest cover, and the noise is generated one speck per pixel "
+            "of your screen and never resampled on the way there.",
             "Chromatic aberration is what the fringing setting is called, it starts at "
             "the hundred the dial used to stop at, and it goes to two hundred. Dither is "
             "new, for the banding a wide blur leaves in a smooth gradient. The specks are "

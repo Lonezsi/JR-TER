@@ -936,3 +936,65 @@ def test_the_rail_gesture_asks_the_element_not_a_list_of_class_names():
     assert "hasAPressOfItsOwn" not in boot, (
         "the rail refuses the gesture on anything pressable again, which on a song page "
         "is nearly everything")
+
+
+def test_the_dither_is_a_dither_and_not_a_grain_overlay():
+    """Four properties, and the first version of this layer got three of them wrong.
+
+    It was an feTurbulence tile drawn at half its size and blended with overlay, and it
+    did nothing to the banding. Measured against a near black ramp it left seven of
+    fourteen band edges standing, while two levels of additive noise left none.
+
+    ADDITIVE. overlay multiplies: on a base darker than half it comes out as the base
+    times one plus or minus the texel, so the amount of dither is proportional to how
+    bright the pixel already is. This app is almost black, so that is almost nothing
+    exactly where the banding is worst, and it is why the banding came and went with the
+    artwork rather than looking like a constant fault.
+
+    PER PIXEL. Neighbouring pixels have to get independent values or there is nothing to
+    break a level boundary with. That means the texture is generated one texel per device
+    pixel and drawn at its own size.
+
+    NEVER RESAMPLED. A browser scales a background image with a bilinear filter, which is
+    a low pass filter, which averages each texel with its neighbours and destroys the
+    per pixel variation. image-rendering: pixelated is the whole mechanism, not a style.
+
+    TRIANGULAR. The same distribution used to dither audio, and for the same reason: it
+    makes the rounding error independent of the value, where uniform noise leaves a faint
+    correlated pattern along a slow ramp.
+    """
+    with open(os.path.join(JS_DIR, "19-dither.js"), encoding="utf-8") as f:
+        dither = f.read()
+    css = "\n".join(open(os.path.join(CSS_DIR, n), encoding="utf-8").read()
+                    for n in sorted(os.listdir(CSS_DIR)) if n.endswith(".css"))
+    grain = re.search(r"\.grain\s*\{[^}]*\}", css)
+    assert grain, "the dither layer has no rule"
+    grain = grain.group(0)
+
+    # Additive, with the multiplicative one only as a fallback the module chooses.
+    assert "plus-lighter" in dither, (
+        "the dither no longer blends additively, so it will do nothing in the darks, "
+        "which is where the banding is")
+    assert "mix-blend-mode: var(--dither-blend" in grain, (
+        "the blend mode is fixed in CSS again, so the module cannot pick the additive "
+        "one where it is available")
+
+    # Never smoothed on the way to the screen.
+    assert "image-rendering: pixelated" in grain, (
+        "the tile will be bilinearly resampled, which averages away the per pixel "
+        "variation that does the dithering")
+
+    # One texel per device pixel: the size comes from the module, divided by the ratio.
+    assert "devicePixelRatio" in dither and "TILE / dpr" in dither, (
+        "the tile is no longer sized to device pixels, so one texel no longer lands on "
+        "one physical pixel")
+    assert "--dither-size" in grain and "--dither-size" in dither
+
+    # Triangular, not uniform. Two uniforms summed is the whole of it.
+    assert "Math.random() + Math.random()" in dither, (
+        "the noise is no longer triangular, so the rounding error is correlated with the "
+        "value again")
+
+    # And the thing that did not work is gone.
+    assert "feTurbulence" not in grain, (
+        "the grain layer is back to an SVG turbulence tile, which is not a dither")

@@ -92,22 +92,14 @@ J.applyLook = function (settings) {
     spread ? "url(#glass-ca) blur(22px) saturate(180%) brightness(1.06)"
            : "var(--glass-filter)");
 
-  /* The dither, which is one number on one element.
+  /* The dither. One number, handed to the module that owns the texture.
    *
-   * A 22px blur over a smooth gradient quantises to eight bits and leaves visible steps,
-   * and the fix for that is and always has been noise: a speck of it per pixel moves each
-   * one across the boundary between two levels at random, so the eye integrates a smooth
-   * ramp instead of finding an edge. It is a single fixed layer over the whole app rather
-   * than one per glass surface, because the banding is in the wash and the panels alike
-   * and there are a dozen surfaces but only ever one screen.
-   *
-   * Twelve per cent at the top of the dial. Dithering wants one or two levels of noise,
-   * which is about three per cent, so the useful range is the bottom third and the rest
-   * is there for anyone who wants the grain as a look. */
-  const grain = J.clamp(Number(said.dither === undefined ? 40 : said.dither), 0, 100);
-  document.documentElement.style.setProperty("--dither", String((grain / 100) * 0.12));
-  const grainLayer = J.$("#grain");
-  if (grainLayer) grainLayer.hidden = grain === 0;
+   * Not a --dither variable set from here any more. The strength and the texture cannot
+   * be decided in two places: the tile has to be generated at the screen's own pixel
+   * density and drawn at exactly its own size, or the browser resamples it and the per
+   * pixel variation that does the actual dithering is filtered away. 19-dither.js sets
+   * both together. */
+  J.dither.apply(said.dither === undefined ? 60 : said.dither);
 
   J.dust.strength(said.dust === undefined ? 55 : said.dust);
 };
