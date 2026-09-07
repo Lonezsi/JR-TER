@@ -39,6 +39,22 @@ CONFIG_PATH = (os.environ.get("JRITER_CLIENT_CONFIG")
 #: Where it lived before the rename.
 OLD_CONFIG_PATH = os.path.join(_APP, "jong", "client.json")
 
+# flrender sits next to this file and is standard library only, so importing it costs
+# nothing on a machine that has never seen FL Studio.
+#
+# Here rather than inside a function, which is where it used to be. It was imported inside
+# cmd_render, which binds it as a local of cmd_render, and send_render then used the bare
+# name from its own scope and raised NameError on every single file. Between that and the
+# tuple it was being handed, the unattended watcher had two separate reasons to send
+# nothing, and the broad except in the watch loop hid both.
+#
+# sys.path rather than a plain import: the directory of a script is on sys.path when it is
+# run as a script and not when something imports it, and this file is now imported by the
+# desktop app.
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import flrender                                                    # noqa: E402
+
 AUDIO_EXT = (".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus")
 CHUNK = 1024 * 1024
 DEFAULTS = {"server": "http://127.0.0.1:7900", "folders": [], "interval_minutes": 5,
@@ -266,7 +282,13 @@ def cmd_watch(cfg, server, args):
                 # the logon session, with nothing to tell you it had happened. Which
                 # song a render belongs to is a question worth asking while looking at
                 # the library. The interactive push command is unchanged.
-                for path in fresh:
+                # survey hands back (path, digest) pairs, and this loop used to bind
+                # the whole pair to `path`. send_render then called os.path.basename on a
+                # tuple, raised TypeError, and the broad except below caught it, printed
+                # one line into a log nobody reads and slept for five minutes. Which is
+                # to say: the unattended watcher, the one feature whose entire job is to
+                # work while nobody is looking, had never sent a single render.
+                for path, _ in fresh:
                     send_render(cfg, server, path)
         except SystemExit as e:
             # A watcher that dies because the server was restarted is not a watcher.
@@ -322,6 +344,55 @@ def cmd_push_file(cfg, server, args):
     return 0 if send_one(cfg, server, path, args.yes) else 1
 
 
+def cmd_push_folder(cfg, server, args):
+    """Every sound file in one folder, sent now.
+
+    Different from "watch this folder", which is the standing arrangement: it adds the
+    folder to a list and a task picks things up from then on. This is the one off. You
+    have a folder of bounces and you want them in the library before you leave, and you
+    do not want that folder watched for the rest of time.
+
+    Different from push as well, which surveys every watched folder. This one is told
+    where to look and looks nowhere else.
+    """
+    folder = os.path.abspath(os.path.expanduser(args.path))
+    if not os.path.isdir(folder):
+        print("There is no folder at %s" % folder)
+        return 1
+    print("JR!TER at %s" % cfg["server"])
+    print("Looking in %s" % folder)
+
+    paths = sorted(walk([folder]))
+    if not paths:
+        print("  no sound files in there.")
+        return 0
+
+    # Asked once for the whole folder rather than once per file. Twenty bounces is twenty
+    # questions, and the answer is the same twenty times.
+    print("  %d sound file(s)." % len(paths))
+    if not (args.yes or ask("Send all of them?")):
+        return 0
+
+    sent = held = failed = 0
+    for path in paths:
+        try:
+            # yes=True from here on: the folder was the question and it has been answered.
+            # Anything it cannot match becomes a new song named after the file, which is
+            # what "upload this folder" means.
+            before = send_one(cfg, server, path, yes=True)
+            if before:
+                sent += 1
+        except Exception as e:
+            # One unreadable file must not end the run. The whole point of this command is
+            # that it is left alone to finish.
+            print("  could not send %s: %s" % (os.path.basename(path), e))
+            failed += 1
+
+    print("")
+    print("%d sent, %d could not be sent." % (sent, failed))
+    return 1 if failed and not sent else 0
+
+
 def cmd_render(cfg, server, args):
     """Render an FL project, or every project in a folder, then send the audio in.
 
@@ -329,8 +400,6 @@ def cmd_render(cfg, server, args):
     versions the export dialog waits to be started by hand. That is said out loud here
     rather than discovered after a silent failure.
     """
-    import flrender
-
     path = os.path.abspath(args.path)
     fl = flrender.find_fl(cfg.get("fl_path"))
     if not fl:
@@ -535,7 +604,7 @@ def cmd_install(cfg, server, args):
     """Make JR!TER part of the machine.
 
     Three things, none of which needs an administrator:
-      the folder watcher runs at logon
+      the desktop app starts at logon, minimised, and watches your folders
       the right click menu appears on audio, on .flp files and on folders
       a daily task pulls a newer JR!TER from GitHub
 
@@ -564,23 +633,36 @@ def cmd_install(cfg, server, args):
         if added:
             save_config(cfg)
 
+    # Not a reason to stop any more.
+    #
+    # It used to refuse outright, which made a fresh machine a chicken and egg: you could
+    # not install without a folder, and the pleasant way to choose a folder is the app that
+    # installing puts there. The tasks and the menu go in either way and the app asks.
     if not cfg["folders"]:
-        print("No folders to watch. Add one with: --folder <path>")
-        return 1
+        print("No folders watched yet. Add one in the app, or with: --folder <path>")
 
     server = Server(cfg["server"], cfg.get("token"))
 
     script = os.path.abspath(__file__)
     quoted = '"%s" "%s"' % (sys.executable, script)
 
+    # The window, not the headless loop.
+    #
+    # pythonw where there is one, so logon does not flash a console up and leave it in the
+    # taskbar next to the window it started. The app is the thing that should be there.
+    app = os.path.join(HERE, "jriter_app.py")
+    windowless = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    runner = windowless if os.path.isfile(windowless) else sys.executable
+    watcher = '"%s" "%s" --minimised' % (runner, app)
+
     if os.name != "nt":
         print("On this system, add the following to your startup:")
-        print("  %s watch" % quoted)
+        print("  %s" % watcher)
         return 0
 
-    def task(name, arguments, schedule):
+    def task(name, command, schedule):
         done = subprocess.run(
-            ["schtasks", "/Create", "/TN", name, "/TR", "%s %s" % (quoted, arguments),
+            ["schtasks", "/Create", "/TN", name, "/TR", command,
              "/RL", "LIMITED", "/F"] + schedule,
             capture_output=True, text=True)
         if done.returncode != 0:
@@ -598,12 +680,26 @@ def cmd_install(cfg, server, args):
         subprocess.run(["schtasks", "/Delete", "/TN", old, "/F"],
                        capture_output=True, text=True)
 
+    print("Starts at logon:")
+    # The Run key, not a scheduled task.
+    #
+    # schtasks /SC ONLOGON wants elevation: measured on this machine, an ONLOGON task is
+    # refused with "Access is denied" from an ordinary shell while the DAILY one beside it
+    # goes in without a murmur. Asking somebody to run an installer as administrator so a
+    # music app can open its own window at logon is the wrong trade.
+    #
+    # The Run key is also simply the right place for this. It is where a windowed app that
+    # belongs to one person goes, it needs no administrator, Task Manager lists it under
+    # Startup where anybody would look for it, and turning it off there is a click.
+    if not _run_at_logon(watcher):
+        print("  could not write the Run key; start it by hand from the app shortcut")
+
     print("Scheduled tasks:")
-    # JRITER, not JR!TER: a task name is an identifier, and cmd treats ! as its own.
-    task("JRITER watch", "watch", ["/SC", "ONLOGON"])
     # Daily rather than at every start: an update that needs a restart should land at a
-    # predictable moment, not in the middle of a session.
-    task("JRITER update", "update", ["/SC", "DAILY", "/ST", "05:00"])
+    # predictable moment, not in the middle of a session. A task rather than the Run key
+    # because this one wants to happen whether or not anybody logs on today.
+    # JRITER, not JR!TER: a task name is an identifier, and cmd treats ! as its own.
+    task("JRITER update", "%s update" % quoted, ["/SC", "DAILY", "/ST", "05:00"])
 
     print("Right click menu:")
     try:
@@ -618,9 +714,69 @@ def cmd_install(cfg, server, args):
 
     print("")
     print("Remove all of it with:")
-    print('  schtasks /Delete /TN "JRITER watch" /F')
-    print('  schtasks /Delete /TN "JRITER update" /F')
-    print("  %s shell remove" % quoted)
+    print("  %s uninstall" % quoted)
+    return 0
+
+
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_NAME = "JRITER"
+
+
+def _run_at_logon(command):
+    """Ask Windows to start something when this person logs on. Per user, no administrator."""
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            winreg.SetValueEx(key, RUN_NAME, 0, winreg.REG_SZ, command)
+        print("  %s" % command)
+        return True
+    except OSError as e:
+        print("  %s" % e)
+        return False
+
+
+def _stop_running_at_logon():
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0,
+                            winreg.KEY_SET_VALUE) as key:
+            winreg.DeleteValue(key, RUN_NAME)
+        return True
+    except OSError:
+        return False                # not there is the ordinary case
+
+
+def cmd_uninstall(cfg, server, args):
+    """Take back everything install put on this machine.
+
+    One command, because the alternative was three lines printed at the end of install that
+    somebody has to keep. Nothing here touches the library or anything in your folders: this
+    is only the wiring.
+    """
+    print("Startup:")
+    print("  removed" if _stop_running_at_logon() else "  was not set")
+
+    print("Scheduled tasks:")
+    for name in ("JRITER watch", "JRITER update", "J-ong watch", "J-ong update"):
+        done = subprocess.run(["schtasks", "/Delete", "/TN", name, "/F"],
+                              capture_output=True, text=True)
+        if done.returncode == 0:
+            print("  %s removed" % name)
+
+    print("Right click menu:")
+    try:
+        import jriter_shell
+        jriter_shell.remove()
+        print("  removed")
+    except Exception as e:
+        print("  could not remove it: %s" % e)
+
+    print("")
+    print("Your library and your folders are untouched.")
     return 0
 
 
@@ -628,6 +784,7 @@ COMMANDS = {
     "scan": cmd_scan, "push": cmd_push, "watch": cmd_watch, "add": cmd_add,
     "folders": cmd_folders, "server": cmd_server, "update": cmd_update,
     "install": cmd_install, "push-file": cmd_push_file, "render": cmd_render,
+    "push-folder": cmd_push_folder, "uninstall": cmd_uninstall,
     "shell": cmd_shell, "flpath": cmd_flpath, "login": cmd_login,
 }
 
@@ -648,12 +805,17 @@ def main(argv=None):
     where = sub.add_parser("server", help="set the JR!TER address")
     where.add_argument("url")
     sub.add_parser("update", help="pull a newer JR!TER from GitHub")
+    sub.add_parser("uninstall", help="take the startup entry and right click menu back off")
     install = sub.add_parser("install", help="run watch at logon, and add the right click menu")
     install.add_argument("--server", help="set the JR!TER server address")
     install.add_argument("--folder", action="append", help="watch a folder (repeatable)")
     one = sub.add_parser("push-file", help="send one file, used by the right click menu")
     one.add_argument("path")
     one.add_argument("-y", "--yes", action="store_true")
+    many = sub.add_parser("push-folder",
+                          help="send every sound file in one folder, now")
+    many.add_argument("path")
+    many.add_argument("-y", "--yes", action="store_true")
     render = sub.add_parser("render", help="render an FL project, or a folder of them")
     render.add_argument("path")
     render.add_argument("-y", "--yes", action="store_true")

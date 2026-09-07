@@ -9,13 +9,59 @@ album membership, and its own playback settings. The website is where you browse
 compare mixes and organise. The desktop agent watches the folder your exports land in and
 puts new renders where they belong.
 
-Standard library Python and plain browser JavaScript. Nothing to install, no build step.
+Standard library Python and plain browser JavaScript. No dependencies, no build step.
+
+## Install it
+
+On Windows, one line in PowerShell. It finds or installs Python, fetches the code, puts
+JR!TER on your desktop and in the Start menu, sets it to start when you log on, and adds the
+right click menu to your folders.
+
+```powershell
+irm https://raw.githubusercontent.com/Lonezsi/JR-TER/main/install.ps1 | iex
+```
+
+Nothing there needs an administrator, and running the same line again updates in place
+without touching your `data` directory. To take the wiring back off:
+
+```powershell
+python client\jriter_client.py uninstall
+```
+
+You end up with two shortcuts, because a machine can be two different things:
+
+| | what it is |
+|---|---|
+| **JR!TER** | the desktop app. Watches your render folders, sends what lands in them, and is the icon on your taskbar. Starts at logon. |
+| **JR!TER Server** | the library itself. One machine somewhere runs this; the app's **Open library** goes to wherever that is. |
+
+If you would rather do it yourself, or you are not on Windows, there is nothing to install:
 
 ```
 python server.py --open
 ```
 
 Then open http://127.0.0.1:7900.
+
+### Right click menu
+
+On a **folder**:
+
+* **Upload every sound file in here** sends what is in there now, once
+* **Render every FL project in here** renders each `.flp` and sends the results
+* **Watch this folder with JR!TER** is the standing arrangement, for the folder your
+  bounces always land in
+
+On an **audio file**: *Upload to JR!TER*. On an **`.flp`**: *Render and send to JR!TER*.
+
+### Always on, reachable from your phone
+
+For the machine that holds the library, so it serves with nobody logged in and gets a public
+HTTPS address through Tailscale Funnel:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File hostsetup\Install-JriterHost.ps1
+```
 
 ---
 

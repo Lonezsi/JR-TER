@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """The right click menu.
 
-Four entries, all written under HKEY_CURRENT_USER:
+Five entries, all written under HKEY_CURRENT_USER:
 
     an audio file   Upload to JR!TER
     an .flp         Render and send to JR!TER
+    a folder        Upload every sound file in here
     a folder        Render every FL project in here
     a folder        Watch this folder
+
+The two folder verbs are not the same thing and the labels have to say so. "Upload every
+sound file in here" is a one off: it sends what is in there now and forgets the folder.
+"Watch this folder" is the standing arrangement, where a task picks up whatever lands in
+it from then on. Having only the second one meant the only way to send a folder you had
+already filled was to watch it for ever.
 
 HKCU rather than HKLM on purpose. Per user keys need no administrator, they are visible
 in one place, and removing them takes the integration away completely. Nothing here
@@ -27,6 +34,8 @@ ENTRIES = [
      "Upload to JR!TER", "push-file", "%1"),
     ("JriterRenderFlp", [r"SystemFileAssociations\.flp\shell"],
      "Render and send to JR!TER", "render", "%1"),
+    ("JriterPushFolder", [r"Directory\shell", r"Directory\Background\shell"],
+     "Upload every sound file in here", "push-folder", "%V"),
     ("JriterRenderFolder", [r"Directory\shell", r"Directory\Background\shell"],
      "Render every FL project in here", "render", "%V"),
     ("JriterWatchFolder", [r"Directory\shell"],
@@ -43,6 +52,7 @@ LEGACY = [
     ("JongUpload", [r"SystemFileAssociations\%s\shell" % ext for ext in AUDIO_EXT]),
     ("JongRenderFlp", [r"SystemFileAssociations\.flp\shell"]),
     ("JongRenderFolder", [r"Directory\shell", r"Directory\Background\shell"]),
+    ("JongPushFolder", [r"Directory\shell", r"Directory\Background\shell"]),
     ("JongWatchFolder", [r"Directory\shell"]),
 ]
 
@@ -69,6 +79,19 @@ def _winreg():
         return winreg
     except ImportError:
         return None
+
+
+def _icon():
+    """The mark, for the menu entries to wear.
+
+    It was sys.executable, which puts the Python logo next to every entry: correct about
+    what runs and wrong about what it is. Windows wants a file that actually holds an icon
+    resource, so this is web/favicon.ico out of the checkout, and it falls back to the old
+    answer rather than writing a path to a file that is not there.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    ico = os.path.join(os.path.dirname(here), "web", "favicon.ico")
+    return ico if os.path.isfile(ico) else sys.executable
 
 
 def _runner():
@@ -101,9 +124,7 @@ def install(keep_open=True):
             base = "%s\\%s\\%s" % (KEY_ROOT, parent, name)
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base) as key:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, label)
-                # A folder entry is only worth showing on folders, and Windows uses this
-                # to keep it out of the way elsewhere.
-                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, sys.executable)
+                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, _icon())
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base + r"\command") as key:
                 # The console stays open on purpose: this is the only place the answers
                 # to "is this a new render of X?" can be given.

@@ -15,7 +15,7 @@
      pixels in a dense track list. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/jriter.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2354B37A'/><g stroke='%230F1311' fill='none' stroke-linecap='round' stroke-linejoin='round'><path d='M15 7 L10.5 13 L15 17.5 L10.5 22' stroke-width='2.6'/><path d='M10.5 22c2.9.5 4.4 2.1 4.4 4 0 1.4-.9 2.3-2.2 2.3' stroke-width='2.2'/><path d='M22 7 V19' stroke-width='2.8'/></g><circle cx='22' cy='24.5' r='1.7' fill='%230F1311'/></svg>">
+<link rel="icon" href="/favicon.ico" sizes="any">
 </head>
 <body>
 
@@ -109,7 +109,7 @@
 
   <aside class="rail" id="rail">
     <div class="rail-top">
-      <a class="wordmark" href="#/" data-link aria-label="Home">
+      <a class="wordmark" href="#/home" data-link aria-label="Home">
         <!-- The quarter rest, drawn rather than typed: nothing in the display
              stack carries U+1D13D, least of all a face somebody uploaded
              themselves, so a text glyph is a notdef box on a machine you cannot
@@ -131,9 +131,30 @@
     <div class="rail-section" id="railAlbums"></div>
     <div class="rail-section" id="railPlaylists"></div>
 
+    <!-- Just above the rule that closes the rail, in the smallest type on the screen.
+         The gesture that reaches this page is a phone gesture, so on a machine with a
+         pointer there was no way to it at all. -->
+    <a class="rail-about" href="#/about" data-link>About</a>
+
     <div class="rail-foot">
+      <!-- The connected Google account, if there is one. Written by boot.js from what
+           the YouTube module already knows, and absent rather than empty when nothing
+           is connected: a grey circle with no picture in it is a thing to wonder about. -->
+      <a class="rail-account" id="railAccount" href="#/settings" data-link hidden>
+        <span class="rail-avatar" id="railAvatar" aria-hidden="true"></span>
+        <span class="rail-account-name truncate" id="railAccountName"></span>
+      </a>
+
       <button class="btn sm" id="newSong">New song</button>
+    </div>
+
+    <!-- The small print, on its own line under the account. Two hundred and eighteen
+         pixels of rail cannot hold an avatar, a name, a button, a ?, a version and the
+         terms in one row: the button alone is eighty seven of them. So the row you use
+         is one line and the row you read is the next. -->
+    <div class="rail-meta">
       <button class="rail-keys" id="railKeys" title="Keyboard shortcuts">?</button>
+      <span class="grow"></span>
       <span class="rail-end">
         <span class="rail-version" id="railVersion"></span>
         <!-- A sheet of paper with a folded corner, beside the version because that is
