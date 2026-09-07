@@ -998,3 +998,74 @@ def test_the_dither_is_a_dither_and_not_a_grain_overlay():
     # And the thing that did not work is gone.
     assert "feTurbulence" not in grain, (
         "the grain layer is back to an SVG turbulence tile, which is not a dither")
+
+
+def test_a_media_query_is_not_undone_by_a_rule_written_after_it():
+    """The cascade bug that broke the renders list on a phone.
+
+    A media query carries no specificity of its own. `@media (max-width: 640px) { .r-wave
+    { display: none } }` and a plain `.r-wave { display: block }` are the same weight, so
+    whichever comes last in the file wins, and the plain rule was two hundred lines
+    further down. The column that was meant to disappear on a phone never did: the row
+    overflowed its panel by ninety six pixels and the buttons hung off the right edge
+    where nothing could reach them.
+
+    Nothing in a browser reports this. The rule is there, it is valid, the media query
+    matches, and it loses anyway.
+
+    Only rules OUTSIDE every media block count as overriding, which is the correction the
+    first version of this test needed: it searched all the text after a block and so
+    reported a wide screen rule being followed by a narrow screen rule for the same
+    selector, which is two conditions that are never both true and is how this file is
+    supposed to be written.
+    """
+    trouble = {}
+    for name in sorted(os.listdir(CSS_DIR)):
+        if not name.endswith(".css"):
+            continue
+        with open(os.path.join(CSS_DIR, name), encoding="utf-8") as f:
+            text = f.read()
+        # Comments out, so a selector quoted in prose is not read as a rule.
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+
+        # The media blocks, found by counting braces rather than by matching a closing
+        # one: a nested rule ends with the same character the block does, and a regex
+        # cannot tell those apart.
+        blocks = []
+        for opener in re.finditer(r"@media[^{]*\{", text):
+            depth, at = 1, opener.end()
+            while at < len(text) and depth:
+                if text[at] == "{":
+                    depth += 1
+                elif text[at] == "}":
+                    depth -= 1
+                at += 1
+            blocks.append((opener.start(), at, text[opener.end():at - 1]))
+
+        def inside_a_block(where):
+            return any(lo <= where < hi for lo, hi, _ in blocks)
+
+        # Every rule outside every media block that sets display, and where it sits.
+        plain = []
+        for rule in re.finditer(r"([^{}@]+)\{([^{}]*)\}", text):
+            if inside_a_block(rule.start()):
+                continue
+            if "display" in rule.group(2):
+                plain.append((rule.start(), rule.group(1).strip()))
+
+        for _, ends, inner in blocks:
+            for rule in re.finditer(r"([^{}]+)\{([^{}]*)\}", inner):
+                if "display" not in rule.group(2):
+                    continue
+                selector = rule.group(1).strip()
+                for at, other in plain:
+                    # >= and not >: a rule sitting immediately after the block starts
+                    # at the block's own end index, because the selector match swallows
+                    # the newline between them. With > this test could not see the very
+                    # bug it was written for.
+                    if other == selector and at >= ends:
+                        trouble.setdefault(name, []).append(selector)
+    assert not trouble, (
+        "these media queries set display on a selector that a later rule outside every "
+        "media block sets display on again, so the media query silently loses on source "
+        "order: %s" % trouble)

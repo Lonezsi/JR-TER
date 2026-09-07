@@ -279,7 +279,21 @@ J.views.renders = {
     function card(render) {
       const used = !render.waiting;
       const sounding = J.player.state.playing && isSounding(render);
+      /* The wave is a sibling of the row and painted before it, which is the whole
+       * trick: the row carries a backdrop filter, and a backdrop is whatever was painted
+       * underneath. So the shape is not drawn on the glass, it is drawn behind it and the
+       * glass then blurs and bends it, which is what puts it inside the material rather
+       * than on its surface. It could not be a child of the row: children paint above
+       * their parent, so anything inside it is on top of the glass by definition.
+       *
+       * And it has the render's own hue, from the same hash the letter tiles used, so a
+       * list of bounces is a list of different colours rather than five grey smears. Grey
+       * was the complaint and grey was mine: I made it grey to stop it reading as a green
+       * stain, which fixed the stain by removing the only thing that told the rows apart.
+       */
       return `
+        <div class="render-slot" style="--wave-hue:${J.hue(render.name)}">
+        ${J.waveform(render.shape, { className: "render-wave" })}
         <div class="render-row ${used ? "used" : ""} ${render.trouble ? "in-trouble" : ""}" data-id="${render.id}"
              ${used ? "" : 'data-act="attach" role="button" tabindex="0"'}
              ${used ? "" : `aria-label="Add ${J.esc(render.name)} to a song"`}>
@@ -289,8 +303,6 @@ J.views.renders = {
           <span class="r-name truncate" data-act="rename" title="Rename this render"
             >${J.esc(render.name)}</span>
           ${J.trouble(render)}
-
-          <span class="r-wave">${J.waveform(render.shape, { className: "render-wave" })}</span>
 
           <span class="r-time">${render.duration ? J.time(render.duration) : ""}</span>
           <span class="r-size">${J.bytes(render.size)}</span>
@@ -315,6 +327,7 @@ J.views.renders = {
               <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
             </button>
           </span>
+        </div>
         </div>`;
     }
 

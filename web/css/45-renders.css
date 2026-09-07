@@ -9,16 +9,25 @@
   flex-wrap: nowrap;
   padding: var(--s3);
   border-radius: var(--r-md);
-  /* Brighter than the panel it sits on, which is the point.
+  /* A pane with some body to it, not a veil.
    *
-   * The panel is glass now too, and two sheets at the same tint stack into one flat
-   * surface with a line drawn on it. A row has to be the lighter of the two to read as a
-   * thing lying on the pane rather than a rectangle cut out of it. */
-  background: var(--glass);
+   * This was --glass, a five per cent white wash, which is right for the rail floating
+   * over a dark library and wrong here: there is a coloured shape behind this one, and a
+   * five per cent veil hid none of it. The wave came through at nearly full strength, the
+   * rows read as neon bars and the duration and the tools disappeared into them.
+   *
+   * A dark tint at sixty per cent knocks the colour back to a suggestion while leaving it
+   * plainly there, and it is still lighter than the panel underneath, which is what keeps
+   * a row reading as something lying on the pane. Everything on top of it is legible
+   * again because there is a pane between them. */
+  background: rgba(17, 17, 20, 0.62);
   -webkit-backdrop-filter: var(--glass-filter-thin);
   backdrop-filter: var(--glass-filter-thin);
   border: 1px solid var(--glass-line);
-  margin-bottom: 6px;
+  /* The slot carries the spacing now, because the wave has to fill the row exactly and
+     a margin on the row would put the wave's box and the row's box in different places. */
+  position: relative;
+  z-index: 1;
   /* So the waveform's blend has this row's own glass as its backdrop and not the page
      behind it. Without this the carve blends straight through to the wallpaper. */
   isolation: isolate;
@@ -28,8 +37,10 @@
    of shouting, and the thing you are choosing between is the render, not the pill. */
 .render-row[role="button"] { cursor: pointer; }
 .render-row:hover {
-  border-color: var(--glass-line);
-  background: var(--glass-2);
+  border-color: var(--line-2);
+  /* Thinner under the pointer, so the colour behind comes up as you go along the list.
+     That is the row acknowledging you without anything moving. */
+  background: rgba(17, 17, 20, 0.5);
 }
 .render-row:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
 
@@ -59,7 +70,9 @@
   padding-left: var(--s3);
 }
 /* Round, never squeezed into ovals. Only the play button said flex: none. */
-.row-tools .icon-btn { flex: none; color: var(--text-3); }
+/* --text-2 rather than --text-3: there is a coloured shape behind these now, and the
+   dimmer grey vanished into it on the brighter hues. */
+.row-tools .icon-btn { flex: none; color: var(--text-2); }
 /* Enough contrast to aim at. Every row was heavy at the left, bright in the middle and
    empty at the right, because these two were drawn in a grey a shade off the row they sat
    on and 16px of thin stroke in that grey is very close to nothing. */
@@ -91,7 +104,7 @@
 .r-time, .r-size, .r-when {
   flex: none;
   font-size: 12px;
-  color: var(--text-3);
+  color: var(--text-2);
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -233,27 +246,6 @@
   text-align: center;
 }
 
-/* On a narrow screen a column goes rather than shrinking, and they go in the order of
-   what can be found out another way: the size is on the sheet the row opens, and the
-   waveform is a glance rather than a fact. The duration and the date stay longest,
-   because those are the two the list exists to compare.
-
-   Measured rather than guessed. The fixed part of the row is the play button, the four
-   columns, the tools and the gaps between them, which comes to about 580 pixels, so a
-   thousand pixel window still leaves the name a comfortable share and there is no reason
-   to drop a column anywhere near it. The first version shed the size at 900, which took
-   it away on an ordinary laptop window. */
-@media (max-width: 780px) {
-  .render-row { gap: var(--s2); }
-  .r-size { display: none; }
-}
-@media (max-width: 640px) {
-  .r-wave { display: none; }
-}
-@media (max-width: 520px) {
-  .r-when { display: none; }
-}
-
 /* The letter tile went. It was generated from the name of the render and it sat eight
    pixels to the left of that same name: a second box at the left edge carrying a copy of
    the information already beside it. */
@@ -298,40 +290,61 @@
  * Still behind the text. z-index 0 puts it above the row's own background and under
  * every sibling, which is in front of the glass and behind the words: the thing to see
  * at a glance is the shape, and the thing to read is the name. */
-/* Its own column, not the background of the row.
+/* Behind the glass, filling the row.
  *
- * It was absolutely positioned across the whole row, under the text, and at that size it
- * stopped being a waveform and became a grey wash behind the name. Worse on a quiet
- * render: the shape collapses to a thin bar across the middle, which read as a line
- * struck through the title. Here it is a band in a slot with nothing to be read on top of
- * it, so it can be as strong as it likes.
+ * Three versions of this. It began painted across the whole row under the text in the
+ * accent, which read as a green stain. I made it grey to stop that, which fixed the
+ * stain by removing the one thing that told two rows apart, and then moved it into a
+ * column of its own to keep it off the text. The column kept it legible and lost what was
+ * good about it: a shape filling the row is a much better glance than a 104 pixel chip.
  *
- * Still carved. Grey so it is a shape in the surface rather than a colour on it, overlay
- * so it modulates the glass instead of sitting on it, and a pixel of near white
- * underneath, which is the lit lower lip of a groove. */
-.r-wave {
-  flex: none;
-  width: 104px; height: 26px;
-  display: block;
+ * So it is back across the row, and this time it is UNDER the glass rather than over it.
+ * The row is a sibling painted after this, and it carries a backdrop filter, so what it
+ * blurs and bends is this shape. That is the difference between a picture on a pane and
+ * something suspended in it, and it is also what makes the text legible again: the same
+ * blur that gives the wave depth is the thing that stops it competing with the name.
+ *
+ * The colour is the render's own, hashed from its name by the same function that tints
+ * the letter tiles, so a list of bounces is a list of colours. Muted, because it is going
+ * to be read through a pane and a saturated fill comes out as a light.
+ */
+.render-slot {
+  position: relative;
+  margin-bottom: 6px;
+  border-radius: var(--r-md);
 }
 .render-wave {
+  position: absolute;
+  inset: 0;
   width: 100%; height: 100%;
-  color: #8E949B;
-  opacity: 0.5;
-  mix-blend-mode: overlay;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.16));
+  z-index: 0;
+  color: hsl(var(--wave-hue, 150) 38% 38%);
+  opacity: 0.62;
   pointer-events: none;
+  /* Faded at both ends, so the shape stops rather than being cut off by the corner of
+     the row. A hard edge under glass still reads as a hard edge. */
+  /* black and transparent as keywords, because in a mask these are not colours: the
+     alpha is the only channel read, and black means opaque here. Written as hex they
+     read as two hardcoded shades to anything scanning this file for colour, including
+     the test that scans this file for colour. */
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+  mask-image:
+    linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
   transition: opacity var(--fast);
 }
-.render-row:hover .render-wave { opacity: 0.72; }
-.render-row.used .render-wave { opacity: 0.28; }
+.render-slot:hover .render-wave { opacity: 0.85; }
+/* One that has found its song has stopped being a decision, so its colour steps back. */
+.render-slot:has(.render-row.used) .render-wave { opacity: 0.26; }
 
 /* Something is wrong with this file, said before anything is played. */
 .render-row.in-trouble { border-color: var(--bad); }
 /* Trouble is the one case the groove takes a colour, and it stops blending: a fault is a
    thing on the surface demanding to be read, not part of it. */
-.render-row.in-trouble .render-wave {
-  color: var(--bad); opacity: 0.75; mix-blend-mode: normal; filter: none;
+/* Trouble takes the colour off the hash and makes it the one colour that means
+   something. It is on the slot because the wave is the slot's child now. */
+.render-slot:has(.render-row.in-trouble) .render-wave {
+  color: var(--bad); opacity: 0.7;
 }
 
 .trouble {
@@ -355,3 +368,27 @@
   opacity: 0.4;
 }
 .pick-row:hover .pick-wave { opacity: 0.65; }
+
+
+/* ── narrow screens ──────────────────────────────────────────────────────────
+ *
+ * At the end of the file on purpose. These were up beside the rules they override, and a
+ * media query carries no extra specificity: `.r-wave { display: block }` two hundred
+ * lines further down beat `@media ... { .r-wave { display: none } }` on source order
+ * alone, so the column that was supposed to disappear on a phone never did, and the row
+ * overflowed its panel by ninety six pixels with the buttons hanging off the right edge.
+ *
+ * A column goes rather than shrinking, in the order of what can be found out another way.
+ * The size is on the sheet the row opens. The duration and the date stay longest, because
+ * those are the two the list exists to compare.
+ */
+@media (max-width: 780px) {
+  .render-row { gap: var(--s2); }
+  .r-size { display: none; }
+}
+@media (max-width: 560px) {
+  .r-when { display: none; }
+  /* The tools stop reserving a gap they do not need once there are three of them in a
+     315 pixel row. */
+  .row-tools { padding-left: var(--s2); }
+}
