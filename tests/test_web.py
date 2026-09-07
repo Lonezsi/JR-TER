@@ -899,3 +899,40 @@ def test_every_dial_in_settings_is_a_setting_the_server_will_take(server):
     assert len(patch) >= 4, "read almost nothing out of the view: %s" % sorted(keys)
     status, said = server.put("/api/settings", patch)
     assert status == 200, said
+
+
+def test_the_rail_gesture_asks_the_element_not_a_list_of_class_names():
+    """What the rail is allowed to slide over, and why it is not a list any more.
+
+    The first version listed classes that could claim a horizontal drag, which is not the
+    same question as whether one is claimed right now. A lyric deck holding one sheet has
+    nowhere to swipe to and an arrangement strip that fits has nothing to scroll, and both
+    refused the gesture regardless, so on a phone the rail could only be pulled from
+    whatever blank background was left over. On a song page there is hardly any.
+
+    Two things must stay true. The gesture is refused where a sideways drag already means
+    something, and that set is decided by measuring the element. And it is NOT refused
+    merely because the thing under the finger is pressable, which is what used to gate it:
+    eight pixels of travel and a swallowed trailing click are what separate a swipe from a
+    press, and both are measurements rather than guesses about markup.
+    """
+    with open(os.path.join(JS_DIR, "90-boot.js"), encoding="utf-8") as f:
+        boot = f.read()
+
+    body = boot[boot.index("function claimsSideways"):]
+    body = body[:body.index("\n  }")]
+    # Direct manipulation and modal surfaces, which are the two that always mean
+    # something. Losing any of these hands the equaliser's drag to the rail.
+    for guarded in ("canvas", ".range", ".bar", ".q-knob",
+                    ".sheet", ".slot-menu", ".pick-list", "textarea"):
+        assert guarded in body, (
+            "%s no longer keeps its sideways drag, so the rail will slide instead of it"
+            % guarded)
+    # And the two conditional ones are measured rather than assumed.
+    assert "children.length > 1" in body, "a one card deck is treated as a carousel again"
+    assert "scrollWidth" in body, "a strip that fits is treated as scrollable again"
+
+    # The old blanket gate is gone and must not come back.
+    assert "hasAPressOfItsOwn" not in boot, (
+        "the rail refuses the gesture on anything pressable again, which on a song page "
+        "is nearly everything")

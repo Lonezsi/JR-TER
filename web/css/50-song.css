@@ -354,8 +354,21 @@
   overflow: hidden;
   border-radius: var(--r-lg);
   touch-action: pan-y;          /* vertical scrolling still belongs to the page */
+  /* The room the cards turn in. Without a perspective on an ancestor a rotateY is an
+     affine squash with no vanishing point, which reads as a card getting thinner rather
+     than as a card turning away. 1100 is shallow enough to be a solid object and not a
+     fisheye. */
+  perspective: 1100px;
+  perspective-origin: 50% 45%;
 }
-.deck-track { display: flex; will-change: transform; }
+/* The track still slides sideways, and that is on purpose: the swipe tracks the thumb by
+   translating this, and that arithmetic is one card per hundred per cent. What changed is
+   that the cards are no longer flat in it. */
+.deck-track {
+  display: flex;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
 
 /* Glass, over the song's own wash.
  *
@@ -378,13 +391,56 @@
   border: 1px solid var(--glass-line);
   box-shadow: var(--edge-top), var(--glass-shadow);
   isolation: isolate;
-  opacity: 0.55;
-  transform: scale(0.985);
-  transition: opacity var(--med), transform var(--med);
+
+  /* Turning, not sliding past.
+   *
+   * It was opacity and a 1.5 per cent scale, which is a flat deck of cards moving
+   * sideways: the only cue that one of them is the front one is that the others are a
+   * bit dimmer. Now the neighbours are pushed back in Z and rotated away from you on
+   * their inside edge, so the deck is an object with a front face and two sides, and a
+   * swipe turns it.
+   *
+   * transform-origin on the edge that stays put. A card rotating about its centre swings
+   * both edges and slides out from under the one in front of it; hinged on the edge
+   * nearest the front card, it turns away like a page.
+   *
+   * The side a card is on decides which way it turns, and CSS can be asked that without
+   * any help from the script: .on ~ .lyric-card is everything after the front card, and
+   * :has(~ .on) is everything before it, which is the previous sibling selector CSS
+   * never had until :has arrived.
+   */
+  transform-origin: 50% 50%;
+  transform: translateZ(-150px) rotateY(0deg);
+  opacity: 0.42;
+  transition: opacity var(--med), transform 420ms cubic-bezier(0.22, 0.7, 0.3, 1);
 }
-.lyric-card.on { opacity: 1; transform: none; }
+.lyric-card:has(~ .lyric-card.on) {
+  transform-origin: 100% 50%;
+  transform: translateZ(-150px) rotateY(34deg);
+}
+.lyric-card.on ~ .lyric-card {
+  transform-origin: 0% 50%;
+  transform: translateZ(-150px) rotateY(-34deg);
+}
+.lyric-card.on { opacity: 1; transform: translateZ(0) rotateY(0deg); }
 .lyric-card.reading { border-color: var(--accent-line); }
-.lyric-card.editing { opacity: 1; transform: none; }
+/* Editing is not a place to be looking at a turned card. */
+.lyric-card.editing { opacity: 1; transform: translateZ(0) rotateY(0deg); }
+
+/* One card is not a deck, so it does not need a stage. A lone card sat 150px back with
+   nothing to compare it to, which is just a slightly smaller card. */
+.deck-track:not(:has(.lyric-card + .lyric-card)) .lyric-card {
+  transform: translateZ(0) rotateY(0deg);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The depth stays, the turn goes: a rotation is the part that reads as motion. */
+  .lyric-card,
+  .lyric-card:has(~ .lyric-card.on),
+  .lyric-card.on ~ .lyric-card { transform: none; }
+  .lyric-card.on { transform: none; }
+}
 
 .card-title {
   font-family: var(--display);

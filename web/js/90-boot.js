@@ -296,16 +296,51 @@ async function boot() {
    * space would have meant almost nowhere to do it. Only the handful of things that are
    * dragged across on purpose are left out, and each is named below with the reason.
    */
-  const KEEPS_ITS_GESTURES = [
-    // Things that are dragged sideways on purpose.
-    ".deck-window",      // lyric cards are swiped between
-    ".comp-scroll",      // the arrangement scrolls across
-    "canvas",            // the equaliser and the limiter are dragged in both axes
-    ".range", ".bar",    // sliders and the scrub bar
-    ".q-knob",
-    // Things that scroll inside themselves.
-    ".sheet", ".slot-menu", ".pick-list",
-  ].join(", ");
+  /* Does the thing under the finger have a sideways gesture of its own RIGHT NOW.
+   *
+   * This was a list of selectors, and a list of selectors is a list of things that *can*
+   * claim a horizontal drag rather than things that currently do. Most of them only
+   * claim one under a condition, and on a song page the condition is usually false: a
+   * lyric deck holding one sheet has nowhere to swipe to, and an arrangement strip that
+   * fits its box has nothing to scroll. Both refused the gesture anyway, which is why
+   * the rail could only be pulled from genuinely empty background, and on a song page
+   * there is hardly any.
+   *
+   * So the question is asked of the element instead of its class name, and the answer
+   * changes as the page does. What is left is the two kinds that always mean something:
+   * direct manipulation, where every drag is aimed at a value, and a surface that is
+   * modal, which owns everything inside it while it is up.
+   */
+  function claimsSideways(node) {
+    if (!node || !node.closest) return false;
+
+    // Every drag on these is a value being set. There is no such thing as a spare
+    // sideways gesture on an equaliser node or a scrub bar.
+    if (node.closest("canvas, .range, .bar, .q-knob")) return true;
+
+    // Modal while it is up, whichever way you drag on it.
+    if (node.closest(".sheet, .slot-menu, .pick-list")) return true;
+
+    // Dragging sideways across words is selecting them, which is the one gesture the
+    // lyric editor cannot afford to lose: it is a text box, and this rail would
+    // otherwise slide out every time somebody tried to pick a line.
+    if (node.closest("textarea, input, select, [contenteditable]")) return true;
+
+    // A deck with somewhere to go. One card is not a carousel, and the panel itself
+    // agrees: its own handler returns early below two sheets.
+    const deck = node.closest(".deck-window");
+    if (deck) {
+      const track = deck.querySelector(".deck-track");
+      if (track && track.children.length > 1) return true;
+    }
+
+    // A strip with more in it than fits. Measured, because an arrangement of four bars
+    // does not scroll and an arrangement of two hundred does.
+    const strip = node.closest(".comp-scroll");
+    if (strip && strip.scrollWidth > strip.clientWidth + 1) return true;
+
+    return false;
+  }
 
   //: How far one direction has to win by before the drag commits to it, in pixels.
   const LOCK = 8;
@@ -327,31 +362,26 @@ async function boot() {
   //: arrives here by opening the rail briskly.
   const PAST = 16;
 
-  /* Empty means nothing here does anything when you press it.
+  /* There is no list of things that are too pressable to swipe over any more.
    *
-   * Not a list of class names, which was the first attempt and was wrong twice over: it
-   * named containers like the hero and the block heads, which cover most of a song page
-   * on a phone, and it could never keep up with markup that changes. The question that
-   * actually matters is whether the thing under the finger has a press of its own, and
-   * an element that does says so: it is a link or a control, it carries an action, or it
-   * is drawn with a pointer cursor. Anything else is background, and background is where
-   * this gesture lives.
+   * There was, and it was the thing that kept this gesture in the margins. It asked
+   * whether the element under the finger had a press of its own, and on a song page
+   * nearly everything does: a lyric card opens an editor, a render row adds itself to a
+   * song, a version chip opens a menu, and every one of them refused to let the rail
+   * move. The answer on a phone was that the rail could only be pulled from whatever
+   * blank space happened to be left, and there is hardly any.
+   *
+   * It is not needed, and the rail itself has been the proof for a while: most of an
+   * open rail is album links and it has allowed this gesture over them all along. Two
+   * things already separate a swipe from a press, and they do it by measurement rather
+   * than by guessing from the markup. Nothing moves until the finger has gone eight
+   * pixels sideways, so a press is still a press and a tap is still a tap. And the click
+   * that arrives at the end of a real drag is thrown away, so the row the finger
+   * happened to be resting on when it let go does not fire.
+   *
+   * What is left out is in claimsSideways above, and everything in it is left out
+   * because the sideways drag is already spoken for, not because a press is.
    */
-  const INTERACTIVE = "a, button, input, textarea, select, label, summary, [role=button],"
-    + " [data-act], [data-link], [data-image], [data-play], [data-preset], [data-slot],"
-    + " [data-go], [data-sort-list], [data-new-song], [data-new-album], [data-song],"
-    + " [data-render], [data-post], [data-item], [data-index], [data-album], [contenteditable]";
-
-  function hasAPressOfItsOwn(node) {
-    if (!node || !node.closest) return false;
-    if (node.closest(INTERACTIVE)) return true;
-    // The catch all: anything drawn as pressable is pressable, whatever it is called.
-    for (let at = node, depth = 0; at && at !== document.body && depth < 6; at = at.parentElement, depth++) {
-      if (at.nodeType !== 1) continue;
-      if (getComputedStyle(at).cursor === "pointer") return true;
-    }
-    return false;
-  }
 
   const railNode = J.$("#rail");
   const scrim = J.$("#railScrim");
@@ -433,17 +463,8 @@ async function boot() {
     drag = null;
     if (e.button) return;                                   // a right or middle press
     if (!narrow()) return;                                  // wide screens collapse, not slide
-    if (e.target.closest(KEEPS_ITS_GESTURES)) return;       // something else owns this
-    /* The rail is not on that list any more.
-     *
-     * It was, on the grounds that it is the thing being opened, and the result was that
-     * once it was open there was nowhere to put a thumb to push it back: the one surface
-     * within reach was the one surface the gesture refused. Its links do not disqualify
-     * it either, because most of an open rail is album rows. Nothing moves until the
-     * finger has gone eight pixels sideways, so a press is still a press, and the click
-     * that follows a real drag is thrown away further down. */
-    const onRail = !!e.target.closest(".rail");
-    if (!onRail && hasAPressOfItsOwn(e.target)) return;
+    // The one question left: is this sideways drag already somebody's.
+    if (claimsSideways(e.target)) return;
     drag = {
       id: e.pointerId, mouse: e.pointerType === "mouse",
       x: e.clientX, y: e.clientY,
