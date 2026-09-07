@@ -19,9 +19,10 @@
 }
 .page-wash.on { opacity: 0.32; }
 
-/* With a song open the panel stops being the ground and becomes another pane over it,
-   or the artwork would stop dead at the panel's edge, which is the thing being fixed. */
-.page-wash.on ~ .shell .main { background: rgba(11, 11, 12, 0.62); }
+/* With a song open the pane thins, so more of the artwork comes through it. The panel is
+   glass on every screen now, so this is a difference of degree rather than the switch
+   from opaque to translucent it used to be. */
+.page-wash.on ~ .shell .main { background: var(--pane-thin); }
 .page-wash.flat {
   background-image:
     radial-gradient(80% 60% at 25% 10%, hsl(var(--hue) 45% 30%), transparent 70%),
@@ -233,11 +234,24 @@
 /* ── main ─────────────────────────────────────────────────────────────────── */
 .main {
   grid-area: main;
-  /* Solid. This is the plane everything else is glass *against*, and a pane that is
-     itself see through has nothing to refract. */
-  background: var(--surface);
+  /* Glass, over whatever the page has put behind it.
+   *
+   * It used to be solid, on the argument that something has to be the plane the other
+   * panes are glass against. That argument was already half abandoned: with artwork open
+   * this rule was overridden to 62 per cent so the wash would not stop dead at the
+   * panel's edge. So the panel was translucent on exactly the screens where there was
+   * something worth seeing through it, and opaque on the rest, and it had no blur either
+   * way, which is what made it read as a flat dark rectangle rather than a pane.
+   *
+   * It has the filter now, so what is behind it bends: the blurred artwork on a song
+   * page, and on the library screens the black ground and the specks drifting over it.
+   * What everything else is glass against is the room, not this panel.
+   */
+  background: var(--pane);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   transition: background var(--slow);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-line);
   border-radius: var(--r-lg);
   min-width: 0;
   min-height: 0;

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <!-- A stand in until there is a photograph here. Replace this file, or point the img in
+       59-view-about.js at a jpg dropped beside it: both are one edit and neither needs a
+       build step, because web/ is served straight off the disk. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12181A"/>
+      <stop offset="1" stop-color="#0A0C0B"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="500" fill="url(#g)"/>
+  <!-- The mark at the logo's own proportions. The stroke is in path units and the group
+       is scaled, so a width picked in screen pixels is multiplied by the scale as well:
+       nine at six times is a fifty four pixel stroke on a hundred and fifty pixel glyph,
+       which merges the strokes into a blob. 2.6 is what the logo uses against the same
+       26 unit height, so it stays a quarter rest at any size. -->
+  <g fill="none" stroke="#54B37A" stroke-opacity="0.55" stroke-width="2.6"
+     stroke-linecap="round" stroke-linejoin="round" transform="translate(164 172) scale(6)">
+    <path d="M8.5 2 L3.5 9.5 L8.5 15 L3.5 21"/>
+    <path d="M3.5 21c3.2.6 4.9 2.4 4.9 4.6 0 1.6-1 2.6-2.4 2.6" stroke-width="2.2"/>
+  </g>
+  <text x="200" y="432" text-anchor="middle" fill="#6B6E74"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-size="17"
+        letter-spacing="1.5">A PHOTO GOES HERE</text>
+</svg>

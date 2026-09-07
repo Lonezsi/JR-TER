@@ -551,11 +551,37 @@ async function boot() {
      * hard against its stop as plainly open and leave it open behind the new screen. The
      * rail goes away: it was the gesture, not the destination. */
     if (armed) {
+      /* Both things leave, then the page changes.
+       *
+       * They go the same way, which is why the bubble is on the same edge as the rail:
+       * taking its class off slides it back out to the left and shutting the rail sends
+       * the rail after it, both on the same duration and the same easing, so it reads as
+       * one object leaving rather than two things animating.
+       *
+       * The navigation waits for them. Setting the hash straight away redrew the screen
+       * underneath while the slide was still running, which is a jump cut with an
+       * animation playing over the top of it. The wait is read from the stylesheet rather
+       * than written here, so it cannot drift from the transition it is waiting for, and
+       * reduced motion collapses --med to a millisecond and this collapses with it.
+       */
       withdrawAbout();
       dragEndedAt = e.timeStamp;
-      drag = null;
+      shell.classList.add("leaving");
+      /* setRail, with the drag still in hand.
+       *
+       * It calls stopDrag itself, and only `if (drag)`. Clearing drag on the line above
+       * this, which is what the first version did out of tidiness, skipped that: the
+       * inline --rail-x the finger had pinned the rail to survived and outranked the
+       * class, and rail-dragging was still on the shell suppressing the transition. The
+       * bubble slid away on its own and the rail sat exactly where it had been let go. */
       setRail(true);
-      location.hash = "#/about";
+
+      const med = getComputedStyle(document.documentElement).getPropertyValue("--med");
+      const ms = Math.max(0, parseFloat(med) || 220);
+      setTimeout(() => {
+        shell.classList.remove("leaving");
+        location.hash = "#/about";
+      }, ms + 40);
       return;
     }
 

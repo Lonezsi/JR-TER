@@ -22,6 +22,28 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "2.5.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "The whole panel is glass, and the renders are in columns",
+        "notes": [
+            "The main panel is glass now, not just the rail and the player. On a song "
+            "page the artwork bends through it instead of stopping dead at its edge.",
+            "The renders list is in real columns. The name is the only thing that "
+            "stretches, so the duration, the size and the date start at the same place "
+            "on every row and you can read down them. The waveform has a slot of its own "
+            "rather than being stretched behind the text, where a quiet render used to "
+            "look like a line struck through the title.",
+            "The letter tile went: it was made from the name it was sitting next to. Add "
+            "is smaller than Play, because two white discs a row is ten of the brightest "
+            "things on the screen arguing with the words.",
+            "The About shortcut is on the left now, on the same edge as the rail, and "
+            "letting go slides the two of them out of frame together before the page "
+            "changes.",
+            "The About page has a picture and something written on it.",
+        ],
+    },
+    {
         "version": "2.4.1",
         "date": "2026-09-07",
         "name": JRITER,

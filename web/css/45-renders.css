@@ -9,11 +9,16 @@
   flex-wrap: nowrap;
   padding: var(--s3);
   border-radius: var(--r-md);
+  /* Brighter than the panel it sits on, which is the point.
+   *
+   * The panel is glass now too, and two sheets at the same tint stack into one flat
+   * surface with a line drawn on it. A row has to be the lighter of the two to read as a
+   * thing lying on the pane rather than a rectangle cut out of it. */
   background: var(--glass);
   -webkit-backdrop-filter: var(--glass-filter-thin);
   backdrop-filter: var(--glass-filter-thin);
   border: 1px solid var(--glass-line);
-  margin-bottom: var(--s2);
+  margin-bottom: 6px;
   /* So the waveform's blend has this row's own glass as its backdrop and not the page
      behind it. Without this the carve blends straight through to the wallpaper. */
   isolation: isolate;
@@ -54,49 +59,57 @@
   padding-left: var(--s3);
 }
 /* Round, never squeezed into ovals. Only the play button said flex: none. */
-.row-tools .icon-btn { flex: none; }
+.row-tools .icon-btn { flex: none; color: var(--text-3); }
+/* Enough contrast to aim at. Every row was heavy at the left, bright in the middle and
+   empty at the right, because these two were drawn in a grey a shade off the row they sat
+   on and 16px of thin stroke in that grey is very close to nothing. */
+.row-tools .icon-btn:hover { color: var(--text); background: var(--hover); }
 /* Throwing a render away is the one thing in this row that cannot be taken back, so it
    is last and it is the only icon that changes colour under the pointer. */
 .row-tools [data-act="dismiss"]:hover { color: var(--bad-hi); }
-/* Name and meta across, not stacked.
+/* The columns.
  *
- * This was display: block with the meta on its own line under the name and the dates on
- * a third, which is a three deck row. Baseline rather than centre, so the twelve pixel
- * meta sits on the same line as the name instead of floating half a line above it. The
- * name gives way first and the meta second: which bounce this is matters more than how
- * many megabytes it is. */
-.render-row .grow {
-  min-width: 0; flex: 1;
-  display: flex; align-items: baseline; gap: var(--s3);
-}
-/* One that has found its song stays readable but stops asking for attention. */
-.render-row.used { opacity: 0.62; }
-.render-row.used:hover { opacity: 1; }
-
-/* The one thing on the row you can change, sized to itself.
-
-   It was display: block, so it filled the whole name column: the hover underline ran the
-   width of the screen and clicking the empty space to the right of a short name opened a
-   sheet you had not aimed at. max-width keeps .truncate's ellipsis working, and
-   vertical-align stops an inline-block leaving a gap under the text. */
-.render-name {
-  display: inline-block;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  vertical-align: bottom;
+ * The name is the only thing that flexes, and that is what turns the rest of the row into
+ * columns rather than a sentence: everything after it is pushed against the right edge,
+ * so it begins at the same x on every row and the eye can run down it. Before this the
+ * duration, the size and the date trailed the name, which is a different length on every
+ * render, so the one thing a list of bounces is for could not be done by looking.
+ */
+.r-name {
+  flex: 1 1 auto;
+  min-width: 60px;
   font-weight: 650;
   cursor: text;
   border-bottom: 1px solid transparent;
 }
-.render-name:hover { border-bottom-color: var(--line-2); }
-.render-row .s {
-  flex: 1 1 auto;
-  min-width: 0;
+.r-name:hover { border-bottom-color: var(--line-2); }
+
+/* Fixed widths, right aligned, tabular figures. Right aligned so the ends of the numbers
+   line up, which is what makes two durations comparable at a glance; tabular so the
+   digits inside them line up too, since proportional figures put the colon of 1:23 and
+   2:07 in different places. */
+.r-time, .r-size, .r-when {
+  flex: none;
   font-size: 12px;
   color: var(--text-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.render-row .s b { color: var(--text-2); font-weight: 650; }
+.r-time { width: 42px; }
+.r-size { width: 62px; }
+.r-when { width: 96px; }
+/* Where a render ended up, in the date column, because a row that has found its song has
+   stopped being one you are deciding about. */
+.r-went { color: var(--text-2); font-weight: 650; }
+/* One that has found its song stays readable but stops asking for attention. */
+.render-row.used { opacity: 0.62; }
+.render-row.used:hover { opacity: 1; }
+
+/* .render-name and .render-row .s went with the old row: the name is .r-name and the
+   meta run it carried has become four columns. */
 
 /* White, with the glyph taken out of the white.
  *
@@ -124,8 +137,12 @@
   mask-repeat: no-repeat;
   transition: transform var(--fast), opacity var(--fast);
 }
-/* The picker sheet's copy, which sits in a tighter row. */
+/* The picker sheet copy, which sits in a tighter row. */
 .cut.sm { width: 28px; height: 28px; }
+/* Add is smaller than Play. Two identical white discs per row is, down a list of five,
+   ten of the brightest objects on the screen arguing with the words, and only one of the
+   two is the reason you opened the row. Both keep the cut out glyph. */
+.render-row .cut.add { width: 27px; height: 27px; }
 .cut:hover { transform: scale(1.06); }
 .cut:active { transform: scale(0.97); }
 /* Drawn outside the mask, or the mask eats the ring. */
@@ -216,25 +233,30 @@
   text-align: center;
 }
 
-@media (max-width: 900px) {
-  /* Still one line. What gives way on a narrow screen is the meta, then the name, and
-     the controls keep their size: a row you cannot read the name of is still useful and
-     a row you cannot press is not. The old rule here made the row wrap into two lines on
-     purpose, which is exactly what this row stopped doing. */
-  /* The meta truncates rather than going. It carries the date, which is the thing you
-     came to the list to compare, and hiding the whole run to save width threw that away
-     on exactly the screen where the list is longest. */
+/* On a narrow screen a column goes rather than shrinking, and they go in the order of
+   what can be found out another way: the size is on the sheet the row opens, and the
+   waveform is a glance rather than a fact. The duration and the date stay longest,
+   because those are the two the list exists to compare.
+
+   Measured rather than guessed. The fixed part of the row is the play button, the four
+   columns, the tools and the gaps between them, which comes to about 580 pixels, so a
+   thousand pixel window still leaves the name a comfortable share and there is no reason
+   to drop a column anywhere near it. The first version shed the size at 900, which took
+   it away on an ordinary laptop window. */
+@media (max-width: 780px) {
   .render-row { gap: var(--s2); }
-  .render-row .grow { gap: var(--s2); }
+  .r-size { display: none; }
+}
+@media (max-width: 640px) {
+  .r-wave { display: none; }
+}
+@media (max-width: 520px) {
+  .r-when { display: none; }
 }
 
-/* The render's own square. It is a generated letter tile, never artwork, and it is not a
-   control. It used to be a button that made a song out of the render, which meant the
-   biggest press target in a row whose job is "add this to a song" did something else,
-   and on a row that had already found its song it made a second one. No display here:
-   .cover already sets its own, and two single class rules disagreeing about display on
-   one element is the thing that put the name's cursor 109 lines from its own rule. */
-.render-art { width: 40px; height: 40px; border-radius: var(--r-sm); }
+/* The letter tile went. It was generated from the name of the render and it sat eight
+   pixels to the left of that same name: a second box at the left edge carrying a copy of
+   the information already beside it. */
 
 /* The two dates a render can carry. They sit inside the name column, under the size
    line, so a long name never pushes them out of the row and nothing here is the first
@@ -276,27 +298,40 @@
  * Still behind the text. z-index 0 puts it above the row's own background and under
  * every sibling, which is in front of the glass and behind the words: the thing to see
  * at a glance is the shape, and the thing to read is the name. */
+/* Its own column, not the background of the row.
+ *
+ * It was absolutely positioned across the whole row, under the text, and at that size it
+ * stopped being a waveform and became a grey wash behind the name. Worse on a quiet
+ * render: the shape collapses to a thin bar across the middle, which read as a line
+ * struck through the title. Here it is a band in a slot with nothing to be read on top of
+ * it, so it can be as strong as it likes.
+ *
+ * Still carved. Grey so it is a shape in the surface rather than a colour on it, overlay
+ * so it modulates the glass instead of sitting on it, and a pixel of near white
+ * underneath, which is the lit lower lip of a groove. */
+.r-wave {
+  flex: none;
+  width: 104px; height: 26px;
+  display: block;
+}
 .render-wave {
-  position: absolute;
-  inset: 0;
   width: 100%; height: 100%;
-  z-index: 0;
   color: #8E949B;
-  opacity: 0.22;
+  opacity: 0.5;
   mix-blend-mode: overlay;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.13));
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.16));
   pointer-events: none;
   transition: opacity var(--fast);
 }
-.render-row:hover .render-wave { opacity: 0.34; }
-.render-row.used .render-wave { opacity: 0.14; }
+.render-row:hover .render-wave { opacity: 0.72; }
+.render-row.used .render-wave { opacity: 0.28; }
 
 /* Something is wrong with this file, said before anything is played. */
 .render-row.in-trouble { border-color: var(--bad); }
 /* Trouble is the one case the groove takes a colour, and it stops blending: a fault is a
    thing on the surface demanding to be read, not part of it. */
 .render-row.in-trouble .render-wave {
-  color: var(--bad); opacity: 0.4; mix-blend-mode: normal; filter: none;
+  color: var(--bad); opacity: 0.75; mix-blend-mode: normal; filter: none;
 }
 
 .trouble {

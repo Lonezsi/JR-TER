@@ -100,6 +100,9 @@ def test_the_notice_names_every_place_the_code_can_reach(request):
                            "shown as a link. Clicking it is the browser going there.",
         "youtu.be": "the same link, short form, in a placeholder",
         "console.cloud.google.com": "a link in the setup instructions",
+        "www.instagram.com": "the author's profile, linked from the about page. Following "
+                             "it is the browser going there, and it is the only thing on "
+                             "that page that leaves.",
         "www.w3.org": "the SVG namespace, which is an identifier and not an address",
         "example.invalid": "a test double's address, reserved and unroutable",
     }

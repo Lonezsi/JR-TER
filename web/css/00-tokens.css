@@ -56,6 +56,12 @@
 
   /* The tint. Barely a colour: a pane is mostly whatever is behind it, lifted just
      enough that type has something to sit on. */
+  /* The main panel's own tint. Darker than the chrome's white veil rather than lighter:
+     the rail and the player float over the library and read as brighter than it, while
+     this is the room those float in and has to stay the darker of the two or the
+     hierarchy inverts. Thinner with artwork open, so more of it comes through. */
+  --pane:        rgba(11, 11, 12, 0.78);
+  --pane-thin:   rgba(11, 11, 12, 0.55);
   --glass:       rgba(255, 255, 255, 0.055);
   --glass-2:     rgba(255, 255, 255, 0.085);
   --glass-line:  rgba(255, 255, 255, 0.13);

@@ -269,64 +269,13 @@ J.views.renders = {
      * from a folder with the project still beside it, so the line is absent rather than
      * showing a blank where a date should be. Zero is how "not known" is spelled
      * everywhere in this library, and J.when draws nothing for it. */
-    function dates(render) {
-      const bits = [];
-      /* When it arrived leads.
-       *
-       * The two below are better facts and they are usually absent: a render only carries
-       * them if it came through the FL client or was taken in from a folder with the
-       * project still beside it. Everything else, which is anything you dragged in, had
-       * no date at all, so the one question you actually ask of a list of bounces, which
-       * of these is the recent one, could not be answered from the row. created_at is
-       * always there because the row could not exist without it.
-       *
-       * First in the line rather than last, and this is the whole reason the meta is
-       * built as a list here instead of written out in the template: the row is one line
-       * now, so on a narrow screen the end of that line is what goes. Whatever matters
-       * most has to be at the front, and it is the date.
-       */
-      if (render.created_at) {
-        bits.push(`<span title="When this render arrived here">added ${
-          J.esc(J.when(render.created_at))}</span>`);
-      }
-      if (render.rendered_at) {
-        bits.push(`<span title="When this audio was rendered">rendered ${
-          J.esc(J.when(render.rendered_at))}</span>`);
-      }
-      if (render.project_at) {
-        bits.push(`<span title="When the project it came out of was made">project ${
-          J.esc(J.when(render.project_at))}</span>`);
-      }
-      return bits;
-    }
-
-    /* The whole meta line, in one order, joined once.
+    /* dates() and meta() went with the old row.
      *
-     * It was three fragments interpolated into the template with their own separators
-     * hanging off them, which is how you get a line that starts with a stray dot the day
-     * one of them is empty. */
-    function meta(render, used) {
-      const bits = dates(render);
-      if (render.duration) bits.push(J.time(render.duration));
-      bits.push(J.bytes(render.size));
-      if (render.origin === "fl" || render.origin === "import") {
-        bits.push(J.esc(render.ext.replace(".", "").toUpperCase()));
-      }
-      if (used) bits.push(`went to <b>${J.esc(render.song_title || "a song")}</b>`);
-      return bits.join(' <span class="sep">·</span> ');
-    }
-
-    /* One row, read left to right: what it is, then the one thing this row is for, then
-     * the tools. The cover, the play button and the name are identity and none of them
-     * navigate anywhere. The action is next. The two icons are a group at the right
-     * edge, with the one that cannot be undone last.
-     *
-     * The cover used to be a button that made a song. It was the biggest press target in
-     * a row whose job is "add this to a song", and on a row that had already found its
-     * song it made a second one. Making a song is on the menu, and it is the first row
-     * of the sheet this row opens. The name used to make a song too, while being drawn
-     * with a text cursor and an underline that said rename, which is what it does now.
+     * They existed to join four facts into one line with separators between them, and a
+     * line is what a row stops needing the moment it has columns: each fact has a slot of
+     * its own now, and the slot is what says which fact it is.
      */
+
     function card(render) {
       const used = !render.waiting;
       const sounding = J.player.state.playing && isSounding(render);
@@ -334,17 +283,21 @@ J.views.renders = {
         <div class="render-row ${used ? "used" : ""} ${render.trouble ? "in-trouble" : ""}" data-id="${render.id}"
              ${used ? "" : 'data-act="attach" role="button" tabindex="0"'}
              ${used ? "" : `aria-label="Add ${J.esc(render.name)} to a song"`}>
-          ${J.waveform(render.shape, { className: "render-wave" })}
-          ${J.cover({ title: render.name, className: "render-art" })}
           <button class="cut play ${sounding ? "sounding" : ""}" data-act="play"
                   aria-label="${sounding ? "Pause" : "Play"} ${J.esc(render.name)}"></button>
-          <span class="grow truncate">
-            <span class="render-name truncate" data-act="rename"
-                  title="Rename this render"
-              >${J.esc(render.name)}</span>
-            <span class="s truncate">${meta(render, used)}${J.trouble(render)}</span>
-          </span>
-          ${shape(render)}
+
+          <span class="r-name truncate" data-act="rename" title="Rename this render"
+            >${J.esc(render.name)}</span>
+          ${J.trouble(render)}
+
+          <span class="r-wave">${J.waveform(render.shape, { className: "render-wave" })}</span>
+
+          <span class="r-time">${render.duration ? J.time(render.duration) : ""}</span>
+          <span class="r-size">${J.bytes(render.size)}</span>
+          <span class="r-when">${used
+            ? `<span class="r-went">${J.esc(render.song_title || "a song")}</span>`
+            : J.esc(J.when(render.created_at))}</span>
+
           <span class="row-tools">
             ${used
               ? `<button class="btn sm ghost" data-act="unattach">Put back</button>`
