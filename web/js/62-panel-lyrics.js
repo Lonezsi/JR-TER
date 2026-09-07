@@ -180,11 +180,9 @@ J.blockLyrics = async function (block, ctx) {
       <div class="block-head">
         <h2>Lyrics</h2>
         <span class="grow"></span>
-        <span class="block-tools">
-          ${s ? `<button class="btn ghost sm" data-act="history">History${
-            s.revisions > 1 ? ` (${s.revisions})` : ""}</button>` : ""}
-          <button class="btn ghost sm" data-act="add">${s ? "Add a version" : "Write lyrics"}</button>
-        </span>
+        ${s ? "" : `<span class="block-tools">
+          <button class="btn ghost sm" data-act="add">Write lyrics</button>
+        </span>`}
       </div>
 
       ${viewing ? `
@@ -204,6 +202,29 @@ J.blockLyrics = async function (block, ctx) {
 
         <div class="deck-window" id="deckWindow">
           <div class="deck-track" id="deckTrack"></div>
+
+          <!-- Everything you can do to the words, in one group on the card's bottom edge.
+               They were in three places: History and Add a version in the heading, the
+               bin at the foot of the card. All three act on the set of words in front of
+               you, so they belong next to it rather than scattered around it.
+               A sibling of the track and not a child of a card: cards are thrown off the
+               screen, and the buttons should not go with them. -->
+          ${s ? `
+            <div class="deck-tools">
+              <button class="deck-tool" data-act="history"
+                      title="Every earlier version of these words">History${
+                s.revisions > 1 ? ` <span class="deck-tool-count">${s.revisions}</span>` : ""}</button>
+              <button class="deck-tool" data-act="add"
+                      title="Start another set of words for this song">Add version</button>
+              ${sheets.length > 1 ? `
+                <button class="deck-tool danger" data-act="drop"
+                        title="Delete these words" aria-label="Delete these words">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                       stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+                    <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>
+                  </svg>
+                </button>` : ""}
+            </div>` : ""}
         </div>
 
         ${many ? `<button class="deck-arrow" data-act="next" aria-label="Next"
@@ -338,17 +359,7 @@ J.blockLyrics = async function (block, ctx) {
         <div class="card-body ${text ? "" : "empty-words"}"
              ${viewing ? "" : 'data-act="edit" title="Click to edit"'}>${
           text ? J.md(body) : "Nothing written yet. Click here to start."}</div>
-        <span class="card-foot-tools">
-          ${partChip(s)}
-          ${sheets.length > 1 ? `
-            <button class="icon-btn card-drop" data-act="drop"
-                    title="Delete these words" aria-label="Delete ${J.esc(title)}">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-                   stroke-width="1.9" stroke-linecap="round">
-                <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>
-              </svg>
-            </button>` : ""}
-        </span>
+        <span class="card-foot-tools">${partChip(s)}</span>
       </article>
       </div>`;
     }).join("");
@@ -764,7 +775,7 @@ J.blockLyrics = async function (block, ctx) {
       { divider: true },
       { label: "Delete these words", icon: "drop", danger: true,
         disabled: sheets.length < 2,
-        run: () => card.querySelector('[data-act="drop"]')?.click() },
+        run: () => J.$('[data-act="drop"]', block)?.click() },
     ];
   });
 

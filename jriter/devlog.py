@@ -22,6 +22,19 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.2.2",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "Cards that leave whole, and one place to act on the words",
+        "notes": [
+            "A card thrown off the deck is no longer sliced off at the edge of its frame. "
+            "It was being eaten by an invisible wall on the way out; it leaves whole now.",
+            "History, Add version and the bin are one pill sitting on the bottom right "
+            "corner of the card. They were in three places: two up in the heading and one "
+            "down at the foot of the card, all three acting on the same set of words.",
+        ],
+    },
+    {
         "version": "3.2.1",
         "date": "2026-09-07",
         "name": JRITER,

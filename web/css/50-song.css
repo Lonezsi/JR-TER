@@ -357,7 +357,15 @@
   /* Wide enough that a long line of a verse is a line rather than a wrap. The cards are
      the middle of the page, so they get the room the page has. */
   max-width: 940px;
-  overflow: hidden;
+  /* Not clipped.
+   *
+   * A card thrown off the deck used to be sliced off at this edge, so what you saw was a
+   * card being eaten by an invisible wall rather than a card leaving. It is allowed out
+   * now. Nothing runs away with it: the page's own scroller clips the far edges, and the
+   * cards either side of the front one are at opacity 0 the whole time they are out there.
+   *
+   * position: relative because the button group below is pinned to this box. */
+  position: relative;
   border-radius: var(--r-lg);
   touch-action: pan-y;          /* vertical scrolling still belongs to the page */
   /* The room the cards turn in. Without a perspective on an ancestor a rotateY is an
@@ -960,4 +968,80 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
 @media (max-width: 640px) {
   .yt-thumb { width: 64px; height: 36px; }
   .in-open { display: none; }
+}
+
+/* ── everything you can do to the words, on the card's own edge ───────────── */
+
+/* One group, at the bottom right, straddling the border.
+ *
+ * These were in three places: History and Add a version up in the heading where the block
+ * tools live, and the bin down at the foot of the card. All three act on the set of words
+ * in front of you, so they read better as one thing attached to it than as three controls
+ * at opposite corners of the screen.
+ *
+ * Sitting on the edge rather than inside or below: half over the card and half off it,
+ * which is what says it belongs to the card without taking any of the card's room. It is
+ * pinned to the window rather than to a card, because cards get thrown off the screen and
+ * a delete button should not go with them.
+ */
+.deck-tools {
+  position: absolute;
+  right: var(--s5);
+  bottom: 0;
+  transform: translateY(50%);
+  z-index: 4;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-pill);
+  background: var(--pane);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
+  box-shadow: var(--edge-top), var(--shadow-2);
+  overflow: hidden;            /* so the ends take the pill's own curve */
+  isolation: isolate;
+}
+.deck-tool {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 var(--s4);
+  height: 32px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+/* A hairline between them rather than gaps, so the group is one object. */
+.deck-tool + .deck-tool { box-shadow: inset 1px 0 0 var(--line); }
+.deck-tool:hover,
+.deck-tool:focus-visible { background: var(--hover); color: var(--text); }
+.deck-tool.danger { padding: 0 var(--s3); color: var(--text-3); }
+.deck-tool.danger:hover { color: var(--bad-hi); background: rgba(212, 104, 94, 0.14); }
+/* How many earlier versions there are, when there are any. */
+.deck-tool-count {
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+/* The card gives its bottom right corner over to the group, so a long last line does not
+   run under it. */
+.lyric-card { padding-bottom: var(--s7); }
+
+/* The dots clear the group rather than sitting under it.
+ *
+ * The group hangs half its height below the card, and the dots were the next thing in the
+ * flow: measured, they overlapped it. Half the group's height plus a gap, stated as one
+ * number so the two cannot drift apart. */
+.deck-dots { margin-top: calc(17px + var(--s3)); }
+
+@media (max-width: 760px) {
+  /* Still in the corner, because that is where it was asked to be and it fits: measured on
+     a 375 wide screen the group is 192 across in a 317 wide deck, so the right hand edge is
+     nowhere near running off. Only the text tightens. */
+  .deck-tool { padding: 0 var(--s3); font-size: 11.5px; }
 }
