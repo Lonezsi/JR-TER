@@ -23,6 +23,20 @@
 :root {
   /* ── the ground ─────────────────────────────────────────────────────────── */
   --bg:          #000000;
+
+  /* One soft blob on the black, and the reason it is worth having is the glass.
+     The main panel is a pane now, and on the library screens there is nothing behind it
+     to bend: a flat black backdrop through a displacement map is still flat black. This
+     gives it something. Barely there on purpose, and in the accent rather than a neutral
+     so it reads as part of the room rather than as a smudge on the screen. */
+  --bg-dot: radial-gradient(58% 44% at 26% 12%,
+                            rgba(84, 179, 122, 0.07), transparent 72%);
+
+  /* The knocked out buttons on a render row. Not pure white: a solid #FFF disc on a dark
+     glass row is the hardest edge in the app and it read as stamped on rather than set
+     into the surface. At 78 per cent the colour behind comes through it a little, which
+     is what puts it in the same material as everything else. */
+  --cut: rgba(255, 255, 255, 0.78);
   --bg-deep:     #000000;
   --bg-high:     #000000;
 

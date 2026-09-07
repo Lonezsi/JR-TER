@@ -19,7 +19,12 @@ html, body {
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  /* Fixed, so it stays put while a page scrolls: a gradient that slides with the content
+     reads as an object on the page rather than as the light in the room. */
+  background-image: var(--bg-dot);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
   font-size: 14px;

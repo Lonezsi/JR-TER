@@ -1103,3 +1103,41 @@ def test_no_web_asset_carries_a_stray_control_character():
     assert not trouble, (
         "these web assets carry control characters, which is always an escape that was "
         "eaten on the way in rather than anything anybody typed: %s" % trouble)
+
+
+def test_a_sample_library_is_never_offered_as_a_render():
+    """The whole reason a watched folder has a kind.
+
+    Marking a library as sync keeps it out of the list of folders a scan walks, which is
+    NOT the same as keeping its files out of a scan. A library living inside a collector
+    is the ordinary case if you keep samples and bounces under one music folder, and the
+    collector walked straight into it: measured on a library of seven one shots, seven
+    new renders.
+    """
+    import time
+    from jriter import db
+    from jriter.modules import sync
+
+    top = os.path.join(config.DATA, "music")
+    library = os.path.join(top, "samples", "kicks")
+    os.makedirs(library, exist_ok=True)
+    for n in range(4):
+        with open(os.path.join(library, "kick_%d.wav" % n), "wb") as f:
+            f.write(b"\x00" * 64)
+    with open(os.path.join(top, "a real bounce.wav"), "wb") as f:
+        f.write(b"\x00" * 64)
+
+    db.insert("sync_folders", {"path": top, "enabled": 1, "kind": sync.COLLECTOR,
+                               "created_at": time.time()})
+    db.insert("sync_folders", {"path": os.path.join(top, "samples"), "enabled": 1,
+                               "kind": sync.SYNC, "created_at": time.time()})
+
+    libraries = [row["path"] for row in
+                 db.query("SELECT path FROM sync_folders WHERE kind = ?", (sync.SYNC,))]
+    found = sorted(os.path.basename(p) for p in sync._walk(top, libraries))
+    assert found == ["a real bounce.wav"], (
+        "the collector reached into the sample library: %s" % found)
+
+    # And without the exclusion it plainly would, so the check above is not vacuous.
+    everything = sorted(os.path.basename(p) for p in sync._walk(top))
+    assert len(everything) == 5, everything

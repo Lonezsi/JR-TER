@@ -191,10 +191,10 @@
 .cut {
   flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px;
+  width: 32px; height: 32px;
   border: 0; padding: 0;
   border-radius: 50%;
-  background: #FFFFFF;
+  background: var(--cut);
   cursor: pointer;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
@@ -207,7 +207,7 @@
 /* Add is smaller than Play. Two identical white discs per row is, down a list of five,
    ten of the brightest objects on the screen arguing with the words, and only one of the
    two is the reason you opened the row. Both keep the cut out glyph. */
-.render-row .cut.add { width: 27px; height: 27px; }
+.render-row .cut.add { width: 26px; height: 26px; }
 .cut:hover { transform: scale(1.06); }
 .cut:active { transform: scale(0.97); }
 /* Drawn outside the mask, or the mask eats the ring. */

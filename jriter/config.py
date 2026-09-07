@@ -122,7 +122,9 @@ _DEFAULTS = {
     # rather than function. Nought is off in both cases and is a real answer: a machine
     # that struggles with either has one place to turn it off, and reduced motion and
     # reduced transparency still override both whatever these say.
-    "dust": 55,
+    # A hundred is what the dial used to top out at, and it is the default now. Both of
+    # these reach two hundred.
+    "dust": 100,
     # Shown as "Chromatic aberration". The key keeps its old name because it is what
     # every settings.json already on disk calls it, and a rename buys a migration for a
     # word only this file ever reads.

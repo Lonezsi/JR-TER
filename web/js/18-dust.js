@@ -32,9 +32,19 @@ J.dust = (function () {
   //: for it" setting is somewhere around thirty five.
   const AREA_PER = 18000, FEWEST = 18, MOST = 90;
 
+  /* Above one the dial adds brightness and size rather than more specks.
+   *
+   * Count is the one dimension that costs anything: every speck is a drawImage and the
+   * canvas is redrawn whole. Doubling it past what was already the top of the range
+   * would double the per frame work to say something the eye reads better as "brighter"
+   * anyway, so the count saturates at one and the rest of the travel goes into the two
+   * dimensions that are free. */
+  const countOf = (power) => Math.min(power, 1);
+
   //: Nought to a hundred, from the settings. Kept here rather than read from the DOM on
   //: every reseed, because it changes when somebody presses Save and at no other time.
-  let power = 0.55;
+  //: One is what the dial used to top out at and is now the default. It can reach two.
+  let power = 1;
 
   //: The soft dot is drawn once at this size and stamped. Sixteen keeps the largest
   //: stamp a mild shrink and the smallest a four to one one, and a smooth gradient has
@@ -118,7 +128,7 @@ J.dust = (function () {
 
   function seed() {
     const room = width * height / AREA_PER;
-    const many = Math.round(J.clamp(room, FEWEST, MOST) * power);
+    const many = Math.round(J.clamp(room, FEWEST, MOST) * countOf(power));
     specks = [];
     for (let i = 0; i < many; i++) {
       specks.push({
@@ -353,7 +363,9 @@ J.dust = (function () {
      * drawing an empty canvas under the glass for ever, which would be the compositor
      * paying for something with nothing in it. */
     strength(value) {
-      const next = J.clamp(Number(value) || 0, 0, 100) / 100;
+      // Two hundred, not a hundred. What used to be the top of the dial is the default,
+      // so the room above it has to exist for the dial to travel into.
+      const next = J.clamp(Number(value) || 0, 0, 200) / 100;
       if (next === power) return;
       power = next;
       if (!power) { halt(); return; }

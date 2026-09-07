@@ -101,7 +101,7 @@ J.applyLook = function (settings) {
    * both together. */
   J.dither.apply(said.dither === undefined ? 60 : said.dither);
 
-  J.dust.strength(said.dust === undefined ? 55 : said.dust);
+  J.dust.strength(said.dust === undefined ? 100 : said.dust);
 };
 
 

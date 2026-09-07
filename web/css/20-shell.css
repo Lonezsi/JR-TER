@@ -437,3 +437,14 @@
    sets no display of its own, so the global [hidden] guard in 10-base.css already wins.
    It had one, and it was worse than useless: it satisfied the test that checks the global
    guard exists, so deleting that guard went unnoticed. */
+
+/* What a sample library holds, under the list of libraries.
+ *
+ * Separated by a rule rather than a heading, because it is not another section: it is the
+ * answer to the button directly above it, and it only exists once that button has been
+ * pressed. */
+.stock {
+  margin-top: var(--s4);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}

@@ -12,6 +12,8 @@ J.views.sync = {
     let candidates = [];
     let scanning = false;
     let summary = null;
+    let stocking = false;
+    let stock = {};
 
     async function loadFolders() {
       const data = await J.get("/api/sync/folders");
@@ -19,39 +21,100 @@ J.views.sync = {
       draw();
     }
 
+    /* One row, whichever kind of folder it is.
+     *
+     * The two sections differ in what they are for and in the button at the top of them,
+     * not in how a folder is drawn, so there is one of these rather than two that drift
+     * apart the first time somebody edits only one. */
+    function folderRow(folder) {
+      return `
+        <div class="list-row" data-folder="${folder.id}">
+          <button class="switch ${folder.enabled ? "on" : ""}" data-act="toggle"
+                  aria-label="Watch this folder"></button>
+          <span class="grow truncate">
+            <div class="truncate" style="font-weight:600">${J.esc(folder.path)}</div>
+            <div class="faint" style="font-size:12px">
+              ${folder.last_scan ? `last looked at ${J.when(folder.last_scan)}` : "not looked at yet"}
+            </div>
+          </span>
+          <button class="icon-btn" data-act="remove" aria-label="Stop watching">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          </button>
+        </div>`;
+    }
+
     function draw() {
+      /* Two sections, because there were always two jobs and one list.
+       *
+       * A folder of samples and a folder of bounces are not the same thing, and this
+       * screen treated every folder as the second: adding a sample library offered five
+       * thousand one-shots as new renders. Which kind a folder is now belongs to the
+       * folder, and each section only ever shows and acts on its own. */
+      const collectors = folders.filter((f) => (f.kind || "collector") === "collector");
+      const libraries = folders.filter((f) => f.kind === "sync");
+
       root.innerHTML = `
         <div class="section">
           <div class="section-head">
-            <h2>Watched folders</h2><span class="grow"></span>
-            <button class="btn sm ghost" data-act="add">Add folder</button>
-            <button class="btn sm primary" data-act="scan" ${folders.length ? "" : "disabled"}>
+            <h2>Render collector</h2><span class="grow"></span>
+            <button class="btn sm ghost" data-act="add" data-kind="collector">Add folder</button>
+            <button class="btn sm primary" data-act="scan" ${collectors.length ? "" : "disabled"}>
               ${scanning ? "Scanning…" : "Scan now"}
             </button>
           </div>
+          <p class="faint" style="margin-top:0">
+            Folders your bounces land in. JR!TER notices new ones arriving so a render
+            reaches the library without you carrying it there. It reads these and never
+            writes to them, and nothing is imported until you say so.
+          </p>
 
-          ${folders.length ? folders.map((folder) => `
-            <div class="list-row" data-folder="${folder.id}">
-              <button class="switch ${folder.enabled ? "on" : ""}" data-act="toggle"
-                      aria-label="Watch this folder"></button>
-              <span class="grow truncate">
-                <div class="truncate" style="font-weight:600">${J.esc(folder.path)}</div>
-                <div class="faint" style="font-size:12px">
-                  ${folder.last_scan ? `last scanned ${J.when(folder.last_scan)}` : "not scanned yet"}
-                </div>
-              </span>
-              <button class="icon-btn" data-act="remove" aria-label="Stop watching">
-                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-              </button>
-            </div>`).join("")
+          ${collectors.length ? collectors.map(folderRow).join("")
           : `<div class="empty">
-               <h3>No folders watched yet</h3>
-               <p>Point JR!TER at the folder your exports land in and it will notice new
-                  bounces arriving, so a render reaches the library without you carrying
-                  it there. It reads that folder and never writes to it, and nothing is
-                  imported until you say so.</p>
-               <button class="btn primary" data-act="add" style="margin-top:var(--s4)">Add a folder</button>
+               <h3>Nothing collecting yet</h3>
+               <p>Point this at the folder your exports land in.</p>
+               <button class="btn primary" data-act="add" data-kind="collector"
+                       style="margin-top:var(--s4)">Add a folder</button>
              </div>`}
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Simple sync</h2><span class="grow"></span>
+            <button class="btn sm ghost" data-act="add" data-kind="sync">Add folder</button>
+            <button class="btn sm ghost" data-act="stock" ${libraries.length ? "" : "disabled"}>
+              ${stocking ? "Looking…" : "Take stock"}
+            </button>
+          </div>
+          <p class="faint" style="margin-top:0">
+            Sample libraries, meant to be the same on every machine you work from. These
+            are never offered as renders, which is the whole reason they are a separate
+            kind: a folder of one shots is not a folder of bounces.
+          </p>
+          <p class="faint" style="margin-top:0">
+            <b>What this does today:</b> takes stock. It counts what a library holds so two
+            machines can be compared. It does not move files between them yet.
+          </p>
+
+          ${libraries.length ? libraries.map(folderRow).join("")
+          : `<div class="empty">
+               <h3>No libraries yet</h3>
+               <p>Point this at your samples.</p>
+               <button class="btn primary" data-act="add" data-kind="sync"
+                       style="margin-top:var(--s4)">Add a folder</button>
+             </div>`}
+
+          ${stock.libraries && stock.libraries.length ? `
+            <div class="stock">
+              ${stock.libraries.map((lib) => `
+                <div class="list-row">
+                  <span class="grow truncate">
+                    <div class="truncate" style="font-weight:600">${J.esc(lib.path)}</div>
+                    <div class="faint" style="font-size:12px">
+                      ${lib.files.toLocaleString()} files &middot; ${J.bytes(lib.bytes)}
+                    </div>
+                  </span>
+                </div>`).join("")}
+            </div>` : ""}
         </div>
 
         ${summary ? `
@@ -123,17 +186,41 @@ J.views.sync = {
       const candidateRow = act.closest("[data-path]");
 
       if (what === "add") {
+        /* The button says which section it came from.
+         *
+         * So the sheet can say what this folder is going to be treated as, rather than
+         * taking a path and deciding afterwards. Putting a sample library in the render
+         * collector is the exact mistake this split exists to prevent, and a shared
+         * dialog that does not mention which one you are in would keep letting it happen.
+         */
+        const kind = act.dataset.kind === "sync" ? "sync" : "collector";
+        const forSync = kind === "sync";
         const values = await J.sheet({
-          title: "Watch a folder",
-          sub: "The full path on the machine running JR!TER. It is only ever read.",
-          confirm: "Watch it",
+          title: forSync ? "Add a sample library" : "Watch a folder for renders",
+          sub: forSync
+            ? "The full path on the machine running JR!TER. Read only, and never offered as a render."
+            : "The full path on the machine running JR!TER. It is only ever read.",
+          confirm: forSync ? "Add it" : "Watch it",
           body: `<div class="sheet-fields"><label class="sheet-label">${J.req("Folder")}
-            <input class="field" name="path" placeholder="C:\\Users\\you\\Music\\Renders"></label></div>`,
+            <input class="field" name="path" placeholder="${
+              forSync ? "C:\\Users\\you\\Samples" : "C:\\Users\\you\\Music\\Renders"
+            }"></label></div>`,
         });
         if (!values || !values.path.trim()) return;
-        const made = await J.try(() => J.post("/api/sync/folders", { path: values.path.trim() }));
-        if (made) J.toast(made.added ? "Watching that folder" : "Already watching that one");
+        const made = await J.try(() => J.post("/api/sync/folders",
+                                              { path: values.path.trim(), kind }));
+        if (made) J.toast(made.added ? "Added" : "Already watching that one");
         await loadFolders();
+      }
+
+      /* Take stock of the sample libraries. Counts what is there; moves nothing. */
+      if (what === "stock") {
+        stocking = true;
+        draw();
+        const data = await J.try(() => J.post("/api/sync/stock"));
+        stocking = false;
+        if (data) stock = data;
+        draw();
       }
 
       if (what === "toggle" && folderRow) {
@@ -206,12 +293,14 @@ J.views.settings = {
 
             <label class="sheet-label">Dust
               <span class="dial">
-                <input class="range" id="dust" type="range" min="0" max="100" step="5"
-                       value="${Number(state.settings.dust === undefined ? 55 : state.settings.dust)}">
-                <b id="dustSaid">${Number(state.settings.dust === undefined ? 55 : state.settings.dust)}</b>
+                <input class="range" id="dust" type="range" min="0" max="200" step="5"
+                       value="${Number(state.settings.dust === undefined ? 100 : state.settings.dust)}">
+                <b id="dustSaid">${Number(state.settings.dust === undefined ? 100 : state.settings.dust)}</b>
               </span>
               <span class="faint dial-note">Specks drifting behind a page with no artwork
-                on it. Nought is none.</span>
+                on it. A hundred is where the dial used to stop and is the normal amount.
+                Past that they get brighter and bigger rather than more numerous, since
+                the count is the only part of this that costs anything to draw.</span>
             </label>
 
             <label class="sheet-label">Chromatic aberration

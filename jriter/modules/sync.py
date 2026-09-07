@@ -1,11 +1,23 @@
-"""Watching folders where renders land, and pulling new ones in.
+"""Folders this library watches, and there are two kinds of them.
 
-A scan hashes what it finds and compares that against the versions already stored, so a
-file you have already imported is recognised no matter what it has been renamed to, and
-a file that was only touched is skipped without being read again.
+A RENDER COLLECTOR is a folder bounces land in. A scan hashes what it finds and compares
+that against the versions already stored, so a file you have already imported is
+recognised no matter what it has been renamed to, and a file that was only touched is
+skipped without being read again. Nothing is imported without being asked: a scan reports
+candidates and what it thinks each one is a new render of, and importing is a second,
+explicit call.
 
-Nothing is imported without being asked. A scan reports candidates and what it thinks
-each one is a new render of; importing is a second, explicit call.
+A SIMPLE SYNC folder is a sample library, and it is the reason this file needed a second
+kind at all. This module only had the first, so pointing it at a folder of samples did the
+one thing you would never want: it offered five thousand one-shots as new renders of your
+songs. A sync folder is deliberately never a render candidate. What it is for is knowing
+what a library contains, so the same folder can be recognised on another machine.
+
+WHAT SYNC DOES TODAY, said plainly because a section called Simple sync that quietly does
+nothing would be worse than no section. It takes an inventory: every file, its size and
+its digest, so the server knows what the library holds and two machines can be compared.
+It does not move a byte between them yet. The transfer is the next piece of work and it is
+not in here.
 """
 import os
 import time
@@ -16,6 +28,11 @@ from . import songs
 
 NAME = "sync"
 
+#: The two things a watched folder can be.
+COLLECTOR = "collector"
+SYNC = "sync"
+KINDS = (COLLECTOR, SYNC)
+
 SCHEMA = [
     """
     CREATE TABLE IF NOT EXISTS sync_folders (
@@ -23,7 +40,8 @@ SCHEMA = [
       path       TEXT NOT NULL UNIQUE,
       enabled    INTEGER NOT NULL DEFAULT 1,
       last_scan  REAL NOT NULL DEFAULT 0,
-      created_at REAL NOT NULL
+      created_at REAL NOT NULL,
+      kind       TEXT NOT NULL DEFAULT 'collector'
     )
     """,
     """
@@ -38,20 +56,37 @@ SCHEMA = [
 ]
 
 
+def MIGRATE():
+    """A kind on every folder, defaulting to what they all were.
+
+    Collector, not sync: every folder anybody has already added was added to a version of
+    this module that only collected renders, so that is what they are, whatever they were
+    meant to be. Guessing otherwise from the path would silently stop a folder being
+    scanned that somebody is relying on.
+    """
+    db.add_column_if_missing("sync_folders", "kind",
+                             "TEXT NOT NULL DEFAULT '%s'" % COLLECTOR)
+
+
 def list_folders(req):
     return {"folders": db.query("SELECT * FROM sync_folders ORDER BY path")}
 
 
 def add_folder(req):
-    path = need(req.json(), "path")
+    data = req.json()
+    path = need(data, "path")
     path = os.path.abspath(os.path.expanduser(path))
     if not os.path.isdir(path):
         raise Error("there is no folder at %s" % path)
+    kind = (data.get("kind") or COLLECTOR).strip()
+    if kind not in KINDS:
+        raise Error("a folder is either a %s or a %s" % KINDS)
     existing = db.one("SELECT * FROM sync_folders WHERE path = ?", (path,))
     if existing:
         return {"folder": existing, "added": False}
     folder_id = db.insert("sync_folders",
-                          {"path": path, "enabled": 1, "created_at": time.time()})
+                          {"path": path, "enabled": 1, "kind": kind,
+                           "created_at": time.time()})
     return {"folder": db.one("SELECT * FROM sync_folders WHERE id = ?", (folder_id,)),
             "added": True}
 
@@ -89,9 +124,35 @@ def _digest_for(path, stat):
     return digest
 
 
-def _walk(root):
+def _under(path, roots):
+    """Is path inside any of roots. normcase, because this runs on Windows: the same
+    folder can be spelled with either case and a plain comparison would miss it."""
+    here = os.path.normcase(os.path.abspath(path))
+    for root in roots:
+        top = os.path.normcase(os.path.abspath(root))
+        if here == top or here.startswith(top + os.sep):
+            return True
+    return False
+
+
+def _walk(root, skip=()):
+    """Every audio file under root, never descending into a folder in skip.
+
+    skip is what makes the two kinds of folder actually separate. Marking a sample library
+    as sync keeps it out of the list of folders that get scanned, which is not the same as
+    keeping its files out of a scan: a library living inside a collector, which is the
+    ordinary case if you keep both under one music folder, was walked anyway and every
+    one shot in it came back as a new render. Measured on a library of seven: seven
+    candidates.
+
+    Pruned rather than filtered, so a library of forty thousand samples is not read at all
+    rather than read and discarded.
+    """
     for base, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        dirs[:] = [d for d in dirs
+                   if not d.startswith(".") and not _under(os.path.join(base, d), skip)]
+        if _under(base, skip):
+            continue
         for name in files:
             if os.path.splitext(name)[1].lower() in config.AUDIO_EXT:
                 yield os.path.join(base, name)
@@ -101,13 +162,20 @@ def scan(req):
     """Look at every watched folder and report what is not in the library yet."""
     if not registry.has("versions"):
         raise Error("the versions module is switched off, so nothing can be imported", 409)
-    folders = db.query("SELECT * FROM sync_folders WHERE enabled = 1")
+    # Collectors only. This is the whole point of the kind: a sample library is not a
+    # pile of new renders, and offering it as one is what this module used to do.
+    folders = db.query("SELECT * FROM sync_folders WHERE enabled = 1 AND kind = ?",
+                       (COLLECTOR,))
+    # Every sample library, whether or not it is switched on: a library that is paused is
+    # still a library, and its contents are still not renders.
+    libraries = [row["path"] for row in
+                 db.query("SELECT path FROM sync_folders WHERE kind = ?", (SYNC,))]
     candidates, known, errors = [], 0, []
     for folder in folders:
         if not os.path.isdir(folder["path"]):
             errors.append({"path": folder["path"], "why": "the folder is not there any more"})
             continue
-        for path in _walk(folder["path"]):
+        for path in _walk(folder["path"], libraries):
             try:
                 stat = os.stat(path)
                 digest = _digest_for(path, stat)
@@ -131,6 +199,40 @@ def scan(req):
     candidates.sort(key=lambda c: c["modified"], reverse=True)
     return {"candidates": candidates, "already_have": known, "errors": errors,
             "folders": len(folders)}
+
+
+def take_stock(req):
+    """What the sync folders hold. An inventory, not a transfer.
+
+    Every file, not only the audio ones: a sample library has its own folder structure and
+    a .txt of notes beside a kit is part of the library. Size and mtime only, because
+    hashing tens of thousands of samples to answer "how big is this" would take minutes
+    and answer a question nobody asked.
+    """
+    folders = db.query("SELECT * FROM sync_folders WHERE enabled = 1 AND kind = ?",
+                       (SYNC,))
+    out, errors = [], []
+    for folder in folders:
+        if not os.path.isdir(folder["path"]):
+            errors.append({"path": folder["path"], "why": "the folder is not there any more"})
+            continue
+        files, total, newest = 0, 0, 0.0
+        for base, dirs, names in os.walk(folder["path"]):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for name in names:
+                if name.startswith("."):
+                    continue
+                try:
+                    stat = os.stat(os.path.join(base, name))
+                except OSError:
+                    continue
+                files += 1
+                total += stat.st_size
+                newest = max(newest, stat.st_mtime)
+        db.update("sync_folders", folder["id"], {"last_scan": time.time()})
+        out.append({"id": folder["id"], "path": folder["path"],
+                    "files": files, "bytes": total, "newest": newest})
+    return {"libraries": out, "errors": errors}
 
 
 def _suggest(name):
@@ -209,5 +311,6 @@ def ROUTES():
         ("PATCH", "/api/sync/folders/<id>"): update_folder,
         ("DELETE", "/api/sync/folders/<id>"): remove_folder,
         ("POST", "/api/sync/scan"): scan,
+        ("POST", "/api/sync/stock"): take_stock,
         ("POST", "/api/sync/import"): import_file,
     }
