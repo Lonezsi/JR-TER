@@ -22,6 +22,46 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "2.4.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "Renders on one line, a deck that turns, and a way out of the library",
+        "notes": [
+            "Renders are one row each: cover, a white play disc with the triangle cut out "
+            "of it, the name, and when it arrived. They were three decks deep. The date "
+            "shows for everything now, not only for renders that came through the client, "
+            "and it leads the line because the end of a line is what a narrow screen "
+            "takes away.",
+            "The waveform is carved into the glass rather than printed on it: grey, "
+            "blended so it modulates the surface instead of sitting on it, with one pixel "
+            "of near white underneath, which is the lit lower lip an engraved edge has.",
+            "Pull the rail past its stop on a phone and hold. A second later it buzzes, a "
+            "bubble arrives from the right edge, and letting go takes you to the page "
+            "behind the library. There is nothing written on it yet.",
+            "The rail slides over the whole song page now. It used to refuse anything "
+            "pressable, which on a song page is nearly everything. What it still refuses "
+            "is measured rather than listed: a deck with more than one card, a strip that "
+            "actually overflows, and canvases, sliders and text boxes, where a sideways "
+            "drag already means something.",
+            "The lyric deck turns instead of sliding past. The cards behind are pushed "
+            "back and hinged away on the edge nearest the front one.",
+            "The sound panel says which deck it is shaping, with the same A and B as the "
+            "hero, and the equaliser and the limiter are drawn inside the preset instead "
+            "of beside it, because a preset holds both and the old layout read as though "
+            "it were an equaliser setting.",
+            "Sign in with Google for the upload, one press instead of a typed code. The "
+            "code is still there and is still the better one when the server is on "
+            "another machine. You still need your own Google client; that part cannot be "
+            "removed.",
+            "Chromatic aberration is what the fringing setting is called, it starts at "
+            "the hundred the dial used to stop at, and it goes to two hundred. Dither is "
+            "new, for the banding a wide blur leaves in a smooth gradient. The specks are "
+            "bigger and no longer sliced in half at the edge of a panel.",
+            "Required fields are marked, optional ones are not, and placeholders went "
+            "back to being examples. The update light is a sentence you can press.",
+        ],
+    },
+    {
         "version": "2.3.0",
         "date": "2026-09-06",
         "name": JRITER,
