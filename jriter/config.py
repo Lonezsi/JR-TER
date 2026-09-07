@@ -22,9 +22,60 @@ WEB = os.path.join(BASE, "web")
 # or the funnel forwards to nothing.
 DATA = (os.environ.get("JRITER_DATA") or os.environ.get("JONG_DATA")
         or os.path.join(BASE, "data"))
-BLOBS = os.path.join(DATA, "blobs")
-DB_PATH = os.path.join(DATA, "jriter.db")
-SETTINGS_PATH = os.path.join(DATA, "settings.json")
+
+# ── one directory per person ─────────────────────────────────────────────────
+#
+# JR!TER used to be one library with one password, so there was one database file and one
+# blob directory and nothing ever had to ask whose they were. It now has an account per
+# person, and the way those are kept apart is that each one gets its own files:
+#
+#     data/
+#       accounts.db              who exists, and what has been shared with whom
+#       auth.json                the server's own signing secret
+#       accounts/
+#         1/  jriter.db  blobs/  settings.json  appearance/  youtube.json
+#         2/  jriter.db  blobs/  settings.json  ...
+#
+# The alternative was an account_id column on all nineteen tables and a WHERE clause at
+# each of the hundred and ninety two places this code talks to SQLite. One missed clause
+# there does not crash and does not show up as a wrong number on a page: it is one person
+# quietly reading another person's library, for as long as nobody notices. Separate files
+# cannot fail that way, because a query written with no thought for accounts at all still
+# cannot reach rows that are not in the file it opened.
+#
+# These are functions and not constants, and the constants they replace are deliberately
+# gone rather than kept as aliases. Anything still reaching for config.BLOBS now raises
+# AttributeError instead of quietly reading whichever library happened to be first.
+
+
+def home(account=None):
+    """The directory holding one account's library."""
+    from . import who
+    return os.path.join(DATA, "accounts", str(account if account is not None else who.must()))
+
+
+def db_path(account=None):
+    return os.path.join(home(account), "jriter.db")
+
+
+def blobs_dir(account=None):
+    return os.path.join(home(account), "blobs")
+
+
+def settings_path(account=None):
+    return os.path.join(home(account), "settings.json")
+
+
+def accounts_db():
+    """The one database that is not anybody's library: who exists, and who shared what."""
+    return os.path.join(DATA, "accounts.db")
+
+
+def ensure_home(account=None):
+    """Make an account's directory and its blob store."""
+    where = home(account)
+    os.makedirs(os.path.join(where, "blobs"), exist_ok=True)
+    return where
 
 HOST = os.environ.get("JRITER_HOST") or os.environ.get("JONG_HOST") or "127.0.0.1"
 PORT = int(os.environ.get("JRITER_PORT") or os.environ.get("JONG_PORT") or "7900")
@@ -53,14 +104,18 @@ def adopt_old_database():
     start.
     """
     old = os.path.join(DATA, "jong.db")
-    if os.path.exists(DB_PATH) or not os.path.exists(old):
+    # Both of these are the old flat layout, on purpose. This runs before accounts exist
+    # and its whole job is to leave one file called jriter.db where accounts.py will find
+    # it a moment later and move it into accounts/1/.
+    new_name = os.path.join(DATA, "jriter.db")
+    if os.path.exists(new_name) or not os.path.exists(old):
         return False
     con = sqlite3.connect(old)
     try:
         con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     finally:
         con.close()
-    os.replace(old, DB_PATH)
+    os.replace(old, new_name)
     # Both are scratch: the log has just been folded in, and -shm is rebuilt on the next
     # open. Left behind they are only clutter, so they go, but not at the cost of the move.
     for leftover in (old + "-wal", old + "-shm"):
@@ -103,6 +158,9 @@ MODULES = [
     # What changed, and the note that appears once after an update. Off is a library that
     # still says which version it is and simply never mentions the rest.
     "devlog",
+    # Letting a friend work on one of your songs. Off is a server where everybody still
+    # has their own library and nobody can show anybody anything.
+    "sharing",
 ]
 
 # The repository JR!TER updates itself from. JR-TER, not JR!TER: GitHub allows only
@@ -146,7 +204,7 @@ _DEFAULTS = {
 
 def _read():
     try:
-        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+        with open(settings_path(), "r", encoding="utf-8") as f:
             return json.load(f)
     except (OSError, ValueError):
         return {}
@@ -174,14 +232,19 @@ def adopt_old_name():
 def save_settings(patch):
     current = _read()
     current.update(patch)
-    ensure_dirs()
-    tmp = SETTINGS_PATH + ".tmp"
+    ensure_home()
+    path = settings_path()
+    tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(current, f, indent=2)
-    os.replace(tmp, SETTINGS_PATH)
+    os.replace(tmp, path)
     return settings()
 
 
 def ensure_dirs():
-    for path in (DATA, BLOBS):
-        os.makedirs(path, exist_ok=True)
+    """The global directory only.
+
+    Called once on the way up, before anybody has signed in and therefore before there is
+    an account whose directory could be made. Per account directories are ensure_home.
+    """
+    os.makedirs(os.path.join(DATA, "accounts"), exist_ok=True)

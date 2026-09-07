@@ -50,6 +50,28 @@ def put_settings(req):
     return saved
 
 
+def _probe():
+    """One query against a real library, from an endpoint nobody has signed in to.
+
+    /api/health is open on purpose: the host watchdog force-kills this process when two
+    probes miss, so it has to be answerable without a credential. Which means there is no
+    account bound, and since libraries became one file each, "the database" is a question
+    that needs a whose.
+
+    The owner's, which is the library that has been there longest and the one whose absence
+    means something is actually wrong. A server with no accounts at all has nothing to probe
+    and is not broken for it: that is a fresh install waiting for somebody to set it up.
+    """
+    from .. import who, accounts
+    if who.now() is not None:
+        db.one("SELECT 1 AS one")
+        return
+    if not accounts.count():
+        return
+    with who.acting_as(accounts.OWNER):
+        db.one("SELECT 1 AS one")
+
+
 def health(req):
     """Is this process alive, and separately, is the library it is serving whole.
 
@@ -61,7 +83,7 @@ def health(req):
     """
     out = {"ok": True, "uptime": round(time.time() - _STARTED, 1)}
     try:
-        db.one("SELECT 1 AS one")
+        _probe()
     except Exception as e:
         # The port answering while the database does not is exactly the wedged state the
         # watchdog exists for, and it was invisible to it.

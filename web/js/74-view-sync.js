@@ -271,6 +271,9 @@ J.views.settings = {
   async render(root) {
     const state = await J.get("/api/state");
     let update = null;
+    //: Invites and the people on this server. Only the owner is allowed to ask, so this
+    //: stays null everywhere else and the section is simply not drawn.
+    let people = null;
     //: Whether this machine can make a video at all. Asked once, like the update check.
     let tool = { found: false, why: "" };
     let font = (state.summary && state.summary.appearance) || { custom_font: false };
@@ -427,6 +430,55 @@ J.views.settings = {
           </div>
           <input type="file" id="fontPick" accept=".ttf,.otf,.woff,.woff2,font/*" hidden>
         </div>
+
+        ${people ? `
+        <div class="section">
+          <div class="section-head"><h2>People</h2><span class="grow"></span>
+            <button class="btn sm primary" data-act="invite">Invite somebody</button>
+          </div>
+          <p class="faint" style="margin-top:0">
+            Everybody here gets a library of their own. Nobody can see anybody else's, and
+            the only way anything crosses between two of them is a song you deliberately
+            share.
+          </p>
+          <p class="faint" style="margin-top:0">
+            Signing up needs an invite, because this library answers on a public address
+            and an open form is an offer to whoever finds it.
+          </p>
+
+          <div class="tracks">
+            ${(people.accounts || []).map((who) => `
+              <div class="list-row">
+                <span class="grow truncate">
+                  <div class="truncate" style="font-weight:600">${J.esc(who.name)}</div>
+                  <div class="faint" style="font-size:12px">
+                    ${J.esc(who.handle)}${who.is_owner ? " &middot; owner" : ""}</div>
+                </span>
+              </div>`).join("")}
+          </div>
+
+          ${(people.invites || []).length ? `
+            <div class="section-head" style="margin-top:var(--s5)"><h3>Invites</h3></div>
+            <div class="tracks">
+              ${people.invites.map((invite) => `
+                <div class="list-row">
+                  <span class="grow truncate">
+                    <div class="truncate">${J.esc(invite.note || "no note")}</div>
+                    <div class="faint" style="font-size:12px">
+                      ${invite.used
+                        ? "used by " + J.esc(invite.used_by_handle || "somebody")
+                        : invite.expired ? "expired" : "waiting"}
+                      &middot; made ${J.when(invite.created_at)}
+                    </div>
+                  </span>
+                  ${invite.used ? "" : `
+                    <button class="icon-btn" data-act="drop-invite" data-id="${invite.id}"
+                            aria-label="Cancel this invite">
+                      <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                    </button>`}
+                </div>`).join("")}
+            </div>` : ""}
+        </div>` : ""}
 
         <div class="section">
           <div class="section-head"><h2>Password</h2></div>
@@ -590,6 +642,59 @@ J.views.settings = {
         location.href = "/login";
       }
 
+      if (act.dataset.act === "invite") {
+        const said = await J.sheet({
+          title: "Invite somebody",
+          sub: "They get an account and a library of their own. They cannot see yours.",
+          confirm: "Make a code",
+          body: `
+            <label class="sheet-label">Who is it for
+              <input class="field" name="note" placeholder="Jozsef" maxlength="80">
+            </label>
+            <label class="sheet-label">Good for
+              <select class="field" name="days">
+                <option value="7">a week</option>
+                <option value="14" selected>two weeks</option>
+                <option value="90">three months</option>
+                <option value="0">until it is used</option>
+              </select>
+            </label>`,
+        });
+        if (!said) return;
+        const made = await J.try(() => J.post("/api/auth/invites", said));
+        if (!made) return;
+        /* Shown once, in a dialog you have to close, because that is the only time it
+         * exists: only a digest of it is kept, the same as a password. */
+        await J.sheet({
+          title: "Send them this",
+          sub: "It works once and is not shown again. Only a digest of it is kept.",
+          confirm: "",
+          cancel: "Done",
+          body: `<p class="code-out" id="inviteCode">${J.esc(made.code)}</p>
+                 <p class="faint" style="font-size:12px">
+                   They open this library, choose "I have an invite", and type it in.</p>`,
+          onMount(sheet) {
+            const box = J.$("#inviteCode", sheet);
+            box.addEventListener("click", async () => {
+              try { await navigator.clipboard.writeText(made.code); J.toast("Copied."); }
+              catch (e) { /* a browser that will not, which is why it is on screen */ }
+            });
+          },
+        });
+        people = await J.get("/api/auth/invites").catch(() => people);
+        draw();
+        return;
+      }
+
+      if (act.dataset.act === "drop-invite") {
+        const done = await J.try(() => J.del(`/api/auth/invites/${act.dataset.id}`),
+                                 "That invite will not work now.");
+        if (!done) return;
+        people = await J.get("/api/auth/invites").catch(() => people);
+        draw();
+        return;
+      }
+
       if (act.dataset.act === "change-password") {
         const values = await J.sheet({
           title: "Change password",
@@ -647,6 +752,14 @@ J.views.settings = {
       J.toast("Titles are wearing " + file.name);
       draw();
     });
+
+    /* Only the owner may ask, and a 403 here is the ordinary answer for everybody else.
+     *
+     * Caught rather than surfaced for exactly that reason: on a friend's Settings screen a
+     * red toast saying they are not allowed to see the invite list would be telling them
+     * off for something the page did on its own. */
+    people = await J.get("/api/auth/invites").catch(() => null);
+    if (people) draw();
 
     if (state.modules.includes("youtube")) {
       tool = await J.get("/api/youtube/tool").catch(() => tool);

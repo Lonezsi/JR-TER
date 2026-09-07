@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from jriter import config, registry
+from jriter import config, registry, accounts
 from jriter.modules import auth
 
 
@@ -96,22 +96,33 @@ def test_an_empty_password_is_not_a_password(secured):
 
 
 def test_the_password_itself_is_never_stored(secured):
+    """Neither in the accounts database nor in the file beside it.
+
+    Both are checked, because the password moved from one to the other and a test that
+    only looked at the old place would have gone on passing while saying nothing.
+    """
     code = auth.setup_code()
     secured.post("/api/auth/setup", {"code": code, "password": "hunter2"})
+
+    row = accounts.owner()
+    assert "hunter2" not in str(dict(row)), "the password is sitting in the clear"
+    assert row["salt"] and row["hash"]
+
     path, _ = auth._paths()
-    with open(path, encoding="utf-8") as f:
-        stored = f.read()
-    assert "hunter2" not in stored, "the password is sitting on disk in the clear"
-    assert "salt" in stored and "hash" in stored
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            assert "hunter2" not in f.read()
 
 
-def test_the_same_password_hashes_differently_in_two_libraries(secured, tmp_path):
-    """A salt per library, so one leaked file says nothing about another."""
+def test_the_same_password_hashes_differently_each_time_it_is_set(secured):
+    """A fresh salt every time, so one leaked hash says nothing about another account
+    that happens to have chosen the same password."""
     code = auth.setup_code()
     secured.post("/api/auth/setup", {"code": code, "password": "same"})
-    first = auth._read()["hash"]
+    first = accounts.owner()["hash"]
     auth.set_password("same")
-    assert auth._read()["hash"] != first
+    assert accounts.owner()["hash"] != first
+    assert auth.check_password("same") is True
 
 
 # ── the gate ─────────────────────────────────────────────────────────────────
@@ -152,7 +163,7 @@ def test_a_forged_cookie_does_not_get_through(secured):
 def test_an_expired_cookie_does_not_get_through(secured, monkeypatch):
     code = auth.setup_code()
     secured.post("/api/auth/setup", {"code": code, "password": "a"})
-    old = auth.issue()
+    old = auth.issue(accounts.OWNER)
     monkeypatch.setattr(time, "time", lambda: time.__dict__["time"]() if False else 9e9)
     assert auth.valid(old) is False
 
@@ -342,7 +353,9 @@ def test_the_token_itself_is_never_stored(secured):
     _, made = secured.request("POST", "/api/auth/tokens", {"name": "the laptop"},
                               headers=owner)
 
-    rows = db.query("SELECT * FROM auth_tokens")
+    # accounts.db, not the library: checking a token means working out which library it
+    # belongs to, and you cannot look inside a library to answer that.
+    rows = accounts._query("SELECT * FROM tokens")
     assert rows, "nothing was written"
     assert made["token"] not in _json.dumps(rows), "the token is in the database in clear"
 

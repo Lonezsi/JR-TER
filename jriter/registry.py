@@ -65,8 +65,34 @@ def _migrate(name, migrate):
                (name, step, time.time()))
 
 
+def prepare():
+    """Create this account's tables, and run its migrations.
+
+    Split out of load() when libraries stopped being one file. load() imports the modules
+    and collects the routes, which is a property of the build and happens once on the way
+    up. This is a property of one database file, and has to happen the first time each
+    account's library is opened: an account that signs up on Tuesday needs the same
+    nineteen tables as the one that has been here since the start, and neither the server
+    starting nor anybody else's library is the moment to make them.
+
+    Called by db.connect the first time it opens a given file, so nothing else has to
+    remember to. A module that fails here is left in place rather than unloaded: its
+    routes still exist and will fail loudly per request, which is a better signal than a
+    feature quietly missing from one person's library and not another's.
+    """
+    for name, module in list(_loaded.items()):
+        schema = getattr(module, "SCHEMA", [])
+        if schema:
+            db.apply_schema(schema)
+        _migrate(name, getattr(module, "MIGRATE", None))
+
+
 def load(names=None):
-    """Import the enabled modules, create their tables, collect their routes."""
+    """Import the enabled modules and collect their routes.
+
+    No longer creates any tables: see prepare(). Nothing here may touch a database, because
+    this runs before anybody has signed in and there is therefore no library to touch.
+    """
     global _loaded, _routes, _failed
     _loaded, _routes, _failed = {}, {}, {}
     for name in (names if names is not None else config.MODULES):
@@ -76,10 +102,6 @@ def load(names=None):
             _failed[name] = traceback.format_exc(limit=3)
             continue
         try:
-            schema = getattr(module, "SCHEMA", [])
-            if schema:
-                db.apply_schema(schema)
-            _migrate(name, getattr(module, "MIGRATE", None))
             for key, handler in (getattr(module, "ROUTES", dict)() or {}).items():
                 # Two modules claiming one route used to be settled by load order, with
                 # nothing said anywhere: the loser's endpoint simply stopped existing and

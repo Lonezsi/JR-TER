@@ -87,8 +87,14 @@ body { padding: var(--s6) var(--s5) 20vh; }
   <h2>The short version</h2>
   <p>
     JR!TER is software you run yourself, on your own machine. There is no company behind
-    it, no account, no analytics and no server of ours that your library passes through.
-    Nobody but you can see what is in it, because it is on your disk.
+    it, no analytics, and no server of ours that your library passes through. It is on
+    somebody's disk rather than in a service, and that somebody is whoever set it up.
+  </p>
+  <p>
+    An account here is an account on that one machine and nowhere else. If several people
+    have one, each has a separate library and the app never shows one person another's; the
+    exception is a song somebody deliberately shares with you, and whoever runs the machine
+    can read the files on it either way. There is more about both further down.
   </p>
   <p>
     Nothing here is asking you to agree to anything. You are not being tracked, so there is
@@ -153,6 +159,12 @@ body { padding: var(--s6) var(--s5) 20vh; }
     YouTube's own terms apply to anything you send there and to the Google account you
     connect. JR!TER is not a party to that and cannot vary it.
   </li>
+  <li>
+    Anybody you invite. An invite gives somebody an account and a library on your machine,
+    and their music then sits on your disk. Keeping it, backing it up or losing it are all
+    yours, and so are the responsibilities set out under "Several people on one library"
+    below.
+  </li>
 </ul>
 
 <h3>Support</h3>
@@ -200,8 +212,51 @@ body { padding: var(--s6) var(--s5) 20vh; }
     and for each machine credential you create its name, its scope and a hash of it. The
     password itself is never stored.
   </li>
+  <li>
+    For each account: a handle, a display name if one was given, and when it was made and
+    last used. For each invite: who made it, a note saying who it was meant for, when it
+    expires, and a hash of the code. The code itself is never stored.
+  </li>
+  <li>
+    For each song shared with somebody: which song, which two accounts, and the name the
+    recipient was given on it.
+  </li>
   <li>Your settings, including any typeface you uploaded.</li>
 </ul>
+
+<h3>Several people on one library</h3>
+<p>
+  This server can hold an account for more than one person. Each account has its own
+  database file and its own folder of audio, and nothing in the application will show one
+  account another's songs, renders, samples, lyrics, presets, albums or settings. Signing up
+  needs an invite from the owner.
+</p>
+<p>
+  The one thing that crosses between two accounts is a song deliberately shared. Sharing
+  gives the other person that one song: they can play its current render, read its words,
+  and work on its equaliser and limiter. Anything they save becomes a copy in their own
+  library rather than a change to yours. It gives them nothing else: not your other songs,
+  not your samples, not your renders list, not your account, and nothing that posts
+  anywhere. The person who shared it can take it back at any time, and what the recipient
+  made stays in their own library because it was always theirs.
+</p>
+<p>
+  <strong>What the separation is, and what it is not.</strong> It is a wall inside the
+  application. It is not a wall against whoever runs the machine. The person whose computer
+  this is has the files: they can open any account's database with any SQLite tool and play
+  any audio file in any account's folder, exactly as they could with any other program's
+  data on their own disk. No software running on somebody's own machine can prevent that,
+  and it would be dishonest to describe this as though it could. If you would not want the
+  owner of the server to be able to read something, do not put it here.
+</p>
+<p>
+  If you are the person running this and you have given accounts to other people, you are
+  holding their material. The exemption for purely personal or household activity described
+  above stops covering you at that point, and the responsibilities in this notice become
+  yours towards them: telling them what is held, letting them take a copy or have it
+  deleted, and looking after it. JR!TER gives every account the same two buttons described
+  below, which covers the first of those without you having to do anything by hand.
+</p>
 
 <h3>Where it is, and where it is not</h3>
 <p>

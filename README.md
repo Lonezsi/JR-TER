@@ -65,6 +65,40 @@ powershell -ExecutionPolicy Bypass -File hostsetup\Install-JriterHost.ps1
 
 ---
 
+## Several people, one server
+
+Your friends can have accounts here. Each one gets a library of its own: separate database,
+separate audio, separate settings. Nothing in the app shows one person another's songs,
+renders, samples or lyrics, and that is structural rather than a permission check, because
+each library is a different file on disk.
+
+Signing up needs an invite. Make one in **Settings → People**, send them the code, and they
+choose their own handle and password. Without that, an open signup form on a public address
+is an offer to whoever finds it.
+
+**Sharing one song.** On a song's title menu, *Share with somebody*. They can play it, read
+the words, and work on the equaliser and the limiter. Anything they save becomes their own
+copy in their own library; yours is untouched. Give them a name on the share and their edits
+are labelled with it, so `Wide master` comes back as `Wide master, edited by Jozsef`. They
+cannot see your other songs, your samples or your renders, and cannot post anything. Take it
+back whenever you like: what they made stays theirs, because it was always in their library.
+
+Your friends can run the desktop agent against their own library too. It signs in with a
+handle:
+
+```bash
+python client\jriter_client.py login --handle jozsef
+```
+
+Leave `--handle` off if the library is yours: an empty handle means the owner, which is what
+it has always meant.
+
+One thing worth being plain about: this is a wall inside the application, not a wall against
+whoever runs the machine. If it is your computer, you have everybody's files, the same as you
+would with any other program's data. The privacy notice says so too.
+
+---
+
 ## What each part is for
 
 Features are easy to list and harder to place. This is the job each one does, written as

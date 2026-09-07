@@ -16,7 +16,7 @@ import hashlib
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import config, registry, problems
+from . import config, registry, problems, who, accounts
 from .wire import Request, Response, Error
 
 CONTENT_TYPES = {
@@ -64,6 +64,11 @@ GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
 # says nothing about the library itself: no titles, no counts, not even its name.
 OPEN_PAGES = {"/login", "/legal", "/jriter.css", "/favicon.ico"}
 OPEN_API = {"/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/health",
+            # Making an account, which by definition happens before you have one. It needs
+            # an invite and it is behind the same guess limiter as a password, so being
+            # open here is not being open: a stranger who reaches it still has to hold a
+            # code this library gave out.
+            "/api/auth/signup",
             # the door wears the same typeface as the library behind it
             "/api/appearance/font"}
 
@@ -353,11 +358,19 @@ class Handler(BaseHTTPRequestHandler):
         if path in OPEN_PAGES or path in OPEN_API:
             return False
         from .modules import auth
-        if auth.signed_in(self.headers):
+        if who.now() is not None:
             return False
         # A machine credential, scoped to what a machine actually does. Checked with the
         # method and path so a token can never reach past what it was made for.
-        return not auth.token_allows(self.headers, self._method_now, path)
+        #
+        # A token belongs to one account's library, the same as a session does, so a token
+        # that is allowed in binds this thread to its owner. Without that the agent would
+        # be through the door and holding no library at all.
+        owner = auth.token_account(self.headers, self._method_now, path)
+        if owner is None:
+            return True
+        who.bind(owner)
+        return False
 
     def _door_is_broken(self):
         """The stored password exists and cannot be read.
@@ -377,6 +390,38 @@ class Handler(BaseHTTPRequestHandler):
             return "the auth module could not read its own state"
 
     def _dispatch(self, method):
+        """Every request passes through here, which is why the binding happens here.
+
+        A thread is handed back to the pool at the end of a request and picks up the next
+        one, which very probably belongs to somebody else. So whose library this thread is
+        allowed to open is set once, at the top, from the cookie, and unset again in the
+        finally below whatever happens in between. There is no default and no fallback: an
+        unbound thread that reaches db.connect raises rather than opening the owner's
+        library on a guess.
+        """
+        try:
+            self._bind()
+            return self._route(method)
+        finally:
+            who.unbind()
+
+    def _bind(self):
+        from .modules import auth
+        if not registry.has("auth"):
+            # No door means no accounts, which is the single library this project began as
+            # and the shape the tests run in. Everything belongs to the owner.
+            who.bind(accounts.OWNER)
+            return
+        who.bind(auth.account_for(self.headers))
+
+    def _route(self, method):
+        """Everything after the account is known.
+
+        Named _route and not _serve: this class already has a _serve, forty lines up, which
+        is the one the do_ verbs call and which wraps the request body handling. A second
+        method of that name in the same class body silently replaces the first, and what
+        that looks like from outside is every request arriving with no account bound.
+        """
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         # The door has to know which verb is being attempted, not just where.

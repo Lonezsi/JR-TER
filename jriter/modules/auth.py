@@ -1,16 +1,27 @@
-"""One password, and a door.
+"""The door, and which of several people came through it.
 
-There are no rules about what the password may be. Length limits, character classes and
-"must contain a symbol" mostly push people towards one bad password reused everywhere,
-and this library has exactly one user who already knows what it is worth.
+There used to be one password and one library. There are now accounts, one library each,
+and this module is what turns a request into the answer to "whose". The accounts themselves
+live in jriter/accounts.py; this is the door in front of them.
 
-What guards it instead is a limit on guessing. An attacker who gets six attempts a minute
-cannot brute force even a short password, and a rate limit costs the person who knows it
-nothing. That is the trade this module makes: no rules about the secret, hard limits on
-attempts.
+There are still no rules about what a password may be. Length limits, character classes and
+"must contain a symbol" mostly push people towards one bad password reused everywhere. What
+guards the door instead is a limit on guessing: six wrong answers and that address waits,
+for longer each time. That trade is unchanged, and it now costs an attacker more, because
+they have to guess a handle as well.
 
 The password is never stored. It is put through scrypt, which is deliberately slow and
 memory hungry, and only the result is kept.
+
+The session cookie carries who it belongs to and is signed with two secrets: the server's,
+which ends every session on this machine when it rotates, and the account's own, which ends
+only that person's. Before there were accounts there was only the first, so changing a
+password signed out everybody on the server, which with one user was the same thing and now
+is not.
+
+Signing up needs an invite. This server answers on a public address, and an open signup form
+is an offer to every crawler that finds it to make an account and store files on somebody's
+home machine.
 """
 import os
 import json
@@ -21,22 +32,19 @@ import hashlib
 import secrets
 import threading
 
-from .. import config, db
-from ..wire import Error, Response
+from .. import config, db, who, accounts
+from ..wire import Error, Response, need
 
 NAME = "auth"
-SCHEMA = [
-    """
-    CREATE TABLE IF NOT EXISTS auth_tokens (
-      id         INTEGER PRIMARY KEY,
-      name       TEXT NOT NULL,
-      digest     TEXT NOT NULL UNIQUE,
-      scope      TEXT NOT NULL DEFAULT 'upload',
-      created_at REAL NOT NULL,
-      last_used  REAL NOT NULL DEFAULT 0
-    )
-    """,
-]
+#: No tables of its own in the library any more.
+#:
+#: auth_tokens used to live here, and it cannot: checking a machine token means working out
+#: which library it belongs to, and you cannot look inside a library to find out whether it
+#: is the right library. They moved to accounts.db, beside the accounts they belong to. See
+#: accounts.TOKENS. A library that still holds the old table simply stops being asked about
+#: it; nothing reads it, and dropping it would be destroying a credential store on an
+#: upgrade for the sake of tidiness.
+SCHEMA = []
 
 #: What a token is allowed to do.
 #:
@@ -158,7 +166,17 @@ def _write(data):
         pass
 
 
+# ── "the library's password" ─────────────────────────────────────────────────
+#
+# These three used to be the whole of it: one password in one file. There are accounts now,
+# so the phrase means the owner's password, and that is where these read and write. They are
+# kept rather than removed because "is this library protected at all" is still a real
+# question, asked by the door and by the health check, and because a library that has not yet
+# been moved into accounts still answers out of auth.json.
+
 def has_password():
+    if accounts.count():
+        return True
     return bool(_read().get("hash"))
 
 
@@ -168,9 +186,17 @@ def _hash(password, salt):
 
 
 def set_password(password):
-    """Any password at all, so long as there is one. Empty is not a password."""
+    """Set the owner's password. Any password at all, so long as there is one."""
     if not isinstance(password, str) or not password:
         raise Error("Type a password. Anything you like, but not nothing.")
+    here = accounts.owner()
+    if here:
+        accounts.set_password(here["id"], password)
+        _spend_setup_code()
+        return True
+
+    # No accounts yet, which is a library on its way up and not yet moved across. Written
+    # where adopt_single_library will look for it.
     salt = secrets.token_bytes(16)
     data = _read()
     data.update({
@@ -180,16 +206,24 @@ def set_password(password):
         "set_at": time.time(),
     })
     _write(data)
-    # The setup code is spent the moment a password exists.
+    _spend_setup_code()
+    return True
+
+
+def _spend_setup_code():
+    """The code stops existing the moment there is somebody to sign in as."""
     _, setup_path = _paths()
     try:
         os.remove(setup_path)
     except OSError:
         pass
-    return True
 
 
 def check_password(password):
+    """Is this the owner's password."""
+    here = accounts.owner()
+    if here:
+        return accounts.check(here, password)
     data = _read()
     if not data.get("hash"):
         return False
@@ -207,7 +241,7 @@ def setup_code():
     existing as soon as a password is set.
     """
     _, path = _paths()
-    if has_password():
+    if accounts.count() or has_password():
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -232,28 +266,75 @@ def _secret():
     return base64.b64decode(data["secret"])
 
 
-def issue():
-    """A signed cookie value: when it was made, and proof we made it."""
+def _sign(body, account_id):
+    """Two secrets, so there are two levers.
+
+    The server's ends every session on this machine. The account's ends one person's, which
+    is what changing a password should do: before accounts, rotating the only secret there
+    was signed out everybody, and with one user nobody could tell the difference.
+    """
+    key = _secret() + (accounts.secret_of(account_id) or "").encode()
+    return hmac.new(key, body.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def issue(account_id):
+    """A signed cookie value: when it was made, whose it is, and proof we made it."""
     issued = str(int(time.time()))
     nonce = secrets.token_hex(8)
-    body = "%s.%s" % (issued, nonce)
-    signature = hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()[:32]
-    return "%s.%s" % (body, signature)
+    body = "%s.%d.%s" % (issued, account_id, nonce)
+    return "%s.%s" % (body, _sign(body, account_id))
 
 
-def valid(token):
-    if not token or token.count(".") != 2:
-        return False
-    issued, nonce, signature = token.split(".")
-    body = "%s.%s" % (issued, nonce)
-    expected = hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()[:32]
-    if not hmac.compare_digest(signature, expected):
-        return False
+def whose(token):
+    """The account this cookie belongs to, or None.
+
+    Two shapes are accepted. Four parts is the current one. Three is what was issued before
+    there were accounts, and it means the owner: a rename that signs everybody out on the
+    morning they pull it is a rename that looks like a bug, and the owner's library is
+    exactly the library that cookie was for.
+    """
+    if not token:
+        return None
+    bits = token.split(".")
+    if len(bits) == 4:
+        issued, said, nonce, signature = bits
+        try:
+            account_id = int(said)
+        except ValueError:
+            return None
+        body = "%s.%s.%s" % (issued, said, nonce)
+    elif len(bits) == 3:
+        issued, nonce, signature = bits
+        account_id = accounts.OWNER
+        # The old body, signed with the old key: the server secret alone. Verified on its
+        # own terms rather than pretending it was signed the new way.
+        body = "%s.%s" % (issued, nonce)
+        expected = hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()[:32]
+        if not hmac.compare_digest(signature, expected):
+            return None
+        return account_id if _fresh(issued) and accounts.by_id(account_id) else None
+    else:
+        return None
+
+    if not hmac.compare_digest(signature, _sign(body, account_id)):
+        return None
+    if not _fresh(issued):
+        return None
+    # A cookie for an account that has been deleted is not a session.
+    return account_id if accounts.by_id(account_id) else None
+
+
+def _fresh(issued):
     try:
         age = time.time() - int(issued)
     except ValueError:
         return False
     return 0 <= age <= SESSION_DAYS * 86400
+
+
+def valid(token):
+    """Kept for the shape of the old question. Prefer whose()."""
+    return whose(token) is not None
 
 
 #: Tokens are stored the way passwords are: only a digest, so the file being read does
@@ -267,23 +348,25 @@ def _token_digest(raw):
     return hashlib.sha256(("jong-token:" + raw).encode("utf-8")).hexdigest()
 
 
-def make_token(name, scope="upload"):
-    """Mint one. The raw value is returned once and never stored."""
+def make_token(name, scope="upload", account_id=None):
+    """Mint one for an account. The raw value is returned once and never stored."""
     if scope not in SCOPES:
         raise Error("scope must be one of: " + ", ".join(sorted(SCOPES)))
     raw = "jt_" + secrets.token_urlsafe(30)
-    db.insert("auth_tokens", {"name": (name or "a machine")[:80],
-                              "digest": _token_digest(raw), "scope": scope,
-                              "created_at": time.time(), "last_used": 0})
+    accounts.add_token(account_id if account_id is not None else who.must(),
+                       (name or "a machine")[:80], _token_digest(raw), scope)
     return raw
 
 
-def token_allows(headers, method, path):
-    """Does the X-Jriter-Token on this request cover this route.
+def token_account(headers, method, path):
+    """Which account's library the X-Jriter-Token on this request may reach, or None.
 
-    Checked instead of a session, not as well as one, so a token can never be used to
-    reach something the person who made it did not intend. An unknown token is simply not
-    signed in, with no way to tell it from a wrong one.
+    Checked instead of a session, not as well as one, so a token can never be used to reach
+    something the person who made it did not intend. An unknown token is simply not signed
+    in, with no way to tell it from a wrong one.
+
+    Returns the account rather than a yes, because being allowed in and knowing whose
+    library to open are the same question once there is more than one library.
     """
     # The old header is still accepted. An agent updates itself from a daily task, so
     # an agent that has not run that task yet is the normal state of things for a day
@@ -291,32 +374,46 @@ def token_allows(headers, method, path):
     # the watch loop swallows the 401 and goes on pushing nothing.
     raw = (headers.get("X-Jriter-Token")
            or headers.get("X-Jong-Token") or "").strip()
-    if not raw or not db.table_exists("auth_tokens"):
-        return False
-    row = db.one("SELECT * FROM auth_tokens WHERE digest = ?", (_token_digest(raw),))
+    if not raw:
+        return None
+    row = accounts.token_for(_token_digest(raw))
     if not row:
-        return False
+        return None
     allowed = SCOPES.get(row["scope"], ())
     if allowed is not None and (method, path) not in allowed:
-        return False
+        return None
     # Useful for telling a live agent from one that stopped months ago.
-    db.run("UPDATE auth_tokens SET last_used = ? WHERE id = ?", (time.time(), row["id"]))
-    return True
+    accounts.token_used(row["id"])
+    return row["account_id"]
 
 
-def signed_in(headers):
-    if not has_password():
-        return False
+def token_allows(headers, method, path):
+    """The old shape of the question, kept for anything that only wants a yes."""
+    return token_account(headers, method, path) is not None
+
+
+def account_for(headers):
+    """Which account this request's cookie belongs to, or None."""
     raw = headers.get("Cookie") or ""
     for part in raw.split(";"):
         name, _, value = part.strip().partition("=")
-        if name in (COOKIE, LEGACY_COOKIE) and valid(value):
-            return True
-    return False
+        if name in (COOKIE, LEGACY_COOKIE):
+            found = whose(value)
+            if found:
+                return found
+    return None
+
+
+def signed_in(headers):
+    return account_for(headers) is not None
 
 
 def sign_out_everywhere():
-    """Rotating the secret invalidates every cookie that was ever issued."""
+    """Rotate the server secret: every cookie on this machine, for everybody.
+
+    The blunt one, and it stays for the case it is actually for, which is a server that may
+    have been reached. Changing one password uses accounts.sign_out_everywhere instead.
+    """
     data = _read()
     data["secret"] = base64.b64encode(secrets.token_bytes(32)).decode()
     _write(data)
@@ -391,9 +488,16 @@ def _cookie_header(req, value, days):
 
 # ── endpoints ────────────────────────────────────────────────────────────────
 def state(req):
+    here = account_for(req.headers)
     answer = {
-        "has_password": has_password(),
-        "signed_in": signed_in(req.headers),
+        # "Is this library set up at all", which before accounts was the same question as
+        # "is there a password". The login page draws the setup form off this.
+        "has_password": accounts.count() > 0 or has_password(),
+        "signed_in": here is not None,
+        "who": accounts.public(accounts.by_id(here)) if here else None,
+        # Whether the sign up form is worth drawing. Never says whether any particular code
+        # is good: that answer belongs behind a rate limit.
+        "can_sign_up": accounts.count() > 0,
         "locked_for": _wait_for(_who(req)),
         "custom_font": False,
     }
@@ -403,24 +507,66 @@ def state(req):
     from .. import registry
     if registry.has("appearance"):
         from . import appearance
-        answer["custom_font"] = appearance.state().get("custom_font", False)
+        # As the owner, explicitly. This is asked by the login page, where nobody is
+        # signed in and there is therefore no library bound; without saying whose, it
+        # raises. The owner's is the right answer: the door belongs to the library rather
+        # than to whichever of several people is about to come through it.
+        with who.acting_as(accounts.OWNER):
+            answer["custom_font"] = appearance.state().get("custom_font", False)
     return answer
 
 
 def setup(req):
-    """Choose the first password. Needs the setup code, and only works once."""
-    if has_password():
-        raise Error("A password is already set on this library.", 409)
+    """Make the first account. Needs the setup code, and only works once."""
+    if accounts.count():
+        raise Error("This library already has an owner.", 409)
     data = req.json()
     code = setup_code()
     given = (data.get("code") or "").strip()
     if not given or not hmac.compare_digest(given, code or ""):
         _note_failure(_who(req))
         raise Error("That setup code is not right.", 403)
-    set_password(data.get("password") or "")
+
+    # The owner's handle is fixed rather than asked for. Signing in with an empty handle
+    # means the owner, so somebody who has only ever typed a password carries on doing
+    # exactly that, and they can put a name on it later.
+    made = accounts.create("owner", data.get("password") or "",
+                           name=(data.get("name") or "").strip(),
+                           account_id=accounts.OWNER)
+    _spend_setup_code()
     _clear(_who(req))
     return Response(status=200, body=b'{"ok":true}', content_type="application/json",
-                    headers={"Set-Cookie": _cookie_header(req, issue(), SESSION_DAYS)})
+                    headers={"Set-Cookie": _cookie_header(req, issue(made["id"]),
+                                                          SESSION_DAYS)})
+
+
+def sign_up(req):
+    """Make an account, with an invite.
+
+    The invite is checked under the same rate limit as a password, because without that
+    this endpoint is an oracle for guessing codes.
+    """
+    ip = _who(req)
+    wait = _wait_for(ip)
+    if wait:
+        raise Error("Too many attempts. Try again in %d seconds." % wait, 429)
+    if not accounts.count():
+        raise Error("This library has no owner yet.", 409)
+
+    data = req.json()
+    invite = accounts.invite_for((data.get("code") or "").strip())
+    if not invite:
+        _note_failure(ip)
+        raise Error("That invite is not one this library gave out, or it has been used "
+                    "already.", 403)
+
+    made = accounts.create(data.get("handle"), data.get("password") or "",
+                           name=(data.get("name") or "").strip())
+    accounts.spend_invite(invite["id"], made["id"])
+    _clear(ip)
+    return Response(status=200, body=b'{"ok":true}', content_type="application/json",
+                    headers={"Set-Cookie": _cookie_header(req, issue(made["id"]),
+                                                          SESSION_DAYS)})
 
 
 def login(req):
@@ -428,16 +574,29 @@ def login(req):
     wait = _wait_for(ip)
     if wait:
         raise Error("Too many attempts. Try again in %d seconds." % wait, 429)
-    if not has_password():
-        raise Error("No password is set on this library yet.", 409)
-    if not check_password(req.json().get("password") or ""):
+    if not accounts.count():
+        raise Error("No account has been made on this library yet.", 409)
+
+    data = req.json()
+    handle = (data.get("handle") or "").strip()
+    # An empty handle means the owner. Before there were accounts the sign in page asked
+    # for a password and nothing else, and for the person whose library this is that should
+    # not have changed.
+    account = accounts.by_handle(handle) if handle else accounts.owner()
+
+    if not accounts.check(account, data.get("password") or ""):
         _note_failure(ip)
         again = _wait_for(ip)
-        raise Error("That is not the password."
+        # One message for a wrong handle and a wrong password, on purpose: telling them
+        # apart is telling a stranger which handles exist on this server.
+        raise Error("That is not right."
                     + (" Too many attempts, wait %d seconds." % again if again else ""), 401)
+
     _clear(ip)
+    accounts.seen(account["id"])
     return Response(status=200, body=b'{"ok":true}', content_type="application/json",
-                    headers={"Set-Cookie": _cookie_header(req, issue(), SESSION_DAYS)})
+                    headers={"Set-Cookie": _cookie_header(req, issue(account["id"]),
+                                                          SESSION_DAYS)})
 
 
 def logout(req):
@@ -447,39 +606,98 @@ def logout(req):
 
 
 def change(req):
-    if not signed_in(req.headers):
+    here = account_for(req.headers)
+    if not here:
         raise Error("Sign in first.", 401)
+    account = accounts.by_id(here)
     data = req.json()
-    if not check_password(data.get("current") or ""):
+    if not accounts.check(account, data.get("current") or ""):
         _note_failure(_who(req))
         raise Error("That is not the current password.", 401)
-    set_password(data.get("new") or "")
-    sign_out_everywhere()
+    accounts.set_password(here, data.get("new") or "")
+    # Theirs alone. This used to rotate the server secret, which signed out every person
+    # on the machine because one of them changed their password.
+    accounts.sign_out_everywhere(here)
     return Response(status=200, body=b'{"ok":true,"signed_out":true}',
                     content_type="application/json",
-                    headers={"Set-Cookie": _cookie_header(req, issue(), SESSION_DAYS)})
+                    headers={"Set-Cookie": _cookie_header(req, issue(here), SESSION_DAYS)})
+
+
+# ── invites ──────────────────────────────────────────────────────────────────
+def list_invites(req):
+    here = account_for(req.headers)
+    if here != accounts.OWNER:
+        raise Error("Only the owner of this library hands out invites.", 403)
+    return {"invites": accounts.invites_by(here),
+            "accounts": [accounts.public(a) for a in accounts.everybody()]}
+
+
+def create_invite(req):
+    here = account_for(req.headers)
+    if here != accounts.OWNER:
+        raise Error("Only the owner of this library hands out invites.", 403)
+    data = req.json()
+    raw = accounts.make_invite(here, note=data.get("note") or "",
+                               days=as_days(data.get("days")))
+    return {"code": raw,
+            "note": "This is the only time it is shown. Send it to whoever it is for."}
+
+
+def as_days(value):
+    try:
+        days = int(value)
+    except (TypeError, ValueError):
+        return 14
+    return max(0, min(365, days))
+
+
+def revoke_invite(req):
+    here = account_for(req.headers)
+    if here != accounts.OWNER:
+        raise Error("Only the owner of this library hands out invites.", 403)
+    accounts.drop_invite(req.params["id"], here)
+    return {"revoked": req.params["id"]}
+
+
+def me(req):
+    """Who this request is, for the rail and for anything that needs to name the editor."""
+    here = account_for(req.headers)
+    if not here:
+        raise Error("Sign in first.", 401)
+    return {"who": accounts.public(accounts.by_id(here))}
+
+
+def rename_me(req):
+    here = account_for(req.headers)
+    if not here:
+        raise Error("Sign in first.", 401)
+    return {"who": accounts.public(accounts.rename(here, need(req.json(), "name")))}
 
 
 def SUMMARY():
-    return {"protected": has_password()}
+    here = who.now()
+    return {"protected": accounts.count() > 0 or has_password(),
+            "accounts": accounts.count(),
+            "is_owner": here == accounts.OWNER,
+            "who": accounts.public(accounts.by_id(here)) if here else None}
 
 
 def list_tokens(req):
     """What machines can reach this library, and when each last did."""
-    rows = db.query("SELECT id, name, scope, created_at, last_used FROM auth_tokens "
-                    "ORDER BY created_at DESC")
-    return {"tokens": rows}
+    return {"tokens": accounts.tokens_of(who.must())}
 
 
 def create_token(req):
     """Mint one for a machine. The value comes back once and is never stored."""
     data = req.json()
-    raw = make_token(data.get("name"), (data.get("scope") or "upload").strip())
+    raw = make_token(data.get("name"), (data.get("scope") or "upload").strip(),
+                     account_id=who.must())
     return {"token": raw, "note": "This is the only time it is shown."}
 
 
 def revoke_token(req):
-    db.run("DELETE FROM auth_tokens WHERE id = ?", (req.params["id"],))
+    # Scoped to this account, so an id guessed off another library revokes nothing.
+    accounts.drop_token(req.params["id"], who.must())
     return {"revoked": req.params["id"]}
 
 
@@ -487,6 +705,12 @@ def ROUTES():
     return {
         ("GET", "/api/auth/state"): state,
         ("POST", "/api/auth/setup"): setup,
+        ("POST", "/api/auth/signup"): sign_up,
+        ("GET", "/api/auth/me"): me,
+        ("PATCH", "/api/auth/me"): rename_me,
+        ("GET", "/api/auth/invites"): list_invites,
+        ("POST", "/api/auth/invites"): create_invite,
+        ("DELETE", "/api/auth/invites/<id>"): revoke_invite,
         ("POST", "/api/auth/login"): login,
         ("GET", "/api/auth/tokens"): list_tokens,
         ("POST", "/api/auth/tokens"): create_token,

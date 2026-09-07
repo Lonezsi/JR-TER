@@ -205,7 +205,7 @@ def test_the_write_ahead_log_is_folded_back_in_rather_than_growing_forever(serve
     for n in range(60):
         server.post("/api/songs", {"title": "Row %d" % n})
 
-    wal = config.DB_PATH + "-wal"
+    wal = config.db_path() + "-wal"
     assert os.path.exists(wal), "WAL mode is not on, so this test is measuring nothing"
     grown = os.path.getsize(wal)
     assert grown > 0, "nothing was written"
@@ -214,7 +214,12 @@ def test_the_write_ahead_log_is_folded_back_in_rather_than_growing_forever(serve
     assert os.path.getsize(wal) <= grown, "checkpointing made the log bigger"
 
     # And on the way out it is emptied rather than merely folded.
-    db.close()
+    #
+    # shut_down and not close. close lets go of the calling thread's own connections, and
+    # every write above happened on a server thread; the log that has to be emptied belongs
+    # to a connection this thread has never held. That distinction is the whole reason the
+    # thirty second timer in server.py had been checkpointing nothing.
+    db.shut_down()
     assert os.path.getsize(wal) == 0 or not os.path.exists(wal),         "the log still held %d bytes after the database was closed" % os.path.getsize(wal)
 
 

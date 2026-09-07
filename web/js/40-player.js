@@ -80,9 +80,17 @@ J.player = (function () {
    * a URL, and the player has no reason to care which it is holding. The kind is kept so
    * the few places that genuinely differ, writing a corrected duration back for one and
    * not the other, can ask. */
-  const srcFor = (item) => (item.kind === "render"
-    ? `/api/renders/${item.id}/audio`
-    : `/api/versions/${item.id}/audio`);
+  /* Where a playable thing's bytes are.
+   *
+   * An item may carry its own url, and a shared song is why. The server works out which
+   * file a share means from the share itself, so the recipient never names a version:
+   * given a free choice of version id, playing a share would be a way to read any file in
+   * any library on the server. The id in that case is a string, which is also why keyFor
+   * exists rather than comparing ids directly. */
+  const srcFor = (item) => (item.url ? item.url
+    : item.kind === "render"
+      ? `/api/renders/${item.id}/audio`
+      : `/api/versions/${item.id}/audio`);
   //: A render id and a version id are both small integers, so the deck remembers which.
   const keyFor = (item) => `${item.kind || "version"}:${item.id}`;
 
@@ -384,7 +392,8 @@ J.player = (function () {
      * the plain path: one file, the transport, and the bar showing what it is. It is
      * also what a playlist uses when the next thing in it is a loose render. */
     async playRender(entry, queue) {
-      const item = { id: entry.id, kind: "render", duration: entry.duration || 0 };
+      const item = { id: entry.id, kind: "render", duration: entry.duration || 0,
+                     url: entry.url || null };
       const asSong = { id: `render:${entry.id}`, kind: "render",
                        title: entry.name || entry.filename || "render" };
       const before = { song: state.song, playing: state.playing };

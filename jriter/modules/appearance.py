@@ -21,7 +21,7 @@ MAX_BYTES = 8 * 1024 * 1024
 
 
 def _dir():
-    return os.path.join(config.DATA, "appearance")
+    return os.path.join(config.home(), "appearance")
 
 
 def _find():
@@ -62,6 +62,16 @@ def state():
 
 
 def get_font(req):
+    """The typeface, which the login page asks for before anybody has signed in.
+
+    So it falls back to the owner's when nothing is bound. /api/appearance/font is one of
+    the handful of endpoints open to a stranger, on purpose: the door wears the same face
+    as the library behind it, and asking for it is not asking for anything else.
+    """
+    from .. import who, accounts
+    if who.now() is None:
+        with who.acting_as(accounts.OWNER):
+            return get_font(req)
     path = _find()
     if not path:
         raise Error("no display font has been uploaded", 404)

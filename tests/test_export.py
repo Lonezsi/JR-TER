@@ -60,9 +60,17 @@ def test_the_copy_never_carries_anything_that_opens_the_door(server, wav):
     auth.set_password("a password for the test")
     auth.make_token("a machine", "upload")
 
+    from jriter import accounts
     held = auth._read()
     secrets = [held.get("hash"), held.get("salt"), held.get("secret")]
-    secrets += [row["digest"] for row in db.query("SELECT digest FROM auth_tokens")]
+    # Out of the accounts database rather than the library. Tokens moved there when there
+    # started being more than one library, which means a copy of a library cannot carry a
+    # credential even by accident: there is no longer one in it to carry.
+    secrets += [row["digest"] for row in accounts._query("SELECT digest FROM tokens")]
+    owner = accounts.owner()
+    if owner:
+        secrets += [owner["hash"], owner["salt"], owner["secret"]]
+    secrets = [x for x in secrets if x]
     secrets = [s for s in secrets if s]
     assert len(secrets) >= 4, "nothing secret existed, so this test proved nothing"
 
@@ -74,11 +82,12 @@ def test_the_copy_never_carries_anything_that_opens_the_door(server, wav):
     for secret in secrets:
         assert secret not in everything, "a credential is in the copy"
 
-    # And the row is still there, so you can see what has been let in.
+    # And there is no token table in the copy at all now, which is the stronger version
+    # of what this test was checking. A library used to hold its own machine credentials
+    # and the export had to be careful to leave the digest column behind; they live in the
+    # accounts database now, which is never part of a library's copy.
     library = json.loads(inside.read("library.json").decode("utf-8"))
-    tokens = library["tables"].get("auth_tokens", [])
-    assert tokens and tokens[0]["name"] == "a machine"
-    assert "digest" not in tokens[0], "the token digest is in the copy"
+    assert "auth_tokens" not in library["tables"]
 
 
 def test_the_copy_says_inside_itself_what_is_missing(server, wav):
@@ -138,7 +147,7 @@ def test_erase_removes_the_library_and_says_what_it_could_not(server, wav):
     # The rows, not the file: see the comment in erase about what os.remove does on
     # Windows while other threads hold the database open.
     assert db.query("SELECT * FROM songs") == []
-    assert not any(names for _, _, names in os.walk(config.BLOBS)), "the audio is still there"
+    assert not any(names for _, _, names in os.walk(config.blobs_dir())), "the audio is still there"
 
     # The three things it cannot reach are named rather than left to be discovered.
     left = " ".join(said["left"]).lower()
@@ -158,6 +167,7 @@ def test_the_copy_arrives_as_a_named_file_and_leaves_nothing_behind(server, wav)
     """
     import glob
     import tempfile
+    import time
     import urllib.request
 
     server.upload("/api/renders", wav(), filename="named.wav")
@@ -174,5 +184,14 @@ def test_the_copy_arrives_as_a_named_file_and_leaves_nothing_behind(server, wav)
     assert "no-store" in (answer.headers.get("Cache-Control") or "")
     assert zipfile.ZipFile(io.BytesIO(raw)).read("library.json")
 
-    after = set(glob.glob(os.path.join(tempfile.gettempdir(), "jriter-export-*")))
+    # Given a moment, because the removal is in the handler's finally and therefore runs
+    # after the last byte is on the wire. The client can be back here before the server has
+    # let go of the file, which is a race this test lost about once in four hundred and not
+    # a leak: what matters is that the copy does not survive, not that it is gone before
+    # the reader blinks.
+    for _ in range(50):
+        after = set(glob.glob(os.path.join(tempfile.gettempdir(), "jriter-export-*")))
+        if not (after - before):
+            break
+        time.sleep(0.02)
     assert not (after - before), "a copy of the library was left in %s" % tempfile.gettempdir()

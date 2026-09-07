@@ -30,6 +30,11 @@ J.router = (function () {
     if (parts[0] === "song") return { view: "song", params: Object.assign({ id: parts[1], tab: parts[2] }, query) };
     if (parts[0] === "album") return { view: "album", params: Object.assign({ id: parts[1] }, query) };
     if (parts[0] === "playlist") return { view: "playlist", params: Object.assign({ id: parts[1] }, query) };
+    // One shared song. Its own path rather than a tab of #/song, because it is not a song
+    // of yours and almost nothing on that screen applies to it.
+    if (parts[0] === "shared" && parts[1]) {
+      return { view: "share", params: Object.assign({ id: parts[1] }, query) };
+    }
     if (J.views[parts[0]]) return { view: parts[0], params: query };
     return { view: "missing", params: { path: pathPart } };
   }

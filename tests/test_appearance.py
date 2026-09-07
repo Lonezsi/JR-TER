@@ -55,8 +55,9 @@ def test_an_uploaded_font_keeps_the_name_it_arrived_with(server, tmp_path):
 
 def test_the_file_on_disk_is_not_named_by_the_uploader(server, tmp_path):
     from jriter import config
+    from jriter.modules import appearance
     upload(server, a_font(tmp_path), filename="../../../nice try.ttf")
-    here = os.path.join(config.DATA, "appearance")
+    here = appearance._dir()
     written = sorted(os.listdir(here))
     assert written, "nothing was stored"
     for name in written:
@@ -91,24 +92,26 @@ def test_something_that_is_not_a_font_format_is_refused(server, tmp_path):
 
 def test_only_one_display_font_at_a_time(server, tmp_path):
     from jriter import config
+    from jriter.modules import appearance
     upload(server, a_font(tmp_path, "First.ttf"))
     status, second = upload(server, a_font(tmp_path, "Second.otf", kind="otf"))
     assert status == 200
     assert second["font"]["font_name"] == "Second.otf"
 
-    fonts = [n for n in os.listdir(os.path.join(config.DATA, "appearance"))
+    fonts = [n for n in os.listdir(appearance._dir())
              if not n.endswith(".name")]
     assert len(fonts) == 1, "the old font was left behind: %s" % fonts
 
 
 def test_removing_it_leaves_nothing_behind(server, tmp_path):
     from jriter import config
+    from jriter.modules import appearance
     upload(server, a_font(tmp_path, "Orena.ttf"))
     status, cleared = server.delete("/api/appearance/font")
     assert status == 200
     assert cleared["font"] == {"custom_font": False}
 
-    here = os.path.join(config.DATA, "appearance")
+    here = appearance._dir()
     left = os.listdir(here) if os.path.isdir(here) else []
     assert left == [], "the font went but something stayed: %s" % left
 

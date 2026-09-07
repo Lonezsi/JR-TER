@@ -112,9 +112,18 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
   <div class="problem" id="problem" hidden></div>
 
   <label id="codeField" hidden>
-    Setup code
+    <span id="codeLabel">Setup code</span>
     <input class="field" id="code" name="code" autocomplete="off" spellcheck="false"
            placeholder="printed where the server is running">
+  </label>
+
+  <!-- Optional on the way in, required on the way up.
+       Somebody who has only ever typed a password here is the owner of this library, and
+       an empty handle means exactly that, so their habit is unchanged. -->
+  <label id="handleField" hidden>
+    <span id="handleLabel">Handle</span>
+    <input class="field" id="handle" name="username" autocomplete="username"
+           spellcheck="false" autocapitalize="none" placeholder="what your friend calls you">
   </label>
 
   <label>
@@ -124,6 +133,13 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
   </label>
 
   <button class="btn primary" id="go" type="submit">Sign in</button>
+
+  <!-- Only when there is somebody to have been invited by. A fresh library shows the
+       setup form instead, and a link offering to sign up to a library that has no owner
+       yet would be an invitation to take it. -->
+  <p class="note" id="swap" hidden>
+    <a href="#" id="swapLink">I have an invite</a>
+  </p>
 
   <p class="note" id="note">
     Guessing is limited to a few tries before this address has to wait.
@@ -142,6 +158,8 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 "use strict";
 const $ = (id) => document.getElementById(id);
 let mode = "login";
+//: Whether this library has an owner yet, and therefore whether an invite could exist.
+let canSignUp = false;
 
 async function api(path, body) {
   const response = await fetch(path, {
@@ -174,20 +192,50 @@ async function decideMode() {
     }
     if (state.signed_in) { location.href = "/"; return; }
     mode = state.has_password ? "login" : "setup";
+    canSignUp = !!state.can_sign_up;
   } catch (e) {
     problem("JR!TER is not answering.");
     return;
   }
 
+  draw();
+}
+
+/* Which of the three doors this is, drawn from `mode`.
+ *
+ * Its own function now, because there are three and you can move between two of them
+ * without asking the server anything: deciding used to be the same code as drawing, which
+ * was fine while the only way to change your mind was to reload. */
+function draw() {
   const setup = mode === "setup";
-  $("codeField").hidden = !setup;
+  const joining = mode === "signup";
+  const fresh = setup || joining;
+
+  // The code field does two jobs, and they are not the same job. Setting up a library
+  // needs the code printed where the server runs; joining one needs a code the owner sent
+  // you. Same input, different question, so the label says which.
+  $("codeField").hidden = !fresh;
+  $("codeLabel").textContent = setup ? "Setup code" : "Invite code";
+  $("code").placeholder = setup ? "printed where the server is running"
+                                : "the code you were sent";
+
+  // A handle is asked for when joining, offered when signing in, and never when setting
+  // up: the owner's handle is fixed, and an empty one means them.
+  $("handleField").hidden = setup;
+  $("handleLabel").textContent = joining ? "Choose a handle" : "Handle";
+  $("handle").placeholder = joining ? "letters, digits, - _ ."
+                                    : "leave empty if this library is yours";
+
   $("blurb").textContent = setup
     ? "Nobody has set a password on this library yet. Choose one now."
-    : "Sign in to your library.";
-  $("passwordLabel").textContent = setup ? "Choose a password" : "Password";
-  $("password").setAttribute("autocomplete", setup ? "new-password" : "current-password");
-  $("go").textContent = setup ? "Set it and open the library" : "Sign in";
-  $("note").textContent = setup
+    : joining
+      ? "Somebody gave you a code. This makes you an account with a library of your own."
+      : "Sign in to your library.";
+  $("passwordLabel").textContent = fresh ? "Choose a password" : "Password";
+  $("password").setAttribute("autocomplete", fresh ? "new-password" : "current-password");
+  $("go").textContent = setup ? "Set it and open the library"
+    : joining ? "Make my account" : "Sign in";
+  $("note").textContent = fresh
     ? "Anything at all, as long as it is not empty. There are no rules about length or "
       + "characters, because guessing is rate limited instead."
     /* Not "any password is accepted" on the sign in screen.
@@ -197,8 +245,18 @@ async function decideMode() {
      * with a password field and a Sign in button under it, the same sentence says
      * something else entirely: that anything typed will get you in. */
     : "Guessing is limited to a few tries before this address has to wait.";
-  (setup ? $("code") : $("password")).focus();
+
+  $("swap").hidden = setup || !canSignUp;
+  $("swapLink").textContent = joining ? "I already have an account" : "I have an invite";
+  (fresh ? $("code") : $("password")).focus();
 }
+
+$("swapLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  mode = mode === "signup" ? "login" : "signup";
+  problem("");
+  draw();
+});
 
 $("door").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -209,8 +267,11 @@ $("door").addEventListener("submit", async (e) => {
   try {
     if (mode === "setup") {
       await api("/api/auth/setup", { code: $("code").value.trim(), password });
+    } else if (mode === "signup") {
+      await api("/api/auth/signup", { code: $("code").value.trim(), password,
+                                      handle: $("handle").value.trim() });
     } else {
-      await api("/api/auth/login", { password });
+      await api("/api/auth/login", { password, handle: $("handle").value.trim() });
     }
     location.href = "/";
   } catch (err) {

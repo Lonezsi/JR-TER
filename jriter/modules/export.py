@@ -174,9 +174,9 @@ def what_erase_takes(req):
                         pass
             return {"path": path, "bytes": total, "how": how}
         return None
-    goes = [weigh(config.DB_PATH, "every row inside it, then the file is compacted to empty"),
-            weigh(config.BLOBS, "every file in it"),
-            weigh(config.SETTINGS_PATH, "deleted")]
+    goes = [weigh(config.db_path(), "every row inside it, then the file is compacted to empty"),
+            weigh(config.blobs_dir(), "every file in it"),
+            weigh(config.settings_path(), "deleted")]
     return {"library": config.settings().get("library_name", "JR!TER"),
             "goes": [g for g in goes if g]}
 
@@ -224,21 +224,21 @@ def erase(req):
     conn.execute("VACUUM")
     conn.isolation_level = ""
 
-    if os.path.isdir(config.BLOBS):
-        for here, _, names in os.walk(config.BLOBS):
+    if os.path.isdir(config.blobs_dir()):
+        for here, _, names in os.walk(config.blobs_dir()):
             for one in names:
                 try:
                     os.remove(os.path.join(here, one))
                 except OSError:
                     pass
-        gone.append("every file under " + config.BLOBS)
+        gone.append("every file under " + config.blobs_dir())
     try:
-        os.remove(config.SETTINGS_PATH)
-        gone.append(config.SETTINGS_PATH)
+        os.remove(config.settings_path())
+        gone.append(config.settings_path())
     except OSError:
         pass
     blobs._forget_usage()
-    config.ensure_dirs()
+    config.ensure_home()
     return {
         "gone": gone,
         "left": [

@@ -38,7 +38,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .. import db, config, blobs, registry, video, audio_meta, problems
+from .. import db, config, blobs, registry, video, audio_meta, problems, who
 from ..wire import Error, Response, need, as_int
 from . import songs
 
@@ -57,7 +57,7 @@ SCOPE = "https://www.googleapis.com/auth/youtube.upload"
 #: Where the account lives. Beside the library rather than in it, because it is a
 #: credential: a database that gets copied about for a backup should not carry one.
 def _account_path():
-    return os.path.join(config.DATA, "youtube.json")
+    return os.path.join(config.home(), "youtube.json")
 
 NAME = "youtube"
 
@@ -191,7 +191,7 @@ def _account(default=None):
 
 def _save_account(data):
     path = _account_path()
-    config.ensure_dirs()
+    config.ensure_home()
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -298,7 +298,7 @@ def _avatar_cache(key):
     # The key comes from a channel name, so it is scrubbed to letters and digits before it
     # is any part of a path. A channel called "../../auth" is a perfectly legal channel.
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(key))[:60] or "one"
-    return os.path.join(config.DATA, "youtube", "avatar-%s" % safe)
+    return os.path.join(config.home(), "youtube", "avatar-%s" % safe)
 
 
 def _may_fetch(url):
@@ -338,7 +338,7 @@ def avatar(req):
              and time.time() - os.path.getmtime(cached) < AVATAR_MAX_AGE)
     if not fresh:
         try:
-            config.ensure_dirs()
+            config.ensure_home()
             os.makedirs(os.path.dirname(cached), exist_ok=True)
             request = urllib.request.Request(
                 entry["avatar_url"], headers={"User-Agent": "JR!TER"})
@@ -688,7 +688,7 @@ def disconnect(req):
 #: like data/youtube.json and data/appearance: these are scratch, not content, and a
 #: backup of the library should not carry a half made video.
 def _work_dir():
-    return os.path.join(config.DATA, "youtube", "work")
+    return os.path.join(config.home(), "youtube", "work")
 
 
 #: One job at a time, in memory, behind a lock. The shape is problems.py's, and so is the
@@ -1038,8 +1038,18 @@ def _still_for(song_id, into):
     return landing
 
 
-def _work(job, song, want):
-    """Make the video and send it. Runs on its own thread; nothing here touches a Request."""
+def _work(job, song, want, account):
+    """Make the video and send it. Runs on its own thread; nothing here touches a Request.
+
+    account is carried in rather than read, because there is nothing on this thread to read
+    it from. Everything below happens as that person: their work directory, their library,
+    their YouTube credential.
+    """
+    with who.acting_as(account):
+        return _work_as(job, song, want)
+
+
+def _work_as(job, song, want):
     room = os.path.join(_work_dir(), job["id"])
     os.makedirs(room, exist_ok=True)
     floor, span = 0.0, 1.0
@@ -1263,7 +1273,13 @@ def start_upload(req):
     _prune_old_work()
     job = _new_job(song, data.get("version_id"), digest)
     _note(privacy_asked=privacy)
-    threading.Thread(target=_work, args=(job, song, want),
+    # The account this upload belongs to, captured here where a request still knows it.
+    #
+    # _work runs on its own thread, and a thread that has not said whose library it is
+    # working on cannot open one: db.connect raises rather than guessing. Which is the
+    # right refusal, and it means every background job in this project has to carry its
+    # account across the thread boundary by hand. This is the one that does.
+    threading.Thread(target=_work, args=(job, song, want, who.must()),
                      name="youtube-upload", daemon=True).start()
     return {"job": _public_job()}
 

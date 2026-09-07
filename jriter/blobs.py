@@ -22,7 +22,7 @@ CHUNK = 1024 * 1024
 
 def path_for(digest):
     """Two levels of fan out, so no directory ends up with fifty thousand entries."""
-    return os.path.join(config.BLOBS, digest[:2], digest[2:4], digest)
+    return os.path.join(config.blobs_dir(), digest[:2], digest[2:4], digest)
 
 
 def exists(digest):
@@ -77,8 +77,9 @@ def put_stream(stream, length):
     is addressed by content, a wrong file under a right name is permanent: exists() only
     stats the path, so it shadows every correct upload of that audio ever after.
     """
-    config.ensure_dirs()
-    handle, tmp = tempfile.mkstemp(prefix="incoming.", suffix=".part", dir=config.BLOBS)
+    config.ensure_home()
+    handle, tmp = tempfile.mkstemp(prefix="incoming.", suffix=".part",
+                                   dir=config.blobs_dir())
     h = hashlib.sha256()
     size = 0
     try:
@@ -164,11 +165,11 @@ def _forget_usage():
 
 def usage(fresh=False):
     now = time.time()
-    if (not fresh and _usage["value"] and _usage["where"] == config.BLOBS
+    if (not fresh and _usage["value"] and _usage["where"] == config.blobs_dir()
             and now - _usage["at"] < USAGE_TTL):
         return _usage["value"]
     total = count = 0
-    for root, _, files in os.walk(config.BLOBS):
+    for root, _, files in os.walk(config.blobs_dir()):
         for name in files:
             if name.endswith(".part"):
                 continue
@@ -178,6 +179,6 @@ def usage(fresh=False):
             except OSError:
                 pass
     _usage["at"] = now
-    _usage["where"] = config.BLOBS
+    _usage["where"] = config.blobs_dir()
     _usage["value"] = {"files": count, "bytes": total}
     return _usage["value"]

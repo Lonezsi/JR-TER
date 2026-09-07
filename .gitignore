@@ -18,3 +18,7 @@ desktop.ini
 
 # The agent's local settings
 client.json
+
+# Written by install.ps1 into whatever directory it installed to. It holds the path to
+# that machine's Python, so it is a local file rather than part of the project.
+JR-TER.cmd

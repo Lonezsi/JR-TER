@@ -522,11 +522,15 @@ def cmd_server(cfg, server, args):
 
 
 def cmd_login(cfg, server, args):
-    """Trade the library's password for a token this machine can keep.
+    """Trade your password for a token this machine can keep.
 
     The password is used once, here, and never written down. What is stored is a token
     scoped to uploading, so this file being read does not hand anybody the ability to
     delete a song. Revoke it from Settings on the library itself.
+
+    The token belongs to one account, so a machine watching folders for one person cannot
+    push into anybody else's library even if the file is copied. Leave --handle off if the
+    library is yours: an empty handle means the owner, which is what it always meant.
     """
     import getpass
 
@@ -540,7 +544,8 @@ def cmd_login(cfg, server, args):
         return 1
 
     # Signed in as a person for exactly one call, to ask for the machine's own credential.
-    data = json.dumps({"password": password}).encode("utf-8")
+    data = json.dumps({"password": password,
+                       "handle": (args.handle or "").strip()}).encode("utf-8")
     request = urllib.request.Request(cfg["server"].rstrip("/") + "/api/auth/login",
                                      data=data, method="POST",
                                      headers={"Content-Type": "application/json"})
@@ -548,7 +553,7 @@ def cmd_login(cfg, server, args):
         with urllib.request.urlopen(request, timeout=30) as response:
             cookie = response.headers.get("Set-Cookie", "").split(";")[0]
     except urllib.error.HTTPError as e:
-        print("JR!TER said no (%d). Wrong password?" % e.code)
+        print("JR!TER said no (%d). Wrong handle or password?" % e.code)
         return 1
     except urllib.error.URLError as e:
         print("Cannot reach %s: %s" % (cfg["server"], e.reason))
@@ -801,6 +806,8 @@ def main(argv=None):
     sub.add_parser("folders", help="list watched folders")
     login = sub.add_parser("login", help="give this machine a credential for the library")
     login.add_argument("--password", help="asked for if not given")
+    login.add_argument("--handle",
+                       help="whose library; leave it off if the library is yours")
     login.add_argument("--name", help="what to call this machine in Settings")
     where = sub.add_parser("server", help="set the JR!TER address")
     where.add_argument("url")

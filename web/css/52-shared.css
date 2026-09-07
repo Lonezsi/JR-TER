@@ -1,0 +1,71 @@
+/* ── songs somebody else shared ────────────────────────────────────────────── */
+
+/* Its own screen, and it has to look like somebody else's work rather than yours.
+ *
+ * The whole design problem here is that a shared song is nearly a song and must not be
+ * mistaken for one. So a row on this list is a track row with the owner's name where the
+ * version count would be, and everything on the song's own page is either plainly theirs or
+ * plainly yours, never quietly one or the other. */
+
+.shared-row .s { color: var(--text-3); }
+
+.share-view { max-width: 760px; }
+
+.share-play {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s4);
+}
+
+/* One thing of theirs, with the button that makes it yours.
+ *
+ * Bordered rather than plain, so it reads as a container with a boundary: what is inside is
+ * theirs until you press the button, and the box is what says where theirs stops. */
+.share-block {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s4);
+  margin-bottom: var(--s4);
+  background: var(--glass);
+}
+.share-block-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+  font-weight: 650;
+  font-size: 13.5px;
+}
+
+/* Editable on purpose, and saving makes a copy rather than writing back.
+   Monospace, because words with a shape are words you can see the shape of. */
+.share-text {
+  width: 100%;
+  resize: vertical;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ── a code shown once ─────────────────────────────────────────────────────── */
+
+/* An invite, or anything else that exists for exactly as long as the dialog is open.
+ *
+ * Big, monospaced and selectable, because the realistic thing somebody does with this is
+ * read it out or copy it, and both want the characters far apart. Clicking copies it; the
+ * text is on screen anyway for the browsers that will not. */
+.code-out {
+  margin: var(--s4) 0;
+  padding: var(--s4);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--grad-sunken);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  cursor: pointer;
+  user-select: all;
+}
+.code-out:hover { border-color: var(--accent-line); }

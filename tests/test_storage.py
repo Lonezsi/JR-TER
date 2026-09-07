@@ -52,7 +52,7 @@ def test_a_partial_upload_leaves_nothing_behind(wav):
 
     digest, size, was_new = blobs.put_stream(ShortStream(), 1000)
     assert size == 0
-    leftovers = [n for _, _, files in os.walk(blobs.config.BLOBS) for n in files
+    leftovers = [n for _, _, files in os.walk(blobs.config.blobs_dir()) for n in files
                  if n.endswith(".part")]
     assert not leftovers, "a partial upload was left in the store"
 
@@ -134,7 +134,12 @@ def test_two_uploads_at_once_do_not_write_into_the_same_temporary_file(tmp_path)
     got = {}
 
     def send(name, payload):
-        got[name] = blobs.put_stream(Slow(payload, gate), len(payload))
+        # A thread that has not said whose library it is writing into cannot open one.
+        # In the server these are request threads and the HTTP layer binds them; here
+        # they are made by hand, so they say it by hand.
+        from jriter import who, accounts
+        with who.acting_as(accounts.OWNER):
+            got[name] = blobs.put_stream(Slow(payload, gate), len(payload))
 
     threads = [threading.Thread(target=send, args=("one", one)),
                threading.Thread(target=send, args=("two", two))]

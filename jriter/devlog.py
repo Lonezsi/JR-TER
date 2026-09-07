@@ -22,6 +22,53 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.0.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "Your friends can have accounts",
+        "notes": [
+            "Somebody else can have an account on this server, with a library of their "
+            "own. Nothing shows one person another's songs, renders, samples or lyrics, "
+            "and that is not a permission check: every account is a separate database "
+            "file and a separate folder of audio, so a query cannot reach rows that are "
+            "not in the file it opened.",
+            "Signing up needs an invite. Make one in Settings, under People, and send "
+            "them the code. Without that, an open form on a public address is an offer to "
+            "whoever finds it.",
+            "You can share one song. They can play it, read the words and work on the "
+            "equaliser and the limiter, and anything they save becomes their own copy "
+            "rather than a change to yours. Give them a name on the share and their edits "
+            "carry it, so a preset comes back as \"the original, edited by them\". They "
+            "cannot see anything else of yours or post anything anywhere, and you can "
+            "take it back whenever you like.",
+            "Your own library is now account one. Your password, your songs, your audio "
+            "and your machine credentials all carried across, and there is nothing to do "
+            "about it: sign in the way you always have.",
+            "One thing said plainly: this is a wall inside the app, not a wall against "
+            "whoever runs the machine. Their computer, their files. The privacy notice "
+            "says the same.",
+        ],
+    },
+    {
+        "version": "2.7.0",
+        "date": "2026-09-07",
+        "name": JRITER,
+        "title": "A front door, and a player that keeps going",
+        "notes": [
+            "Pressing the name in the rail opens a front page instead of the library: "
+            "what this is in a sentence, the songs and albums you keep opening, and what "
+            "changed lately. The release notes moved there out of Settings.",
+            "The player has two new buttons. Repeat plays the same thing again. The other "
+            "one keeps it going when the queue runs out, choosing from your own library "
+            "rather than stopping dead: the same album counts for most, then how often "
+            "you open something, then how recently you touched it, then chance. Both are "
+            "remembered per browser and either can be switched off.",
+            "The account you have connected shows at the foot of the rail, and on a phone "
+            "the search box now shrinks away as the panel comes over it rather than "
+            "sitting half covered behind it.",
+        ],
+    },
+    {
         "version": "2.6.0",
         "date": "2026-09-07",
         "name": JRITER,

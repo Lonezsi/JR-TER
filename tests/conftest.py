@@ -16,25 +16,32 @@ sys.path.insert(0, ROOT)
 _TMP = tempfile.mkdtemp(prefix="jriter-tests-")
 os.environ["JRITER_DATA"] = _TMP
 
-from jriter import config, db, registry  # noqa: E402  (must come after the env var)
+from jriter import config, db, registry, who, accounts  # noqa: E402  (after the env var)
 
 
 @pytest.fixture(autouse=True)
 def fresh_library(tmp_path, monkeypatch):
-    """Every test gets an empty library on disk and an empty database."""
+    """Every test gets an empty library on disk and an empty database.
+
+    One directory now holds several libraries, so DATA is the only path that gets pointed
+    somewhere else: everything under it is derived from the account being served. Which is
+    the owner here, bound for the length of the test, because a test that has not said
+    whose library it is about would otherwise raise rather than guess.
+    """
     data = tmp_path / "data"
-    blobs = data / "blobs"
-    blobs.mkdir(parents=True)
+    data.mkdir(parents=True)
     monkeypatch.setattr(config, "DATA", str(data))
-    monkeypatch.setattr(config, "BLOBS", str(blobs))
-    monkeypatch.setattr(config, "DB_PATH", str(data / "jriter.db"))
-    monkeypatch.setattr(config, "SETTINGS_PATH", str(data / "settings.json"))
     db.close()
+    accounts.reset_for_tests()
+    who.bind(accounts.OWNER)
+    config.ensure_home(accounts.OWNER)
     # The door is loaded only by the tests that are about the door. Every other test is
     # about the library itself, and signing in first would say nothing about it.
     registry.load([m for m in config.MODULES if m != "auth"])
     yield
     db.close()
+    accounts.reset_for_tests()
+    who.unbind()
     registry.load([m for m in config.MODULES if m != "auth"])
 
 

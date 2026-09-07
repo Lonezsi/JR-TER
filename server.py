@@ -12,7 +12,7 @@ import argparse
 import threading
 import webbrowser
 
-from jriter import config, http, registry, db
+from jriter import config, http, registry, db, accounts, who
 
 
 def main(argv=None):
@@ -38,6 +38,20 @@ def main(argv=None):
     try:
         if config.adopt_old_database():
             print("  moved     the old jong.db to jriter.db")
+        # And then, once, the single library becomes account 1.
+        #
+        # Same reasoning as the rename above and the same refusal to catch anything: a
+        # half moved library is worse than a server that will not start and says why. It
+        # is a no op on every run after the first, and on a library that never had a
+        # password there is nothing to move it to.
+        from jriter.modules import auth
+        landed = accounts.adopt_single_library(auth._read())
+        if landed:
+            print("  accounts  your library is now account %d (%s)"
+                  % (landed["account"], ", ".join(landed["moved"]) or "nothing to move"))
+            if landed.get("tokens"):
+                print("            %d machine credential(s) carried across"
+                      % landed["tokens"])
     except OSError as e:
         # Refusing to start beats starting empty. Carrying on means sqlite makes a fresh
         # library under the new name, the guard inside then keeps this from ever running
@@ -45,7 +59,15 @@ def main(argv=None):
         print("JR!TER could not move the old library across: %s" % e)
         print("  Something still has it open. Stop that and start again.")
         return 1
-    config.adopt_old_name()
+    # As the owner, and only if there is one.
+    #
+    # This reads and rewrites a settings.json, which since accounts is a per account file,
+    # so it needs to know whose. The owner's, because this is about a library that predates
+    # accounts entirely and that library is the one that became account 1. A server that has
+    # never been set up has no settings to rename and nothing to do.
+    if accounts.count():
+        with who.acting_as(accounts.OWNER):
+            config.adopt_old_name()
 
     try:
         server = http.serve(args.host, args.port)
@@ -120,9 +142,10 @@ def main(argv=None):
     finally:
         stop.set()
         server.server_close()
-        # This is the one moment nothing else is running, so the log is emptied rather
-        # than merely folded back in.
-        db.close()
+        # This is the one moment nothing else is running, so every library's log is
+        # emptied rather than merely folded back in. shut_down rather than close: close
+        # is this thread's connections, and this thread has served no requests.
+        db.shut_down()
     return 0
 
 

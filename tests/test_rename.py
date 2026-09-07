@@ -60,14 +60,22 @@ def _old_library(where, songs=3):
     return path
 
 
+#: Where the pre accounts library sits.
+#:
+#: config.db_path() is not this. That one answers "where does the account being served keep
+#: its library", which is data/accounts/<id>/jriter.db and is a question that only makes
+#: sense once accounts exist. Everything in this file is about the step before that: the
+#: rename from the project's old name, which leaves one file flat in the data directory for
+#: accounts.adopt_single_library to find and move.
+
+
 def test_the_old_library_is_carried_across_whole(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA", str(tmp_path))
-    monkeypatch.setattr(config, "DB_PATH", os.path.join(str(tmp_path), "jriter.db"))
     _old_library(str(tmp_path), songs=3)
 
     assert config.adopt_old_database() is True
 
-    con = sqlite3.connect(config.DB_PATH)
+    con = sqlite3.connect(os.path.join(config.DATA, "jriter.db"))
     assert con.execute("SELECT COUNT(*) FROM songs").fetchone()[0] == 3, \
         "the rows that were only in the write ahead log did not come across"
     con.close()
@@ -79,7 +87,6 @@ def test_it_does_not_run_twice(tmp_path, monkeypatch):
     """The second call must decline, or a later jong.db from a backup would overwrite a
     library that has been in use for weeks."""
     monkeypatch.setattr(config, "DATA", str(tmp_path))
-    monkeypatch.setattr(config, "DB_PATH", os.path.join(str(tmp_path), "jriter.db"))
     _old_library(str(tmp_path))
 
     assert config.adopt_old_database() is True
@@ -88,13 +95,12 @@ def test_it_does_not_run_twice(tmp_path, monkeypatch):
 
 def test_it_never_overwrites_a_library_that_is_already_here(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA", str(tmp_path))
-    monkeypatch.setattr(config, "DB_PATH", os.path.join(str(tmp_path), "jriter.db"))
     _old_library(str(tmp_path))
-    with open(config.DB_PATH, "w", encoding="utf-8") as f:
+    with open(os.path.join(config.DATA, "jriter.db"), "w", encoding="utf-8") as f:
         f.write("a real library, in use")
 
     assert config.adopt_old_database() is False
-    with open(config.DB_PATH, encoding="utf-8") as f:
+    with open(os.path.join(config.DATA, "jriter.db"), encoding="utf-8") as f:
         assert f.read() == "a real library, in use"
 
 
@@ -108,7 +114,6 @@ def test_a_move_that_fails_says_so_instead_of_claiming_success(tmp_path, monkeyp
     right outcome, so what is checked is that it is raised rather than eaten.
     """
     monkeypatch.setattr(config, "DATA", str(tmp_path))
-    monkeypatch.setattr(config, "DB_PATH", os.path.join(str(tmp_path), "jriter.db"))
     _old_library(str(tmp_path))
 
     def refuse(*args, **kwargs):
@@ -117,15 +122,13 @@ def test_a_move_that_fails_says_so_instead_of_claiming_success(tmp_path, monkeyp
     monkeypatch.setattr(os, "replace", refuse)
     with pytest.raises(OSError):
         config.adopt_old_database()
-    assert not os.path.exists(config.DB_PATH), \
+    assert not os.path.exists(os.path.join(config.DATA, "jriter.db")), \
         "an empty library was left behind by a move that did not happen"
 
 
-def test_a_library_still_called_by_the_old_name_is_renamed(tmp_path, monkeypatch):
+def test_a_library_still_called_by_the_old_name_is_renamed():
     """The rail and the browser tab read the saved name, not the default, so without
     this the rename lands everywhere except the two places anybody looks."""
-    monkeypatch.setattr(config, "DATA", str(tmp_path))
-    monkeypatch.setattr(config, "SETTINGS_PATH", os.path.join(str(tmp_path), "settings.json"))
     config.save_settings({"library_name": "J-ong", "accent": "#54B37A"})
 
     config.adopt_old_name()
@@ -133,9 +136,7 @@ def test_a_library_still_called_by_the_old_name_is_renamed(tmp_path, monkeypatch
     assert config.settings()["accent"] == "#54B37A", "it rewrote more than the name"
 
 
-def test_a_library_somebody_named_keeps_its_name(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "DATA", str(tmp_path))
-    monkeypatch.setattr(config, "SETTINGS_PATH", os.path.join(str(tmp_path), "settings.json"))
+def test_a_library_somebody_named_keeps_its_name():
     config.save_settings({"library_name": "Hedda's tapes"})
 
     config.adopt_old_name()
@@ -165,7 +166,9 @@ def test_the_old_upload_header_is_still_accepted():
     """A laptop's agent updates itself from a daily task, so a new server meeting an
     older client is the ordinary state of things for a day and longer if it was off."""
     import inspect
-    source = inspect.getsource(auth.token_allows)
+    # token_account, because that is where the reading of the header now lives:
+    # token_allows kept the old shape of the question and delegates.
+    source = inspect.getsource(auth.token_account)
     assert "X-Jriter-Token" in source and "X-Jong-Token" in source
 
 
