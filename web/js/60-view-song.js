@@ -144,13 +144,7 @@ J.views.song = {
               </span>
             </div>
 
-            <!-- Two groups rather than six loose controls.
-                 Which take and which preset is one question; what to do with it is
-                 another, and on a phone they cannot share a line: measured at 375, the A
-                 picker came out 67 pixels wide with "v1 · Wide master" squeezed out of it
-                 entirely. Grouped, the row can break between them instead of inside them. -->
             <div class="ab-inline" id="abInline">
-              <div class="ab-slots">
               ${versions.length ? `
                 <button class="slot-pick" data-slot="A"><span class="k">A</span><span class="v">not set</span>
                   <svg class="caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
@@ -165,8 +159,6 @@ J.views.song = {
                 <button class="slot-pick" data-slot="B" hidden><span class="k">B</span><span class="v">not set</span>
                   <svg class="caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
-              </div>
-              <div class="ab-acts">
                 <button class="btn sm ghost ab-add" data-slot="B" title="Listen to two takes side by side">
                   Compare
                 </button>
@@ -198,7 +190,6 @@ J.views.song = {
                     </svg>
                     Share
                   </button>` : ""}
-              </div>
             </div>
           </div>
         </div>

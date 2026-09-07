@@ -222,15 +222,12 @@
   --ab-h: 38px;
   display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
 }
-/* The two halves: which take, and what to do with it. */
-.ab-slots,
-.ab-acts { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
-/* Named rather than a universal child selector, which lost. `.ab-inline *` is one
+/* Named rather than a universal child selector, which lost. `.ab-inline > *` is one
    class and `.btn.sm` is two, so the 30 pixel height won on specificity and the row
    still came out in three heights. */
-.ab-inline .btn,
-.ab-inline .slot-pick,
-.ab-inline .ab-switch { height: var(--ab-h); }
+.ab-inline > .btn,
+.ab-inline > .slot-pick,
+.ab-inline > .ab-switch { height: var(--ab-h); }
 .slot-pick {
   position: relative;
   display: inline-flex; align-items: center; gap: var(--s2);
@@ -434,6 +431,20 @@
  * gone: a drawn on bevel and a real rotation disagree the moment the card turns, and the
  * disagreement is what read as wrong. */
 .slab-edge {
+  /* Only while the card is actually turning.
+   *
+   * A wall rotated a quarter turn is edge on to the viewer and should project to nothing,
+   * and it very nearly does: measured at rest it comes out three pixels wide, because the
+   * perspective origin is at 50% 42% rather than dead centre, so the sides are seen very
+   * slightly from the outside. Three pixels of lit grey down each edge of a card reads as
+   * another card sitting just behind this one, which is exactly what these lyrics are not
+   * supposed to have any more.
+   *
+   * There is nothing to show at rest anyway: thickness is a thing you see when an object
+   * turns. So they appear under a thumb and while a card is on its way out, and the rest
+   * of the time the card has clean edges. */
+  opacity: 0;
+  transition: opacity 120ms linear;
   position: absolute;
   top: 1px; bottom: 1px;
   width: var(--slab-thick, 18px);
@@ -455,6 +466,9 @@
   /* The right wall faces away from the light, so it is the darker of the two. */
   filter: brightness(0.72);
 }
+/* Under a thumb, and on the way out. Both are the card turning. */
+.lyric-slab.nudging .slab-edge,
+.lyric-slab:not(.on) .slab-edge { opacity: 1; }
 
 /* Where the cards you are not reading are: off the frame, on the side they came from.
  *
@@ -823,19 +837,14 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
   .song-title { font-size: clamp(30px, 11vw, 46px); }
   .song-title-input { font-size: clamp(30px, 11vw, 46px); }
 
-  /* Two rows: which take, then what to do with it.
+  /* A and B go full width, so neither is a squeezed chip.
    *
-   * They shared one before, and there is not room. Measured at 375: A came out 67 pixels
-   * with "v1 · Wide master" squeezed out of it, Compare 87, Arrange 48, Share 91, and the
-   * gaps between them. The picker is the one carrying information and it was the one that
-   * lost, because it is the only one that can shrink.
-   *
-   * Stacked, the picker gets the width it needs to say what is loaded and the three
-   * actions sit under it at their own size. */
-  .ab-inline { width: 100%; flex-direction: column; align-items: stretch; }
-  .ab-slots > .slot-pick { flex: 1 1 0; min-width: 0; }
-  .ab-acts { flex-wrap: wrap; }
-  .ab-acts > .btn { flex: 1 1 auto; }
+   * Not a three column grid: that said "there are exactly three things in this row", which
+   * stopped being true the moment anything else joined them. Share is here on every song,
+   * including the ones with no renders and therefore no A or B at all, and a fourth child
+   * in a three column grid wraps into a row of its own with a hole beside it. */
+  .ab-inline { width: 100%; }
+  .ab-inline > .slot-pick { flex: 1 1 0; min-width: 0; }
   .slot-menu { left: 0; right: auto; min-width: min(280px, 84vw); }
   .slot-pick[data-slot="B"] .slot-menu { left: auto; right: 0; }
 

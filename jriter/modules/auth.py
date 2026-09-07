@@ -667,6 +667,25 @@ def me(req):
     return {"who": accounts.public(accounts.by_id(here))}
 
 
+def people(req):
+    """Everybody with an account on this server.
+
+    Open to anybody signed in, not just the owner, and that is a deliberate difference from
+    the invite list next door. Sharing a song means naming a person, so you have to be able
+    to see who is here; and on a server where everybody was invited by the same person,
+    which is every one of them, that is not news to anybody.
+
+    accounts.public and nothing else: a handle, a display name, when they joined. Never a
+    hash, a salt or a secret, and nothing at all about what is in anybody's library.
+    """
+    here = account_for(req.headers)
+    if not here:
+        raise Error("Sign in first.", 401)
+    return {"people": [accounts.public(a) for a in accounts.everybody()],
+            "me": here,
+            "owner": accounts.OWNER}
+
+
 def rename_me(req):
     here = account_for(req.headers)
     if not here:
@@ -707,6 +726,7 @@ def ROUTES():
         ("POST", "/api/auth/setup"): setup,
         ("POST", "/api/auth/signup"): sign_up,
         ("GET", "/api/auth/me"): me,
+        ("GET", "/api/auth/people"): people,
         ("PATCH", "/api/auth/me"): rename_me,
         ("GET", "/api/auth/invites"): list_invites,
         ("POST", "/api/auth/invites"): create_invite,

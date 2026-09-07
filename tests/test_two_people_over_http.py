@@ -189,6 +189,40 @@ def test_a_share_id_somebody_else_holds_is_not_yours(library):
     assert status == 404
 
 
+def test_everybody_can_see_who_else_is_here(library):
+    """The account page's list, and deliberately not owner only.
+
+    Sharing a song means naming a person, so you have to be able to see who is here. On a
+    server where everybody was invited by the same person, which is every one of them, that
+    is not news to anybody either.
+    """
+    owner, friend = _owner_and_friend(library)
+    status, said = friend.call("GET", "/api/auth/people")
+    assert status == 200
+    handles = sorted(p["handle"] for p in said["people"])
+    assert handles == ["jozsef", "owner"]
+    assert said["me"] == [p for p in said["people"] if p["handle"] == "jozsef"][0]["id"]
+
+
+def test_the_list_of_people_carries_nothing_private(library):
+    """A handle, a name, when they joined. Never a credential, and nothing whatever about
+    what is in anybody's library."""
+    owner, friend = _owner_and_friend(library)
+    status, said = friend.call("GET", "/api/auth/people")
+    body = json.dumps(said)
+    for leak in ("hash", "salt", "secret", "password"):
+        assert leak not in body, "the people list carries %s" % leak
+    for person in said["people"]:
+        assert set(person) <= {"id", "handle", "name", "is_owner", "created_at"}, person
+
+
+def test_a_stranger_cannot_ask_who_is_here(library):
+    _owner_and_friend(library)
+    nobody = Browser(library)
+    status, _ = nobody.call("GET", "/api/auth/people")
+    assert status == 401
+
+
 def test_signed_out_is_still_nothing(library):
     """The door itself, unchanged by any of this."""
     _owner_and_friend(library)

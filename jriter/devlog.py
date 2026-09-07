@@ -22,6 +22,31 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.2.3",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "An account page, and three things put back where they were",
+        "notes": [
+            "There is an account page, and the row at the foot of the sidebar goes to it "
+            "rather than to settings. It says who you are, whether Google is connected, "
+            "how many songs have been shared with you, and lists everybody else with an "
+            "account on this server. Names, handles and when they joined, and nothing "
+            "else: each account is a separate database and there is no way to ask one "
+            "what is in another.",
+            "Nothing shows at the edges of the card you are reading. The card has walls, "
+            "because it turns in three dimensions when you swipe it, and they were "
+            "catching three pixels of light down each side while it sat still. They only "
+            "exist now while a card is actually turning.",
+            "The take and preset picker is back on one row with Compare, Arrange and "
+            "Share on a phone. Giving it a row of its own in 3.2.1 made that area worse, "
+            "not better.",
+            "Prev, play and next are in the middle of the player again and the position "
+            "slider is back underneath them, on a phone as well as everywhere else. The "
+            "slimmer bar stays: a smaller cover, no volume slider on a device with keys "
+            "for it, and repeat and up next out of the way on the right.",
+        ],
+    },
+    {
         "version": "3.2.2",
         "date": "2026-09-08",
         "name": JRITER,
