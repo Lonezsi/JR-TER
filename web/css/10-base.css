@@ -140,6 +140,37 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 *::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); background-clip: content-box; }
 *::-webkit-scrollbar-track { background: transparent; }
+/* No stepper arrows, and no corner block.
+ *
+ * Chromium draws both as soon as a scrollbar is styled at all. They are square, and they
+ * sit at the ends of the track, which on a rounded panel is exactly where the radius is:
+ * on a dropdown that scrolls they merge with the thumb into what reads as one full height
+ * bar with square ends cutting through both corners. Reported as the scrollbar going
+ * outside the border radius, which is precisely what it was doing.
+ *
+ * Nothing in this app scrolls a line at a time by pressing an arrow, so there is nothing
+ * to miss. The thumb above is already held off the edge by a transparent border, which is
+ * what keeps it clear of the curve once these are gone. */
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* A scrollbar inside a rounded box, not across its corners.
+ *
+ * The thumb is already held off the sides by a transparent border, so it never sticks out
+ * sideways. What it does do is run the whole height of the track, and on a panel with
+ * enough content to nearly fill the thumb, its ends land inside the corner curve: a light
+ * bar crossing the round, which is what "the scrollbar for dropdowns can go outside of the
+ * border radius" describes. Measured with two panels side by side, one at 160 pixels of
+ * content in 150 and one at 700 in 150: only the long thumb touches the corners.
+ *
+ * So the track is inset from each end by the panel's own radius, and the thumb cannot
+ * reach a corner however long it gets. Per surface because the inset is the radius, and
+ * these three have two different ones between them: they are the only rules in the app
+ * that both scroll and round their corners, which is the pairing that shows this.
+ */
+.slot-menu::-webkit-scrollbar-track,
+.yt-log::-webkit-scrollbar-track { margin: var(--r-md) 0; }
+.sheet::-webkit-scrollbar-track { margin: var(--r-xl) 0; }
 
 
 /* ── moving between screens ───────────────────────────────────────────────── */

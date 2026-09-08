@@ -123,6 +123,20 @@ J.router = (function () {
     J.pageFoot.attach(root);
     if (inPlace) root.scrollTop = wasScrolled;
 
+    /* Whether the reader has scrolled since this navigation started.
+     *
+     * The reset at the end of this function runs after the fetches, and a screen is
+     * scrollable long before then: the skeleton goes in straight away, so on a phone you
+     * open a song, start reading down it, and a second later the content arrives and
+     * throws you back to the top. Reported exactly that way.
+     *
+     * Once, and it takes itself off. Writing the skeleton cannot trip it, because the node
+     * is new and therefore already at nought, and nothing in a view scrolls this element
+     * on the way in. */
+    let scrolled = false;
+    root.addEventListener("scroll", () => { scrolled = true; },
+                          { once: true, passive: true });
+
     const settle = () => {
       hideProgress();
       // Next frame, so the browser has the starting state to animate away from.
@@ -167,10 +181,14 @@ J.router = (function () {
     currentView = view;
     currentParams = params;
     J.markNav(view);
-    // Only a real navigation goes back to the top. Writing the content resets the
-    // scroll, so the position has to be the one captured before the swap, not the one
-    // read back afterwards, which is always zero.
-    root.scrollTop = inPlace ? wasScrolled : 0;
+    /* Only a real navigation goes back to the top, and only if nobody has gone anywhere.
+     *
+     * Writing the content resets the scroll, so a restored position has to be the one
+     * captured before the swap rather than the one read back afterwards, which is always
+     * nought. And a fresh screen is only sent to the top if the reader has not already
+     * moved: they were reading it while it loaded, and where they got to is theirs. */
+    if (inPlace) root.scrollTop = wasScrolled;
+    else if (!scrolled) root.scrollTop = 0;
   }
 
   return {

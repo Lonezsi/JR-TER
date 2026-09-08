@@ -5,6 +5,19 @@
  */
 "use strict";
 
+/* Whether this engine renders an SVG filter reference inside a backdrop-filter.
+ *
+ * The same two Blink only signals the @supports block in 00-tokens.css uses, asked here
+ * because the chromatic setting writes that token inline and an inline property beats a
+ * stylesheet. Kept in one place so the two answers cannot disagree: if this and that block
+ * ever say different things, the app gets a reference it cannot draw and loses the blur
+ * with it, which is invisible from here and obvious on the screen.
+ *
+ * It cannot be a feature test of the thing itself. WebKit parses the reference, reports it
+ * supported, and never renders it. */
+J.canRefract = CSS.supports("background", "paint(x)")
+  || CSS.supports("-webkit-app-region", "no-drag");
+
 J.applyAccent = function (hex) {
   if (!hex) return;
   const root = document.documentElement;
@@ -94,16 +107,21 @@ J.applyLook = function (settings) {
   /* Nought means off, and off means the plain glass rather than three displacements all
    * at the same scale doing three times the work to look identical.
    *
-   * This is the only place an SVG reference goes into a backdrop-filter, and it is the
-   * only place that can afford to: WebKit parses the reference and never renders it, so
-   * turning this up on Safari costs the blur on the two big edges and leaves a surface
-   * that is still readable on its own. Everywhere else asks for filter functions only,
-   * because a dialog that depends on a filter is a dialog you cannot read on the browser
-   * that skips it. */
-  document.documentElement.style.setProperty(
-    "--glass-filter-edge",
-    spread ? "url(#glass-ca) blur(22px) saturate(180%) brightness(1.06)"
-           : "var(--glass-filter)");
+   * An inline property beats the stylesheet, including the @supports block in 00-tokens
+   * that decides whether this engine can have a refraction at all. So this asks the same
+   * question that block asks, and on an engine that cannot render one it writes nothing
+   * and lets the cascade stand: turning this dial up in Safari would otherwise put the
+   * reference back and take the blur off the rail and the player, which is the whole bug
+   * the gate exists to avoid. */
+  const root = document.documentElement;
+  if (spread && J.canRefract) {
+    root.style.setProperty("--glass-filter-edge",
+                           "url(#glass-ca) blur(22px) saturate(180%) brightness(1.06)");
+  } else if (spread) {
+    root.style.removeProperty("--glass-filter-edge");
+  } else {
+    root.style.setProperty("--glass-filter-edge", "var(--glass-filter)");
+  }
 
   /* The dither. One number, handed to the module that owns the texture.
    *

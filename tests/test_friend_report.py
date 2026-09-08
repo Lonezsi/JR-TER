@@ -38,34 +38,53 @@ def token(name):
 
 # ── the glass, which was three of their reports ──────────────────────────────
 
-def test_no_backdrop_filter_asks_for_an_svg_filter():
+BLINK_GATE = "@supports (background: paint(x)) or (-webkit-app-region: no-drag)"
+
+
+def test_the_refraction_is_only_asked_for_behind_the_engine_gate():
     """"sotet modban kicsit sok a modalok attetszosege", "a legordulo listak is nagyon
     rosszul latszodnak", "a menu nagyon atlatszo, olvashatatlan".
 
-    One cause. The chain led with url(#glass), and one unsupported function invalidates the
-    whole declaration, so WebKit applied no blur at all: every glass surface became a five
-    per cent white film with the page's own text sharp underneath it. WebKit parses the
-    reference quite happily and never renders it, so no @supports can find this out, which
-    is why the rule is that a stylesheet does not ask for it.
+    One cause for all three: the chain led with url(#glass), one unsupported function
+    invalidates the whole declaration, and WebKit parses that reference, reports it
+    supported, and never renders it. The app lost its blur with no fallback, and no way to
+    detect any of it.
+
+    The refraction is what this app looks like, so it is not gone: it is asked for only
+    inside a block gated on an engine known to draw it. Written that way round on purpose.
+    Refusing it only where it is known to fail would leave every future engine defaulting
+    to broken, and broken here is invisible to feature detection.
     """
-    for name, source in every_css().items():
-        for line in source.split("\n"):
-            if "backdrop-filter" not in line or "@supports" in line:
-                continue
-            assert "url(" not in line, \
-                "%s asks for an SVG filter in a backdrop: %s" % (name, line.strip())
+    tokens = css("00-tokens.css")
+    assert tokens.count(BLINK_GATE) == 1, "one gate, spelled exactly once"
+
+    base, gated = tokens.split(BLINK_GATE, 1)
+    # The half before the gate is the fallback, and it has to survive an engine that
+    # cannot render a reference at all.
     for chain in ("--glass-filter", "--glass-filter-thin", "--glass-filter-edge"):
-        assert "url(" not in token(chain), "%s still leads with a reference" % chain
+        assert "url(" not in token(chain), \
+            "%s asks for a reference outside the gate" % chain
+    assert "url(#glass" not in base, "the fallback half must not name an SVG filter"
+    # And inside it, all three chains are the real thing again.
+    for ref in ("url(#glass)", "url(#glass-thin)", "url(#glass-ca)"):
+        assert ref in gated, "%s is missing from the gated block" % ref
+    # Along with the light tints, which are what glass actually looks like.
+    assert "rgba(255, 255, 255, 0.055)" in gated
+    assert "rgba(255, 255, 255, 0.085)" in gated
 
 
-def test_the_chromatic_setting_is_the_one_place_it_is_allowed():
-    """It is a setting somebody turned on, it degrades to a plain blur, and it is the only
-    caller. Anything else putting a reference in a backdrop is the bug coming back."""
+def test_the_gate_is_asked_the_same_question_in_both_places():
+    """The chromatic dial writes --glass-filter-edge inline, and an inline property beats a
+    stylesheet. If the two ever disagree, that dial puts a reference back on an engine that
+    cannot draw it and takes the blur off the rail and the player with it."""
     boot = js("90-boot.js")
-    assert boot.count("url(#glass-ca)") == 1
-    assert 'spread ? "url(#glass-ca)' in boot, "still the opt in path"
-    # And it falls back to the plain chain rather than to nothing.
-    assert ': "var(--glass-filter)")' in boot
+    assert 'CSS.supports("background", "paint(x)")' in boot
+    assert 'CSS.supports("-webkit-app-region", "no-drag")' in boot
+    assert "J.canRefract" in boot
+    assert "if (spread && J.canRefract) {" in boot, "the dial has to ask before it writes"
+    assert 'root.style.removeProperty("--glass-filter-edge");' in boot, \
+        "and stand aside rather than write a reference it cannot draw"
+    assert boot.count("url(#glass-ca)") == 1, "still the one caller"
 
 
 def test_glass_is_a_surface_without_a_blur():
@@ -86,12 +105,17 @@ def test_glass_is_a_surface_without_a_blur():
     assert float(re.search(r",\s*([0-9.]+)\)", token("--glass-2")).group(1)) >= 0.9
 
 
-def test_the_drawer_over_the_page_is_near_solid():
+def test_the_drawer_over_the_page_takes_the_dialog_tint():
     """"a menu nagyon atlatszo, olvashatatlan", from a phone.
 
-    On a wide screen the rail is a column with the page beside it. At phone width it lies
-    over the page, and the page is words: a song title and three lines of lyrics were
-    legible straight through it.
+    On a wide screen the rail is a column of the grid with the page beside it, so there is
+    nothing behind it. At phone width it lies over the page, and the page is words: a song
+    title and three lines of lyrics were legible straight through it.
+
+    So it asks for --glass-2, the tint that carries text you are reading now, rather than
+    --glass, the tint for large chrome. Which of those is nearly solid and which is a film
+    depends on whether this engine can refract; the point is that the drawer is on the same
+    side of that line as a dialog either way.
     """
     shell = css("20-shell.css")
     at = shell.index("@media (max-width: 900px)")
@@ -544,3 +568,86 @@ def test_the_playlists_heading_is_there_before_the_first_one_is():
     assert 'class="eyebrow rail-eyebrow"' in body
     assert "rail-none" in body, "and it says what a playlist is for while it is empty"
     assert ".rail-none {" in css("20-shell.css")
+
+
+# ── two the owner found ──────────────────────────────────────────────────────
+
+def test_scrolling_while_a_screen_loads_is_not_thrown_away():
+    """"on phone when i open a page and scroll down immediately it scrolls back up".
+
+    The reset to the top ran after the fetches, and a screen is scrollable long before
+    then: the skeleton goes in straight away, so you open a song, start reading down it,
+    and a second later the content lands and the router puts you back at the top.
+    """
+    router = js("80-router.js")
+    assert 'root.addEventListener("scroll", () => { scrolled = true; },' in router, \
+        "the router has to know whether anybody has moved"
+    assert "{ once: true, passive: true }" in router, \
+        "once, and it takes itself off"
+    assert "else if (!scrolled) root.scrollTop = 0;" in router, \
+        "a fresh screen only goes to the top if nobody got there first"
+    assert "root.scrollTop = inPlace ? wasScrolled : 0;" not in router, \
+        "the unconditional reset is what stole the scroll"
+
+
+def test_a_fresh_screen_still_starts_at_the_top():
+    """The reset exists for a reason and the fix must not cost it: arriving somewhere new
+    without touching anything starts at the beginning, and a redraw of the screen you are
+    already on keeps your place."""
+    router = js("80-router.js")
+    assert "if (inPlace) root.scrollTop = wasScrolled;" in router
+    assert "const wasScrolled = old.scrollTop;" in router, \
+        "the position has to be read before the swap; afterwards it is always nought"
+
+
+def test_a_rounded_panel_keeps_its_corners_when_it_scrolls():
+    """"the scrollbar for dropdowns can go outside of the border radius".
+
+    The thumb was already held off the sides by a transparent border, so it never stuck out
+    sideways. What it did was run the whole height of the track, and on a panel with enough
+    content to nearly fill the thumb its ends landed inside the corner curve: a light bar
+    crossing the round.
+
+    Measured with two panels side by side, 160 pixels of content in 150 against 700 in 150.
+    Only the long thumb touched the corners, which is why the real dropdown showed it and a
+    probe with plenty of overflow did not.
+
+    So the track is inset from each end by the panel's own radius and the thumb cannot reach
+    a corner however long it gets.
+    """
+    base = css("10-base.css")
+    assert ".slot-menu::-webkit-scrollbar-track," in base
+    assert ".yt-log::-webkit-scrollbar-track { margin: var(--r-md) 0; }" in base
+    assert ".sheet::-webkit-scrollbar-track { margin: var(--r-xl) 0; }" in base, \
+        "the sheet is rounded further, so it needs a deeper inset"
+
+
+def test_the_scrollbar_treatment_is_not_written_twice():
+    """The stylesheet already insets the thumb on `*`, and I duplicated it per surface
+    before noticing. Two copies of one rule is one of them going stale."""
+    base = css("10-base.css")
+    assert base.count("background-clip: content-box;") <= 2, \
+        "the thumb inset belongs on * and nowhere else"
+    assert ".slot-menu::-webkit-scrollbar-thumb" not in base, \
+        "the global thumb rule already covers this"
+    assert "*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }" in base, \
+        "the steppers land in the corners the moment a bar is styled at all"
+
+
+def test_every_rounded_scroller_is_covered():
+    """Three surfaces both scroll and are rounded, which is the combination that shows
+    this. A fourth appearing without being added here is the bug coming back somewhere
+    else, so the list is checked against the stylesheets rather than trusted."""
+    import re as _re
+    found = set()
+    for name, source in every_css().items():
+        stripped = _re.sub(r"/\*.*?\*/", "", source, flags=_re.S)
+        for m in _re.finditer(r"([^{}]+)\{([^{}]*)\}", stripped):
+            sel, body = m.group(1).strip(), m.group(2)
+            if "@" in sel or "::-webkit" in sel:
+                continue
+            if _re.search(r"overflow(-y)?:\s*(auto|scroll)", body) \
+                    and _re.search(r"border-radius:", body):
+                found.add(sel.replace("\n", " ").strip())
+    assert found == {".slot-menu", ".sheet", ".yt-log"}, \
+        "rounded scrollers changed: %s" % sorted(found)

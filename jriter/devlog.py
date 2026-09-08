@@ -22,6 +22,29 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.1",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "The glass is the glass again",
+        "notes": [
+            "The refraction is back. Taking it out everywhere was the wrong call: it is "
+            "what this app looks like, and I removed it from the machines that can draw it "
+            "in order to fix the ones that cannot. It is asked for again, inside a block "
+            "gated on the engine, and the flat readable version is now what Safari and "
+            "anything else that cannot refract falls back to. It has to be the engine "
+            "rather than a feature test, because WebKit reports the reference supported "
+            "and then never renders it.",
+            "Scrolling a page while it is still loading no longer throws you back to the "
+            "top. The skeleton is on screen and scrollable long before the content lands, "
+            "and the jump to the top ran after it: you would open a song on a phone, start "
+            "reading down, and get pulled back a second later.",
+            "A dropdown's scrollbar stays inside its rounded corners. The thumb runs the "
+            "whole height of the track, so on a list with just a little more than fits, "
+            "its ends sat inside the curve and crossed it. The track is inset from each "
+            "end by the panel's own radius now.",
+        ],
+    },
+    {
         "version": "3.3.0",
         "date": "2026-09-08",
         "name": JRITER,
