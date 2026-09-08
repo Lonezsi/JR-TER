@@ -10,6 +10,13 @@ J.player = (function () {
   const state = {
     song: null,
     queue: [],
+    /* What is in the queue: "song" or "render".
+     *
+     * Written when the queue is, by whoever had the list in their hands and therefore
+     * knows. Next used to work this out from the row it was about to play and from what
+     * was playing at the time, and a wrong answer there hands a render id to the songs
+     * endpoint. A playlist holds both kinds, so there was a real way to be wrong. */
+    queueKind: "song",
     index: -1,
     slots: { A: { version: null, preset: null }, B: { version: null, preset: null } },
     presets: [],
@@ -20,7 +27,11 @@ J.player = (function () {
     volume: 0.9,
     preparing: null,      // 0..1 while a render is being read for the compositor
     /* Play the same thing again when it ends. */
-    repeat: false,
+    /* "off", "one" or "all". Three states of one button, so one value.
+     *
+     * A boolean until now, and it meant "one", but it was drawn with the cycle icon that
+     * means "all" everywhere else, so the player read as the opposite of what it did. */
+    repeat: "off",
     /* Keep going when the queue runs out, by asking the library what is next.
      *
      * On by default, because stopping dead at the end of a list is what it used to do and
@@ -30,6 +41,20 @@ J.player = (function () {
     /* The last few songs autoplay has chosen, so a small library does not loop three of
      * them. Ids only, never written down anywhere but this tab's memory. */
     lately: [],
+  };
+
+  //: The order the repeat button cycles in, and the only values state.repeat takes.
+  //:
+  //: Off first because it is the resting state, then the narrower of the two: pressing
+  //: once is the thing people press it for.
+  const REPEATS = ["off", "one", "all"];
+
+  //: What each state is called, for the title and the label. One place, because a control
+  //: whose tooltip and whose aria-label are written separately ends up with two answers.
+  const REPEAT_SAYS = {
+    off: "Repeat off",
+    one: "Repeating this one",
+    all: "Repeating the whole list",
   };
 
   //: How much of the recent past autoplay refuses to repeat.
@@ -50,7 +75,9 @@ J.player = (function () {
    */
   try {
     const kept = JSON.parse(localStorage.getItem(REMEMBER) || "{}");
-    if (typeof kept.repeat === "boolean") state.repeat = kept.repeat;
+    /* A boolean is what older versions stored, and it meant repeat this one. */
+    if (typeof kept.repeat === "boolean") state.repeat = kept.repeat ? "one" : "off";
+    else if (REPEATS.includes(kept.repeat)) state.repeat = kept.repeat;
     if (typeof kept.autoplay === "boolean") state.autoplay = kept.autoplay;
   } catch (e) { /* a private window, or something that is not JSON */ }
 
@@ -291,13 +318,20 @@ J.player = (function () {
              answer "now" and two answer "from now on". The right hand side is already
              where the standing choices are, next to A/B and the volume. -->
         <div class="player-modes">
-          <button class="icon-btn mode ${state.repeat ? "on" : ""}" data-act="repeat"
-                  title="${state.repeat ? "Repeating this one" : "Repeat this one"}"
-                  aria-pressed="${state.repeat}" aria-label="Repeat this one">
+          <button class="icon-btn mode ${state.repeat === "off" ? "" : "on"}"
+                  data-act="repeat"
+                  title="${REPEAT_SAYS[state.repeat]}"
+                  aria-pressed="${state.repeat !== "off"}"
+                  aria-label="${REPEAT_SAYS[state.repeat]}">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
                  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M17 3l3 3-3 3"/><path d="M20 6H8a4 4 0 0 0-4 4v1"/>
               <path d="M7 21l-3-3 3-3"/><path d="M4 18h12a4 4 0 0 0 4-4v-1"/>
+              ${state.repeat === "one" ? `<!-- The 1 in the loop, which is what tells this
+                   state from the other one. Drawn rather than set as text: the loop is a
+                   17 pixel icon and a text node in it would take the page's font, its
+                   line height and its own baseline. -->
+                <path d="M11 10.5l1.6-1v6" stroke-width="2.1"/>` : ""}
             </svg>
           </button>
           <!-- The switch for the algorithm. Off is a player that stops at the end of the
@@ -355,7 +389,11 @@ J.player = (function () {
       state.song = song;
       state.active = "A";
       state.playing = true;
-      if (queue) { state.queue = queue; state.index = queue.findIndex((s) => s.id === song.id); }
+      if (queue) {
+        state.queue = queue;
+        state.queueKind = "song";
+        state.index = queue.findIndex((s) => s.id === song.id);
+      }
       if (changed) state.slots.B = { version: null, preset: null };
       state.slots.A.version = version;
       render();
@@ -411,7 +449,11 @@ J.player = (function () {
       state.slots.A = { version: item, preset: null };
       state.slots.B = { version: null, preset: null };
       state.presets = [];
-      if (queue) { state.queue = queue; state.index = queue.findIndex((q) => q.id === entry.id); }
+      if (queue) {
+        state.queue = queue;
+        state.queueKind = "render";
+        state.index = queue.findIndex((q) => q.id === entry.id);
+      }
       render();
       startTicking();
       J.emit("player:change");
@@ -583,11 +625,10 @@ J.player = (function () {
       if (next < 0 || next >= state.queue.length) return;
       state.index = next;
       const entry = state.queue[next];
-      /* A queue is all one kind, because it always comes from one list. The rows in it
-       * are whatever that list holds, and a render row off the API carries no kind of
-       * its own, so what is playing now is what says which kind this is. */
-      const renders = (entry && entry.kind === "render")
-        || (state.song && state.song.kind === "render");
+      /* Which kind was settled when the queue was filled, by the screen that filled it.
+       * Nothing is inferred here any more: the row's own kind is still honoured when it
+       * carries one, because a playlist row does, but the queue has the final say. */
+      const renders = state.queueKind === "render" || (entry && entry.kind === "render");
       if (renders) api.playRender(entry, state.queue);
       else J.playSong(entry, state.queue);
     },
@@ -674,7 +715,11 @@ J.player = (function () {
       const act = hit.dataset.act;
       if (act === "toggle") api.toggle();
       if (act === "next") api.step(1);
-      if (act === "repeat") api.modes({ repeat: !state.repeat });
+      if (act === "repeat") {
+        const next = REPEATS[(REPEATS.indexOf(state.repeat) + 1) % REPEATS.length];
+        api.modes({ repeat: next });
+        J.toast(REPEAT_SAYS[next] + ".");
+      }
       if (act === "autoplay") {
         api.modes({ autoplay: !state.autoplay });
         J.toast(state.autoplay
@@ -728,7 +773,7 @@ J.player = (function () {
          * Straight back to nought on the same element rather than reloading the source:
          * the file is decoded and buffered already, so this is the one gapless thing the
          * player can honestly do. */
-        if (state.repeat) {
+        if (state.repeat === "one") {
           audio.currentTime = 0;
           audio.play().catch(() => { /* a tab that has not been touched yet */ });
           return;
@@ -739,6 +784,15 @@ J.player = (function () {
         // Something after this in the queue is always the answer if there is one.
         if (state.index >= 0 && state.index + 1 < state.queue.length) {
           api.step(1);
+          return;
+        }
+        /* The end of the list, with the whole list on repeat.
+         *
+         * Back to the top rather than on to whatever autoplay would have chosen: somebody
+         * who asked for this list again has said which songs they want. A queue of one is
+         * the same song again, which is what repeating a list of one means. */
+        if (state.repeat === "all" && state.queue.length) {
+          api.step(-state.index);
           return;
         }
         if (state.autoplay) api.keepGoing();
@@ -777,7 +831,24 @@ J.player = (function () {
 J.playSong = async function (song, queue) {
   const same = J.player.state.song && J.player.state.song.id === song.id;
   if (same && J.player.state.slots.A.version) return J.player.toggle();
-  const data = await J.try(() => J.get(`/api/songs/${song.id}/versions`));
+
+  /* Not J.try, which shows whatever the server said.
+   *
+   * What the server says when a song is not there is "no song with id 28", which is a
+   * sentence for whoever is reading the log, and it was going straight to a toast in front
+   * of somebody who is listening to music. Four of them stacked up in the report. A song
+   * that has been deleted from under a list is worth one plain line, and a queue that
+   * still names it is worth nothing at all: it carries on to the next one.
+   */
+  let data = null;
+  try {
+    data = await J.get(`/api/songs/${song.id}/versions`);
+  } catch (e) {
+    if (queue) return;                       // the list is stale; say nothing, move on
+    J.toast(song.title ? `${song.title} is not in the library any more.`
+                       : "That song is not in the library any more.", "bad");
+    return;
+  }
   if (!data) return;
   const versions = data.versions || [];
   if (!versions.length) {

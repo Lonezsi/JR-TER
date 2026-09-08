@@ -34,6 +34,15 @@ def get_settings(req):
     return config.settings()
 
 
+def get_defaults(req):
+    """What Settings puts back when asked to.
+
+    Served rather than written into the page, so there is one table of defaults and it is
+    the one the server actually falls back to.
+    """
+    return {"defaults": config.defaults()}
+
+
 def put_settings(req):
     patch = req.json()
     allowed = {"library_name", "accent", "auto_update", "sync_interval_minutes",
@@ -130,5 +139,6 @@ def ROUTES():
         ("GET", "/api/health/errors"): errors,
         ("DELETE", "/api/health/errors"): forget_errors,
         ("GET", "/api/settings"): get_settings,
+        ("GET", "/api/settings/defaults"): get_defaults,
         ("PUT", "/api/settings"): put_settings,
     }

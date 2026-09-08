@@ -260,7 +260,7 @@
   background: var(--accent-soft);
   border-color: var(--accent-line);
 }
-.pick-row.new:hover { background: rgba(84, 179, 122, 0.2); }
+.pick-row.new:hover { background: rgba(var(--accent-rgb), 0.2); }
 .pick-plus {
   display: grid; place-items: center;
   width: 38px; height: 38px; flex: none;

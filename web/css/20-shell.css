@@ -119,7 +119,7 @@
 .nav a svg { flex: none; opacity: 0.9; }
 .nav a:hover { background: var(--hover); color: var(--text); }
 .nav a.on {
-  background: linear-gradient(90deg, var(--accent-soft) 0%, rgba(84, 179, 122, 0.04) 100%);
+  background: linear-gradient(90deg, var(--accent-soft) 0%, rgba(var(--accent-rgb), 0.04) 100%);
   color: var(--accent-hi);
 }
 /* A lit edge on the side the eye starts from, so which screen you are on is readable
@@ -145,6 +145,19 @@
   padding-right: 2px;
 }
 .rail-section .eyebrow { padding: var(--s3) var(--s3) var(--s2); }
+/* A heading with something to press on it. The button is small and quiet: it is a way in,
+   not the thing the section is for. */
+.rail-eyebrow { display: flex; align-items: center; gap: var(--s2); }
+.rail-eyebrow .grow { flex: 1; }
+.rail-eyebrow .icon-btn.tiny { margin: -4px -4px -4px 0; }
+/* What a section with nothing in it says. Small, because it is a note rather than an
+   empty state: the empty states in this app are for whole screens. */
+.rail-none {
+  padding: 0 var(--s3) var(--s3);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
 .rail-album {
   display: flex; align-items: center; gap: var(--s3);
   padding: 6px var(--s2);
@@ -436,6 +449,17 @@
   margin-bottom: var(--s4);
 }
 .section-head .grow { flex: 1; }
+/* The buttons after a heading, as one thing.
+ *
+ * Loose in a wrapping row they wrap one at a time, so where the line breaks depends on how
+ * long the heading happens to be: "Render collector" sent both of its buttons to a second
+ * line and "Simple sync" kept one up beside the title, which is two panels side by side
+ * disagreeing about their own shape. Grouped, the row breaks between the heading and the
+ * buttons or not at all.
+ *
+ * Not .block-tools, which is the song page's and is invisible until its block is hovered.
+ * There is nothing to hover with on a phone, and these are the only actions the panel has. */
+.head-tools { display: flex; align-items: center; gap: var(--s2); flex: none; }
 
 /* ── responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
@@ -450,6 +474,15 @@
     transform: translate3d(var(--rail-x), 0, 0);
     transition: transform var(--med);
     box-shadow: var(--shadow-3);
+    /* Near solid here, and only here.
+     *
+     * On a wide screen the rail is a column of the grid with the page beside it, so there
+     * is nothing behind it and the tint can be light. At this width it is a drawer lying
+     * over the page, and the page is words: at three quarters it was a menu with a song
+     * title, a verse and three lines of lyrics legible straight through it, which is how
+     * it was reported. A drawer over text is the same job as a dialog over text, so it
+     * takes the same tint. */
+    background: var(--glass-2);
     /* Sideways on the rail is ours, up and down still belongs to the browser. Without
        this the browser claims the whole gesture and sends pointercancel partway through,
        which is the same thing that stopped the swipe working on a phone until .view was

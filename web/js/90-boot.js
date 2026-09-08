@@ -10,6 +10,12 @@ J.applyAccent = function (hex) {
   const root = document.documentElement;
   root.style.setProperty("--accent", hex);
   // The hover and soft variants are derived so one setting stays one setting.
+  /* Including the bare numbers, which is what every translucent tint of the accent is
+   * built from: ten rules across the stylesheets and two canvas fills want a version of
+   * this colour at some alpha, and before this they had the green written out by hand and
+   * stayed green whatever was chosen here. */
+  const { r, g, b } = J.rgb(hex);
+  root.style.setProperty("--accent-rgb", `${r}, ${g}, ${b}`);
   root.style.setProperty("--accent-hi", J.lighten(hex, 0.14));
   root.style.setProperty("--accent-lo", J.lighten(hex, -0.18));
   root.style.setProperty("--accent-soft", J.alpha(hex, 0.14));
@@ -86,7 +92,14 @@ J.applyLook = function (settings) {
     if (node) node.setAttribute("scale", String(value));
   }
   /* Nought means off, and off means the plain glass rather than three displacements all
-   * at the same scale doing three times the work to look identical. */
+   * at the same scale doing three times the work to look identical.
+   *
+   * This is the only place an SVG reference goes into a backdrop-filter, and it is the
+   * only place that can afford to: WebKit parses the reference and never renders it, so
+   * turning this up on Safari costs the blur on the two big edges and leaves a surface
+   * that is still readable on its own. Everywhere else asks for filter functions only,
+   * because a dialog that depends on a filter is a dialog you cannot read on the browser
+   * that skips it. */
   document.documentElement.style.setProperty(
     "--glass-filter-edge",
     spread ? "url(#glass-ca) blur(22px) saturate(180%) brightness(1.06)"
@@ -234,16 +247,28 @@ async function refreshRailPlaylists(state) {
   try {
     const data = await J.get("/api/playlists");
     const mine = (data.playlists || []).filter((p) => !p.album_id);
-    holder.innerHTML = mine.length
-      ? `<div class="eyebrow">Playlists</div>` + mine.map((p) => `
-          <a class="rail-album" href="#/playlist/${p.id}" data-link>
-            ${J.cover({ title: p.title, className: "cover" })}
-            <span class="truncate">
-              <span class="t truncate">${J.esc(p.title)}</span>
-              <span class="s truncate">${p.count} item${p.count === 1 ? "" : "s"}</span>
-            </span>
-          </a>`).join("")
-      : "";
+    /* The heading is here whether there are any or not.
+     *
+     * It used to be absent until the first playlist existed, and the only way to make that
+     * first one was through a song: add to a playlist, then New. So the feature was real
+     * and had no door of its own, and the rail said nothing about it either way. */
+    holder.innerHTML = `
+      <div class="eyebrow rail-eyebrow">
+        <span>Playlists</span>
+        <span class="grow"></span>
+        <button class="icon-btn tiny" data-act="new-playlist"
+                title="Start a playlist" aria-label="Start a playlist">${J.plus(14)}</button>
+      </div>
+      ${mine.length ? mine.map((p) => `
+        <a class="rail-album" href="#/playlist/${p.id}" data-link>
+          ${J.cover({ title: p.title, className: "cover" })}
+          <span class="truncate">
+            <span class="t truncate">${J.esc(p.title)}</span>
+            <span class="s truncate">${p.count} item${p.count === 1 ? "" : "s"}</span>
+          </span>
+        </a>`).join("")
+      : `<div class="rail-none">Nothing yet. A playlist can hold songs and loose
+           renders together.</div>`}`;
   } catch (e) {
     holder.innerHTML = "";
   }
@@ -848,6 +873,29 @@ async function boot() {
             J.playSong(list[0], list);
           } },
       ];
+    });
+  }
+
+  /* Starting one from the rail. Delegated, because refreshRailPlaylists rewrites this
+   * element's contents every time anything about a playlist changes. */
+  const railPlaylists = J.$("#railPlaylists");
+  if (railPlaylists) {
+    railPlaylists.addEventListener("click", async (e) => {
+      if (!e.target.closest('[data-act="new-playlist"]')) return;
+      const said = await J.sheet({
+        title: "A new playlist",
+        sub: "It starts empty. Add songs and renders to it from their own menus.",
+        confirm: "Make it",
+        body: `<label class="sheet-label">Name
+                 <input class="field" name="title" maxlength="120" placeholder="Late takes">
+               </label>`,
+      });
+      const title = said && (said.title || "").trim();
+      if (!title) return;
+      const made = await J.try(() => J.post("/api/playlists", { title }));
+      if (!made) return;
+      J.emit("playlists:changed");
+      location.hash = `#/playlist/${made.playlist.id}`;
     });
   }
 

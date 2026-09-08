@@ -114,13 +114,38 @@ J.cover = (opts) => {
          `<span class="letter">${J.esc(letter)}</span></div>`;
 };
 
+//: How many toasts can be on screen before the oldest is pushed off.
+//:
+//: There was no limit. Something going wrong four times in a row put four boxes up the
+//: middle of the screen, which is a stack tall enough to cover what you were doing and
+//: says nothing the first one did not.
+const TOAST_MOST = 3;
+
 J.toast = (message, kind) => {
   const stack = J.$("#toasts");
   if (!stack) return;
+
+  /* The same thing twice is the same thing.
+   *
+   * A skip through four dead rows in a queue raised four toasts with four different ids
+   * in them, and a repeated failure raises the identical line over and over. Rather than
+   * a wall of boxes, the one already there is kept and counted, which also keeps it on
+   * screen for longer without a separate timer to manage.
+   */
+  const already = [...stack.children].find((n) => n.dataset.said === message);
+  if (already) {
+    const times = Number(already.dataset.times || 1) + 1;
+    already.dataset.times = times;
+    already.textContent = `${message} (${times})`;
+    return;
+  }
+
   const node = document.createElement("div");
   node.className = "toast" + (kind === "bad" ? " bad" : "");
+  node.dataset.said = message;
   node.textContent = message;
   stack.appendChild(node);
+  while (stack.children.length > TOAST_MOST) stack.firstElementChild.remove();
   setTimeout(() => {
     node.style.transition = "opacity 200ms";
     node.style.opacity = "0";

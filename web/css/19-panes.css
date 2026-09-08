@@ -107,7 +107,7 @@
 .empty:not(.quiet) {
   border-color: var(--glass-line);
   background:
-    radial-gradient(120% 100% at 50% 0%, rgba(84, 179, 122, 0.06), transparent 62%),
+    radial-gradient(120% 100% at 50% 0%, rgba(var(--accent-rgb), 0.06), transparent 62%),
     var(--glass);
   -webkit-backdrop-filter: var(--glass-filter-thin);
   backdrop-filter: var(--glass-filter-thin);

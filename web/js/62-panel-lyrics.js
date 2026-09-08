@@ -192,14 +192,6 @@ J.blockLyrics = async function (block, ctx) {
         </span>`}
       </div>
 
-      ${viewing ? `
-        <div class="time-bar">
-          <span>Looking at the words from <b>${J.date(viewing.created_at)}</b>. Nothing has changed.</span>
-          <span class="grow"></span>
-          <button class="btn sm" data-act="restore">Restore these</button>
-          <button class="btn ghost sm" data-act="back">Back to now</button>
-        </div>` : ""}
-
       <div class="lyric-deck">
         ${many ? `<button class="deck-arrow" data-act="prev" aria-label="Previous"
                     ${at === 0 ? "disabled" : ""}>
@@ -244,6 +236,22 @@ J.blockLyrics = async function (block, ctx) {
       ${many ? `<div class="deck-dots">${sheets.map((sh, i) =>
         `<button class="deck-dot ${i === at ? "on" : ""}" data-go="${i}"
                  title="${J.esc(sh.name)}" aria-label="${J.esc(sh.name)}"></button>`).join("")}</div>` : ""}
+
+      <!-- Which revision you are looking at, under the card rather than over it.
+           It used to sit above the deck, so the first click on a history entry pushed the
+           card down by the height of this bar and every switch after that nudged it again
+           when the date wrapped differently. What moves when you are reading a card should
+           not be the card: "amikor a history-t valtogatom a felul levo uzenet miatt ugral
+           maga az a resz, amit eppen szerkeszteni akarok, ami zavaro". Down here it is
+           also where you are already looking, because it is right above the list you just
+           clicked in. -->
+      ${viewing ? `
+        <div class="time-bar">
+          <span>Looking at the words from <b>${J.date(viewing.created_at)}</b>. Nothing has changed.</span>
+          <span class="grow"></span>
+          <button class="btn sm" data-act="restore">Restore these</button>
+          <button class="btn ghost sm" data-act="back">Back to now</button>
+        </div>` : ""}
 
       ${history ? `
         <div class="history-rail">

@@ -35,8 +35,17 @@ J.menu = (function () {
     // contains() throws on anything that is not a Node, and an event whose target is
     // the window is not far fetched. A menu that cannot be closed is the worst outcome
     // available here, so anything unrecognised counts as outside.
-    const inside = e.target instanceof Node && open.node.contains(e.target);
-    if (!inside) close();
+    if (!(e.target instanceof Node)) { close(); return; }
+    if (open.node.contains(e.target)) return;
+    /* The button the menu is hanging off is not outside it.
+     *
+     * This runs on pointerdown, before the click, so pressing that button again used to
+     * close the menu here and then the click opened a new one: the press toggled nothing
+     * and the only way to be rid of a menu was to press something else. The press is left
+     * alone now and show() does the toggling, which is where it can be told apart from a
+     * right click somewhere new. */
+    if (open.anchor && open.anchor.contains(e.target)) return;
+    close();
   }
 
   function onKey(e) {
@@ -106,6 +115,20 @@ J.menu = (function () {
 
     /* items, and where. `where` is a pointer event, or {anchor: element}. */
     show(items, where) {
+      /* Pressing the button again puts the menu away.
+       *
+       * It used to close and open again on the same press, so the only way to get rid of
+       * one was to press something else: "ha megint ranyomok akkor bezarom, de csak ujra
+       * nyitja es ha felrenyomok akkoor zarja csak be". On a phone, where there is no
+       * Escape key and no right button, pressing the thing again is the whole vocabulary.
+       *
+       * Only for a menu hanging off a button. A right click carries a position rather than
+       * an anchor, and clicking again somewhere else should move the menu there, not make
+       * it disappear. */
+      if (where && where.anchor && open && open.anchor === where.anchor) {
+        close();
+        return null;
+      }
       close();
       /* The song page's slot menu is its own thing, older than this one and shaped
        * around versions and presets rather than a list of actions. It still has to go
@@ -130,7 +153,7 @@ J.menu = (function () {
       }).join("");
 
       document.body.appendChild(node);
-      open = { node, items: usable };
+      open = { node, items: usable, anchor: (where && where.anchor) || null };
 
       const at = where && where.anchor
         ? { anchor: where.anchor.getBoundingClientRect() }

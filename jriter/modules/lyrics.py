@@ -62,6 +62,23 @@ def name_from(text, fallback):
     return fallback
 
 
+def plain_name(sheet):
+    """What a set of words with nothing in it is called.
+
+    Not the name it had. Deleting every word out of a sheet left the old first line sitting
+    on the card as its title, so the card read as the previous words with the body missing:
+    "nem torli ki, hanem az elozo szoveget mutatja ugyanugy", with a screenshot of a
+    revision marked nought characters under a heading that still said something.
+
+    The same shape a sheet gets when it is made, since that is what it has gone back to
+    being: one of several, with nothing written in it yet.
+    """
+    try:
+        return "v%d" % (int(sheet["position"]) + 1)
+    except (KeyError, TypeError, ValueError):
+        return "v1"
+
+
 def _latest(sheet_id):
     return db.one("SELECT * FROM lyric_revisions WHERE sheet_id = ? ORDER BY id DESC LIMIT 1",
                   (sheet_id,))
@@ -122,8 +139,10 @@ def save_text(req):
                 "message": "Nothing changed, so no new revision was kept."}
     db.insert("lyric_revisions",
               {"sheet_id": sheet["id"], "text": text, "created_at": time.time()})
+    # An empty sheet goes back to being called v-something rather than keeping the title
+    # of the words that were deleted out of it.
     db.update("lyric_sheets", sheet["id"],
-              {"name": name_from(text, sheet["name"])})
+              {"name": name_from(text, plain_name(sheet))})
     songs.touch(sheet["song_id"])
     return {"sheet": _with_text(get_sheet(sheet["id"])), "saved": True}
 
@@ -175,7 +194,8 @@ def restore(req):
                 "message": "That text is already the current one."}
     db.insert("lyric_revisions",
               {"sheet_id": sheet["id"], "text": old["text"], "created_at": time.time()})
-    db.update("lyric_sheets", sheet["id"], {"name": name_from(old["text"], sheet["name"])})
+    db.update("lyric_sheets", sheet["id"],
+              {"name": name_from(old["text"], plain_name(sheet))})
     songs.touch(sheet["song_id"])
     return {"sheet": _with_text(get_sheet(sheet["id"])), "saved": True}
 

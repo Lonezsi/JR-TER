@@ -112,7 +112,7 @@
   background: var(--grad-accent);
   border-color: transparent;
   color: var(--text-on-accent);
-  box-shadow: var(--edge-top), 0 2px 8px rgba(84, 179, 122, 0.25);
+  box-shadow: var(--edge-top), 0 2px 8px rgba(var(--accent-rgb), 0.25);
 }
 .ab-chip[disabled] { opacity: 0.4; cursor: default; }
 

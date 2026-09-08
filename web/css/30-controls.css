@@ -25,7 +25,7 @@
 .btn.primary {
   background: var(--grad-accent);
   color: var(--text-on-accent);
-  box-shadow: var(--edge-top), 0 2px 10px rgba(84, 179, 122, 0.25);
+  box-shadow: var(--edge-top), 0 2px 10px rgba(var(--accent-rgb), 0.25);
 }
 .btn.primary:hover { background: var(--grad-accent-hi); }
 .btn.ghost { background: transparent; color: var(--text-2); box-shadow: none; }
@@ -219,6 +219,10 @@ textarea.field { min-height: 120px; resize: vertical; line-height: 1.7; }
   cursor: pointer;
   transition: border-color var(--fast);
 }
+/* Save, and the way back. Two buttons on one line, and the second is quieter because
+   putting the look back is not the thing you came here to do. */
+.settings-foot { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+
 .swatch:hover { border-color: var(--line-2); }
 .swatch:focus-within { border-color: var(--accent-line); }
 

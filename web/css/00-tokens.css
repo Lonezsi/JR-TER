@@ -58,8 +58,16 @@
   --accent:      #54B37A;
   --accent-hi:   #74D398;
   --accent-lo:   #38835A;
-  --accent-soft: rgba(84, 179, 122, 0.16);
-  --accent-line: rgba(84, 179, 122, 0.42);
+  /* The same colour as three numbers, for the tints.
+   *
+   * Ten rules across the stylesheets wrote the green out by hand to get a translucent
+   * version of it, and none of them followed the accent when it was changed in Settings:
+   * a pink accent came out as a pink button with a green halo. A token per alpha would be
+   * eight names to keep straight, so this is the colour and rgba() supplies the alpha.
+   * Set at runtime by J.applyAccent alongside the rest. */
+  --accent-rgb:  84, 179, 122;
+  --accent-soft: rgba(var(--accent-rgb), 0.16);
+  --accent-line: rgba(var(--accent-rgb), 0.42);
 
   --warn:        #D9A441;
   --bad:         #D4685E;
@@ -76,14 +84,37 @@
      hierarchy inverts. Thinner with artwork open, so more of it comes through. */
   --pane:        rgba(11, 11, 12, 0.78);
   --pane-thin:   rgba(11, 11, 12, 0.55);
-  --glass:       rgba(255, 255, 255, 0.055);
-  --glass-2:     rgba(255, 255, 255, 0.085);
+  /* Glass that is still a surface when the blur does not arrive.
+   *
+   * These were a five and an eight per cent white film, which is a tint and nothing else:
+   * every bit of the legibility came from the blur behind it. On a browser that does not
+   * apply the filter, that left a dialog as a sheet of clear glass with text on it and the
+   * page's own text sharp underneath, and reading it meant working out which words were
+   * which. Two people reported it as three separate bugs from the same cause: the modals,
+   * the dropdowns and the rail.
+   *
+   * So the tint is dark and mostly opaque, and the blur is the improvement rather than the
+   * whole of it. Glass over a near black room has to be dark anyway: a white veil on a
+   * black ground is fog, and fog is what those screenshots looked like.
+   *
+   * --glass-2 is what carries text you have to read now: dialogs, menus, dropdowns. It is
+   * nearly solid on purpose. --glass is the large chrome, which sits over the artwork wash
+   * rather than over words, and can afford to let more through. */
+  --glass:       rgba(17, 18, 21, 0.74);
+  --glass-2:     rgba(20, 21, 25, 0.96);
   --glass-line:  rgba(255, 255, 255, 0.13);
 
-  /* Distort, then blur, then lift. The order matters: displacing an image that has
-     already been blurred bends a smudge, which looks like nothing at all. */
-  --glass-filter:      url(#glass) blur(22px) saturate(180%) brightness(1.06);
-  --glass-filter-thin: url(#glass-thin) blur(14px) saturate(170%) brightness(1.05);
+  /* Blur, then lift. Filter functions only.
+   *
+   * The refraction used to lead this chain as url(#glass), and that is what broke every
+   * glass surface in Safari. One unsupported function invalidates the whole declaration,
+   * and WebKit parses an SVG reference here quite happily and then never renders it, so
+   * @supports says yes, the blur never happens, and there is no way for a stylesheet to
+   * find out. Nothing in here can fail: blur, saturate and brightness are as old as the
+   * property. The refraction is now opt in through the chromatic setting, which is the one
+   * place it is allowed to quietly do nothing. */
+  --glass-filter:      blur(22px) saturate(180%) brightness(1.06);
+  --glass-filter-thin: blur(14px) saturate(170%) brightness(1.05);
 
   /* The same glass with the colours coming apart slightly, for the two big panes that
      have a real edge to them. Experimental, and deliberately one line: three
@@ -94,8 +125,11 @@
 
      Not on the topbar, which sits over the one list that scrolls, and not on sheets or
      menus, which are small and short lived. The cost is worth paying where the glass is
-     large and mostly still. */
-  --glass-filter-edge: url(#glass-ca) blur(22px) saturate(180%) brightness(1.06);
+     large and mostly still.
+
+     Plain by default, for the reason above. The chromatic setting is what puts the SVG
+     reference back, and a browser that cannot render it gets this instead. */
+  --glass-filter-edge: blur(22px) saturate(180%) brightness(1.06);
 
   /* The lit top edge every real pane has, and the shadow it sits in. */
   --edge-top: inset 0 1px 0 rgba(255, 255, 255, 0.14);

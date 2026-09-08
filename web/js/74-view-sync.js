@@ -63,10 +63,12 @@ J.views.sync = {
                      + "reads these and never writes to them, and nothing is imported "
                      + "until you say so.")}
               <span class="grow"></span>
-              <button class="btn sm ghost" data-act="add" data-kind="collector">Add</button>
-              <button class="btn sm primary" data-act="scan" ${collectors.length ? "" : "disabled"}>
-                ${scanning ? "Scanning…" : "Scan"}
-              </button>
+              <span class="head-tools">
+                <button class="btn sm ghost" data-act="add" data-kind="collector">Add</button>
+                ${collectors.length ? `<button class="btn sm primary" data-act="scan">
+                  ${scanning ? "Scanning…" : "Scan"}
+                </button>` : ""}
+              </span>
             </div>
 
             ${collectors.length ? `<div class="folder-list">${
@@ -89,10 +91,12 @@ J.views.sync = {
                      + "what a library holds so two machines can be compared. It does not "
                      + "move files between them yet.")}
               <span class="grow"></span>
-              <button class="btn sm ghost" data-act="add" data-kind="sync">Add</button>
-              <button class="btn sm ghost" data-act="stock" ${libraries.length ? "" : "disabled"}>
-                ${stocking ? "Looking…" : "Take stock"}
-              </button>
+              <span class="head-tools">
+                <button class="btn sm ghost" data-act="add" data-kind="sync">Add</button>
+                ${libraries.length ? `<button class="btn sm ghost" data-act="stock">
+                  ${stocking ? "Looking…" : "Take stock"}
+                </button>` : ""}
+              </span>
             </div>
 
             ${libraries.length ? `<div class="folder-list">${
@@ -168,16 +172,6 @@ J.views.sync = {
       { label: "Remove from the list", icon: "drop", danger: true,
         run: () => node.querySelector('[data-act="remove"]')?.click() },
     ];
-  });
-
-  root.addEventListener("input", (e) => {
-    const picker = e.target.closest("#accent");
-    if (!picker) return;
-    // The swatch is the control; the native input behind it is only the colour wheel.
-    const holder = picker.closest(".swatch");
-    holder.style.setProperty("--picked", picker.value);
-    const hex = J.$(".swatch-hex", holder);
-    if (hex) hex.textContent = picker.value;
   });
 
   root.addEventListener("click", async (e) => {
@@ -280,6 +274,12 @@ J.views.settings = {
     let tool = { found: false, why: "" };
     let font = (state.summary && state.summary.appearance) || { custom_font: false };
 
+    /* Whether the app is currently wearing something that has not been saved.
+     *
+     * Only set by the controls that preview, and cleared by saving or by leaving. Without
+     * it, leaving any other screen would reapply these settings for no reason. */
+    let previewing = false;
+
     function draw() {
       root.innerHTML = `
         <div class="section">
@@ -331,7 +331,14 @@ J.views.settings = {
                 than a fix.</span>
             </label>
 
-            <div><button class="btn primary sm" data-act="save-settings">Save</button></div>
+            <div class="settings-foot">
+              <button class="btn primary sm" data-act="save-settings">Save</button>
+              <!-- Asked for: "Lehetne egy gomb a beallitasoknal, ami visszaallitja az
+                   eredeti beallitasokat". It fills the form and previews, like every other
+                   control on this page, and Save is still what writes it: one rule for the
+                   whole screen rather than one button that behaves differently. -->
+              <button class="btn ghost sm" data-act="reset-look">Back to normal</button>
+            </div>
           </div>
         </div>
 
@@ -562,11 +569,81 @@ J.views.settings = {
         glass_edge: Number((J.$("#glassEdge", root) || {}).value),
         dither: Number((J.$("#dither", root) || {}).value),
       });
+      previewing = true;
+    });
+
+    /* The accent, which is a dial like the others and was wired to the wrong page.
+     *
+     * This handler used to sit in J.views.sync, the folders screen, whose element never
+     * contains #accent: it could not fire, so the dot never changed colour and neither did
+     * the hex beside it. That is the whole of "a color picker-nek nem modosul a szine".
+     * Moved here, where the picker actually is, and it previews the room while it is at it.
+     */
+    root.addEventListener("input", (e) => {
+      const picker = e.target.closest("#accent");
+      if (!picker) return;
+      // The swatch is the control; the native input behind it is only the colour wheel.
+      const holder = picker.closest(".swatch");
+      holder.style.setProperty("--picked", picker.value);
+      const hex = J.$(".swatch-hex", holder);
+      if (hex) hex.textContent = picker.value;
+      J.applyAccent(picker.value);
+      previewing = true;
+    });
+
+    /* Leaving without saving puts the room back.
+     *
+     * The alternative, and the one this used to do by accident, is an app wearing settings
+     * that exist nowhere: not in the form, which redraws from what was saved, and not on
+     * the server. The first slider you touched then reset everything at once, which is
+     * what made it read as broken rather than as unsaved. */
+    function putItBack() {
+      if (!previewing) return;
+      previewing = false;
+      J.applyAccent(state.settings.accent);
+      J.applyLook(state.settings);
+    }
+    /* Once, and then it takes itself off.
+     *
+     * J.on hands the handler the event, so the view's name is on .detail. There is no J.off
+     * and this runs on every arrival at this screen, so a listener that stayed would mean
+     * one more of them per visit, each holding a stale copy of the saved settings to put
+     * back. The same self removing shape the song page uses for player:change. */
+    J.on("view:leaving", function leaving(e) {
+      if (e.detail !== "settings") return;
+      J.bus.removeEventListener("view:leaving", leaving);
+      putItBack();
     });
 
     root.addEventListener("click", async (e) => {
       const act = e.target.closest("[data-act]");
       if (!act) return;
+
+      if (act.dataset.act === "reset-look") {
+        const said = await J.get("/api/settings/defaults").catch(() => null);
+        const back = said && said.defaults;
+        if (!back) { J.toast("Could not read the defaults.", "bad"); return; }
+        const put = (id, value) => { const node = J.$("#" + id, root); if (node) node.value = value; };
+        put("accent", back.accent);
+        put("dust", back.dust);
+        put("glassEdge", back.glass_edge);
+        put("dither", back.dither);
+        for (const [id, value] of [["dust", back.dust], ["glassEdge", back.glass_edge],
+                                   ["dither", back.dither]]) {
+          const said2 = J.$("#" + id + "Said", root);
+          if (said2) said2.textContent = value;
+        }
+        const holder = J.$(".swatch", root);
+        if (holder) {
+          holder.style.setProperty("--picked", back.accent);
+          const hex = J.$(".swatch-hex", holder);
+          if (hex) hex.textContent = back.accent;
+        }
+        J.applyAccent(back.accent);
+        J.applyLook(back);
+        previewing = true;
+        J.toast("The look is back to normal. Save to keep it.");
+      }
 
       if (act.dataset.act === "save-settings") {
         const patch = {
@@ -583,6 +660,7 @@ J.views.settings = {
         const saved = await J.try(() => J.put("/api/settings", patch), "Saved");
         if (saved) {
           state.settings = saved;
+          previewing = false;          // what is on screen is what is stored
           J.applyAccent(saved.accent);
           J.applyLook(saved);
           J.emit("settings:changed");

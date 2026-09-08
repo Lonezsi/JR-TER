@@ -86,6 +86,18 @@ J.router = (function () {
       && String(params.id || "") === String(currentParams.id || "");
     const inPlace = sameScreen
       && (!!(options && options.inPlace) || location.hash !== currentPath);
+
+    /* Actually leaving, said out loud.
+     *
+     * A view that changes something outside its own element has to be able to put it back.
+     * Settings is the one that does: the dials preview live, so the app is wearing values
+     * that were never saved, and walking away used to leave them on. What came back was a
+     * form showing the saved numbers over an app showing the unsaved ones, and the first
+     * touch of a slider snapped everything to the form. Reported exactly that way.
+     *
+     * Not on a refresh or a refinement, which are the same screen redrawing. */
+    if (currentView && !sameScreen) J.emit("view:leaving", currentView);
+
     showProgress();
 
     /* A fresh element every time, rather than emptying the old one.

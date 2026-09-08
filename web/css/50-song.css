@@ -204,6 +204,16 @@
 .block-head .grow { flex: 1; }
 .block-tools { display: flex; align-items: center; gap: var(--s2); opacity: 0; transition: opacity var(--fast); }
 .block:hover .block-tools, .block:focus-within .block-tools { opacity: 1; }
+/* Nothing to hover with, so nothing to reveal.
+ *
+ * Reported from a phone: "vannak gombok amik lapin hovernel kapnak egy hatteret, ezzel
+ * egyertelmu hogy egy gomb, telon kicsit talan zavaro hogy hoverelni nem tudok". These
+ * were worse than dim: at zero they are invisible, and the only reason they ever showed up
+ * on a phone was a width rule further down that happens to catch most of them. A pointer
+ * that cannot hover gets the tools outright. */
+@media (hover: none) {
+  .block-tools { opacity: 1; }
+}
 
 /* ── A and B, in the header ───────────────────────────────────────────────── */
 /* One height for everything in this row.
@@ -689,7 +699,10 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
 .time-bar {
   display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
   padding: var(--s3) var(--s4);
-  margin-bottom: var(--s4);
+  /* Above the history list it introduces, not above the card. It moved from over the deck
+     to under it, so the space it needs moved with it. */
+  margin: var(--s5) auto var(--s2);
+  max-width: 640px;
   border-radius: var(--r-md);
   background: rgba(217, 164, 65, 0.1);
   border: 1px solid rgba(217, 164, 65, 0.3);

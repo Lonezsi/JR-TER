@@ -210,6 +210,16 @@ def _read():
         return {}
 
 
+def defaults():
+    """What a setting is before anybody chooses.
+
+    A copy, so a caller cannot edit the table every other read comes from. Exposed because
+    the settings page has a button that puts the look back, and the alternative was the
+    same four numbers written down a second time in JavaScript, where they would drift.
+    """
+    return dict(_DEFAULTS)
+
+
 def settings():
     """User settings, with defaults filled in for anything never set."""
     out = dict(_DEFAULTS)

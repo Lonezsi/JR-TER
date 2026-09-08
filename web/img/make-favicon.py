@@ -2,12 +2,19 @@
 
 Run by hand, never at startup and never as part of a build:
 
-    python web/img/make-favicon.py
+    python web/img/make-favicon.py            # writes web/favicon.ico
+    python web/img/make-favicon.py --preview  # and a big PNG to look at
 
-The mark is the exclamation out of JR!TER: a bar and a dot cut out of a green tile, which
-is what the icon already was. Only the exclamation, without the J the SVG also drew: this
-has to survive being sixteen pixels across in a browser tab and a taskbar, and two glyphs
-at that size are four grey smudges.
+The mark is a quarter rest and an exclamation, cut out of a green tile, because that is
+the joke the whole name is built on: a rest is the instruction to play nothing, and it is
+standing next to the loudest punctuation there is. An icon for a music workspace that says
+"silence!" is the point, and an icon that is only the exclamation throws it away.
+
+The rest is not a typed glyph. Nothing in the display stack carries U+1D13D, least of all a
+face somebody uploaded themselves, so a text glyph is a notdef box on a machine you cannot
+test. It is the same path the wordmark in the rail draws, sampled from the same numbers, so
+the two marks cannot drift apart. Cut heavier here: the wordmark is nine pixels wide beside
+23 pixel text and wants a hairline, and a tab icon at sixteen wants a stroke you can see.
 
 Standard library, like everything else here. An ICO is a small header followed by whole
 files, and since Vista those files may be PNGs, so this writes four PNGs with zlib and
@@ -17,11 +24,13 @@ Committed as a binary because it is one, but this file is why it looks the way i
 regenerating it is one command rather than an image editor and a guess at the green.
 """
 import os
+import sys
 import zlib
 import struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, os.pardir, "favicon.ico")
+PREVIEW = os.path.join(HERE, "favicon-preview.png")
 
 #: The colours the mark already had.
 #:
@@ -38,9 +47,104 @@ INK = (15, 19, 17)           # the near black the SVG used
 #: its largest, 48 is the desktop, 32 the taskbar, 16 the tab.
 SIZES = (16, 32, 48, 256)
 
-#: How many samples per pixel per axis. The mark is all curves and straight edges at small
-#: sizes, and a hard edged 16px icon looks like a mistake next to every other tab.
+#: How many samples per pixel per axis. The mark is all curves and diagonals, and a hard
+#: edged 16px icon looks like a mistake next to every other tab.
 SUPER = 4
+
+# ── the rest, from the wordmark ──────────────────────────────────────────────
+#
+# The path in index.html, in its own 12 by 30 viewBox: a three legged zigzag, then a hook
+# off the bottom of it made of two cubics. Written out as numbers rather than parsed,
+# because a path parser to read one path is a parser to maintain.
+ZIGZAG = [(8.5, 2.0), (3.5, 9.5), (8.5, 15.0), (3.5, 21.0)]
+HOOK = [
+    # start,        control 1,     control 2,     end
+    ((3.5, 21.0), (6.7, 21.6), (8.4, 23.4), (8.4, 25.6)),
+    ((8.4, 25.6), (8.4, 27.2), (7.4, 28.2), (6.0, 28.2)),
+]
+
+#: Where the two glyphs sit, in a 100 wide tile.
+#:
+#: Both numbers were chosen by looking at the thing: the rest is the taller and more
+#: distinctive of the two so it gets the height, and the gap is small enough that they read
+#: as one mark rather than two marks sharing a tile.
+REST_TOP, REST_BOTTOM = 11.0, 89.0
+REST_MID_X = 36.5
+REST_STROKE = 13.0          # the heavy cut: 13 per cent of the tile, so 2.1px at 16
+HOOK_STROKE = 11.0          # the wordmark thins the hook too, in the same proportion
+
+BANG_MID_X = 69.0
+BANG_W = 15.5
+BANG_TOP, BANG_BOTTOM = 18.0, 63.0
+DOT_Y, DOT_R = 80.5, 8.5
+
+
+def _cubic(seg, steps=24):
+    """A cubic Bezier as points. Sampled rather than solved: the stroke is a distance to a
+    polyline, and at this many steps the error is far below one pixel of a 256px icon."""
+    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = seg
+    out = []
+    for i in range(steps + 1):
+        t = i / float(steps)
+        u = 1.0 - t
+        out.append((u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+                    u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3))
+    return out
+
+
+def _rest_path():
+    """The rest's centreline in tile coordinates, as two polylines with their widths.
+
+    Scaled from the viewBox by height, so the mark keeps the proportions the rail draws,
+    and centred on REST_MID_X by its own bounding box rather than by the viewBox, which has
+    slack on both sides.
+    """
+    hook = []
+    for seg in HOOK:
+        hook.extend(_cubic(seg))
+    lines = [(ZIGZAG, REST_STROKE), (hook, HOOK_STROKE)]
+
+    every = [p for line, _ in lines for p in line]
+    top = min(y for _, y in every)
+    bottom = max(y for _, y in every)
+    left = min(x for x, _ in every)
+    right = max(x for x, _ in every)
+
+    # Height is set by the outside of the stroke, not the centreline, or the mark comes out
+    # taller than asked for by half a stroke at each end.
+    scale = ((REST_BOTTOM - REST_TOP) - REST_STROKE) / (bottom - top)
+    mid = (left + right) / 2.0
+    # The widths are already in tile units, so only the centreline is scaled.
+    out = []
+    for line, width in lines:
+        out.append(([(REST_MID_X + (x - mid) * scale,
+                      REST_TOP + REST_STROKE / 2.0 + (y - top) * scale) for x, y in line],
+                    width))
+    return out
+
+
+#: Worked out once, not per pixel. At 256 with four times supersampling this function is
+#: asked about a million points, and the rest is the same rest every time.
+REST = _rest_path()
+
+
+def _near(px, py, line, half):
+    """Is this point within half a stroke of a polyline. Round joins and caps, which is
+    what the wordmark asks for and what keeps the zigzag from growing spikes."""
+    for i in range(len(line) - 1):
+        ax, ay = line[i]
+        bx, by = line[i + 1]
+        dx, dy = bx - ax, by - ay
+        span = dx * dx + dy * dy
+        if span <= 0:
+            t = 0.0
+        else:
+            t = ((px - ax) * dx + (py - ay) * dy) / span
+            t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+        ox, oy = px - (ax + t * dx), py - (ay + t * dy)
+        if ox * ox + oy * oy <= half * half:
+            return True
+    return False
 
 
 def _rounded(x, y, w, h, r):
@@ -55,23 +159,26 @@ def _rounded(x, y, w, h, r):
 
 
 def _mark(x, y, size):
-    """The exclamation, in a unit square scaled to size. Returns a colour or None.
+    """The rest and the exclamation, in a unit square scaled to size.
 
-    Laid out against a 100 wide grid and scaled, so the proportions are the same at every
-    size rather than drifting as the pixels get coarser.
+    Returns a colour or None. Laid out against a 100 wide grid and scaled, so the
+    proportions are the same at every size rather than drifting as the pixels get coarser.
     """
-    u = size / 100.0
-    bar_w = 15 * u
+    u = 100.0 / size
+    gx, gy = x * u, y * u
+
+    for line, width in REST:
+        if _near(gx, gy, line, width / 2.0):
+            return INK
+
     # The bar tapers very slightly, which is what keeps it from reading as a rectangle
     # somebody forgot to shape.
-    top, bottom = 20 * u, 62 * u
-    if top <= y <= bottom:
-        share = (y - top) / (bottom - top)
-        half = (bar_w / 2.0) * (1.0 - 0.12 * share)
-        if abs(x - size / 2.0) <= half:
+    if BANG_TOP <= gy <= BANG_BOTTOM:
+        share = (gy - BANG_TOP) / (BANG_BOTTOM - BANG_TOP)
+        half = (BANG_W / 2.0) * (1.0 - 0.12 * share)
+        if abs(gx - BANG_MID_X) <= half:
             return INK
-    dot_y, dot_r = 79 * u, 8.5 * u
-    if (x - size / 2.0) ** 2 + (y - dot_y) ** 2 <= dot_r * dot_r:
+    if (gx - BANG_MID_X) ** 2 + (gy - DOT_Y) ** 2 <= DOT_R * DOT_R:
         return INK
     return None
 
@@ -117,8 +224,9 @@ def _pixels(size):
     return rows
 
 
-def _png(rows):
-    size = len(rows)
+def _png_any(rows, width, height):
+    """Rows of RGBA tuples as a PNG. Any rectangle: the icons are square, the preview
+    strip is not."""
     raw = bytearray()
     for row in rows:
         raw.append(0)                     # filter: none, on every scanline
@@ -129,28 +237,63 @@ def _png(rows):
         return (struct.pack(">I", len(payload)) + kind + payload
                 + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF))
 
-    return (b"\x89PNG\r\n\x1a\n"
-            + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
+    return (bytes([137, 80, 78, 71, 13, 10, 26, 10])
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
             + chunk(b"IEND", b""))
 
 
+def _png(rows):
+    return _png_any(rows, len(rows), len(rows))
+
 def main():
-    images = [_png(_pixels(size)) for size in SIZES]
-    header = struct.pack("<HHH", 0, 1, len(images))
-    # The directory comes before the images and has to say where each one starts, so the
-    # offset of the first is however long the header and the whole directory are.
-    offset = len(header) + 16 * len(images)
-    directory = b""
-    for size, blob in zip(SIZES, images):
-        # 256 is written as 0: the field is one byte and the format says 0 means 256.
-        directory += struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32,
-                                 len(blob), offset)
-        offset += len(blob)
+    icons = [(size, _png(_pixels(size))) for size in SIZES]
+
+    # ICONDIR, then one ICONDIRENTRY each, then the files. Offsets are from the top of the
+    # file, so they depend on how many entries there are.
+    head = struct.pack("<HHH", 0, 1, len(icons))
+    offset = len(head) + 16 * len(icons)
+    entries, blobs = b"", b""
+    for size, data in icons:
+        entries += struct.pack("<BBBBHHII",
+                               0 if size >= 256 else size,   # 0 means 256
+                               0 if size >= 256 else size,
+                               0, 0, 1, 32, len(data), offset)
+        blobs += data
+        offset += len(data)
+
     with open(OUT, "wb") as f:
-        f.write(header + directory + b"".join(images))
-    print("wrote %s (%d bytes, sizes %s)"
-          % (os.path.normpath(OUT), offset, ", ".join(str(s) for s in SIZES)))
+        f.write(head + entries + blobs)
+    print("wrote %s, %d bytes, sizes %s"
+          % (os.path.relpath(OUT, os.path.join(HERE, os.pardir, os.pardir)),
+             len(head + entries + blobs), ", ".join(str(s) for s in SIZES)))
+
+    if "--preview" in sys.argv:
+        # Something to actually look at: the big one, and the two small ones blown up
+        # nearest neighbour beside it, so a decision about sixteen pixels is made by
+        # looking at sixteen pixels rather than at a drawing of them.
+        panels = [_pixels(256)]
+        for small in (32, 16):
+            grid = _pixels(small)
+            k = 256 // small
+            panels.append([[grid[py // k][px // k] for px in range(256)]
+                           for py in range(256)])
+
+        gap = 16
+        dark = (0, 0, 0, 255)
+        width = 256 * len(panels) + gap * (len(panels) - 1)
+        rows = []
+        for py in range(256):
+            row = []
+            for i, panel in enumerate(panels):
+                if i:
+                    row += [dark] * gap
+                row += panel[py]
+            rows.append(row)
+        with open(PREVIEW, "wb") as f:
+            f.write(_png_any(rows, width, 256))
+        print("wrote %s (256, then 32 and 16 blown up)"
+              % os.path.relpath(PREVIEW, os.path.join(HERE, os.pardir, os.pardir)))
 
 
 if __name__ == "__main__":

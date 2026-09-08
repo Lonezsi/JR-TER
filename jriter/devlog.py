@@ -22,6 +22,74 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.0",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "Glass you can read, on a browser I do not own",
+        "notes": [
+            "The icon is a quarter rest and an exclamation again. A rest is the "
+            "instruction to play nothing and it is standing next to the loudest "
+            "punctuation there is, which is the joke the whole name is built on, and an "
+            "icon that is only the exclamation throws it away. Same shape as the mark in "
+            "the sidebar, drawn from the same numbers, cut heavier so it survives being "
+            "sixteen pixels wide in a tab.",
+            "Every glass surface is readable in Safari. It was not: dialogs, dropdowns "
+            "and the menu on a phone were a five per cent white film with the page's own "
+            "text sharp underneath, and you had to work out which words were which. One "
+            "cause for all three. The glass asked for an SVG refraction as the first item "
+            "in its filter, one unsupported item invalidates the whole declaration, and "
+            "WebKit accepts that reference and then never draws it, so there was no way "
+            "for a stylesheet to find out. The blur is plain filter functions now, and "
+            "the tint is dark enough to be a surface even with no blur at all.",
+            "The colour picker in Settings works. Its handler had been wired to the "
+            "folders screen, which does not have a colour picker on it, so nothing "
+            "happened when you used it. The accent also previews as you choose it, the "
+            "way dust and chromatic and dither already did.",
+            "Leaving Settings without saving puts the room back. It used to leave the "
+            "preview on: the form came back showing the saved numbers over an app wearing "
+            "the unsaved ones, and the first slider you touched snapped everything at "
+            "once. There is also a Back to normal button now.",
+            "Repeat has three states: off, this one, and the whole list. It only ever did "
+            "one song, while wearing the icon that means the whole list everywhere else, "
+            "so the player read as the opposite of what it did. The one track state has a "
+            "1 in the loop.",
+            "Anything tinted with the accent follows the accent. Ten rules and two "
+            "canvas fills had the green written out as numbers, so a pink accent gave you "
+            "a pink button with a green halo and a pink equaliser over green bands.",
+            "No more \"no song with id 28\" while you are listening. A queue holds songs "
+            "or loose renders, and Next worked out which by looking at what happened to "
+            "be playing; a playlist can hold both, so there was a real way to be wrong, "
+            "and a wrong answer handed a render's number to the songs endpoint. Four of "
+            "those stacked up in the report. The same message twice is now one message "
+            "with a count on it.",
+            "Deleting every word out of a set of lyrics takes its title with it. The "
+            "heading is the first line of the words, and it was only rewritten when there "
+            "was a line to read, so emptying one left the old title sitting on the card: "
+            "it read as the previous words with the body missing, over a revision the "
+            "history correctly called nought characters.",
+            "Switching between old versions of a lyric no longer moves the card you are "
+            "reading. The bar saying which version you are looking at was above the card, "
+            "so the first click pushed it down and every switch after that nudged it "
+            "again. It is under the card now, right above the list you clicked in.",
+            "An arrow over the app, an I-beam over the words. Every label, count and "
+            "heading used to offer to be edited, which matters here because the song "
+            "title genuinely is a line you click into and it looked no different. "
+            "Selecting and copying is untouched.",
+            "Playlists have their own way in. The heading is in the sidebar whether you "
+            "have any or not, with a plus on it: making one used to be reachable only "
+            "through a song, and with none yet the section was not there at all.",
+            "Pressing a button that opened a menu closes it again. It used to close and "
+            "reopen on the same press, so the only way to be rid of one was to press "
+            "something else, which on a phone is the whole vocabulary: there is no Escape "
+            "key and no right button.",
+            "Room under the arrangement, which was touching the heading below it. The "
+            "Scan and Take stock buttons are absent rather than greyed out when there is "
+            "no folder to use them on. The two folder panels wrap their headings the same "
+            "way. Tools that only appeared on hover appear without one, on a screen that "
+            "has no hover.",
+        ],
+    },
+    {
         "version": "3.2.4",
         "date": "2026-09-08",
         "name": JRITER,

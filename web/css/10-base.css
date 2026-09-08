@@ -34,6 +34,36 @@ body {
   overscroll-behavior: none;
 }
 
+/* An arrow over the chrome, an I-beam over the words.
+ *
+ * Reported as "sok szoveg nem kattinthato vagy atirhato, de cursor text type-ra valt": the
+ * browser's default puts an I-beam over any text, so every label, heading, count and eyebrow
+ * in the app offered to be edited. That is a small lie everywhere and a real one here,
+ * because the song title genuinely is an editable line you click into, and it looked
+ * exactly like the labels around it.
+ *
+ * So the shell is an arrow and the things you actually read or copy ask for the I-beam
+ * back. Selection is untouched either way: a drag still selects, whichever cursor is
+ * showing, so nothing about copying gets harder. Anything with a cursor of its own, which
+ * is every button and every handle, keeps it: this is one class of specificity and those
+ * are set on the element.
+ */
+body { cursor: default; }
+
+/* The words. Lyrics, prose, paths, names, numbers you might want out of the app: text
+   that is there to be read, and therefore text worth offering to select. */
+.card-body,
+.card-title,
+.lyric-body,
+.path,
+.sub,
+.md,
+.devlog-body,
+.legal-body,
+p, li, code, pre { cursor: auto; }
+/* Not kbd: those are key caps in the shortcuts sheet, which are chrome drawn as objects
+   rather than text anybody wants out of the app. */
+
 h1, h2, h3 {
   font-family: var(--display);
   font-weight: 700;
@@ -92,7 +122,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background:
-    radial-gradient(120% 100% at 50% 0%, rgba(84, 179, 122, 0.05), transparent 62%),
+    radial-gradient(120% 100% at 50% 0%, rgba(var(--accent-rgb), 0.05), transparent 62%),
     var(--grad-surface);
   box-shadow: var(--edge-top);
 }
@@ -136,7 +166,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .nav-bar span {
   display: block; height: 100%; width: 0;
   background: linear-gradient(90deg, var(--accent-lo), var(--accent-hi));
-  box-shadow: 0 0 10px rgba(84, 179, 122, 0.6);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6);
 }
 .nav-bar.running span { width: 82%; transition: width 2.4s cubic-bezier(0.1, 0.8, 0.2, 1); }
 .nav-bar.done span { width: 100%; opacity: 0; transition: width 140ms linear, opacity 220ms 120ms linear; }
@@ -201,12 +231,14 @@ button, input, textarea, select { font: inherit; color: inherit; }
    passes underneath, and everywhere else it is a grey box that costs a compositor layer.
 
    Where the filter cannot be had at all, those surfaces fall back to solid. */
-/* The probe has to name the thing that is actually depended on.
-   blur(1px) is supported in places url(#glass) is not, and one unsupported function
-   invalidates the whole declaration, so a browser that failed only on the url() got no
-   blur AND no fallback: a five percent white film over the artwork with the text sitting
-   on nothing at all. */
-@supports not (backdrop-filter: url(#glass) blur(1px)) {
+/* The probe names the blur, because the blur is now all that is asked for.
+   It used to name url(#glass), on the reasoning that a probe should name the thing that is
+   depended on. That was right and it still did not work: WebKit parses an SVG reference
+   here and then never renders it, so the @supports said yes, the filter did nothing, and
+   the fallback never came. Nothing in the chain can fail any more, so this block is for
+   browsers with no backdrop-filter at all, and the tints below it are readable without
+   one either way. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .rail, .topbar, .player, .sheet, .slot-menu { background: var(--surface); }
   /* The card carries text rather than chrome, so it falls back to the panel colour
      it used to be rather than to a nearly invisible film. */

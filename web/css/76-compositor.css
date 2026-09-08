@@ -31,7 +31,15 @@
 .comp-body {
   min-width: 0;
   max-width: 100%;
+  /* Room underneath as well as above.
+   *
+   * Measured at zero: the LYRICS heading sat exactly on this panel's bottom edge, so the
+   * strip and the next section read as one crowded block. Reported as "az arrenged div
+   * alatt lehetne tobb hely, mert nagyon osszeer az alatta levokkel". The drawer collapses
+   * to nothing when shut and its inner box hides its overflow, so this costs no space at
+   * all on a song with the panel closed. */
   margin-top: var(--s4);
+  margin-bottom: var(--s6);
   padding: var(--s4);
   border-radius: var(--r-lg);
   background: var(--grad-surface);
@@ -171,7 +179,7 @@
 }
 /* The one being heard right now. */
 .comp-clip.live {
-  box-shadow: inset 0 2px 0 var(--accent-hi), 0 0 20px rgba(84, 179, 122, 0.2);
+  box-shadow: inset 0 2px 0 var(--accent-hi), 0 0 20px rgba(var(--accent-rgb), 0.2);
 }
 
 .comp-wave {
@@ -343,7 +351,7 @@
   /* --edge-top first: this rule replaces box-shadow outright and loads after the card's
      own, so without it the pane loses its lit top edge exactly while it is playing. */
   box-shadow: var(--edge-top), 0 0 0 1px var(--accent-line),
-              0 12px 40px rgba(84, 179, 122, 0.14);
+              0 12px 40px rgba(var(--accent-rgb), 0.14);
 }
 
 @media (max-width: 900px) {
@@ -410,7 +418,7 @@
   color: var(--accent-hi);
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }
-.comp-toggle.on:hover { background: rgba(84, 179, 122, 0.2); }
+.comp-toggle.on:hover { background: rgba(var(--accent-rgb), 0.2); }
 
 /* On a phone the row already holds A, Compare and this; the word is the first thing
    that can go. */

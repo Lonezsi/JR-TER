@@ -62,6 +62,15 @@ J.eq = (function () {
       return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
 
+    /* A translucent accent, for the fills under the curve.
+     *
+     * A canvas fillStyle is a string, so it cannot hold a var(): these two fills used to
+     * be the green written out by hand, which meant a pink accent drew a pink curve over
+     * green bands. --accent-rgb is the three numbers, set by J.applyAccent. */
+    function tint(alpha) {
+      return "rgba(" + (css("--accent-rgb") || "84, 179, 122") + ", " + alpha + ")";
+    }
+
     function drawGrid() {
       ctx2d.lineWidth = 1;
       ctx2d.strokeStyle = "rgba(255,255,255,0.055)";
@@ -162,7 +171,7 @@ J.eq = (function () {
       ctx2d.lineTo(width, gToY(0));
       ctx2d.lineTo(0, gToY(0));
       ctx2d.closePath();
-      ctx2d.fillStyle = data.bypass ? "rgba(255,255,255,0.04)" : "rgba(84, 179, 122, 0.11)";
+      ctx2d.fillStyle = data.bypass ? "rgba(255,255,255,0.04)" : tint(0.11);
       ctx2d.fill();
     }
 
@@ -179,7 +188,7 @@ J.eq = (function () {
           const half = Math.max(0.08, 1 / Math.max(band.q, 0.1));
           const left = fToX(band.freq / Math.pow(2, half));
           const right = fToX(band.freq * Math.pow(2, half));
-          ctx2d.fillStyle = "rgba(84, 179, 122, 0.08)";
+          ctx2d.fillStyle = tint(0.08);
           ctx2d.fillRect(left, 0, Math.max(2, right - left), height);
         }
 
