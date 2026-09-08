@@ -26,6 +26,10 @@ J.compositor = (function () {
 
     const pxPerBeat = () => BASE_PX_PER_BEAT * zoom;
 
+    //: How far the button group stays clear of the edge of the visible strip, so it reads
+    //: as sitting on a block rather than jammed against the side of the box.
+    const EDGE = 6;
+
     function draw() {
       const parts = A.state.parts;
       const clips = A.state.clips;
@@ -73,6 +77,29 @@ J.compositor = (function () {
               <div class="comp-bars"></div>
               <div class="comp-clips">${clips.map(clipHtml).join("")}</div>
               <div class="comp-playhead" hidden></div>
+              <!-- Duplicate and remove, on whichever block is chosen.
+                   A sibling of the clips rather than a child of one, for two reasons: a
+                   clip has overflow hidden so the waveform stops at its edges, and a
+                   fourteen pixel clip has no room to put two buttons inside. Out here it
+                   can sit on the corner and hang over the edge. -->
+              <div class="comp-tools" hidden>
+                <button class="comp-tool" data-act="dup-sel" title="Duplicate this section"
+                        aria-label="Duplicate this section">
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor"
+                          stroke-width="1.8" fill="none"/>
+                    <path d="M5 15V5h10" stroke="currentColor" stroke-width="1.8" fill="none"
+                          stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button class="comp-tool danger" data-act="del-sel"
+                        title="Take this section out" aria-label="Take this section out">
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" stroke="currentColor"
+                          stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           <div class="comp-foot">
@@ -81,7 +108,7 @@ J.compositor = (function () {
               &middot; ${J.time(A.duration())}</span>
             <span class="grow"></span>
             <span class="faint comp-hint">drag to move &middot; edges to trim &middot;
-              double click to duplicate</span>
+              tap to choose</span>
           </div>`
         : `<div class="empty comp-empty">
              <h3>Nothing laid out yet</h3>
@@ -96,6 +123,12 @@ J.compositor = (function () {
       clips.forEach((clip) => paintClip(clip.id));
       const scroll = J.$(".comp-scroll", root);
       if (scroll) scroll.scrollLeft = scrollLeft;
+
+      /* A rebuild used to lose which block was chosen, because the outline lives in a
+       * class on a node that has just been replaced. The choice is state, so it survives
+       * the thing that was drawing it. */
+      if (selected && !A.state.clips.some((c) => c.id === selected)) selected = null;
+      markSelected();
     }
 
     let scrollLeft = 0;
@@ -145,8 +178,27 @@ J.compositor = (function () {
       });
     }
 
+    /* Put the clip nodes in the order the state says, without building any.
+     *
+     * The live reorder during a drag used to call draw(), which rewrites the panel's whole
+     * innerHTML. That destroys the very node the finger is holding, on the frame it
+     * crosses a boundary: the pointer capture goes with it, every canvas in the track is
+     * thrown away and repainted, and the block you were dragging blinks. Moving the
+     * existing nodes keeps all of it, and appendChild on a node already in the parent is a
+     * move rather than a copy, so this is the reorder and nothing else. */
+    function reorderNodes() {
+      const holder = J.$(".comp-clips", root);
+      if (!holder) return;
+      for (const clip of A.state.clips) {
+        const node = J.$(`[data-clip="${clip.id}"]`, holder);
+        if (node) holder.appendChild(node);
+      }
+    }
+
     // ── pointer work ────────────────────────────────────────────────────────
     root.addEventListener("pointerdown", (e) => {
+      // The buttons on the chosen block are presses, not handles.
+      if (e.target.closest(".comp-tools")) return;
       const clipNode = e.target.closest(".comp-clip");
       if (!clipNode) return;
       const clipId = clipNode.dataset.clip;
@@ -158,8 +210,15 @@ J.compositor = (function () {
       const order = A.state.clips.map((c) => c.id);
 
       dragging = { clipId, edge: edge ? edge.dataset.edge : null, startX, startBeats, order,
-                   moved: false };
+                   moved: false, reordered: false,
+                   // Where the block sits before anything moves, so it can be kept under
+                   // the finger across a reorder that changes where its slot is.
+                   homeLeft: clipNode.offsetLeft };
       clipNode.classList.add("holding");
+      // See the note in 76-compositor.css: a reorder re-inserts nodes, which restarts the
+      // entry animation, and that animation would take the transform off the finger.
+      const holder = J.$(".comp-clips", root);
+      if (holder) holder.classList.add("moving");
       try { clipNode.setPointerCapture(e.pointerId); } catch (err) { /* not captured */ }
 
       const onMove = (event) => {
@@ -189,27 +248,59 @@ J.compositor = (function () {
           walked += width;
         }
         const current = A.state.clips.findIndex((c) => c.id === clipId);
-        if (target !== current) { A.move(clipId, target); draw(); }
+        if (target !== current) {
+          A.move(clipId, target);
+          reorderNodes();
+          dragging.reordered = true;
+        }
+
+        /* And the block itself goes with the hand.
+         *
+         * The reorder above says where it will land; this is what it does on the way,
+         * which without it was nothing at all. The offset is worked out against where the
+         * node sits *now*, not where it started, because a reorder has just moved its slot
+         * out from under it: wanted is a fixed point on the track and offsetLeft is the
+         * slot, so the difference is what keeps the same part of the block under the same
+         * part of the finger from the first pixel to the last. */
+        const node = J.$(`[data-clip="${clipId}"]`, root);
+        if (node) node.style.setProperty("--drag",
+                                         `${dragging.homeLeft + dx - node.offsetLeft}px`);
+        placeTools();
       };
 
-      const onUp = () => {
+      const done = () => {
         window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointerup", done);
+        window.removeEventListener("pointercancel", done);
         const node = J.$(`[data-clip="${clipId}"]`, root);
-        if (node) node.classList.remove("holding");
-        const wasTrim = !!(dragging && dragging.edge);
-        if (dragging && !dragging.moved) select(clipId);
+        if (node) {
+          node.classList.remove("holding");
+          node.style.removeProperty("--drag");
+        }
+        const stillHolder = J.$(".comp-clips", root);
+        if (stillHolder) stillHolder.classList.remove("moving");
+        if (!dragging) return;
+        const wasTrim = !!dragging.edge;
+        const tapped = !dragging.moved;
+        const reordered = dragging.reordered;
         dragging = null;
-        /* A trim has already been drawn, one width at a time, all the way through the
-         * gesture. Rebuilding the whole panel again at the end throws away ten canvases
-         * and paints ten more for a picture that is already correct, which is a visible
-         * hitch on the frame you let go. A move reorders the track, so that one does
-         * need the rebuild. */
-        if (wasTrim) redrawSizes();
-        else draw();
+
+        if (tapped) { select(clipId); return; }
+
+        /* Nothing here needs the panel built again.
+         *
+         * A trim has already been drawn, one width at a time, all the way through the
+         * gesture, and a move has been reordering the real nodes as it went. draw() would
+         * throw away every canvas in the track and paint them all again for a picture that
+         * is already right, and that hitch on the frame you let go is what a press felt
+         * like: the whole strip flickering because it had been rebuilt. The numbers along
+         * the foot are the only stale thing, and redrawSizes writes those. */
+        if (wasTrim || reordered) redrawSizes();
+        placeTools();
       };
       window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointerup", done);
+      window.addEventListener("pointercancel", done);
     });
 
     /* Only the widths changed, so only the widths are written. Rebuilding the panel on
@@ -229,14 +320,65 @@ J.compositor = (function () {
         foot.textContent = `${A.state.clips.length} part${A.state.clips.length === 1 ? "" : "s"}`
           + ` · ${Math.round(A.totalBeats() / A.state.perBar)} bars · ${J.time(A.duration())}`;
       }
+      /* Widths just changed, so the corner the two buttons sit on has moved. Here rather
+       * than at the call sites: this is the one function that changes a width, and
+       * trimming the chosen block was leaving them behind at its old edge. */
+      placeTools();
     }
 
     let selected = null;
+
+    /* Which block carries the outline, and where its two buttons sit.
+     *
+     * Split out of select() because a redraw has to be able to put both back without
+     * announcing a choice that has not been made again. */
+    function markSelected() {
+      J.$$(".comp-clip", root).forEach((node) => {
+        node.classList.toggle("on", node.dataset.clip === selected);
+      });
+      placeTools();
+    }
+
+    /* The tools ride on the chosen block, so they follow a reorder, a trim, a zoom and a
+     * drag without any of those having to know they exist. Left is the block's right hand
+     * edge; the stylesheet pulls them back over it from there.
+     *
+     * Then kept on screen. A section can be wider than the strip is, and a chorus whose
+     * right hand edge is a thousand pixels off to the right had its two buttons out there
+     * with it: you chose a block and nothing appeared. So the corner is where they want to
+     * be and the visible window is where they are allowed to be, and they slide along the
+     * top of a block that is only partly in view. Never off the block itself, in either
+     * direction, or they would read as belonging to the one next door.
+     */
+    function placeTools() {
+      const tools = J.$(".comp-tools", root);
+      if (!tools) return;
+      const node = selected && J.$(`[data-clip="${selected}"]`, root);
+      if (!node) { tools.hidden = true; return; }
+      tools.hidden = false;
+      tools.style.top = `${node.offsetTop}px`;
+
+      const drag = parseFloat(node.style.getPropertyValue("--drag")) || 0;
+      const left = node.offsetLeft + drag;
+      const right = left + node.offsetWidth;
+      const scroll = J.$(".comp-scroll", root);
+      // Measured off the element rather than assumed: the buttons are wider on a phone.
+      const width = tools.offsetWidth || 60;
+
+      let at = right;
+      if (scroll) {
+        const from = scroll.scrollLeft + width + EDGE;
+        const to = scroll.scrollLeft + scroll.clientWidth - EDGE;
+        at = J.clamp(at, Math.min(from, to), Math.max(from, to));
+      }
+      // And back inside the block, which wins over the window: a block scrolled entirely
+      // out of view takes its buttons with it rather than parking them at the edge.
+      tools.style.left = `${J.clamp(at, Math.min(left + width, right), right)}px`;
+    }
+
     function select(clipId) {
       selected = clipId;
-      J.$$(".comp-clip", root).forEach((node) => {
-        node.classList.toggle("on", node.dataset.clip === clipId);
-      });
+      markSelected();
       const clip = A.state.clips.find((c) => c.id === clipId);
       J.emit("compositor:select", { clip, part: clip && A.state.parts.find((p) => p.id === clip.part) });
     }
@@ -308,13 +450,17 @@ J.compositor = (function () {
       }
       if (e.key === "d" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        A.duplicate(selected);
+        const copy = A.duplicate(selected);
         draw();
+        if (copy) select(copy.id);
       }
     });
 
     root.addEventListener("scroll", (e) => {
-      if (e.target.classList.contains("comp-scroll")) scrollLeft = e.target.scrollLeft;
+      if (!e.target.classList.contains("comp-scroll")) return;
+      scrollLeft = e.target.scrollLeft;
+      // The buttons are kept inside the visible window, so where that window is matters.
+      placeTools();
     }, true);
 
     // ── the header ──────────────────────────────────────────────────────────
@@ -336,6 +482,17 @@ J.compositor = (function () {
           ? "Playing as arranged. A and B now compare sounds."
           : "Back to the render as it was rendered.");
       }
+      if (what === "dup-sel" && selected) {
+        const copy = A.duplicate(selected);
+        draw();
+        if (copy) select(copy.id);
+      }
+      if (what === "del-sel" && selected) {
+        A.remove(selected);
+        selected = null;
+        draw();
+      }
+
       if (what === "half") { A.setTempo(A.state.bpm / 2); draw(); }
       if (what === "double") { A.setTempo(A.state.bpm * 2); draw(); }
       if (what === "in") { zoom = J.clamp(zoom * 1.35, 0.3, 6); draw(); }

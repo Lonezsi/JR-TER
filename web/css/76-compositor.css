@@ -74,12 +74,41 @@
   outline: none;
   /* Held so the clips do not fight the page for a horizontal drag. */
   overscroll-behavior-x: contain;
+
+  /* Thick enough to be a control.
+   *
+   * Dragging a block moves the block now, which is the whole point of it, and that took
+   * away the way you used to get along a long arrangement: dragging the background. So
+   * the bar has to be the answer, and a hairline you have to hunt for with a thumb is not
+   * one. Fourteen pixels is a comfortable target and still reads as a scrollbar rather
+   * than a second timeline. */
+  scrollbar-width: auto;
+  scrollbar-color: var(--line-2) transparent;
 }
+.comp-scroll::-webkit-scrollbar { height: 14px; }
+.comp-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: var(--r-pill);
+}
+.comp-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: var(--r-pill);
+  /* Inset from the track, so the thumb reads as a thing sitting in a groove. */
+  border: 3px solid transparent;
+  background-clip: content-box;
+  min-width: 40px;
+}
+.comp-scroll::-webkit-scrollbar-thumb:hover { background-clip: content-box; }
+.comp-scroll::-webkit-scrollbar-thumb:hover,
+.comp-scroll::-webkit-scrollbar-thumb:active { background-color: var(--text-3); }
 .comp-scroll:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-line); }
 
 .comp-track {
   position: relative;
-  height: 104px;
+  /* Ten taller than it was, to pay for the headroom the row below takes. The blocks are
+     the same height they have always been; the strip is not shorter for having somewhere
+     to put the two buttons. */
+  height: 114px;
   min-width: 100%;
 }
 .comp-bars {
@@ -93,7 +122,11 @@
   display: flex;
   height: 100%;
   align-items: stretch;
-  padding: var(--s2) 0;
+  /* Eighteen at the top rather than eight, which is half the height of the button group
+     plus a little. The group sits centred on a block's top edge, and .comp-scroll hides
+     its vertical overflow, so without the headroom the top thirteen pixels of it were cut
+     off by the edge of the scroll box. Measured. */
+  padding: 18px 0 var(--s2);
   gap: 2px;
 }
 
@@ -112,11 +145,30 @@
   overflow: hidden;
   cursor: grab;
   user-select: none;
+  /* Sideways on a block is ours, up and down is still the page's.
+   *
+   * Without this the browser owns the horizontal pan: a finger on a block scrolled the
+   * strip instead of moving the block, and a moment into the gesture the drag was taken
+   * back with pointercancel. Said here rather than on the scroller, because touch-action
+   * does not inherit and a finger lands on the block, not on the box around it. The
+   * scroller keeps its own pan, so the background and the bar still scroll.
+   * The lyric deck had the same bug; there is a note about it in 50-song.css. */
+  touch-action: pan-y;
+  /* Where the finger has it, while it is being held. Nothing at rest. */
+  transform: translate3d(var(--drag, 0px), 0, 0);
   transition: filter var(--fast), box-shadow var(--fast);
 }
 .comp-clip:hover { filter: brightness(1.14); }
 .comp-clip.on { box-shadow: 0 0 0 2px var(--accent), var(--edge-top); }
-.comp-clip.holding { cursor: grabbing; filter: brightness(1.2); z-index: 2; }
+.comp-clip.holding {
+  cursor: grabbing;
+  filter: brightness(1.2);
+  z-index: 3;
+  /* Picked up, so it passes over the others rather than through them. No transition on
+     the transform while held: that is the finger's to set, and easing it would put the
+     block a frame behind the hand for the whole drag. */
+  box-shadow: 0 0 0 1px hsl(var(--hue) 45% 45%), 0 10px 22px rgba(0, 0, 0, 0.55);
+}
 /* The one being heard right now. */
 .comp-clip.live {
   box-shadow: inset 0 2px 0 var(--accent-hi), 0 0 20px rgba(84, 179, 122, 0.2);
@@ -162,6 +214,45 @@
   opacity: 0; transition: opacity var(--fast);
 }
 .comp-clip:hover .comp-grip::after { opacity: 1; }
+
+/* Duplicate and remove, sitting on the top right corner of the chosen block.
+ *
+ * Positioned by the panel against the block's right hand edge, then pulled back over it
+ * from here, so the group overhangs the corner the way the pill on a lyric card does. It
+ * is not inside the block: a block is fourteen pixels wide at its smallest and clips its
+ * own overflow, so a group in there would be hidden on exactly the blocks that are
+ * hardest to hit. */
+.comp-tools {
+  position: absolute;
+  /* Both offsets come from the chosen block: the panel sets top and left to its top right
+     corner, and this pulls the group back over it so it straddles the corner. */
+  z-index: 5;
+  transform: translate(-100%, -50%);
+  display: flex;
+  align-items: center;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-edge);
+  backdrop-filter: var(--glass-filter-edge);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--edge-top), 0 6px 18px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.comp-tool {
+  display: grid; place-items: center;
+  width: 30px; height: 26px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.comp-tool + .comp-tool { box-shadow: inset 1px 0 0 var(--glass-line); }
+.comp-tool:hover { background: var(--hover); color: var(--text); }
+/* The same wash the bin on a lyric card uses, spelled the same way: there is no token
+   for it, and inventing one here for a single button would be a token nothing else has. */
+.comp-tool.danger:hover { background: rgba(212, 104, 94, 0.12); color: var(--bad-hi); }
+.comp-tool:focus-visible { outline: 2px solid var(--accent-line); outline-offset: -2px; }
 
 .comp-playhead {
   position: absolute; top: 0; bottom: 0; width: 2px;
@@ -259,10 +350,13 @@
   /* The spacer would otherwise hold the zoom and detect buttons out on a line of their
      own miles to the right. On a phone the header is simply two rows. */
   .comp-head > .grow { flex-basis: 100%; height: 0; }
-  .comp-track { height: 92px; }
+  .comp-track { height: 102px; }
   .comp-grip { width: 16px; }
   .comp-hint { display: none; }
   .comp-body { padding: var(--s3); }
+  /* Thumbs, and the bar is how you get along the strip here. */
+  .comp-scroll::-webkit-scrollbar { height: 16px; }
+  .comp-tool { width: 36px; height: 30px; }
 }
 
 
@@ -272,6 +366,14 @@
   animation: clip-in 240ms var(--ease) both;
   animation-delay: 90ms;
 }
+/* Not while one is being moved.
+ *
+ * Reordering the track moves a node with appendChild, and re-inserting an element starts
+ * its CSS animations again from the top. For a third of a second after every boundary the
+ * block crossed, clip-in was running on the one in your hand, and an animation's transform
+ * beats the element's own: --drag was being set correctly and ignored, so the block let go
+ * of the finger and sat in its new slot. Measured, on the way to finding this. */
+.comp-clips.moving .comp-clip { animation: none; }
 @keyframes clip-in {
   from { opacity: 0; transform: translate3d(0, 8px, 0); }
 }

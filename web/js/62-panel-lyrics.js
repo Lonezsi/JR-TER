@@ -14,6 +14,13 @@
 "use strict";
 
 J.blockLyrics = async function (block, ctx) {
+  //: How long a card takes to get out of the frame, matching the slab transform in
+  //: 50-song.css. .leaving has to come off again afterwards: a class that outlives its
+  //: animation leaves the walls lit on a card standing still.
+  //: Inside the function on purpose. The bundle is every file in one scope with no module
+  //: wrapper, so a name declared at the top level of this one belongs to all of them.
+  const LEAVING_MS = 420;
+
   let sheets = [];
   let at = 0;
   let editing = false;
@@ -445,10 +452,19 @@ J.blockLyrics = async function (block, ctx) {
    * transition. There is nothing to time and nothing to wait for.
    */
   function markCurrent() {
+    /* The one on its way out, said out loud.
+     *
+     * A card shows its walls while it turns, and the two cards moving here are turning in
+     * opposite directions: one is being thrown and one is arriving. Only the thrown one
+     * should have thickness. There is no way to ask a slab which of the two it is once
+     * the class has moved, so the answer is taken before it moves and kept for as long as
+     * the journey lasts. */
+    const going = J.$(".lyric-slab.on", block);
+
     J.$$(".lyric-slab", block).forEach((slab, i) => {
       // Whatever the finger pinned it to goes, so the stylesheet is what positions it.
       slab.style.transform = "";
-      slab.classList.remove("nudging");
+      slab.classList.remove("nudging", "leaving");
       slab.classList.toggle("on", i === at);
       const card = J.$(".lyric-card", slab);
       if (card) {
@@ -456,6 +472,14 @@ J.blockLyrics = async function (block, ctx) {
         card.classList.toggle("reading", viewing && i === at);
       }
     });
+
+    /* Only if it really is leaving. markCurrent also runs on a plain redraw, where the
+     * front card is the same card before and after and nothing is going anywhere. */
+    if (going && !going.classList.contains("on")) {
+      going.classList.add("leaving");
+      clearTimeout(going._leaving);
+      going._leaving = setTimeout(() => going.classList.remove("leaving"), LEAVING_MS);
+    }
   }
 
   function go(index, animate) {

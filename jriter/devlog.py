@@ -22,6 +22,36 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.2.4",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "Dragging a section moves the section",
+        "notes": [
+            "Dragging a block in the arrangement moves the block. It used to scroll the "
+            "strip instead: the browser owned the sideways drag, and a moment in it took "
+            "the gesture away, so the block started to move and then stopped following "
+            "your finger. It now stays under your finger to the pixel, the whole way, "
+            "including across the moment it changes places with its neighbour.",
+            "Because dragging the background is no longer how you get along a long "
+            "arrangement, the scrollbar under the strip is thick enough to be a control: "
+            "fourteen pixels, and sixteen on a phone.",
+            "Pressing a block no longer rebuilds the strip. Every section draws its own "
+            "waveform onto its own canvas, and a press threw all of them away and painted "
+            "them again to show the picture that was already there. That flicker was what "
+            "a press felt like.",
+            "Whichever section is chosen carries two buttons on its top right corner: "
+            "duplicate, and take it out. Both were a right click or a Backspace away, and "
+            "neither of those is a thing a phone can do. They stay on screen when the "
+            "section is wider than the strip.",
+            "Nothing flashes at the edges of the lyric card any more. A card has walls, "
+            "because it turns in three dimensions when you throw it, and the rule said "
+            "they belong to every card that is not the front one. The card arriving takes "
+            "the front the instant you let go and then fades up from nothing, so for the "
+            "length of that fade it was a card appearing with its walls already lit. Only "
+            "a card that is actually leaving has thickness now.",
+        ],
+    },
+    {
         "version": "3.2.3",
         "date": "2026-09-08",
         "name": JRITER,

@@ -466,9 +466,15 @@
   /* The right wall faces away from the light, so it is the darker of the two. */
   filter: brightness(0.72);
 }
-/* Under a thumb, and on the way out. Both are the card turning. */
+/* Under a thumb, and on the way out. Both are the card turning, and they are the only two.
+ *
+ * This used to say :not(.on), which is every card that is not the front one, and that is
+ * how the next set of words flashed its edges on the way in. The arriving card takes .on
+ * the moment you let go and then fades up from nothing over the same transition, so for
+ * the length of that fade it was a card being revealed with its walls already lit, and
+ * they only went out once it had arrived. Leaving is a state, not the absence of one. */
 .lyric-slab.nudging .slab-edge,
-.lyric-slab:not(.on) .slab-edge { opacity: 1; }
+.lyric-slab.leaving .slab-edge { opacity: 1; }
 
 /* Where the cards you are not reading are: off the frame, on the side they came from.
  *
