@@ -152,9 +152,12 @@ def test_the_chosen_block_carries_duplicate_and_remove():
 
 
 def test_the_buttons_are_not_a_drag_handle():
+    """The panel has two pointerdown handlers: this one, and the bar's under the strip.
+    Anchor on the clip, not on whichever comes first in the file."""
     body = panel()
-    at = body.index('root.addEventListener("pointerdown"')
-    assert 'if (e.target.closest(".comp-tools")) return;' in body[at:at + 300], \
+    at = body.index('const clipNode = e.target.closest(".comp-clip");')
+    start = body.rindex('root.addEventListener("pointerdown"', 0, at)
+    assert 'if (e.target.closest(".comp-tools")) return;' in body[start:at], \
         "a press on the buttons would otherwise start a drag of the block under them"
 
 
@@ -240,24 +243,20 @@ def test_a_trim_moves_them_too():
 
 # ── getting about ────────────────────────────────────────────────────────────
 
-def test_the_scrollbar_is_thick_enough_to_be_a_control():
+def test_there_is_still_a_thick_way_along_the_strip():
     """It is the way along a long arrangement now that a drag moves the block.
 
-    Dragging the background used to be how you got about. That gesture belongs to the
-    block, so the bar has to answer for it, and a hairline you hunt for with a thumb does
-    not.
+    This used to assert the native scrollbar's height, which was the right thing to assert
+    while the native scrollbar was the control. It never was on a phone: measured at 375,
+    the bar reserves no space and is not drawn there at all. So the control is an element,
+    and what it has to be is tested properly in test_arrange_bar.py. What is left here is
+    the promise this file made in 3.2.4, which still has to hold: dragging the background
+    is not how you get about any more, so something else has to be.
     """
     css = sheet()
-    bar = re.search(r"\.comp-scroll::-webkit-scrollbar \{([^}]*)\}", css)
-    assert bar, "the bar is styled at all"
-    height = int(re.search(r"height:\s*(\d+)px", bar.group(1)).group(1))
-    assert height >= 14, "a thumb needs something to aim at"
-    assert "scrollbar-width: auto;" in block(css, ".comp-scroll"), \
-        "Firefox does not read the webkit pseudo elements"
-    assert "::-webkit-scrollbar-thumb" in css, "a track with no thumb is a groove"
-    # Bigger again where the only pointer is a thumb.
-    phone = css[css.index("@media (max-width: 900px)"):]
-    assert "::-webkit-scrollbar { height: 16px; }" in phone
+    assert ".comp-bar {" in css, "the strip needs a way along it that is not a block"
+    assert "scrollbar-width: none;" in block(css, ".comp-scroll"), \
+        "and only one of them, or there are two bars doing one job"
 
 
 def test_the_hint_at_the_foot_says_what_the_gestures_actually_do():

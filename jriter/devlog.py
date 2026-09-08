@@ -22,6 +22,24 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.3",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "A bar under the arrangement you can actually catch",
+        "notes": [
+            "The way along a long arrangement is a real control now: a thick bar under "
+            "the strip, set out from the blocks, dragged with a finger like anything else "
+            "here. Tapping it jumps, dragging the thumb pans, and it is not there at all "
+            "when the whole arrangement already fits.",
+            "It had to stop being a scrollbar. Making that thicker did nothing on a "
+            "phone, which is where it was needed: measured at 375 with 927 pixels of "
+            "content in 291, the strip scrolls and the bar reserves no space and is not "
+            "drawn. Phone browsers use an overlay scrollbar and ignore the sizing, and on "
+            "an iPhone the indicator cannot be dragged in the first place, so every number "
+            "in the old rules was a desktop number.",
+        ],
+    },
+    {
         "version": "3.3.2",
         "date": "2026-09-08",
         "name": JRITER,

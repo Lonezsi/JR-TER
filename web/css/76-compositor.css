@@ -83,33 +83,69 @@
   /* Held so the clips do not fight the page for a horizontal drag. */
   overscroll-behavior-x: contain;
 
-  /* Thick enough to be a control.
+  /* No native bar at all. There is a real one under the strip.
    *
-   * Dragging a block moves the block now, which is the whole point of it, and that took
-   * away the way you used to get along a long arrangement: dragging the background. So
-   * the bar has to be the answer, and a hairline you have to hunt for with a thumb is not
-   * one. Fourteen pixels is a comfortable target and still reads as a scrollbar rather
-   * than a second timeline. */
-  scrollbar-width: auto;
-  scrollbar-color: var(--line-2) transparent;
+   * The rules that used to be here set it to fourteen pixels and sixteen on a phone, and
+   * measured at 375 none of that did anything: the strip scrolls, 927 pixels of content in
+   * 291, and the bar reserves no space and is not drawn. Mobile Chromium uses an overlay
+   * scrollbar and ignores this sizing, iOS Safari the same, and on iOS the indicator
+   * cannot be dragged in the first place. So every number in them was desktop only, which
+   * is the one place getting along the strip was never the problem. */
+  scrollbar-width: none;
 }
-.comp-scroll::-webkit-scrollbar { height: 14px; }
-.comp-scroll::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: var(--r-pill);
-}
-.comp-scroll::-webkit-scrollbar-thumb {
-  background: var(--line-2);
-  border-radius: var(--r-pill);
-  /* Inset from the track, so the thumb reads as a thing sitting in a groove. */
-  border: 3px solid transparent;
-  background-clip: content-box;
-  min-width: 40px;
-}
-.comp-scroll::-webkit-scrollbar-thumb:hover { background-clip: content-box; }
-.comp-scroll::-webkit-scrollbar-thumb:hover,
-.comp-scroll::-webkit-scrollbar-thumb:active { background-color: var(--text-3); }
+.comp-scroll::-webkit-scrollbar { display: none; height: 0; }
 .comp-scroll:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-line); }
+
+/* ── the bar you can actually grab ─────────────────────────────────────────── */
+
+/* Under the strip, with room above it, and thick enough for a thumb.
+ *
+ * It is an element rather than a scrollbar, so a finger reaches it exactly the way it
+ * reaches a block: pointer events, no engine involved, and the same behaviour on a phone
+ * as on a laptop. The whole 26 pixels is the target; the groove drawn inside it is
+ * narrower, because a control the size of its own target looks like a slab. */
+.comp-bar {
+  position: relative;
+  height: 26px;
+  margin-top: var(--s3);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  /* The strip's own drag belongs to the blocks and the page's belongs to the page. This
+     is neither: a drag here is this control's, in both directions, or the browser starts
+     panning something else halfway through. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* The groove, drawn rather than being the box, so the box can stay a big target. */
+.comp-bar::before {
+  content: "";
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 10px; margin-top: -5px;
+  border-radius: var(--r-pill);
+  background: var(--grad-sunken);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.comp-bar-thumb {
+  position: absolute; top: 50%;
+  height: 14px; margin-top: -7px;
+  border-radius: var(--r-pill);
+  background: var(--line-2);
+  box-shadow: var(--edge-top);
+  transition: background var(--fast);
+  /* No transition on the transform: that is the finger's to set, and easing it would put
+     the thumb a frame behind the hand for the whole drag. The same reason a block being
+     dragged has none. */
+}
+.comp-bar:hover .comp-bar-thumb { background: var(--text-3); }
+.comp-bar.holding .comp-bar-thumb { background: var(--accent); }
+
+@media (max-width: 900px) {
+  /* Fatter still where the only pointer is a thumb, and further from the blocks so a
+     grab for the bar cannot land on the strip instead. */
+  .comp-bar { height: 34px; margin-top: var(--s4); }
+  .comp-bar::before { height: 12px; margin-top: -6px; }
+  .comp-bar-thumb { height: 18px; margin-top: -9px; }
+}
 
 .comp-track {
   position: relative;
@@ -362,8 +398,6 @@
   .comp-grip { width: 16px; }
   .comp-hint { display: none; }
   .comp-body { padding: var(--s3); }
-  /* Thumbs, and the bar is how you get along the strip here. */
-  .comp-scroll::-webkit-scrollbar { height: 16px; }
   .comp-tool { width: 36px; height: 30px; }
 }
 

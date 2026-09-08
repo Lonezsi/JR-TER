@@ -30,6 +30,13 @@ J.compositor = (function () {
     //: as sitting on a block rather than jammed against the side of the box.
     const EDGE = 6;
 
+    //: The narrowest the bar's thumb is allowed to get.
+    //:
+    //: Its width is the share of the strip that is on screen, and on a long arrangement at
+    //: full zoom that share is a few per cent: honest, and too small to hit. Forty four is
+    //: the usual floor for something a thumb has to land on.
+    const THUMB_LEAST = 44;
+
     function draw() {
       const parts = A.state.parts;
       const clips = A.state.clips;
@@ -102,6 +109,13 @@ J.compositor = (function () {
               </div>
             </div>
           </div>
+          <!-- The way along a long arrangement, as a real control.
+               A native scrollbar is not one on a phone: it reserves no space, it is drawn
+               as an overlay if it is drawn at all, and on iOS it cannot be dragged. This
+               is a div, so a finger reaches it the same way it reaches everything else. -->
+          <div class="comp-bar" hidden>
+            <div class="comp-bar-thumb"></div>
+          </div>
           <div class="comp-foot">
             <span class="faint">${clips.length} part${clips.length === 1 ? "" : "s"}
               &middot; ${Math.round(total / bars)} bars
@@ -129,6 +143,7 @@ J.compositor = (function () {
        * the thing that was drawing it. */
       if (selected && !A.state.clips.some((c) => c.id === selected)) selected = null;
       markSelected();
+      syncBar();
     }
 
     let scrollLeft = 0;
@@ -177,6 +192,77 @@ J.compositor = (function () {
         color: "rgba(255,255,255,0.42)",
       });
     }
+
+    /* Where the bar's thumb is, and how wide.
+     *
+     * Both are the same two ratios a scrollbar has always been: how much of the strip is
+     * on screen, and how far along it you are. Read from the scroller rather than worked
+     * out from beats and zoom, so there is one source of truth and no way for the bar to
+     * disagree with what it is a picture of.
+     */
+    function syncBar() {
+      const bar = J.$(".comp-bar", root);
+      const scroll = J.$(".comp-scroll", root);
+      if (!bar || !scroll) return;
+      const thumb = J.$(".comp-bar-thumb", bar);
+      const over = scroll.scrollWidth - scroll.clientWidth;
+      // Nothing to pan, nothing to pan with. A full width thumb that cannot move is a
+      // control that lies about being one.
+      bar.hidden = over <= 1;
+      if (bar.hidden || !thumb) return;
+
+      const width = bar.clientWidth;
+      const share = scroll.clientWidth / scroll.scrollWidth;
+      const wide = Math.max(THUMB_LEAST, Math.round(width * share));
+      thumb.style.width = `${wide}px`;
+      thumb.style.transform =
+        `translate3d(${Math.round((scroll.scrollLeft / over) * (width - wide))}px, 0, 0)`;
+    }
+
+    /* Dragging it, and tapping the track to jump.
+     *
+     * Bound once to the panel rather than to the thumb, because draw() replaces both of
+     * them: the same reason every other handler in here is delegated.
+     */
+    root.addEventListener("pointerdown", (e) => {
+      const bar = e.target.closest(".comp-bar");
+      if (!bar) return;
+      const scroll = J.$(".comp-scroll", root);
+      const thumb = J.$(".comp-bar-thumb", bar);
+      if (!scroll || !thumb) return;
+
+      const over = scroll.scrollWidth - scroll.clientWidth;
+      const width = bar.clientWidth;
+      const wide = thumb.getBoundingClientRect().width;
+      const room = width - wide;
+      if (room <= 0 || over <= 0) return;
+
+      const box = bar.getBoundingClientRect();
+      const onThumb = e.target.closest(".comp-bar-thumb");
+      // Grabbing the thumb keeps the point you grabbed it by; tapping the track puts the
+      // middle of the thumb under the finger, which is what makes a tap read as "go here".
+      const held = onThumb ? e.clientX - thumb.getBoundingClientRect().left : wide / 2;
+
+      const to = (x) => {
+        const at = J.clamp(x - box.left - held, 0, room);
+        scroll.scrollLeft = (at / room) * over;
+      };
+      to(e.clientX);
+      bar.classList.add("holding");
+      try { bar.setPointerCapture(e.pointerId); } catch (err) { /* not captured */ }
+
+      const move = (event) => to(event.clientX);
+      const done = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", done);
+        window.removeEventListener("pointercancel", done);
+        const still = J.$(".comp-bar", root);
+        if (still) still.classList.remove("holding");
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", done);
+      window.addEventListener("pointercancel", done);
+    });
 
     /* Put the clip nodes in the order the state says, without building any.
      *
@@ -324,6 +410,7 @@ J.compositor = (function () {
        * than at the call sites: this is the one function that changes a width, and
        * trimming the chosen block was leaving them behind at its old edge. */
       placeTools();
+      syncBar();
     }
 
     let selected = null;
@@ -461,6 +548,7 @@ J.compositor = (function () {
       scrollLeft = e.target.scrollLeft;
       // The buttons are kept inside the visible window, so where that window is matters.
       placeTools();
+      syncBar();
     }, true);
 
     // ── the header ──────────────────────────────────────────────────────────
@@ -578,10 +666,20 @@ J.compositor = (function () {
     }
     const timer = setInterval(follow, 60);
 
+    /* The bar is drawn in pixels, so its own width matters.
+     *
+     * Everything else that changes the picture goes through draw, a scroll or a trim. A
+     * window getting narrower goes through none of them: the track shrinks, the thumb
+     * keeps the width and offset it was given for the old one, and it ends up pointing at
+     * the wrong part of a strip or hanging off the end of its groove. Not in follow(),
+     * which runs seventeen times a second whether anything moved or not. */
+    const onResize = () => syncBar();
+    window.addEventListener("resize", onResize);
+
     draw();
     return {
       redraw: draw,
-      stop() { clearInterval(timer); },
+      stop() { clearInterval(timer); window.removeEventListener("resize", onResize); },
     };
   }
 
