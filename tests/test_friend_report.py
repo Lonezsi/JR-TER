@@ -117,9 +117,10 @@ def test_every_accent_tint_follows_the_accent():
     obvious: ten rules and two canvas fills wrote the green out as numbers and stayed green
     whatever was picked.
     """
+    # Including the tokens file. Two hid there behind the exemption this test used to
+    # grant it: the soft blob on the page's ground and the accent glow, both of which stay
+    # green under a pink accent exactly like the ten rules that were fixed.
     for name, source in every_css().items():
-        if name == "00-tokens.css":
-            continue
         assert not re.search(r"rgba\(\s*84\s*,\s*179\s*,\s*122", source), \
             "%s still has the green written out by hand" % name
     for name in ("30-eq.js", "35-limiter.js"):
