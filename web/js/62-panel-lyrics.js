@@ -21,6 +21,23 @@ J.blockLyrics = async function (block, ctx) {
   //: wrapper, so a name declared at the top level of this one belongs to all of them.
   const LEAVING_MS = 420;
 
+  //: How the history list leaves, and how far the stagger goes.
+  //:
+  //: STAGGER_CAP is where rows stop waiting their turn: a sheet with forty revisions in it
+  //: would otherwise spend two seconds finishing, and everything past the tenth row is
+  //: below the fold of a 300 pixel list anyway. It is written onto each row, so the
+  //: stylesheet does not have to count anything.
+  //:
+  //: The three below are the closing sequence, and they are the same numbers as the
+  //: entry-out animation and the .history-wrap transition in 50-song.css. They have to
+  //: agree: this is what decides when the rows have finished leaving and it is therefore
+  //: safe to collapse the height, and then to redraw. Nothing about the opening is here,
+  //: because nothing waits for it.
+  const STAGGER_CAP = 9;
+  const OUT_STEP = 26;     // between one row leaving and the next
+  const OUT_MS = 130;      // how long one row takes to go
+  const SHUT_MS = 240;     // the height closing after them
+
   let sheets = [];
   let at = 0;
   let editing = false;
@@ -254,18 +271,34 @@ J.blockLyrics = async function (block, ctx) {
         </div>` : ""}
 
       ${history ? `
-        <div class="history-rail">
-          ${history.map((r, i) => `
-            <div class="history-entry ${viewing ? (viewing.id === r.id ? "on" : "") : (i === 0 ? "on" : "")}"
-                 data-rev="${r.id}">
-              <span class="when">${J.date(r.created_at)}</span>
-              <span class="grow"></span>
-              <span class="size">${r.length} characters</span>
-              ${i === 0 ? '<span class="size">now</span>' : ""}
-            </div>`).join("")}
+        <!-- Two elements for one list, because the height is animated.
+             A grid row going from 0fr to 1fr is how a panel opens to exactly as tall as
+             its contents without anybody having to know that number in advance, and the
+             row has to be on a box that is not also the scrolling one. -->
+        <div class="history-wrap">
+          <div class="history-rail">
+            ${history.map((r, i) => `
+              <div class="history-entry ${viewing ? (viewing.id === r.id ? "on" : "") : (i === 0 ? "on" : "")}"
+                   data-rev="${r.id}"
+                   style="--i:${Math.min(i, STAGGER_CAP)};
+                          --out:${Math.min(history.length - 1 - i, STAGGER_CAP)}">
+                <span class="when">${J.date(r.created_at)}</span>
+                <span class="grow"></span>
+                <span class="size">${r.length} characters</span>
+                ${i === 0 ? '<span class="size">now</span>' : ""}
+              </div>`).join("")}
+          </div>
         </div>` : ""}`;
 
     drawCards();
+
+    /* The row cannot animate from a value it was never rendered at.
+     *
+     * A grid row written straight out as 1fr has no start state, so the panel would arrive
+     * at full height with no transition at all. One frame at 0fr first, then the class,
+     * and the browser has two values to move between. */
+    const wrap = J.$(".history-wrap", block);
+    if (wrap) requestAnimationFrame(() => wrap.classList.add("on"));
   }
 
   function drawCards() {
@@ -648,6 +681,37 @@ J.blockLyrics = async function (block, ctx) {
     if (lost) J.toast("Left as it was.");
   }
 
+  /* Put the history away, backwards.
+   *
+   * draw() rewrites the whole block, so calling it first leaves nothing on the page to
+   * animate: the rows have to go while they still exist. Last row first, so the list folds
+   * up from the bottom the way it unrolled from the top, then the height closes, and only
+   * then is anything redrawn.
+   *
+   * The waits are timers rather than transitionend. There are as many animations here as
+   * there are revisions and they finish in a stagger, so the useful event is "the last
+   * one", which is a count and a clock either way; and on a machine asking for reduced
+   * motion nothing animates and no events fire at all, which would hang here for ever.
+   */
+  async function closeHistory() {
+    const wrap = J.$(".history-wrap", block);
+    const done = () => { history = null; viewing = null; draw(); };
+    if (!wrap) { done(); return; }
+
+    const rows = J.$$(".history-entry", wrap).length;
+    wrap.classList.add("closing");
+    // The bar above it belongs to the same gesture, so it leaves with the rows.
+    const bar = J.$(".time-bar", block);
+    if (bar) bar.classList.add("closing");
+
+    await J.wait(Math.min(rows - 1, STAGGER_CAP) * OUT_STEP + OUT_MS);
+    if (!block.isConnected) return;
+    wrap.classList.remove("on");        // and now the height
+    await J.wait(SHUT_MS);
+    if (!block.isConnected) return;
+    done();
+  }
+
   block.addEventListener("click", async (e) => {
     const dot = e.target.closest("[data-go]");
     if (dot) { go(Number(dot.dataset.go)); return; }
@@ -693,7 +757,7 @@ J.blockLyrics = async function (block, ctx) {
     if (what === "back") { viewing = null; draw(); }
 
     if (what === "history") {
-      if (history) { history = null; viewing = null; draw(); return; }
+      if (history) { await closeHistory(); return; }
       const data = await J.try(() => J.get(`/api/lyrics/${s.id}/history`));
       if (!data) return;
       history = data.revisions || [];

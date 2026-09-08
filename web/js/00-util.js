@@ -155,6 +155,14 @@ J.toast = (message, kind) => {
 
 /* Dialogs. Resolves with a value when confirmed and null when dismissed, so callers
  * read as `const name = await J.sheet(...)` rather than a pile of callbacks. */
+/* A pause, for sequencing one animation after another.
+ *
+ * Used where the thing being waited for is a stagger: several animations finishing at
+ * different times, so the useful event is "the last one", which is a count and a clock
+ * rather than a transitionend. It also still resolves on a machine asking for reduced
+ * motion, where nothing animates and no events fire at all. */
+J.wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 J.sheet = (opts) => new Promise((resolve) => {
   const backdrop = J.$("#modalBackdrop");
   const { title, sub = "", body = "", confirm = "Save", cancel = "Cancel",

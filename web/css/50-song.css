@@ -710,10 +710,39 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
 }
 .time-bar .grow { flex: 1; }
 
+/* The list opening downwards.
+ *
+ * A grid row from 0fr to 1fr, which is the one way to transition to "as tall as the
+ * content happens to be": max-height needs a number nobody has, and a guess is either a
+ * list that gets cut off or an animation that spends half its time crossing empty space.
+ * The compositor drawer opens the same way.
+ *
+ * Slower than the app's other transitions on purpose. This is a list of things to read
+ * arriving, not a panel snapping into place, and the rows come in behind it in their own
+ * time; at --med the height was done before the second row had started.
+ */
+.history-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 420ms var(--ease);
+}
+.history-wrap.on { grid-template-rows: 1fr; }
+/* Quicker on the way down, and this is the number the panel waits on.
+ *
+ * They have to agree. The panel removes .on and then waits before redrawing, and it was
+ * waiting 240 against a 420 transition: the last twenty pixels of the collapse were cut
+ * off by the element being taken away mid animation. Measured in the close, which ended
+ * at a height of 20 and then nothing. */
+.history-wrap.closing { transition: grid-template-rows 240ms var(--ease); }
+
 .history-rail {
   display: flex; flex-direction: column; gap: 1px;
   max-height: 300px; overflow-y: auto;
-  max-width: 640px; margin: var(--s5) auto 0;
+  /* A grid row can only collapse a child that will let itself be shortened. Not
+     overflow: hidden here: that would be two classes against one and would beat the
+     overflow-y below it, so a long history would stop scrolling. auto clips too. */
+  min-height: 0;
+  max-width: 640px; margin: 0 auto;
 }
 .history-entry {
   display: flex; align-items: center; gap: var(--s3);
@@ -722,12 +751,61 @@ textarea.card-edit::placeholder { color: var(--text-3); font-style: italic; }
   cursor: pointer;
   font-size: 13px; color: var(--text-2);
   transition: background var(--fast), color var(--fast);
+  /* One row at a time, top to bottom on the way in.
+   *
+   * --i is the row's own index, written on it by the panel, so the delay is a multiple of
+   * something the stylesheet does not have to count. Capped there rather than here: forty
+   * revisions would otherwise take two seconds to finish arriving.
+   *
+   * From the left as well as up, which is what makes it read as a list unrolling rather
+   * than a block fading in: the eye follows the leading edge down the column. */
+  animation: entry-in 260ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 42ms);
 }
 .history-entry:hover { background: var(--hover); color: var(--text); }
 .history-entry.on { background: var(--accent-soft); color: var(--accent-hi); }
+/* The gap above the list, on the first row rather than on the box around it.
+ *
+ * Neither a margin nor padding on the rail can be part of this animation. A margin is
+ * outside the box the collapsing row shortens, and padding cannot shrink below itself: the
+ * collapse measured 160, 93, 33, 20, and then stopped at 20 and was cut off there when the
+ * element was removed. On the first row it is inside the box that clips, so the whole
+ * thing reaches nought. */
+.history-entry:first-child { margin-top: var(--s5); }
+
 .history-entry .when { font-variant-numeric: tabular-nums; }
 .history-entry .grow { flex: 1; }
 .history-entry .size { color: var(--text-3); font-size: 11.5px; }
+
+@keyframes entry-in {
+  from { opacity: 0; transform: translate3d(-10px, -6px, 0); }
+}
+
+/* And backwards on the way out: --out is the index counted from the bottom, so the last
+   row leaves first and the list folds up from the end it unrolled to. Quicker, because
+   leaving is not the part anybody is watching. */
+.history-wrap.closing .history-entry {
+  animation: entry-out 130ms var(--ease) both;
+  animation-delay: calc(var(--out, 0) * 26ms);
+}
+@keyframes entry-out {
+  to { opacity: 0; transform: translate3d(-10px, -6px, 0); }
+}
+
+/* The bar above the list belongs to the same gesture, so it goes with the rows. */
+.time-bar.closing {
+  animation: entry-out 180ms var(--ease) both;
+}
+
+/* Nothing staggers, nothing slides, and the height does not crawl. The panel still opens
+   and closes: the script waits on a clock rather than on these, so it does not matter to
+   it whether they ran. */
+@media (prefers-reduced-motion: reduce) {
+  .history-wrap { transition: none; }
+  .history-entry,
+  .history-wrap.closing .history-entry,
+  .time-bar.closing { animation: none; }
+}
 
 /* ── versions ─────────────────────────────────────────────────────────────── */
 .ab-bar {

@@ -390,9 +390,35 @@
 }
 
 /* The row of things that act on one card, sitting on the card they act on. */
+/* Which section these words belong to, on the floor of the card.
+ *
+ * It used to sit in the flow straight after the words, so on a card with two lines in it
+ * the tag landed a third of the way down with two hundred pixels of nothing under it,
+ * and it moved every time the words got longer. It is a label about the whole card rather
+ * than the end of the text, so it belongs at the bottom of the card and stays there.
+ *
+ * Absolute rather than a flex column with an auto margin, because the card's height is a
+ * floor and not a height: pushing with margin only works once the content is tall enough
+ * to fill it, which is the case this was wrong in.
+ *
+ * Left, because the group of buttons hangs off the bottom right corner. Inset by the
+ * card's own padding so it lines up with the words above it. */
 .card-foot-tools {
+  position: absolute;
+  left: var(--s6);
+  bottom: var(--s5);
   display: flex; align-items: center; gap: var(--s2);
-  margin-top: var(--s4);
+}
+@media (max-width: 760px) {
+  /* The card's padding tightens at this width, so the tag follows it in.
+   *
+   * And it lifts clear of the button group. That group hangs half its height below the
+   * card's bottom edge, so on a narrow card the two share a horizontal band: measured at
+   * 375, the tag ran to 142 and the group started at 122. They did not actually overlap,
+   * because the tag's floor and the group's ceiling were both at 822, which is touching
+   * and one pixel from wrong. 17 is half the group's height, the same number the dots
+   * below the card are spaced by, plus a gap. */
+  .card-foot-tools { left: var(--s4); bottom: calc(17px + var(--s2)); }
 }
 /* Quiet until wanted. Deleting a set of words is not something to be invited into. */
 .card-drop {

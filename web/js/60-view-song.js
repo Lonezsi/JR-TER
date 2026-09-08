@@ -428,14 +428,19 @@ function wireAB(root, ctx) {
     if (!chip) return;
     const slot = chip.dataset.slot;
 
-    /* The chip selects, the caret opens the menu.
+    /* An unselected chip selects. The one already selected is a dropdown.
      *
-     * These read as dropdowns and they had no way to choose between them: clicking
-     * either one only ever opened a menu, so which deck you were listening to, and
-     * therefore which equaliser the Sound panel was shaping, could only be changed from
-     * the player at the bottom of the screen. Pressing B here now means B, and the panel
-     * follows. The caret keeps the menu, and so does a right click. */
-    if (!e.target.closest(".caret")) {
+     * These read as dropdowns and they had no way to choose between them: clicking either
+     * one only ever opened a menu, so which deck you were listening to, and therefore
+     * which equaliser the Sound panel was shaping, could only be changed from the player
+     * at the bottom of the screen. Pressing B here means B, and the panel follows.
+     *
+     * But once a chip is the selected one, pressing it again has nothing left to select,
+     * and a control that looks like a dropdown and does nothing is worse than one that
+     * does the obvious thing. So the chosen chip is a dropdown across its whole width,
+     * not only on the caret. The caret still opens either of them, and so does a right
+     * click, which is what makes the unselected one reachable as a menu too. */
+    if (!e.target.closest(".caret") && !chip.classList.contains("sel")) {
       const playing = J.player.state.song && J.player.state.song.id === ctx.song.id;
       const held = playing ? J.player.state.slots[slot] : null;
       // A always has an answer, playing or not: it is the render that would play. B does

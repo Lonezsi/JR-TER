@@ -22,6 +22,25 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.2",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "A list that unrolls, and a tag that stays put",
+        "notes": [
+            "The history under a set of lyrics opens downwards and the entries arrive one "
+            "after another, top to bottom. Closing is the same thing backwards: the last "
+            "row leaves first, the list folds up from the bottom, and only then does the "
+            "panel close.",
+            "The section tag sits on the floor of the lyrics card. It used to be in the "
+            "flow straight after the words, so on a card with two lines in it the tag "
+            "landed a third of the way down with a lot of nothing underneath, and it "
+            "moved every time the words got longer.",
+            "Pressing the chosen take in the compare row opens its list, anywhere on it "
+            "rather than only on the little arrow. The one that is not chosen still "
+            "chooses when pressed, because that is the thing it has left to do.",
+        ],
+    },
+    {
         "version": "3.3.1",
         "date": "2026-09-08",
         "name": JRITER,
