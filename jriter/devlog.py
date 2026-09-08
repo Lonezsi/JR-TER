@@ -22,6 +22,30 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.5",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "The Share button has never worked",
+        "notes": [
+            "Sharing a song from the button in the top row now works. It never has. The "
+            "button was added after sharing already existed on the song title's menu, and "
+            "the two are wired up in different places: the button could not see the "
+            "function it was calling, so pressing it did nothing but put an error on the "
+            "screen. The menu entry worked the whole time, which is why the feature looked "
+            "present. Both go through the same one now.",
+            "Two new tests, because five hundred and fifty three read the front end as "
+            "text and none of them would ever have caught this. One parses every script "
+            "with a real engine. The other looks for exactly this shape: a function called "
+            "from somewhere that cannot reach it.",
+            "The second of those passed on the broken file when it was first written, "
+            "which makes it worth less than nothing. It read the song view through a set "
+            "of patterns that mis-paired the quotes in a template holding another "
+            "template, threw away nine tenths of the file, found no functions in what was "
+            "left and had nothing to report. It reads the file properly now, and before it "
+            "checks anything it checks that it has not lost its place.",
+        ],
+    },
+    {
         "version": "3.3.4",
         "date": "2026-09-08",
         "name": JRITER,

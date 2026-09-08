@@ -687,6 +687,74 @@ function place(menu, anchor) {
 }
 
 /* The title is the control. Click it, type, press Enter. */
+/* Giving one song to one person.
+ *
+ * Deliberately a sheet with a name in it rather than a link you copy. A link that works
+ * for whoever holds it is a credential in a chat window; this names an account on this
+ * server, so a share has somebody's name on it and can be taken back from them by name.
+ */
+async function shareSong(ctx) {
+  const state = await J.try(() => J.get(`/api/shares?song=${ctx.songId}`));
+  if (!state) return;
+  const people = state.people || [];
+  if (!people.length) {
+    J.toast("Nobody else has an account on this library yet.");
+    return;
+  }
+  const already = state.shares || [];
+
+  /* The fields carry name attributes because that is how J.sheet hands them back: it
+   * resolves with every [name] inside it, or null if the dialog was dismissed. */
+  const answer = await J.sheet({
+    title: `Share ${ctx.song.title}`,
+    sub: "They can listen to it and work on the sound and the words. Nothing else of "
+       + "yours, and their edits become their own copy rather than changing yours.",
+    confirm: "Share it",
+    body: `
+      <label class="sheet-label">Who
+        <select class="field" name="handle">
+          ${people.map((p) => `<option value="${J.esc(p.handle)}">${
+            J.esc(p.name)} (${J.esc(p.handle)})</option>`).join("")}
+        </select>
+      </label>
+      <label class="sheet-label">What to call them on this
+        <input class="field" name="as_name" placeholder="Jozsef" maxlength="60">
+      </label>
+      <p class="faint" style="font-size:12px">
+        Given a name, anything they edit is saved as "the original, edited by that name",
+        so you can tell whose is whose later. Leave it empty and their copies are simply
+        theirs.
+      </p>
+      ${already.length ? `
+        <div class="share-block" style="margin-top:var(--s4)">
+          <div class="share-block-head">Already shared with</div>
+          ${already.map((row) => `
+            <div class="list-row">
+              <span class="grow truncate">${J.esc(row.to_name)}</span>
+              <button class="btn sm ghost" type="button" data-drop="${row.id}">
+                Take it back</button>
+            </div>`).join("")}
+        </div>` : ""}`,
+    onMount(sheet) {
+      sheet.addEventListener("click", async (e) => {
+        const drop = e.target.closest("[data-drop]");
+        if (!drop) return;
+        // Not a data-act: that name is the delegated vocabulary of the view underneath,
+        // and this button is answered here, four lines down.
+        e.preventDefault();
+        const done = await J.try(() => J.del(`/api/shares/${drop.dataset.drop}`),
+                                 "Taken back. What they made stays theirs.");
+        if (done) drop.closest(".list-row").remove();
+      });
+    },
+  });
+  if (!answer) return;
+  await J.try(() => J.post("/api/shares", {
+    song: ctx.songId, handle: answer.handle, as_name: (answer.as_name || "").trim(),
+  }), "Shared.");
+}
+
+
 function wireTitle(root, ctx, previous) {
   const heading = J.$("#songTitle", root);
   if (!heading) return;
@@ -696,85 +764,24 @@ function wireTitle(root, ctx, previous) {
     previous.length ? { label: `Names it has had (${previous.length})`, icon: "open",
       run: () => J.$("#alsoKnown", root)?.click() } : null,
     { divider: true },
-    /* Sharing lives here rather than as a button in the top row.
+    /* Sharing is also here, not only on the button in the top row.
      *
-     * That row is already five controls wide and every one of them is something you do
-     * while working on the song. Sharing is something you do once, deliberately, and the
-     * menu on the title is where the once-per-song things already are. */
-    has("sharing") ? { label: "Share with somebody", icon: "open", run: share } : null,
+     * It used to be here alone, on the reasoning that the top row is already five controls
+     * wide and sharing is a once-per-song thing rather than something you do while
+     * working. Then a button was asked for and added, and that reasoning lost; the menu
+     * entry stays because this is where the other once-per-song things are.
+     *
+     * Both go through shareSong, which is why it sits at the top of this file rather than
+     * in here. It was in here, and the button in wireHero could not see it: pressing Share
+     * raised "share is not defined" from the day it was added. */
+    has("sharing") ? { label: "Share with somebody", icon: "open",
+      run: () => shareSong(ctx) } : null,
     { label: "Copy the name", icon: "copy",
       run: async () => {
         try { await navigator.clipboard.writeText(ctx.song.title); J.toast("Copied."); }
         catch (e) { J.toast(ctx.song.title); }
       } },
   ]);
-
-  /* Giving one song to one person.
-   *
-   * Deliberately a sheet with a name in it rather than a link you copy. A link that works
-   * for whoever holds it is a credential in a chat window; this names an account on this
-   * server, so a share has somebody's name on it and can be taken back from them by name.
-   */
-  async function share() {
-    const state = await J.try(() => J.get(`/api/shares?song=${ctx.songId}`));
-    if (!state) return;
-    const people = state.people || [];
-    if (!people.length) {
-      J.toast("Nobody else has an account on this library yet.");
-      return;
-    }
-    const already = state.shares || [];
-
-    /* The fields carry name attributes because that is how J.sheet hands them back: it
-     * resolves with every [name] inside it, or null if the dialog was dismissed. */
-    const answer = await J.sheet({
-      title: `Share ${ctx.song.title}`,
-      sub: "They can listen to it and work on the sound and the words. Nothing else of "
-         + "yours, and their edits become their own copy rather than changing yours.",
-      confirm: "Share it",
-      body: `
-        <label class="sheet-label">Who
-          <select class="field" name="handle">
-            ${people.map((p) => `<option value="${J.esc(p.handle)}">${
-              J.esc(p.name)} (${J.esc(p.handle)})</option>`).join("")}
-          </select>
-        </label>
-        <label class="sheet-label">What to call them on this
-          <input class="field" name="as_name" placeholder="Jozsef" maxlength="60">
-        </label>
-        <p class="faint" style="font-size:12px">
-          Given a name, anything they edit is saved as "the original, edited by that name",
-          so you can tell whose is whose later. Leave it empty and their copies are simply
-          theirs.
-        </p>
-        ${already.length ? `
-          <div class="share-block" style="margin-top:var(--s4)">
-            <div class="share-block-head">Already shared with</div>
-            ${already.map((row) => `
-              <div class="list-row">
-                <span class="grow truncate">${J.esc(row.to_name)}</span>
-                <button class="btn sm ghost" type="button" data-drop="${row.id}">
-                  Take it back</button>
-              </div>`).join("")}
-          </div>` : ""}`,
-      onMount(sheet) {
-        sheet.addEventListener("click", async (e) => {
-          const drop = e.target.closest("[data-drop]");
-          if (!drop) return;
-          // Not a data-act: that name is the delegated vocabulary of the view underneath,
-          // and this button is answered here, four lines down.
-          e.preventDefault();
-          const done = await J.try(() => J.del(`/api/shares/${drop.dataset.drop}`),
-                                   "Taken back. What they made stays theirs.");
-          if (done) drop.closest(".list-row").remove();
-        });
-      },
-    });
-    if (!answer) return;
-    await J.try(() => J.post("/api/shares", {
-      song: ctx.songId, handle: answer.handle, as_name: (answer.as_name || "").trim(),
-    }), "Shared.");
-  }
 
   const edit = () => {
     if (J.$(".song-title-input", root)) return;
@@ -894,7 +901,7 @@ function wireHero(root, ctx) {
 
     // The same sheet the title's menu opens, so there is one way of sharing rather than
     // two that can drift apart.
-    if (act.dataset.act === "share") share();
+    if (act.dataset.act === "share") shareSong(ctx);
 
     /* The plus beside the render count. Two ways in, because a render either comes off
      * this machine or is already waiting in the list. */
