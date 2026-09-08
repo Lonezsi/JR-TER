@@ -30,6 +30,22 @@ J.compositor = (function () {
     //: as sitting on a block rather than jammed against the side of the box.
     const EDGE = 6;
 
+    //: The band at each end of the strip where holding a block pans it, and how fast.
+    //:
+    //: Forty is about a thumb's width, so the band is reachable without being somewhere you
+    //: land by accident, and the speed rises across it: resting at the inside edge creeps
+    //: and pressing to the outside edge runs. Nine hundred pixels a second at full tilt
+    //: crosses a long arrangement in about a second and is still slow enough to stop where
+    //: you meant to.
+    //:
+    //: Pixels per second, not per frame: the loop multiplies by the time that actually
+    //: passed. PAN_CAP is how much time one frame is allowed to claim, so a tab coming back
+    //: from the background pans a frame's worth instead of leaping to the end.
+    const PAN_BAND = 40;
+    const PAN_MOST = 900;
+    const PAN_CAP = 48;
+    const PAN_EVERY = 16;
+
     //: The narrowest the bar's thumb is allowed to get.
     //:
     //: Its width is the share of the strip that is on screen, and on a long arrangement at
@@ -281,6 +297,129 @@ J.compositor = (function () {
       }
     }
 
+    /* Where a pointer is along the strip, whatever the scroll is doing.
+     *
+     * Measured against the row of blocks rather than the scrolling box, because that row's
+     * own rectangle already moves with the scroll: this is the same number before and
+     * after a pan, which is what makes it safe to compare with offsetLeft.
+     *
+     * The old version added the scroller's scrollLeft on top of that, which would have
+     * been double counting. It read `track.parentElement.scrollLeft`, and the row's parent
+     * is .comp-track, which does not scroll, so it was adding nought and the sum happened
+     * to be right.
+     */
+    function pointerOnStrip(clientX) {
+      const row = J.$(".comp-clips", root);
+      return row ? clientX - row.getBoundingClientRect().left : 0;
+    }
+
+    /* Which way the block in hand should move, if either, decided against its neighbours.
+     *
+     * One step at a time and nothing else. The block already follows the finger, so it has
+     * a visual centre; the only question is whether that centre has gone past the centre
+     * of the block on one side or the other.
+     *
+     * This is what stops the flicker. It used to walk every block's width to find which
+     * half of which slot the pointer was in, and those widths are the layout that includes
+     * the block being dragged: committing a move changed the boundaries that had just
+     * decided it, so the same position mapped back and it swapped again on the next event.
+     * Measured at five order changes across one boundary. Deciding it against the
+     * neighbours cannot do that, because after a swap the neighbour is on the other side
+     * and further away than the centre that just passed it.
+     */
+    function reorderAround(clipId) {
+      const node = J.$(`[data-clip="${clipId}"]`, root);
+      if (!node) return;
+      const mine = node.getBoundingClientRect();
+      const centre = mine.left + mine.width / 2;
+
+      const middleOf = (sibling) => {
+        if (!sibling || !sibling.classList.contains("comp-clip")) return null;
+        const box = sibling.getBoundingClientRect();
+        return box.left + box.width / 2;
+      };
+      const after = middleOf(node.nextElementSibling);
+      const before = middleOf(node.previousElementSibling);
+
+      let step = 0;
+      if (after !== null && centre > after) step = 1;
+      else if (before !== null && centre < before) step = -1;
+      if (!step) return;
+
+      const now = A.state.clips.findIndex((c) => c.id === clipId);
+      // Quietly: the order is not settled until the finger comes up, and every
+      // announcement rebuilds the lyric deck. done() pays for all of them at once.
+      A.move(clipId, now + step, true);
+      reorderNodes();
+      if (dragging) dragging.reordered = true;
+    }
+
+    /* Holding a block against either end of the strip pans it.
+     *
+     * Dragging a block owns the sideways gesture now, so there is no way to carry one past
+     * the edge of what is on screen: you would have to drop it, scroll, and pick it up
+     * again. This is the usual answer, and it repeats on a timer rather than on pointer
+     * events because a finger held still at the edge stops sending any.
+     *
+     * The speed rises with how far into the band the finger is, so resting near the edge
+     * creeps and pressing into it moves. Every step re-asks the reorder question with the
+     * finger where it still is, or the block would slide along the strip without ever
+     * changing places with anything.
+     */
+    let panning = null;
+    function edgePan(clientX, clipId) {
+      const scroll = J.$(".comp-scroll", root);
+      if (!scroll) return stopPan();
+      const box = scroll.getBoundingClientRect();
+      const into = clientX < box.left + PAN_BAND ? clientX - (box.left + PAN_BAND)
+                 : clientX > box.right - PAN_BAND ? clientX - (box.right - PAN_BAND)
+                 : 0;
+      if (!into) return stopPan();
+
+      const speed = J.clamp(into / PAN_BAND, -1, 1) * PAN_MOST;
+      if (panning) { panning.speed = speed; panning.x = clientX; return; }
+
+      /* A timer with the clock read inside it, which is neither of the obvious choices.
+       *
+       * Not a fixed step per tick, which is what this was first: measured, it panned about
+       * a hundred pixels a second against the four hundred it was asking for, because
+       * every tick does layout and sometimes a reorder and the timer never gets the
+       * interval it asked for. Multiplying by the time that actually passed makes PAN_MOST
+       * pixels per second, which is a promise that can be kept on a slow machine.
+       *
+       * And not requestAnimationFrame, which is the usual tool for something that moves:
+       * it is paused entirely while the page is hidden, and a control loop should not
+       * depend on that. Nothing here needs frame alignment either, because what it writes
+       * is scrollLeft and the compositor picks that up on its own schedule.
+       *
+       * The elapsed time is capped, so a tab that was away for a while comes back and pans
+       * one tick's worth rather than leaping to the end.
+       */
+      const step = () => {
+        if (!dragging || !panning) return stopPan();
+        const now = performance.now();
+        const dt = Math.min(PAN_CAP, now - panning.last);
+        panning.last = now;
+        const was = scroll.scrollLeft;
+        scroll.scrollLeft = was + (panning.speed * dt) / 1000;
+        if (scroll.scrollLeft === was) return;        // at one end; nothing moved
+        const node = J.$(`[data-clip="${panning.clipId}"]`, root);
+        if (node) {
+          node.style.setProperty("--drag",
+            `${pointerOnStrip(panning.x) - dragging.grabbedBy - node.offsetLeft}px`);
+        }
+        reorderAround(panning.clipId);
+        placeTools();
+      };
+      panning = { speed, x: clientX, clipId, last: performance.now(), timer: 0 };
+      panning.timer = setInterval(step, PAN_EVERY);
+    }
+    function stopPan() {
+      if (!panning) return;
+      clearInterval(panning.timer);
+      panning = null;
+    }
+
     // ── pointer work ────────────────────────────────────────────────────────
     root.addEventListener("pointerdown", (e) => {
       // The buttons on the chosen block are presses, not handles.
@@ -297,9 +436,10 @@ J.compositor = (function () {
 
       dragging = { clipId, edge: edge ? edge.dataset.edge : null, startX, startBeats, order,
                    moved: false, reordered: false,
-                   // Where the block sits before anything moves, so it can be kept under
-                   // the finger across a reorder that changes where its slot is.
-                   homeLeft: clipNode.offsetLeft };
+                   // How far into the block the finger landed, on the strip's own ruler.
+                   // Everything about where the block should be is this plus where the
+                   // finger is now, which stays true across a reorder and across a pan.
+                   grabbedBy: pointerOnStrip(startX) - clipNode.offsetLeft };
       clipNode.classList.add("holding");
       // See the note in 76-compositor.css: a reorder re-inserts nodes, which restarts the
       // entry animation, and that animation would take the transform off the finger.
@@ -322,39 +462,26 @@ J.compositor = (function () {
           }
           return;
         }
-        // Moving: work out which slot the pointer is over and reorder live, so the
-        // track shows the result rather than a floating ghost of it.
-        const track = J.$(".comp-clips", root);
-        const rect = track.getBoundingClientRect();
-        const at = event.clientX - rect.left + track.parentElement.scrollLeft;
-        let walked = 0, target = A.state.clips.length - 1;
-        for (let i = 0; i < A.state.clips.length; i++) {
-          const width = A.state.clips[i].beats * pxPerBeat();
-          if (at < walked + width / 2) { target = i; break; }
-          walked += width;
-        }
-        const current = A.state.clips.findIndex((c) => c.id === clipId);
-        if (target !== current) {
-          A.move(clipId, target);
-          reorderNodes();
-          dragging.reordered = true;
-        }
-
-        /* And the block itself goes with the hand.
+        /* The block goes with the hand.
          *
-         * The reorder above says where it will land; this is what it does on the way,
-         * which without it was nothing at all. The offset is worked out against where the
-         * node sits *now*, not where it started, because a reorder has just moved its slot
-         * out from under it: wanted is a fixed point on the track and offsetLeft is the
-         * slot, so the difference is what keeps the same part of the block under the same
-         * part of the finger from the first pixel to the last. */
+         * In track coordinates, not as a delta from where the finger started, because the
+         * strip can scroll underneath during a drag: `at` is where the finger is on the
+         * strip whatever the scroll is doing, and grabbedBy is how far into the block the
+         * finger landed. The offset is against where the node sits *now*, since a reorder
+         * moves its slot out from under it. */
+        const at = pointerOnStrip(event.clientX);
         const node = J.$(`[data-clip="${clipId}"]`, root);
-        if (node) node.style.setProperty("--drag",
-                                         `${dragging.homeLeft + dx - node.offsetLeft}px`);
+        if (node) {
+          node.style.setProperty("--drag",
+                                 `${at - dragging.grabbedBy - node.offsetLeft}px`);
+        }
+        reorderAround(clipId);
         placeTools();
+        edgePan(event.clientX, clipId);
       };
 
       const done = () => {
+        stopPan();
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", done);
         window.removeEventListener("pointercancel", done);
@@ -372,6 +499,13 @@ J.compositor = (function () {
         dragging = null;
 
         if (tapped) { select(clipId); return; }
+
+        /* The one announcement for however many crossings the drag made.
+         *
+         * A quiet move changes the order and tells nobody, so this is where the rest of
+         * the app finds out: the save, the playback reschedule, and the lyric deck's own
+         * redraw all hang off it. */
+        if (reordered) { A.touch(); A.resync(); }
 
         /* Nothing here needs the panel built again.
          *

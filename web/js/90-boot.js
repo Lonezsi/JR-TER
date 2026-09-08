@@ -432,7 +432,13 @@ async function boot() {
 
     // Every drag on these is a value being set. There is no such thing as a spare
     // sideways gesture on an equaliser node or a scrub bar.
-    if (node.closest("canvas, .range, .bar, .q-knob")) return true;
+    //
+    // .comp-bar is the arrangement's own scrollbar, and it is here rather than with the
+    // strip below because it does not matter whether the strip overflows: if the bar is on
+    // screen at all then it is because there is something to pan, and every sideways drag
+    // on it is a position being set. Without this, dragging it slid the rail out from under
+    // the finger halfway through.
+    if (node.closest("canvas, .range, .bar, .comp-bar, .q-knob")) return true;
 
     // Modal while it is up, whichever way you drag on it.
     if (node.closest(".sheet, .slot-menu, .pick-list")) return true;

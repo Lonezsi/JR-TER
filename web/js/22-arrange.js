@@ -364,11 +364,24 @@ J.arrange = (function () {
     },
 
     // ── editing ──────────────────────────────────────────────────────────────
-    move(clipId, toIndex) {
+    /* Put a clip somewhere else in the order.
+     *
+     * `quiet` is for the middle of a drag. touch() emits arrange:change, and the lyric
+     * deck rebuilds every card it has on that event, so announcing each boundary a block
+     * crosses on its way somewhere means rebuilding the deck several times a second for an
+     * order nobody has settled on yet. Edge panning made that obvious, because the strip
+     * moves under a still finger and the crossings arrive as fast as the scroll does, but
+     * it was already true of an ordinary drag across four blocks.
+     *
+     * A quiet move still changes the order: what it skips is telling anybody. Whoever is
+     * doing the dragging owes one touch() when the gesture ends.
+     */
+    move(clipId, toIndex, quiet) {
       const from = state.clips.findIndex((c) => c.id === clipId);
       if (from < 0) return;
       const [clip] = state.clips.splice(from, 1);
       state.clips.splice(J.clamp(toIndex, 0, state.clips.length), 0, clip);
+      if (quiet) return;
       api.touch();
       api.resync();
     },

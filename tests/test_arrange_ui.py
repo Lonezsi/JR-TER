@@ -116,8 +116,9 @@ def test_a_reorder_moves_the_nodes_rather_than_building_new_ones():
     """
     body = code(panel())
     assert "function reorderNodes()" in body
-    at = body.index("const current = A.state.clips.findIndex((c) => c.id === clipId);")
-    move = body[at:at + 200]
+    # The decision lives in reorderAround now, which is where the flicker fix put it.
+    at = body.index("function reorderAround(clipId)")
+    move = body[at:body.index("function edgePan", at)]
     assert "reorderNodes();" in move
     assert "draw();" not in move, "a live reorder must not rebuild the panel"
 

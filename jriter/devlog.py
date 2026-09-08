@@ -22,6 +22,28 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.4",
+        "date": "2026-09-08",
+        "name": JRITER,
+        "title": "A section that knows where it is going",
+        "notes": [
+            "Moving a section no longer flickers at the point where it is about to change "
+            "places. It was choosing its slot by measuring against every block in the row, "
+            "and those measurements include the block in your hand: making the move "
+            "changed the very thing that had just decided it, so the same spot sent it "
+            "straight back. It now only asks whether it has passed the middle of the "
+            "block beside it, one step at a time, which cannot argue with itself.",
+            "Holding a section against either end of the strip scrolls it, faster the "
+            "harder you press into the edge, and the section keeps changing places as it "
+            "goes. There was no way to carry one past the edge of what was on screen "
+            "before: you had to drop it, scroll, and pick it up again.",
+            "Dragging the bar under the strip no longer pulls the sidebar out with it.",
+            "A drag that crosses several blocks now tells the rest of the app once, when "
+            "you let go, instead of on every crossing. Each announcement rebuilds the "
+            "lyric deck, and with edge scrolling those arrive as fast as the strip moves.",
+        ],
+    },
+    {
         "version": "3.3.3",
         "date": "2026-09-08",
         "name": JRITER,
