@@ -7,10 +7,14 @@ button raised "share is not defined" from the day it was added. Five hundred and
 three tests passed the whole time, because every one of them reads the source as text.
 
 What this does not do, so that a green run is not read as more than it is: it follows a
-nested helper only where the scope holding it is named in a way reading the file can see,
-which is thirteen of the thirty seven scripts and sixty one helpers, and only where the
-helper's name is bound exactly once in its file. Everything else is invisible to it. It is
-a tripwire across one path, not a type checker.
+helper only where its name is bound exactly once in its file, because a name used twice
+cannot be traced without resolving scopes properly, and it says nothing about anything
+reached through a dot. It is a tripwire across one path, not a type checker.
+
+What it does cover is every script, in whatever shape the scope was written: a plain
+declaration, a property handed a function, a module closure, an object of methods. An
+earlier version knew two of those four and therefore watched thirteen files of thirty
+seven, with the song view among them by luck rather than design.
 
 These two do not. One parses every file with a real JavaScript engine, and the other looks
 for that exact shape: a function called from outside the function it belongs to. Neither is
@@ -53,78 +57,44 @@ def test_the_file_parses(name):
 
 # ── is everything it calls actually in reach ─────────────────────────────────
 
+#: A declaration that binds a callable to a name, in the two forms this codebase uses.
+#: A `function` is hoisted to the top of its scope and a `const` is not hoisted at all;
+#: both are invisible from outside the scope holding them, which is all this is about.
 DECL = re.compile(r"^(\s*)(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(")
-
-# The other way this codebase writes a helper, and the more dangerous one: a `function`
-# declaration is hoisted to the top of its scope, a `const` is not hoisted at all. Both
-# are invisible from outside the scope that holds them, which is all this test is about.
-#
-# Narrow on purpose. It wants to see the arrow or the `function` keyword, so that
-# `const total = (a + b);` is not mistaken for a helper. An arrow whose parameters are
-# wrapped across lines is missed, and that is the right way to be wrong here.
 BIND = re.compile(r"^(\s*)(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*"
                   r"(?:async\s*)?(?:function\b|\([^()]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)")
 
 CALL = re.compile(r"(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(")
 
+#: Everything that opens a function scope, with a name where there is one to take.
+#:
+#: Four shapes, because this codebase writes four. The first two are the declarations
+#: above; the third is a property handed a function, which is how the views are defined;
+#: the fourth is a method in an object literal, which is how the panels are.
+OPENERS = (
+    re.compile(r"(?:^|[^.\w$])(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\("),
+    re.compile(r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?"
+               r"(?:function\b|\([^()]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)"),
+    re.compile(r"([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*=\s*(?:async\s*)?"
+               r"(?:function\b|\([^()]*\)\s*=>)"),
+    re.compile(r"([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?"
+               r"(?:function\b|\([^()]*\)\s*=>)"),
+    re.compile(r"^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^()]*\)\s*\{"),
+)
 
-# The way most of this codebase opens a scope: a property on J handed a function. There
-# are sixty six of these against twenty four plain declarations, and until they counted as
-# scopes everything nested inside one had no home and was never compared against anything.
-# Named by the whole path, so a complaint points at something you can find.
-HELD = re.compile(r"^(\s*)([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*=\s*"
-                  r"(?:async\s*)?(?:function\b|\([^()]*\)\s*=>)")
+#: A scope with no name: an immediately invoked function, or a callback written inline.
+#: It still has to be pushed, or everything inside one is attributed to whatever encloses
+#: it and a helper in a callback looks like a helper in the function around it.
+ANON = re.compile(r"(?:\(\s*(?:async\s+)?function\s*\(|=>\s*\{|\bfunction\s*\()")
 
-
-# Any binding at all, so that a name can be counted rather than reasoned about.
+#: Any binding at all, so that a name can be counted rather than reasoned about.
 ANY_BIND = re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)")
 WORD = re.compile(r"[A-Za-z_$][\w$]*")
 
-# Words that appear in a parameter list without being parameters.
+#: Words that turn up in a parameter list without being parameters.
 NOT_A_NAME = {"async", "function", "const", "let", "var", "of", "in", "new", "typeof",
-              "await", "return", "true", "false", "null", "undefined"}
-
-
-def _bound_here(line):
-    """Every name this line binds: what it declares, and anything in its parameter list.
-
-    Deliberately greedy. Destructured parameters, defaults and stray words all come back
-    as names, and each one only ever removes a name from the check, never adds a
-    complaint. The cost of guessing high is a gap; the cost of guessing low is a test
-    nobody trusts.
-    """
-    names = []
-    found = _declared(line)
-    if found:
-        names.append(found.group(2))
-    names += ANY_BIND.findall(line)
-
-    # The parameter list, if this line opens something that takes one.
-    if found or re.match(r"^\s*(?:async\s+)?function\b", line):
-        cut = line.find("(")
-        if cut != -1:
-            depth = 0
-            for i in range(cut, len(line)):
-                if line[i] == "(":
-                    depth += 1
-                elif line[i] == ")":
-                    depth -= 1
-                    if depth == 0:
-                        names += [w for w in WORD.findall(line[cut + 1:i])
-                                  if w not in NOT_A_NAME]
-                        break
-    return names
-
-
-def _declared(line):
-    """The name this line declares a callable under, if it declares one, and its indent.
-
-    Three shapes, because this codebase uses three: a declaration, a binding, and a
-    property handed a function. The match's first group is the indent, which is how the
-    caller tells a scope opened at the top of the file from a helper nested in one.
-    """
-    return DECL.match(line) or BIND.match(line) or HELD.match(line)
-
+              "await", "return", "true", "false", "null", "undefined", "if", "for",
+              "while", "switch", "catch", "else", "do", "try"}
 
 ENDS_A_VALUE = ")]}"
 
@@ -278,21 +248,87 @@ def _bare(source):
     return "".join(out)
 
 
-def _tagged(source):
-    """Every line with its brace depth and the top level function it sits in."""
-    out = []
+def _declared(line):
+    """The name this line declares a callable under, if it declares one, and its indent."""
+    return DECL.match(line) or BIND.match(line)
+
+
+def _opens(line):
+    """The name of the scope this line opens, or None if it opens no named scope."""
+    for pattern in OPENERS:
+        found = pattern.search(line)
+        if found:
+            return found.group(1)
+    return None
+
+
+def _params(line):
+    """The names in this line's parameter list.
+
+    Greedy on purpose. Destructured parameters, defaults and stray words all come back as
+    names, and every one of those only ever removes a name from the check rather than
+    adding a complaint. The cost of guessing high is a gap; the cost of guessing low is a
+    test nobody trusts.
+    """
+    names = []
+    cut = line.find("(")
+    if cut == -1:
+        return names
     depth = 0
-    top = None
-    for line in source.split("\n"):
-        found = _declared(line)
-        if depth == 0 and found and not found.group(1):
-            top = found.group(2)
-        out.append((line, depth, top))
-        depth += line.count("{") - line.count("}")
-        if depth <= 0:
-            top = None
-            depth = max(0, depth)
-    return out
+    for i in range(cut, len(line)):
+        if line[i] == "(":
+            depth += 1
+        elif line[i] == ")":
+            depth -= 1
+            if depth == 0:
+                names = [w for w in WORD.findall(line[cut + 1:i]) if w not in NOT_A_NAME]
+                break
+    return names
+
+
+def _walk(bare):
+    """Every declaration and call in the file, each with the chain of scopes holding it.
+
+    A scope stack rather than a rule per shape. The chain is what makes the question
+    answerable: a call can reach a declaration exactly when the declaration's chain is a
+    prefix of the call's, which is what "an ancestor scope" means written down.
+    """
+    stack = []
+    decls = []
+    calls = []
+    binds = {}
+
+    for raw in bare.split("\n"):
+        chain = tuple(name for name, kind in stack if kind)
+
+        for name in ANY_BIND.findall(raw):
+            binds[name] = binds.get(name, 0) + 1
+        opener = _declared(raw)
+        if opener:
+            binds[opener.group(2)] = binds.get(opener.group(2), 0) + 1
+            decls.append((opener.group(2), chain))
+        if opener or re.match(r"^\s*(?:async\s+)?function\b", raw):
+            for name in _params(raw):
+                binds[name] = binds.get(name, 0) + 1
+        else:
+            for called in CALL.findall(raw):
+                calls.append((called, chain, raw.strip()))
+
+        opened = raw.count("{")
+        closed = raw.count("}")
+        if opened:
+            label = _opens(raw)
+            named = label is not None or ANON.search(raw) is not None
+            for k in range(opened):
+                if k == 0 and named:
+                    stack.append((label or "(anonymous)", True))
+                else:
+                    stack.append((None, False))       # a plain block, not a scope
+        for _ in range(closed):
+            if stack:
+                stack.pop()
+
+    return decls, calls, binds
 
 
 def offence(name, source):
@@ -323,35 +359,28 @@ def offence(name, source):
                 " test: unbalanced means the scope check never ran on the real text."
                 % (name, off))
 
-    tagged = _tagged(bare)
+    decls, calls, binds = _walk(bare)
 
-    # name -> every scope that declares one, because a name used twice cannot be traced
-    # by name. Short local names repeat all over this codebase: there are two `close`
-    # helpers in the song view alone, one per function, each called only from its own.
+    # Where each name is declared, and only names declared once and bound once. A name
+    # the file uses twice cannot be followed without resolving scopes properly: there are
+    # two `close` helpers in the song view, one per function, each called only from its
+    # own, and `done` is a helper in one scope and an argument of another. Both of those
+    # were reported as bugs by a version of this that guessed, and neither was one.
     homes = {}
-    times = {}
-    for line, depth, top in tagged:
-        # Not `for name in`: `name` is this function's argument, Python has no block
-        # scope, and the loop would leave the last identifier in the file sitting in it.
-        # The complaint below then names that instead of the file. A scope bug in the
-        # scope checker, which is at least on topic.
-        for bound in _bound_here(line):
-            times[bound] = times.get(bound, 0) + 1
-        found = DECL.match(line) or BIND.match(line)
-        if found and depth > 0 and top:
-            homes.setdefault(found.group(2), set()).add(top)
+    for called, chain in decls:
+        homes.setdefault(called, set()).add(chain)
 
-    owner = {n: list(w)[0] for n, w in homes.items() if len(w) == 1 and times.get(n) == 1}
-
-    for line, depth, top in tagged:
-        if _declared(line):
+    for called, chain, line in calls:
+        where = homes.get(called)
+        if not where or len(where) != 1 or binds.get(called, 0) != 1:
             continue
-        for called in CALL.findall(line):
-            holder = owner.get(called)
-            if holder and holder != top:
-                return ("%s: %s() is declared inside %s and called from %s, which cannot"
-                        " see it:\n    %s"
-                        % (name, called, holder, top or "the top level", line.strip()))
+        home = next(iter(where))
+        if chain[:len(home)] == home:
+            continue
+        return ("%s: %s() is declared in %s and called from %s, which cannot see it:"
+                "\n    %s"
+                % (name, called, " > ".join(home) or "the top level",
+                   " > ".join(chain) or "the top level", line))
     return None
 
 

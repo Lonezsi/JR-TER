@@ -22,6 +22,42 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.8",
+        "date": "2026-09-09",
+        "name": JRITER,
+        "title": "An update that runs late instead of not at all",
+        "notes": [
+            "The nightly update is skipped on battery and, until now, was then simply "
+            "dropped rather than delayed. A laptop unplugged overnight never updated, and "
+            "nothing anywhere said so, because a task that skipped and a task that "
+            "succeeded look the same from outside. Found by reading the task's own "
+            "history: one run exited 0x800710E0, which is what that condition returns, "
+            "and the next exited nought because the machine happened to be plugged in. "
+            "It now runs on battery, and a run that does get missed is caught up.",
+            "Neither of those two settings can be reached through schtasks, which is why "
+            "the task had Windows' defaults in the first place. The installer asks "
+            "PowerShell for them instead, and does not stop the install if a machine "
+            "refuses: running on the old conditions is what it has always done.",
+            "Four new tests for that, and one of them exists because of the thing it "
+            "tests. The checker went in as a function nested inside the installer, which "
+            "is a function nothing else can reach and therefore nothing else can check: "
+            "exactly the shape of the Share button two releases ago. It sits at the top "
+            "of the file now and a test hands it a fake shell and reads the command it "
+            "built.",
+            "The check that would have caught that Share button now reads every script "
+            "rather than thirteen of thirty seven. It knew a plain declaration and a "
+            "property handed a function, and two thirds of this front end is written as "
+            "a module closure or an object of methods, which it could not see into at "
+            "all. The song view was one of the thirteen by luck. It keeps a stack of "
+            "scopes now, so the shape a function is written in stops mattering.",
+            "Three more tests about running order, after a pass that broke things on "
+            "purpose to find out what the tests would miss. A song added to an album "
+            "could have landed at the top instead of the end and nothing anywhere would "
+            "have said so, which is not a crash, it is a record in the wrong order. "
+            "Albums had no tests of their own at all.",
+        ],
+    },
+    {
         "version": "3.3.7",
         "date": "2026-09-09",
         "name": JRITER,

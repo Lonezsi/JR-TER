@@ -605,6 +605,43 @@ def cmd_update(cfg, server, args):
     return 0
 
 
+def catch_up(name):
+    """Let the task run on battery, and run late if it missed its moment.
+
+    schtasks /Create takes Windows' defaults for both of these, and the defaults are
+    wrong for this task: DisallowStartIfOnBatteries with StartWhenAvailable off means
+    a run missed on battery is dropped rather than delayed. A laptop unplugged
+    overnight never updates, and nothing says so, because a task that skipped and a
+    task that succeeded look the same from outside. Measured here: the run on one day
+    exited 0x800710E0, which is what that condition returns, and the next exited 0
+    because the machine happened to be plugged in.
+
+    A git pull is a few seconds of a slow disk. It does not need to wait for mains.
+
+    Neither setting is reachable from schtasks, so this asks PowerShell, which is on
+    every Windows that has schtasks. Still no Python package.
+
+    Best effort on purpose. A task that runs on the old conditions is the behaviour
+    this has always had, so failing here is worth a line and not a stopped install.
+    """
+    script = (
+        "$ErrorActionPreference='Stop';"
+        "$t = Get-ScheduledTask -TaskName '%s';"
+        "$t.Settings.DisallowStartIfOnBatteries = $false;"
+        "$t.Settings.StopIfGoingOnBatteries = $false;"
+        "$t.Settings.StartWhenAvailable = $true;"
+        "Set-ScheduledTask -TaskName '%s' -Settings $t.Settings | Out-Null"
+    ) % (name.replace("'", "''"), name.replace("'", "''"))
+    done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive",
+                           "-Command", script],
+                          capture_output=True, text=True)
+    if done.returncode != 0:
+        print("      (left on the default power conditions: a run missed on battery "
+              "will not be caught up)")
+        return False
+    return True
+
+
 def cmd_install(cfg, server, args):
     """Make JR!TER part of the machine.
 
@@ -675,6 +712,7 @@ def cmd_install(cfg, server, args):
             print("      " + (done.stderr or done.stdout).strip().splitlines()[-1][:160])
             return False
         print("  %s" % name)
+        catch_up(name)
         return True
 
     # The tasks the old name registered, taken away before the new ones go in.

@@ -490,6 +490,38 @@ def test_deleting_every_word_takes_the_title_with_it(server):
     assert emptied["sheet"]["name"] == "v1", "back to what an unwritten sheet is called"
 
 
+def test_an_emptied_sheet_is_named_for_where_it_sits(server):
+    """The two above only ever empty the first sheet, where v1 is right by accident.
+
+    Written after breaking plain_name to return "v1" for everything and watching all 635
+    tests pass. A song's words come as a deck, so the sheet being emptied is usually not
+    the first one, and a name that ignores position puts a second v1 on the pile with no
+    way to tell it from the real one.
+    """
+    song_id = _a_song(server)
+    ids = []
+    for words in ("the first verse", "a chorus", "the middle eight"):
+        _, made = server.post("/api/songs/%d/lyrics" % song_id, {"text": words})
+        ids.append(made["sheet"]["id"])
+
+    # The third one, so a name that forgets where it sits is visibly wrong rather than
+    # accidentally right.
+    _, emptied = server.put("/api/lyrics/%d/text" % ids[2], {"text": ""})
+    assert emptied["saved"] is True
+    assert emptied["sheet"]["name"] == "v3", (
+        "the third set of words came back as %r. An emptied sheet is named for its place"
+        " in the deck, and ignoring that puts two sheets under one name."
+        % emptied["sheet"]["name"])
+
+    # And nothing else was renamed on the way past.
+    _, listing = server.get("/api/songs/%d/lyrics" % song_id)
+    names = [row["name"] for row in listing["lyrics"]]
+    assert len(names) == len(set(names)), \
+        "two sets of words on one song share a name: %r" % names
+    assert "the first verse" in names and "a chorus" in names, \
+        "emptying one sheet renamed the others: %r" % names
+
+
 def test_restoring_an_empty_revision_takes_the_title_too(server):
     """The same thing by the other route: a sheet put back to a revision that was empty.
 
