@@ -66,6 +66,16 @@ SCOPES = {
         ("GET", "/api/songs/match"),
         ("GET", "/api/versions/have"),
         ("GET", "/api/sync/folders"),
+        # The two that actually put something in the library, missing until a token was
+        # made and asked to use them. Everything above is a read, so a token passed every
+        # check until the moment it had something to say, and then said "Sign in to use
+        # this library" about a library it was holding a credential for.
+        #
+        # They are the upload. A scope that can survey a library and not add to it is not
+        # the scope this one is named after, and neither of them can delete anything,
+        # which is the line this scope exists to draw.
+        ("POST", "/api/songs"),
+        ("POST", "/api/songs/<id>/versions"),
     ),
     "full": None,          # None means no restriction
 }
@@ -358,6 +368,20 @@ def make_token(name, scope="upload", account_id=None):
     return raw
 
 
+def _shape(path):
+    """A request path as its route shape: /api/songs/12/versions -> /api/songs/<id>/versions
+
+    The scope list is literal paths, and a literal never equals a path with an id in it,
+    so every route that takes one was unreachable by a token whatever the list said. This
+    is the smallest thing that fixes that: a segment of digits is an id.
+
+    Deliberately not a route table lookup. The router knows the real patterns, but this
+    check runs before anything is routed, on purpose, so that a token is judged on what it
+    asked for rather than on what the server was willing to do with it.
+    """
+    return "/".join("<id>" if part.isdigit() else part for part in path.split("/"))
+
+
 def token_account(headers, method, path):
     """Which account's library the X-Jriter-Token on this request may reach, or None.
 
@@ -380,7 +404,8 @@ def token_account(headers, method, path):
     if not row:
         return None
     allowed = SCOPES.get(row["scope"], ())
-    if allowed is not None and (method, path) not in allowed:
+    if allowed is not None and (method, path) not in allowed \
+            and (method, _shape(path)) not in allowed:
         return None
     # Useful for telling a live agent from one that stopped months ago.
     accounts.token_used(row["id"])

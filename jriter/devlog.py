@@ -22,6 +22,29 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.7",
+        "date": "2026-09-09",
+        "name": JRITER,
+        "title": "A token for uploading, which could not upload",
+        "notes": [
+            "A machine token made for pushing bounces could read the library and not add "
+            "to it. The list of what the upload scope allows was missing the two routes "
+            "that do the work, making a song and pushing the bytes, so a token passed "
+            "every check right up to the moment it had something to say and then answered "
+            "\"Sign in to use this library\" about a library it was holding a credential "
+            "for.",
+            "Half of why it stayed missing: the check compared the request against the "
+            "list letter for letter, and no letter for letter entry can equal a path with "
+            "a number in it. Every route that takes one was unreachable by a token "
+            "whatever the list said, so adding the entry alone would have changed "
+            "nothing. A path is now read as its shape before it is looked up.",
+            "This is the third time that list has drifted from the client it describes, "
+            "and it carries a note about the first. It is not kept by hand any more: a "
+            "test reads the calls out of the client and fails if the scope does not cover "
+            "them. The scope still cannot delete anything, and a test holds that line too.",
+        ],
+    },
+    {
         "version": "3.3.6",
         "date": "2026-09-09",
         "name": JRITER,
