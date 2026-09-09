@@ -173,7 +173,7 @@ IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif")
 
 _DEFAULTS = {
     "library_name": "JR!TER",
-    "accent": "#54B37A",
+    "accent": "#F4C2C2",
     "auto_update": True,
     "sync_interval_minutes": 5,
     # Two dials, nought to a hundred, for the two things on this page that are taste

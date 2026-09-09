@@ -102,6 +102,109 @@ J.hue = (text) => {
   return hash;
 };
 
+/* ── the accent, and where its hue comes from ──────────────────────────────────
+ *
+ * Baby pink is hsl(0, 70%, 86%). Every accent the app shows is that same pastel at a
+ * different hue, which is what lets the colour follow a song without ever becoming
+ * something a button cannot be made of.
+ *
+ * Checked at every hue rather than assumed, because the whole point is that the app hands
+ * this colour to artwork it has never seen. The worst case in the band is hue 240, which
+ * reads at 12.32:1 as text on the page and carries the dark ink at 10.41:1. AA wants 4.5
+ * for body text, so there is room to spare wherever a sleeve sends it.
+ */
+J.ACCENT_SAT = 70;
+J.ACCENT_LIGHT = 86;
+
+J.hslHex = (h, s, l) => {
+  const sat = s / 100;
+  const light = l / 100;
+  const c = (1 - Math.abs(2 * light - 1)) * sat;
+  const x = c * (1 - Math.abs(((((h % 360) + 360) % 360) / 60) % 2 - 1));
+  const m = light - c / 2;
+  const sixth = Math.floor(((((h % 360) + 360) % 360) / 60)) % 6;
+  const table = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]];
+  const [r, g, b] = table[sixth];
+  const to = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${to(r)}${to(g)}${to(b)}`.toUpperCase();
+};
+
+/* A hue as an accent: the pastel band, never the raw colour. */
+J.accentFromHue = (hue) => J.hslHex(hue, J.ACCENT_SAT, J.ACCENT_LIGHT);
+
+/* The accent the library is actually set to, which is what everything goes back to. */
+J.chosenAccent = () => (J.state && J.state.settings && J.state.settings.accent) || null;
+
+/* The hue of a picture, or null when it has not got one.
+ *
+ * Weighted by how colourful each pixel is, so a grey sleeve with one stripe of colour
+ * follows the stripe. A sleeve with no colour at all returns null rather than a hue read
+ * out of noise, and the caller falls back to the chosen accent.
+ *
+ * Averaged around the circle: hue 350 and hue 10 are ten degrees apart and average to 0,
+ * and averaging them as numbers gives 180, which is cyan.
+ */
+J.hueOfImage = (function () {
+  const seen = new Map();          // one sample per url, they do not change
+  return function (url) {
+    if (!url) return Promise.resolve(null);
+    if (seen.has(url)) return Promise.resolve(seen.get(url));
+    return new Promise((resolve) => {
+      const img = new Image();
+      // No crossOrigin: these are served by this app from this origin, and asking for
+      // CORS on a same origin image only invites a request that does not need making.
+      img.onerror = () => { seen.set(url, null); resolve(null); };
+      img.onload = () => {
+        let hue = null;
+        try {
+          const size = 32;
+          const canvas = document.createElement("canvas");
+          canvas.width = canvas.height = size;
+          const ctx2d = canvas.getContext("2d", { willReadFrequently: true });
+          ctx2d.drawImage(img, 0, 0, size, size);
+          const data = ctx2d.getImageData(0, 0, size, size).data;
+
+          let sin = 0;
+          let cos = 0;
+          let weight = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 128) continue;
+            const r = data[i] / 255;
+            const g = data[i + 1] / 255;
+            const b = data[i + 2] / 255;
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const light = (max + min) / 2;
+            const delta = max - min;
+            if (delta < 0.02) continue;                 // grey, no hue to take
+            const sat = delta / (1 - Math.abs(2 * light - 1) || 1);
+            let h;
+            if (max === r) h = ((g - b) / delta) % 6;
+            else if (max === g) h = (b - r) / delta + 2;
+            else h = (r - g) / delta + 4;
+            h *= 60;
+            // Colourful and mid toned counts most: the ends of the range are where a
+            // hue is least trustworthy and least visible.
+            const w = sat * (1 - Math.abs(2 * light - 1));
+            const rad = h * Math.PI / 180;
+            sin += Math.sin(rad) * w;
+            cos += Math.cos(rad) * w;
+            weight += w;
+          }
+          if (weight > 0.5) {
+            hue = (Math.atan2(sin, cos) * 180 / Math.PI + 360) % 360;
+          }
+        } catch (e) {
+          hue = null;                                   // a tainted canvas, nothing to do
+        }
+        seen.set(url, hue);
+        resolve(hue);
+      };
+      img.src = url;
+    });
+  };
+}());
+
 /* One cover markup for every screen: real artwork when there is some, a coloured
  * placeholder built from the title when there is not. */
 J.cover = (opts) => {
@@ -430,6 +533,9 @@ J.pageWash = function (url, hue) {
     // screens it shows through the rail and the player, which is the one time those two
     // panes have anything to refract.
     J.dust.start(null);
+    // Off a song, so the accent goes back to whatever the library is set to. This is the
+    // only place that has to remember, because it is the only place that changed it.
+    J.applyAccent(J.chosenAccent());
     return;
   }
   wash.classList.toggle("flat", !url);
@@ -440,6 +546,30 @@ J.pageWash = function (url, hue) {
    * element is removed, not hidden. The hue is handed over as a number because --hue is
    * an inline property on this element and a sibling cannot inherit it. */
   if (url) J.dust.stop(); else J.dust.start(hue);
+
+  /* And the accent takes the same hue as the ground.
+   *
+   * Here rather than in the song view because this function already knows what is behind
+   * the app on every screen, and a second place that decided it would be a second place
+   * to forget. Only the hue is taken: see the note above J.accentFromHue.
+   *
+   * The picture case is asynchronous and deliberately not awaited. The wash is already
+   * on screen and the colour arriving a frame later is better than holding the render
+   * for a decode. The guard is that the wash is still showing the same picture when the
+   * sample comes back, or a fast walk through three songs would settle on whichever
+   * decoded last rather than the one being looked at.
+   */
+  if (!url) {
+    J.applyAccent(J.accentFromHue(hue));
+    return;
+  }
+  const wanted = url;
+  J.hueOfImage(url).then((found) => {
+    if (wash.style.backgroundImage.indexOf(String(wanted).replace(/'/g, "%27")) === -1) {
+      return;                       // moved on while the picture was decoding
+    }
+    J.applyAccent(found === null ? J.chosenAccent() : J.accentFromHue(found));
+  });
 };
 
 /* The shape of a render, drawn small.

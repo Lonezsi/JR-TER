@@ -21,6 +21,7 @@ not in here.
 """
 import os
 import time
+import urllib.parse
 
 from .. import db, blobs, config, audio_meta, registry
 from ..wire import Error, need
@@ -304,6 +305,90 @@ def SUMMARY():
     return {"folders": folders["n"] if folders else 0}
 
 
+#: A sample is a one shot, not an album. Big enough for a long loop, small enough that a
+#: mistake cannot fill the disk before anybody notices.
+UPLOAD_MOST = 64 * 1024 * 1024
+
+
+def _free_name(folder, name):
+    """A name inside folder that is not taken, by adding a number if it has to.
+
+    Overwriting is not offered. A sample library is a collection somebody else assembled
+    and this endpoint exists to add to it, so a clash gets "kick 2.wav" rather than
+    replacing the kick that was already there.
+    """
+    stem, ext = os.path.splitext(name)
+    tryout = name
+    n = 2
+    while os.path.exists(os.path.join(folder, tryout)):
+        tryout = "%s %d%s" % (stem, n, ext)
+        n += 1
+    return tryout
+
+
+def upload_into(req):
+    """Put one sound file into a sample library.
+
+    The one place anything writes into a watched folder, which is why this is the longest
+    handler in the file for the least work. Everything else here reads.
+    """
+    folder = db.one("SELECT * FROM sync_folders WHERE id = ?", (req.params["id"],))
+    if not folder:
+        raise Error("no watched folder with that id", 404)
+    if (folder["kind"] or COLLECTOR) != SYNC:
+        raise Error("that folder is a render collector, not a sample library. Anything "
+                    "landing in a collector is offered as a new render, which is not "
+                    "what a one shot is for.", 400)
+    if not os.path.isdir(folder["path"]):
+        raise Error("the folder %s is not there any more" % folder["path"], 409)
+
+    length = int(req.headers.get("Content-Length") or 0)
+    if length <= 0:
+        raise Error("no file in that upload")
+    if length > UPLOAD_MOST:
+        raise Error("a sample over %d MB is not a sample" % (UPLOAD_MOST // 1048576))
+
+    # Decoded first, then taken apart, and the order is the whole point.
+    #
+    # The browser sends the name percent encoded. The other upload handlers here use it
+    # as it arrives, which is fine when all they want is the extension, and not fine when
+    # the name becomes a file on a disk: "my kick #1.wav" would land as "my kick %231.wav".
+    #
+    # Decoding it means %2F arrives as a separator, so the sanitising has to happen after
+    # the decoding rather than before it, or it is sanitising the wrong string. basename on
+    # both separators, so neither ../ nor ..\ survives being read on a machine that only
+    # treats one of them as one.
+    raw = urllib.parse.unquote((req.headers.get("X-Filename") or "").strip())
+    name = os.path.basename(raw.replace("\\", "/"))
+    if not name or name in (".", ".."):
+        raise Error("that upload did not say what it was called")
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in config.AUDIO_EXT:
+        raise Error("JR!TER takes %s, not %s"
+                    % (", ".join(config.AUDIO_EXT), ext or name))
+
+    into = os.path.abspath(folder["path"])
+    name = _free_name(into, name)
+    dest = os.path.abspath(os.path.join(into, name))
+    # Belt and braces. basename should have made this impossible; a path that still ends
+    # up outside the folder means an assumption above is wrong, and the answer to that is
+    # to stop rather than to write.
+    if os.path.dirname(dest) != into:
+        raise Error("that name does not stay inside the folder", 400)
+
+    body = req.rfile.read(length)
+    if len(body) != length:
+        raise Error("the upload stopped early", 400)
+
+    tmp = dest + ".part"
+    with open(tmp, "wb") as f:
+        f.write(body)
+    os.replace(tmp, dest)
+
+    return {"added": name, "folder": folder["id"], "bytes": len(body),
+             "path": dest}
+
+
 def ROUTES():
     return {
         ("GET", "/api/sync/folders"): list_folders,
@@ -313,4 +398,5 @@ def ROUTES():
         ("POST", "/api/sync/scan"): scan,
         ("POST", "/api/sync/stock"): take_stock,
         ("POST", "/api/sync/import"): import_file,
+        ("POST", "/api/sync/folders/<id>/upload"): upload_into,
     }

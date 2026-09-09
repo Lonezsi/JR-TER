@@ -17,8 +17,12 @@
    glass and the content is not. A translucent card floating on a black page over nothing
    is a grey card with extra steps.
 
-   Plant green stays. It is the one colour in the room and it belongs to whatever is
-   playing. */
+   One colour in the room, and it belongs to whatever is playing. Baby pink by default,
+   and on a song it is not the default: the accent takes the hue of the song's own
+   background, so the room is tinted by what you are looking at and goes back to pink when
+   you leave. The saturation and lightness do not come from the artwork, only the hue,
+   because a sleeve that is nearly black would otherwise hand back an accent nobody can
+   read. */
 
 :root {
   /* ── the ground ─────────────────────────────────────────────────────────── */
@@ -53,11 +57,11 @@
   --text:        #F2F3F4;
   --text-2:      #9EA1A6;
   --text-3:      #6B6E74;
-  --text-on-accent: #05130B;
+  --text-on-accent: #2A1015;
 
-  --accent:      #54B37A;
-  --accent-hi:   #74D398;
-  --accent-lo:   #38835A;
+  --accent:      #F4C2C2;
+  --accent-hi:   #F6CBCB;
+  --accent-lo:   #C89F9F;
   /* The same colour as three numbers, for the tints.
    *
    * Ten rules across the stylesheets wrote the green out by hand to get a translucent
@@ -65,7 +69,7 @@
    * a pink accent came out as a pink button with a green halo. A token per alpha would be
    * eight names to keep straight, so this is the colour and rgba() supplies the alpha.
    * Set at runtime by J.applyAccent alongside the rest. */
-  --accent-rgb:  84, 179, 122;
+  --accent-rgb:  244, 194, 194;
   --accent-soft: rgba(var(--accent-rgb), 0.16);
   --accent-line: rgba(var(--accent-rgb), 0.42);
 

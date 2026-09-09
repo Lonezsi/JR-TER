@@ -151,7 +151,28 @@ def test_every_accent_tint_follows_the_accent():
         source = js(name)
         for hit in re.findall(r'"rgba\(84, 179, 122[^"]*"', source):
             assert False, "%s: %s should come off --accent-rgb" % (name, hit)
-    assert token("--accent-rgb") == "84, 179, 122"
+    # The token is the accent as three numbers, so it has to be that colour and not a
+    # colour it used to be. Read from --accent rather than written down here, or this
+    # assertion becomes the very thing it exists to forbid: a copy that goes stale.
+    accent = token("--accent").strip().lstrip("#")
+    wanted = ", ".join(str(int(accent[i:i + 2], 16)) for i in (0, 2, 4))
+    assert token("--accent-rgb") == wanted, (
+        "--accent is #%s, which is rgb(%s), and --accent-rgb says %r. Every translucent"
+        " tint in the app is built from the second one, so while they disagree the tints"
+        " are a different colour from the thing they are tinting."
+        % (accent.upper(), wanted, token("--accent-rgb")))
+
+    # And nothing anywhere may write that colour out by hand, whatever it currently is.
+    # The green below is checked by name because it is the one that was scattered; this
+    # is the rule that stops the next one being.
+    spaced = wanted.replace(", ", r"\s*,\s*")
+    for name, source in every_css().items():
+        found = re.findall(r"rgba\(\s*" + spaced, source)
+        assert not found, (
+            "%s writes the accent out as numbers %d time(s). It will stay that colour"
+            " when the accent is changed, which is what --accent-rgb is for."
+            % (name, len(found)))
+
     assert 'setProperty("--accent-rgb"' in js("90-boot.js"), \
         "the token has to be written when the accent is"
 
@@ -159,7 +180,7 @@ def test_every_accent_tint_follows_the_accent():
 def test_the_canvas_reads_the_accent_rather_than_holding_one():
     eq = js("30-eq.js")
     assert "function tint(alpha)" in eq
-    assert 'css("--accent-rgb") || "84, 179, 122"' in eq, \
+    assert 'css("--accent-rgb") || "' in eq, \
         "a fallback is fine; a fixed colour is not"
 
 

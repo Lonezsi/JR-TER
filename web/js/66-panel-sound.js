@@ -506,9 +506,35 @@ J.blockSound = async function (panel, ctx) {
     const lim = active.data.limiter || {};
     const slot = audibleSlot();
     const reduction = slot ? J.audio.reductionOf(slot) : 0;
-    nums.innerHTML = `<span>thr <b>${Number(lim.threshold).toFixed(1)}</b></span>
-      <span>ceil <b>${Number(lim.ceiling).toFixed(1)}</b></span>
-      <span>gr <b>${reduction.toFixed(1)}</b></span>`;
+
+    /* Built once, and after that only the numbers are touched.
+     *
+     * This used to rewrite innerHTML on every tick, which is seven times a second for as
+     * long as a song is open. Two of these three numbers only move when you drag a
+     * control and the third is nought while nothing is playing, so it was destroying and
+     * rebuilding the same six elements, forever, to show the same values.
+     *
+     * That is what the flickering was. Replacing a node restarts any transition on it
+     * and drops a selection inside it, so a row of numbers nobody was changing sat there
+     * blinking. Measured before the fix: forty three replacements in six seconds on a
+     * page where nothing at all was happening.
+     *
+     * Comparing before writing matters as much as building once: during playback the
+     * reduction really does change, and setting textContent that already holds that text
+     * would dirty the node again on every tick for the two that did not move.
+     */
+    if (!nums.firstElementChild) {
+      nums.innerHTML = "<span>thr <b></b></span>"
+                     + "<span>ceil <b></b></span>"
+                     + "<span>gr <b></b></span>";
+    }
+    const shown = nums.querySelectorAll("b");
+    const wanted = [Number(lim.threshold).toFixed(1),
+                    Number(lim.ceiling).toFixed(1),
+                    reduction.toFixed(1)];
+    for (let i = 0; i < shown.length && i < wanted.length; i++) {
+      if (shown[i].textContent !== wanted[i]) shown[i].textContent = wanted[i];
+    }
   }
   /* Stopped when the panel goes, not merely skipped.
    *

@@ -22,6 +22,41 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.4.0",
+        "date": "2026-09-09",
+        "name": JRITER,
+        "title": "Pink, and it takes the hue of whatever you are listening to",
+        "notes": [
+            "The accent is baby pink now, and on a song it is not. It takes the hue of "
+            "the song's own background, from the artwork where there is some and from "
+            "the colour the title generates where there is not, and goes back to pink "
+            "when you leave. Only the hue travels: the weight of the colour stays where "
+            "pink has it, so a sleeve that is nearly black cannot hand back an accent "
+            "nobody can read. Checked at all 360 hues rather than assumed, the worst "
+            "case carries text at 12.3 to 1.",
+            "A picture is sampled rather than guessed at, weighted by how colourful each "
+            "part of it is, so a mostly grey sleeve with one stripe of colour follows the "
+            "stripe. A sleeve with no colour in it at all keeps your chosen accent "
+            "instead of inventing one out of noise.",
+            "The flickering is gone, and it was one thing in one place. The three numbers "
+            "under the limiter were rebuilt seven times a second for as long as a song "
+            "was open, whether or not any of them had changed, and rebuilding an element "
+            "restarts anything animating on it. Two of those numbers only move when you "
+            "drag a control and the third is nought while nothing plays, so it was "
+            "destroying and recreating the same six elements forever to show the same "
+            "values. Measured before: 43 replacements in six seconds on a page where "
+            "nothing was happening. After: none at all.",
+            "Sample libraries have an upload button. Everything else that fills one reads "
+            "a folder already on the machine running JR!TER, which is no use from a "
+            "phone. Only on libraries, never on render collectors, because anything "
+            "landing in a collector is offered as a new render.",
+            "The name on an upload is taken apart and rebuilt rather than trusted, and "
+            "decoded before it is taken apart rather than after, since the separator that "
+            "matters arrives encoded. A name already in use gets a number instead of "
+            "replacing what is there: a sample library is a collection you assembled.",
+        ],
+    },
+    {
         "version": "3.3.8",
         "date": "2026-09-09",
         "name": JRITER,

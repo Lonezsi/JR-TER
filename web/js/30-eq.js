@@ -68,7 +68,7 @@ J.eq = (function () {
      * be the green written out by hand, which meant a pink accent drew a pink curve over
      * green bands. --accent-rgb is the three numbers, set by J.applyAccent. */
     function tint(alpha) {
-      return "rgba(" + (css("--accent-rgb") || "84, 179, 122") + ", " + alpha + ")";
+      return "rgba(" + (css("--accent-rgb") || "244, 194, 194") + ", " + alpha + ")";
     }
 
     function drawGrid() {
@@ -161,7 +161,7 @@ J.eq = (function () {
         if (i === 0) ctx2d.moveTo(freqX[i], y);
         else ctx2d.lineTo(freqX[i], y);
       }
-      ctx2d.strokeStyle = data.bypass ? "rgba(255,255,255,0.24)" : css("--accent-hi") || "#6ECB92";
+      ctx2d.strokeStyle = data.bypass ? "rgba(255,255,255,0.24)" : css("--accent-hi") || "#F6CBCB";
       ctx2d.lineWidth = 2;
       ctx2d.lineJoin = "round";
       ctx2d.stroke();
@@ -195,7 +195,7 @@ J.eq = (function () {
         ctx2d.beginPath();
         ctx2d.arc(x, y, active || hot ? 8 : 6, 0, Math.PI * 2);
         ctx2d.fillStyle = isOn
-          ? (active ? css("--accent-hi") || "#6ECB92" : css("--accent") || "#54B37A")
+          ? (active ? css("--accent-hi") || "#F6CBCB" : css("--accent") || "#F4C2C2")
           : "rgba(255,255,255,0.28)";
         ctx2d.fill();
         ctx2d.lineWidth = 2;

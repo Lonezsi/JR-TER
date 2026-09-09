@@ -39,9 +39,9 @@ PREVIEW = os.path.join(HERE, "favicon-preview.png")
 #: the same mark as a real file, so there is one of it: green ground, dark glyph, the way
 #: it already was. Not the other way round, however much a dark tile suits the app, because
 #: an icon that changes is an icon people stop recognising.
-GROUND = (84, 179, 122)      # --accent
-GROUND_HI = (116, 211, 152)  # --accent-hi
-INK = (15, 19, 17)           # the near black the SVG used
+GROUND = (244, 194, 194)     # --accent
+GROUND_HI = (246, 203, 203)  # --accent-hi
+INK = (26, 14, 18)           # the near black the SVG used, warmed to match the ground
 
 #: Every size Windows and browsers actually reach for. 256 is what File Explorer shows at
 #: its largest, 48 is the desktop, 32 the taskbar, 16 the tab.

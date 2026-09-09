@@ -136,7 +136,7 @@ J.limiter = (function () {
       const levelWidth = dbToX(level);
       const gradient = ctx2d.createLinearGradient(0, 0, width, 0);
       gradient.addColorStop(0, css("--accent-lo") || "#3E8B5D");
-      gradient.addColorStop(0.75, css("--accent") || "#54B37A");
+      gradient.addColorStop(0.75, css("--accent") || "#F4C2C2");
       gradient.addColorStop(1, css("--warn") || "#D9A441");
       ctx2d.fillStyle = gradient;
       ctx2d.fillRect(0, barTop, levelWidth, barHeight);

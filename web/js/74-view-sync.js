@@ -27,6 +27,12 @@ J.views.sync = {
      * not in how a folder is drawn, so there is one of these rather than two that drift
      * apart the first time somebody edits only one. */
     function folderRow(folder) {
+      /* The upload button is on libraries and never on collectors.
+       *
+       * A collector offers what lands in it as a new render, so putting one shots into
+       * one is the mistake the two kinds were split to prevent. The row knows which kind
+       * it is drawing, so it is decided here rather than left to the handler. */
+      const library = folder.kind === "sync";
       return `
         <div class="list-row" data-folder="${folder.id}">
           <button class="switch ${folder.enabled ? "on" : ""}" data-act="toggle"
@@ -37,6 +43,15 @@ J.views.sync = {
               ${folder.last_scan ? `last looked at ${J.when(folder.last_scan)}` : "not looked at yet"}
             </div>
           </span>
+          ${library ? `
+            <button class="icon-btn" data-act="put-samples"
+                    aria-label="Add sounds to this library" title="Add sounds">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M12 16V4M12 4L8 8M12 4l4 4M5 17v2a1 1 0 001 1h12a1 1 0 001-1v-2"
+                      fill="none" stroke="currentColor" stroke-width="1.9"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>` : ""}
           <button class="icon-btn" data-act="remove" aria-label="Stop watching">
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
           </button>
@@ -180,6 +195,51 @@ J.views.sync = {
       const what = act.dataset.act;
       const folderRow = act.closest("[data-folder]");
       const candidateRow = act.closest("[data-path]");
+
+      if (what === "put-samples" && folderRow) {
+        /* A hidden input rather than a drop zone, for now.
+         *
+         * A file picker is the one way in that works the same on a phone, and a phone is
+         * the reason this button exists at all: everything else that fills a sample
+         * library reads a folder that is already on the machine running JR!TER.
+         *
+         * Several files at once, sent one after another rather than together. Sixty
+         * files is sixty requests and that is fine; what it buys is that one refusal
+         * names the file it was about instead of failing the whole batch.
+         */
+        const picker = document.createElement("input");
+        picker.type = "file";
+        picker.accept = ".wav,.mp3,.flac,.m4a,.aac,.ogg,.opus,audio/*";
+        picker.multiple = true;
+        picker.style.display = "none";
+        document.body.appendChild(picker);
+        picker.addEventListener("change", async () => {
+          const files = Array.from(picker.files || []);
+          picker.remove();
+          if (!files.length) return;
+
+          const into = folderRow.dataset.folder;
+          let sent = 0;
+          const failed = [];
+          for (const file of files) {
+            const done = await J.try(
+              () => J.upload(`/api/sync/folders/${into}/upload`, file));
+            if (done) sent += 1;
+            else failed.push(file.name);
+          }
+          if (sent) {
+            J.toast(sent === 1 ? "Added one sound." : `Added ${sent} sounds.`);
+          }
+          if (failed.length) {
+            J.toast(`${failed.length} did not go in: ${failed.slice(0, 3).join(", ")}`,
+                    "bad");
+          }
+          // Take stock again so the counts on screen match what is on the disk.
+          await loadFolders();
+        }, { once: true });
+        picker.click();
+        return;
+      }
 
       if (what === "add") {
         /* The button says which section it came from.
