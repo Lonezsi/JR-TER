@@ -208,6 +208,72 @@
 }
 
 
+/* ── glass for the engines that cannot bend light ──────────────────────────────
+ *
+ * WebKit and Gecko, which is every browser on an iPhone, Safari on a Mac, and Firefox
+ * everywhere. They were being handed the flat tier, and the flat tier is dark and mostly
+ * opaque for one reason: it has to survive a backdrop-filter that never arrives.
+ *
+ * That is the wrong reason to apply to these. Only url() is broken in WebKit's
+ * backdrop-filter. blur(), saturate() and brightness() have worked for years, which is
+ * why this tier is gated on the filter existing at all: below it, the flat tier stands.
+ *
+ * So blur for real, and then do the part the blur cannot. A displacement map is what is
+ * missing and there is no way to fake one in CSS. There is no need to fake the whole
+ * thing: what the eye reads as glass happens at the rim, and every bit of that is
+ * reachable with inset shadows.
+ *
+ * All of it rides on --edge-top, which every glass surface already draws and already
+ * composes with its own shadow, so this changes one token and no rules. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  @supports not ((background: paint(x)) or (-webkit-app-region: no-drag)) {
+    :root {
+      /* Lighter than the flat tier, because here the blur behind it is real. Still far
+         from the five per cent film Blink gets: that one is riding a displacement map as
+         well, and this is not.
+         *
+         * The floor under both numbers is legibility with the blur contributing nothing,
+         * measured over white, which is the state the friend's iPhone was actually in.
+         * --glass bottoms out at 0.61 and --glass-2 has room to spare, so:
+         *
+         *     --glass    0.55  3.72:1  under AA, which is where this started
+         *     --glass    0.64  5.07:1  what it is
+         *     --glass-2  0.88 11.68:1
+         *
+         * 0.55 was the first guess and the test next door threw it out. */
+      --glass:       rgba(17, 18, 21, 0.64);
+      --glass-2:     rgba(20, 21, 25, 0.88);
+      --glass-line:  rgba(255, 255, 255, 0.16);
+
+      /* More blur than Blink asks for, deliberately. Blink spends part of its effect
+         budget on the bend; this has only the blur, so the blur does more of the work. */
+      --glass-filter:      blur(30px) saturate(190%) brightness(1.08);
+      --glass-filter-thin: blur(20px) saturate(180%) brightness(1.06);
+      --glass-filter-edge: blur(30px) saturate(190%) brightness(1.08);
+
+      /* The lens, in six lines.
+       *
+       * Read top to bottom: the lit edge, then the rim gathering light and letting it
+       * fall inward, then the two sides coming apart in colour the way a real edge
+       * splits it, then the bounce off whatever is underneath. The third and fourth are
+       * what url(#glass-ca) was for; the second is the one a flat panel can never have,
+       * because a panel is lit and a lens collects. */
+      --edge-top:
+        inset 0   1px  0    rgba(255, 255, 255, 0.24),
+        inset 0   18px 24px -20px rgba(255, 255, 255, 0.16),
+        inset 1px 0    0    rgba(150, 200, 255, 0.11),
+        inset -1px 0   0    rgba(255, 205, 165, 0.10),
+        inset 0  -1px  0    rgba(255, 255, 255, 0.06),
+        inset 0  -16px 20px -20px rgba(120, 180, 255, 0.10);
+
+      /* A little deeper, so the pane sits off the page rather than on it. Glass has
+         thickness and the shadow is the only place left to say so. */
+      --glass-shadow: 0 16px 44px rgba(0, 0, 0, 0.58);
+    }
+  }
+}
+
+
 @media (prefers-reduced-motion: reduce) {
   :root { --fast: 1ms linear; --med: 1ms linear; --slow: 1ms linear; }
   * { animation-duration: 1ms !important; scroll-behavior: auto !important; }

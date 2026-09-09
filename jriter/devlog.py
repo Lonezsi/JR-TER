@@ -22,6 +22,45 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.3.6",
+        "date": "2026-09-09",
+        "name": JRITER,
+        "title": "Upload to JR!TER, which had never once uploaded anything",
+        "notes": [
+            "Right clicking a bounce and choosing Upload to JR!TER now uploads it. Every "
+            "entry in that menu answered \"Cannot launch PythonCore 3.13 because no "
+            "executable name is available\" and had done since the day it was added. It "
+            "reads like a broken Python and it was nothing of the kind: the line written "
+            "into the registry escaped its quotes by doubling them and then wrapped the "
+            "result in another pair, and cmd only unwraps an outer pair in cases that "
+            "line did not meet. What reached the launcher was a command whose quotes no "
+            "longer paired up, so it could not tell which interpreter it had been asked "
+            "for. It is one flag, and the flag exists for exactly this.",
+            "Glass on iPhones and Macs, and in Firefox. Those engines were being handed "
+            "the flat panel meant for a browser with no blur at all, on the grounds that "
+            "their backdrop-filter cannot be trusted. Only part of it cannot: the SVG "
+            "filter that bends the light is ignored there, and the blur underneath it has "
+            "worked for years. So they get their own surface now, blurred for real, with "
+            "the rim doing the work the bend used to: light gathered at the edge and let "
+            "fall inward, the two sides coming apart in colour, a bounce along the "
+            "bottom. Not the same thing. Much closer than a dark rectangle.",
+            "It is checked with a number rather than an opinion, because the thin glass "
+            "was reported as unreadable twice from two Apple devices and it deserved to "
+            "be. Over white with the blur contributing nothing, the thin tint carries "
+            "text at 1.11 to 1, which is not a look, it is a page you cannot read. The "
+            "new surface holds 5.07 for the panels and 11.68 for the dialogs, and a test "
+            "now refuses any tint an engine can reach without the bend that drops under "
+            "the readable line. The first draft of that surface failed it and was "
+            "changed, not excused.",
+            "The mark reads as a rest again in a browser tab. At sixteen pixels the three "
+            "legs swung less far across than the stroke drawing them was wide, so they "
+            "filled into each other and what was left was a bar with a bump, which is the "
+            "half of the joke that needs the rest to look like a rest. The 16 gets its "
+            "own cut now: two legs, swinging nearly twice as wide, and the curl shortened "
+            "to a stub. Everything larger is untouched.",
+        ],
+    },
+    {
         "version": "3.3.5",
         "date": "2026-09-08",
         "name": JRITER,

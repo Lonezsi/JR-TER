@@ -108,6 +108,32 @@ def _runner():
     return '"%s" "%s"' % (sys.executable, client)
 
 
+def command_line(runner, command, argument, keep_open=True):
+    """The exact string that goes in the registry, so something other than Windows can ask.
+
+    It used to be built in the middle of the registry write, which meant the only way to
+    see one was to install the menu and read it back, and that is a thing nobody does
+    casually. Every entry here had been broken since it was written and the way it was
+    found was a person right clicking a wav.
+
+    The console stays open on purpose: this is the only place the answers to "is this a
+    new render of X?" can be given.
+
+    /s is the whole reason any of these work. Without it the wrapper doubled every quote
+    and added a pair of its own, and cmd only strips an outer pair under conditions that
+    line did not meet, so py.exe was handed a command line whose quotes did not pair up
+    and answered "Cannot launch PythonCore 3.13 because no executable name is available".
+    Which reads like a broken Python install and is nothing of the kind.
+
+    /s says: take the first and last quote off and treat the rest literally. No escaping,
+    no doubling, and a path with a space keeps its own quotes.
+    """
+    line = '%s %s "%s"' % (runner, command, argument)
+    if keep_open:
+        line = 'cmd /s /c "%s & pause"' % line
+    return line
+
+
 def install(keep_open=True):
     """Add the entries. Returns a list of what was written."""
     winreg = _winreg()
@@ -126,12 +152,8 @@ def install(keep_open=True):
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, label)
                 winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, _icon())
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base + r"\command") as key:
-                # The console stays open on purpose: this is the only place the answers
-                # to "is this a new render of X?" can be given.
-                line = '%s %s "%s"' % (runner, command, argument)
-                if keep_open:
-                    line = 'cmd /c "%s & pause"' % line.replace('"', '""')
-                winreg.SetValueEx(key, "", 0, winreg.REG_SZ, line)
+                winreg.SetValueEx(key, "", 0, winreg.REG_SZ,
+                                  command_line(runner, command, argument, keep_open))
             written.append(base)
     return written
 

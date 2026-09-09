@@ -63,6 +63,22 @@ HOOK = [
     ((8.4, 25.6), (8.4, 27.2), (7.4, 28.2), (6.0, 28.2)),
 ]
 
+# ── and the same rest cut for sixteen pixels ────────────────────────────────
+#
+# Three legs and a curl do not fit in twelve pixels of height. Measured, before drawing
+# anything: the path above travels 5.0 across against 26.2 down, so at 78 per cent of a
+# 16px tile that is 12.4 tile units of horizontal swing against a 13 unit stroke. The
+# wiggle is narrower than the line that draws it, the legs fill into each other, and what
+# comes out is a bar. Nothing about the stroke weight fixes that; the shape has to change.
+#
+# Two legs, swinging 11.0 across instead of 5.0, and a hook shortened to a stub that turns
+# once and stops. Fewer, larger, further apart, which is the only drawing that survives
+# this size.
+ZIGZAG_SMALL = [(10.0, 2.0), (2.0, 11.5), (10.0, 21.0)]
+HOOK_SMALL = [
+    ((10.0, 21.0), (7.2, 23.0), (5.4, 25.4), (4.2, 28.2)),
+]
+
 #: Where the two glyphs sit, in a 100 wide tile.
 #:
 #: Both numbers were chosen by looking at the thing: the rest is the taller and more
@@ -72,6 +88,15 @@ REST_TOP, REST_BOTTOM = 11.0, 89.0
 REST_MID_X = 36.5
 REST_STROKE = 13.0          # the heavy cut: 13 per cent of the tile, so 2.1px at 16
 HOOK_STROKE = 11.0          # the wordmark thins the hook too, in the same proportion
+
+#: The small cut's own weights and placing.
+#:
+#: Thinner rather than heavier, which is the opposite of what it looks like it should want:
+#: the legs are what have to stay apart, and at 16 a heavier stroke closes the gap between
+#: them again. Pushed left as well, because swinging twice as wide runs it into the bang.
+REST_STROKE_SMALL = 11.5
+HOOK_STROKE_SMALL = 10.5
+REST_MID_X_SMALL = 32.0
 
 BANG_MID_X = 69.0
 BANG_W = 15.5
@@ -92,17 +117,27 @@ def _cubic(seg, steps=24):
     return out
 
 
-def _rest_path():
+def _rest_path(small=False):
     """The rest's centreline in tile coordinates, as two polylines with their widths.
 
     Scaled from the viewBox by height, so the mark keeps the proportions the rail draws,
     and centred on REST_MID_X by its own bounding box rather than by the viewBox, which has
     slack on both sides.
+
+    With small, the two legged version and the numbers that go with it. It is the same
+    function because the scaling and centring are the part that must not differ: only the
+    path and three constants change.
     """
+    zigzag = ZIGZAG_SMALL if small else ZIGZAG
+    segments = HOOK_SMALL if small else HOOK
+    stroke = REST_STROKE_SMALL if small else REST_STROKE
+    hook_stroke = HOOK_STROKE_SMALL if small else HOOK_STROKE
+    mid_x = REST_MID_X_SMALL if small else REST_MID_X
+
     hook = []
-    for seg in HOOK:
+    for seg in segments:
         hook.extend(_cubic(seg))
-    lines = [(ZIGZAG, REST_STROKE), (hook, HOOK_STROKE)]
+    lines = [(zigzag, stroke), (hook, hook_stroke)]
 
     every = [p for line, _ in lines for p in line]
     top = min(y for _, y in every)
@@ -112,13 +147,13 @@ def _rest_path():
 
     # Height is set by the outside of the stroke, not the centreline, or the mark comes out
     # taller than asked for by half a stroke at each end.
-    scale = ((REST_BOTTOM - REST_TOP) - REST_STROKE) / (bottom - top)
+    scale = ((REST_BOTTOM - REST_TOP) - stroke) / (bottom - top)
     mid = (left + right) / 2.0
     # The widths are already in tile units, so only the centreline is scaled.
     out = []
     for line, width in lines:
-        out.append(([(REST_MID_X + (x - mid) * scale,
-                      REST_TOP + REST_STROKE / 2.0 + (y - top) * scale) for x, y in line],
+        out.append(([(mid_x + (x - mid) * scale,
+                      REST_TOP + stroke / 2.0 + (y - top) * scale) for x, y in line],
                     width))
     return out
 
@@ -126,6 +161,10 @@ def _rest_path():
 #: Worked out once, not per pixel. At 256 with four times supersampling this function is
 #: asked about a million points, and the rest is the same rest every time.
 REST = _rest_path()
+REST_SMALL = _rest_path(small=True)
+
+#: Below this, the two legged rest. The 32 carries three legs and a curl; the 16 does not.
+SMALL_AT = 20
 
 
 def _near(px, py, line, half):
@@ -167,7 +206,7 @@ def _mark(x, y, size):
     u = 100.0 / size
     gx, gy = x * u, y * u
 
-    for line, width in REST:
+    for line, width in (REST_SMALL if size < SMALL_AT else REST):
         if _near(gx, gy, line, width / 2.0):
             return INK
 

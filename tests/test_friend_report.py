@@ -293,6 +293,47 @@ def test_the_icon_draws_both_marks():
     assert gaps, "the exclamation has no gap, so it is one solid stroke"
 
 
+def test_the_rest_still_zigzags_at_the_size_it_is_smallest():
+    """A tab icon is sixteen pixels and the rest had stopped being a rest at that size.
+
+    Every other icon test asks the 100px drawing, where three legs and a curl have room,
+    and all of them passed while the 16 was mud.
+
+    Measured off the rendered mark, not off the constants. The first version of this test
+    asserted that REST_SMALL swings wider than its stroke, which is true whether or not
+    the 16 is drawn with it, so pointing the 16 back at the fine path left the test green.
+
+    The number that separates them is the ratio of sideways travel to stroke thickness. A
+    zigzag is only visible while the centreline moves further across than the line drawing
+    it is wide; below that the legs overlap and close into a bar with a bump on it. The
+    fine path at 16 gives 1.19 and the small cut gives 1.88.
+    """
+    f = _favicon()
+    size = 16
+    fine = 8                      # subpixel samples per pixel, per axis
+
+    rows = []
+    for sy in range(size * fine):
+        y = (sy + 0.5) / fine
+        xs = [(sx + 0.5) / fine for sx in range(size * fine // 2)
+              if f._mark((sx + 0.5) / fine, y, size) is not None]
+        if xs:
+            rows.append((min(xs), max(xs)))
+    assert rows, "nothing is drawn where the rest goes at 16"
+
+    mids = [(a + b) / 2.0 for a, b in rows]
+    widths = sorted(b - a for a, b in rows)
+    swing = max(mids) - min(mids)
+    # The thinnest run is the stroke; the turns and the hook are wider than it.
+    stroke = widths[len(widths) // 10]
+
+    assert swing / stroke > 1.5, (
+        "at 16 the rest travels %.2fpx across against a %.2fpx stroke, a ratio of %.2f."
+        " Below about 1.5 the legs overlap and it closes into a bar, which is the half of"
+        " the mark that carries the joke. The fine path scores 1.19 here and the two"
+        " legged cut scores 1.88." % (swing, stroke, swing / stroke))
+
+
 def test_the_icon_and_the_wordmark_are_the_same_rest():
     """Two drawings of one mark drift. These share their numbers, so they cannot."""
     index = io.open(os.path.join(HERE, "web", "index.html"), encoding="utf-8").read()
