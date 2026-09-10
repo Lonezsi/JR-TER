@@ -22,6 +22,46 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.5.0",
+        "date": "2026-09-10",
+        "name": JRITER,
+        "title": "The colour belongs to what is playing",
+        "notes": [
+            "The accent follows the player now, not the page you are looking at. A song "
+            "takes the average colour of its artwork; a render takes the colour its own "
+            "waveform is already drawn in; nothing playing means the colour you chose. "
+            "There is a switch for it in Settings, on by default.",
+            "Which is also why it was changing inconsistently. It used to hang off the "
+            "page background, and opening one song set it three times on the way in, "
+            "visibly stepping, repainting the drifting specks with each one. A colour "
+            "that belongs to what you are listening to should not change because you "
+            "walked to another screen. Walking around now changes it exactly no times.",
+            "Neon rather than pale, and never dark, which needed solving rather than "
+            "picking. A saturated blue is dark whatever you do to it, so one lightness "
+            "for every hue is either a blue nobody can read or a green that is not neon. "
+            "The lightness is worked out per hue instead: the most vivid one that still "
+            "carries text. Green comes out at the floor, blue is lifted because it has "
+            "to be, and every hue in between reads at five to one or better.",
+            "And it moves rather than cutting. The accent is registered with the browser "
+            "as a colour rather than as a piece of text, which is what lets it be "
+            "transitioned at all, and the five tints that used to be set alongside it are "
+            "mixed from it in the stylesheet now. So one value changes and the whole room "
+            "follows it, and none of them can be left holding the colour from before.",
+            "The rest of the flickering was the page background. It faded out and back in "
+            "on every single navigation, including between two songs, because the ground "
+            "was cleared the moment you left a screen and set again once the next one had "
+            "finished loading. It is claimed rather than cleared now: the arriving screen "
+            "says what it wants, and only a screen that wants nothing gets nothing.",
+            "The desktop app opens the library instead of drawing its own version of it. "
+            "It was a window with its own background, panel, line and accent colours, "
+            "which is to say a second design system, and it was not kept in step: "
+            "changing the accent left that window green because nothing in it could read "
+            "the stylesheet. A hundred and thirty lines lighter, no colours of its own, "
+            "and the browser chrome is no longer a dark green either.",
+            "The pink is pinker.",
+        ],
+    },
+    {
         "version": "3.4.0",
         "date": "2026-09-09",
         "name": JRITER,

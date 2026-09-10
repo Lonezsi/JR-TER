@@ -102,48 +102,72 @@ J.hue = (text) => {
   return hash;
 };
 
-/* ── the accent, and where its hue comes from ──────────────────────────────────
+/* ── the accent band ──────────────────────────────────────────────────────────
  *
- * Baby pink is hsl(0, 70%, 86%). Every accent the app shows is that same pastel at a
- * different hue, which is what lets the colour follow a song without ever becoming
- * something a button cannot be made of.
+ * Neon: as saturated as the app can carry, and never a dark colour.
  *
- * Checked at every hue rather than assumed, because the whole point is that the app hands
- * this colour to artwork it has never seen. The worst case in the band is hue 240, which
- * reads at 12.32:1 as text on the page and carries the dark ink at 10.41:1. AA wants 4.5
- * for body text, so there is room to spare wherever a sleeve sends it.
+ * Those two fight each other at one hue. A saturated blue is dark however it is mixed, so
+ * one lightness for all 360 is either a blue nobody can read or a green that is not neon.
+ * The lightness is solved per hue instead: the lowest, and so the most vivid, that still
+ * clears NEON_FLOOR against the black page.
+ *
+ * Measured across every hue: nothing falls below 5:1 as text, the ink on it never falls
+ * below 4.65:1, and neighbouring hues differ by at most 2 points of lightness, so moving
+ * through the colours of a sleeve does not band.
  */
-J.ACCENT_SAT = 70;
-J.ACCENT_LIGHT = 86;
+J.NEON_SAT = 95;
+J.NEON_FLOOR = 5.0;         // contrast against the page, as text
+J.NEON_LIGHT_MIN = 45;      // below this it is a dark colour, whatever its saturation
+J.NEON_LIGHT_MAX = 90;
 
 J.hslHex = (h, s, l) => {
   const sat = s / 100;
   const light = l / 100;
   const c = (1 - Math.abs(2 * light - 1)) * sat;
-  const x = c * (1 - Math.abs(((((h % 360) + 360) % 360) / 60) % 2 - 1));
+  const hue = (((h % 360) + 360) % 360);
+  const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
   const m = light - c / 2;
-  const sixth = Math.floor(((((h % 360) + 360) % 360) / 60)) % 6;
   const table = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]];
-  const [r, g, b] = table[sixth];
+  const [r, g, b] = table[Math.floor(hue / 60) % 6];
   const to = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
   return `#${to(r)}${to(g)}${to(b)}`.toUpperCase();
 };
 
-/* A hue as an accent: the pastel band, never the raw colour. */
-J.accentFromHue = (hue) => J.hslHex(hue, J.ACCENT_SAT, J.ACCENT_LIGHT);
+/* Relative luminance, and the contrast between two of those. The same arithmetic the
+ * contrast tests use, so the band the app draws is the band the tests measure. */
+J.luminance = (hex) => {
+  const { r, g, b } = J.rgb(hex);
+  const channel = (v) => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+};
+J.contrastOnBlack = (hex) => (J.luminance(hex) + 0.05) / 0.05;
 
-/* The accent the library is actually set to, which is what everything goes back to. */
+/* A hue, neonised: the most vivid version of it this app can put text on.
+ *
+ * Bisection rather than a table, because a table is 360 numbers to keep in step with a
+ * threshold written somewhere else. Twenty iterations settles it to a thousandth of a
+ * point of lightness and runs once per change of accent, which is once per song.
+ */
+J.neon = (hue) => {
+  let lo = J.NEON_LIGHT_MIN;
+  let hi = J.NEON_LIGHT_MAX;
+  // The floor may already clear it, in which case that is the answer and the most vivid.
+  if (J.contrastOnBlack(J.hslHex(hue, J.NEON_SAT, lo)) >= J.NEON_FLOOR) return J.hslHex(hue, J.NEON_SAT, lo);
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (J.contrastOnBlack(J.hslHex(hue, J.NEON_SAT, mid)) >= J.NEON_FLOOR) hi = mid;
+    else lo = mid;
+  }
+  return J.hslHex(hue, J.NEON_SAT, hi);
+};
+
+/* The accent the library is set to, which is the base of everything and what the app goes
+ * back to. Pink until somebody changes it in Settings. */
 J.chosenAccent = () => (J.state && J.state.settings && J.state.settings.accent) || null;
 
-/* The hue of a picture, or null when it has not got one.
- *
- * Weighted by how colourful each pixel is, so a grey sleeve with one stripe of colour
- * follows the stripe. A sleeve with no colour at all returns null rather than a hue read
- * out of noise, and the caller falls back to the chosen accent.
- *
- * Averaged around the circle: hue 350 and hue 10 are ten degrees apart and average to 0,
- * and averaging them as numbers gives 180, which is cyan.
- */
 J.hueOfImage = (function () {
   const seen = new Map();          // one sample per url, they do not change
   return function (url) {
@@ -523,56 +547,100 @@ J.sort = (function () {
  * the rail and the player have something with colour in it to bend. Called with nothing
  * by every other view, which is how it goes away again.
  */
-J.pageWash = function (url, hue) {
-  const wash = document.getElementById("pageWash");
-  if (!wash) return;
-  if (!url && hue === undefined) {
-    wash.classList.remove("on", "flat");
-    wash.style.backgroundImage = "";
-    // Nothing behind the app at all. The dust is the only thing back there, and on these
-    // screens it shows through the rail and the player, which is the one time those two
-    // panes have anything to refract.
-    J.dust.start(null);
-    // Off a song, so the accent goes back to whatever the library is set to. This is the
-    // only place that has to remember, because it is the only place that changed it.
-    J.applyAccent(J.chosenAccent());
-    return;
-  }
-  wash.classList.toggle("flat", !url);
-  if (url) wash.style.backgroundImage = `url('${String(url).replace(/'/g, "%27")}')`;
-  else { wash.style.backgroundImage = ""; wash.style.setProperty("--hue", hue); }
-  wash.classList.add("on");
-  /* A picture behind the app is the thing the dust was standing in for, so it goes: the
-   * element is removed, not hidden. The hue is handed over as a number because --hue is
-   * an inline property on this element and a sibling cannot inherit it. */
-  if (url) J.dust.stop(); else J.dust.start(hue);
+/* The picture behind the whole app, and the reason it used to flicker.
+ *
+ * Opening one song called this three times: twice with nothing, by the router clearing up
+ * after the screen being left, and once with the song, by the view. .page-wash transitions
+ * its opacity over 420ms, so the entire page ground faded out and then back in on every
+ * single navigation, including from one song to another.
+ *
+ * So: idempotent, and coalesced. What is on screen is remembered, a request for the same
+ * thing does nothing at all, and several requests in one tick collapse to the last one
+ * before the browser has a chance to paint the ones in between. A clear followed
+ * immediately by a set is now a set.
+ *
+ * It does not decide the accent. It used to, and that was wrong for the same reason it
+ * flickered: this runs on navigation, and the accent belongs to what is playing rather
+ * than to what is being looked at. Three calls meant three accents on the way into one
+ * song. See 42-accent.js.
+ */
+J.pageWash = (function () {
+  let showing = null;                 // the key of what is actually on screen
+  let wanted = null;                  // the key asked for this tick, if any
+  let queued = false;
 
-  /* And the accent takes the same hue as the ground.
-   *
-   * Here rather than in the song view because this function already knows what is behind
-   * the app on every screen, and a second place that decided it would be a second place
-   * to forget. Only the hue is taken: see the note above J.accentFromHue.
-   *
-   * The picture case is asynchronous and deliberately not awaited. The wash is already
-   * on screen and the colour arriving a frame later is better than holding the render
-   * for a decode. The guard is that the wash is still showing the same picture when the
-   * sample comes back, or a fast walk through three songs would settle on whichever
-   * decoded last rather than the one being looked at.
-   */
-  if (!url) {
-    J.applyAccent(J.accentFromHue(hue));
-    return;
-  }
-  const wanted = url;
-  J.hueOfImage(url).then((found) => {
-    if (wash.style.backgroundImage.indexOf(String(wanted).replace(/'/g, "%27")) === -1) {
-      return;                       // moved on while the picture was decoding
+  const keyOf = (url, hue) => (url ? "url:" + url : (hue === undefined ? "none" : "hue:" + hue));
+
+  function apply(url, hue) {
+    const wash = document.getElementById("pageWash");
+    if (!wash) return;
+    if (!url && hue === undefined) {
+      wash.classList.remove("on", "flat");
+      wash.style.backgroundImage = "";
+      // Nothing behind the app at all. The dust is the only thing back there, and on
+      // these screens it shows through the rail and the player, which is the one time
+      // those two panes have anything to refract.
+      J.dust.start(null);
+      return;
     }
-    J.applyAccent(found === null ? J.chosenAccent() : J.accentFromHue(found));
-  });
-};
+    wash.classList.toggle("flat", !url);
+    if (url) wash.style.backgroundImage = `url('${String(url).replace(/'/g, "%27")}')`;
+    else { wash.style.backgroundImage = ""; wash.style.setProperty("--hue", hue); }
+    wash.classList.add("on");
+    /* A picture behind the app is the thing the dust was standing in for, so it goes: the
+     * element is removed, not hidden. The hue is handed over as a number because --hue is
+     * an inline property on this element and a sibling cannot inherit it. */
+    if (url) J.dust.stop(); else J.dust.start(hue);
+  }
 
-/* The shape of a render, drawn small.
+  let claimed = false;
+
+  function commit(url, hue) {
+    const key = keyOf(url, hue);
+    if (key === showing) return;          // already on screen, nothing to do
+    showing = key;
+    apply(url, hue);
+  }
+
+  const wash = function (url, hue) {
+    claimed = true;
+    wanted = { key: keyOf(url, hue), url: url, hue: hue };
+    if (queued) return;
+    queued = true;
+    /* A microtask, not a frame. It runs before the browser paints, so two requests in one
+     * tick never show the first, and it does not cost the frame requestAnimationFrame
+     * would. */
+    queueMicrotask(() => {
+      queued = false;
+      const last = wanted;
+      wanted = null;
+      if (last) commit(last.url, last.hue);
+    });
+  };
+
+  /* A navigation has started and some view may want the ground.
+   *
+   * Nothing is changed here, which is the entire point: clearing at this moment is what
+   * made the screen fade out and back in, because the arriving view sets its own wash
+   * only after its fetches have come back, one or more ticks later.
+   */
+  wash.expect = function () { claimed = false; };
+
+  /* The arriving view has rendered. If it never asked for a ground, it does not want one.
+   *
+   * Called after the render rather than before, so the clear lands on a screen that is
+   * already showing rather than in the gap between two.
+   */
+  wash.settle = function () {
+    if (claimed) return;
+    claimed = true;
+    commit(null, undefined);
+  };
+
+  return wash;
+}());
+
+/* The shape of a render, drawn small./* The shape of a render, drawn small.
  *
  * A hundred and twenty numbers from the server, 0 to 255, one per column. Drawn as an
  * SVG polygon rather than a canvas because it sits behind a row in a list: a canvas per

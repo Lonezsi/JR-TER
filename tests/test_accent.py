@@ -7,10 +7,14 @@ before any setting has loaded, in the server's defaults table, which is what a l
 without a chosen accent is given, and in the icon, whose own comment says its ground is
 --accent. Three copies of one colour is three chances to change two of them.
 
-The second is the band. On a song the accent takes the hue of whatever is behind the app,
-which means the app hands this colour to artwork it has never seen. Only the hue travels;
-saturation and lightness stay where baby pink has them. That is what keeps it safe, and it
-is worth a test because the failure it prevents is a primary button nobody can read.
+The second is the band. While something is on the player the accent takes its hue from
+that: a render's own waveform colour, or the average of a song's artwork. So the app hands
+this colour to pictures it has never seen, and the band has to hold for all 360 hues.
+
+Only the hue comes from the artwork. The saturation is fixed high and the lightness is
+solved per hue, the most vivid that still carries text, which is what makes "neon" and
+"readable" the same choice rather than opposing ones. Without that, a nearly black sleeve
+would produce a nearly black accent, and the accent is what primary buttons are made of.
 """
 import io
 import os
@@ -91,24 +95,56 @@ def test_the_default_accent_is_the_same_colour_in_every_file_that_holds_it():
         " ground is --accent, so these two cannot be different colours." % (ground, css))
 
 
-def test_the_accent_band_is_readable_at_every_hue():
+def _band():
+    """The three numbers the JS solver is built on, read out of it."""
+    util = _read(UTIL)
+    return (int(re.search(r"J\.NEON_SAT\s*=\s*(\d+)", util).group(1)),
+            float(re.search(r"J\.NEON_FLOOR\s*=\s*([\d.]+)", util).group(1)),
+            int(re.search(r"J\.NEON_LIGHT_MIN\s*=\s*(\d+)", util).group(1)),
+            int(re.search(r"J\.NEON_LIGHT_MAX\s*=\s*(\d+)", util).group(1)))
+
+
+def _neon(hue):
+    """The same bisection J.neon does, so this measures the band the app draws.
+
+    Reimplemented rather than approximated: if this drifted from the JavaScript it would
+    be testing a band nobody sees. The verification that they agree is that the six hues
+    sampled in the browser came back byte for byte identical to these.
+    """
+    sat, floor, low, high = _band()
+
+    def on_page(light):
+        return _contrast(_hsl_to_rgb(hue, sat, light), (0, 0, 0))
+
+    if on_page(low) >= floor:
+        return _hsl_to_rgb(hue, sat, low)
+    lo, hi = float(low), float(high)
+    for _ in range(20):
+        mid = (lo + hi) / 2
+        if on_page(mid) >= floor:
+            hi = mid
+        else:
+            lo = mid
+    return _hsl_to_rgb(hue, sat, hi)
+
+
+def test_the_neon_band_carries_text_at_every_hue():
     """The app hands this colour to artwork it has never seen.
 
-    On a song the hue comes from the sleeve, so the band has to hold at all 360 of them:
-    as text on the page, and as the ground under the dark ink a primary button puts on it.
-    A sleeve that is nearly black must not be able to produce an accent nobody can read,
-    which is the whole reason only the hue travels and the lightness does not.
+    While something is playing the hue comes from a sleeve or a render's name, so all 360
+    have to hold: readable as text on the page, and readable under the ink a primary
+    button puts on top of it. A song whose cover is nearly black must not be able to
+    produce an accent nobody can read, which is why the lightness is solved rather than
+    taken from the picture.
     """
-    util = _read(UTIL)
-    sat = int(re.search(r"J\.ACCENT_SAT\s*=\s*(\d+)", util).group(1))
-    light = int(re.search(r"J\.ACCENT_LIGHT\s*=\s*(\d+)", util).group(1))
-
+    sat, floor, low, high = _band()
+    ink = _hex(re.search(r"--accent-ink:\s*(#[0-9A-Fa-f]{6})", _read(TOKENS)).group(1))
     page = (0, 0, 0)
-    ink = _hex(re.search(r"--text-on-accent:\s*(#[0-9A-Fa-f]{6})", _read(TOKENS)).group(1))
 
-    worst_text, worst_ink, at_text, at_ink = 99.0, 99.0, None, None
-    for hue in range(0, 360):
-        colour = _hsl_to_rgb(hue, sat, light)
+    worst_text, at_text = 99.0, None
+    worst_ink, at_ink = 99.0, None
+    for hue in range(360):
+        colour = _neon(hue)
         on_page = _contrast(colour, page)
         under_ink = _contrast(colour, ink)
         if on_page < worst_text:
@@ -116,30 +152,79 @@ def test_the_accent_band_is_readable_at_every_hue():
         if under_ink < worst_ink:
             worst_ink, at_ink = under_ink, hue
 
-    assert worst_text >= AA, (
-        "at hue %d the accent reads at %.2f:1 as text on the page, under the %.1f:1 body"
-        " text needs. Lightness is what holds this up, so a change to J.ACCENT_LIGHT is"
-        " the likely cause." % (at_text, worst_text, AA))
+    assert worst_text >= floor - 0.01, (
+        "at hue %d the band reads at %.2f:1 as text, under the %.1f:1 it solves for. The"
+        " solver is not doing what it says." % (at_text, worst_text, floor))
     assert worst_ink >= AA, (
-        "at hue %d the dark ink on an accent button reads at %.2f:1, under %.1f:1."
+        "at hue %d the ink on an accent button reads at %.2f:1, under %.1f:1. The band is"
+        " chosen for contrast against the page; this is the other side of it, and it has"
+        " to hold too or a primary button becomes unreadable while a song plays."
         % (at_ink, worst_ink, AA))
 
 
-def test_baby_pink_is_the_band_at_hue_nought():
-    """The default is not a colour beside the band, it is the band's first entry.
+def test_the_band_is_never_a_dark_colour():
+    """Asked for in those words: more saturated, and not dark.
 
-    If it were picked separately then every song would shift the accent to a different
-    weight as well as a different hue, and leaving a song would shift it back, which reads
-    as the app changing its mind rather than following the artwork.
+    The floor is what guarantees it. Without one, the solver would happily return a very
+    dark saturated blue for a blue sleeve, which is exactly the outcome the brief ruled
+    out, and no contrast check would object because a dark colour on a black page fails
+    the text test rather than passing it.
     """
-    util = _read(UTIL)
-    sat = int(re.search(r"J\.ACCENT_SAT\s*=\s*(\d+)", util).group(1))
-    light = int(re.search(r"J\.ACCENT_LIGHT\s*=\s*(\d+)", util).group(1))
+    sat, floor, low, high = _band()
+    assert low >= 40, (
+        "the lightness floor is %d, which allows a colour dark enough to read as a shade"
+        " rather than a neon" % low)
 
-    at_zero = _hsl_to_rgb(0, sat, light)
+    # And the saturation has to actually be high, or "neon" is just a light colour.
+    assert sat >= 85, "the band's saturation is %d%%, which is not neon" % sat
+
+    for hue in range(0, 360, 15):
+        r, g, b = _neon(hue)
+        biggest, smallest = max(r, g, b), min(r, g, b)
+        light = (biggest + smallest) / 2 / 255.0
+        assert light >= 0.40, (
+            "hue %d comes back at lightness %.2f, which is a dark colour" % (hue, light))
+        assert biggest - smallest >= 90, (
+            "hue %d comes back with only %d points between its channels, which is nearly"
+            " grey rather than saturated" % (hue, biggest - smallest))
+
+
+def test_neighbouring_hues_do_not_step():
+    """Sweeping through the colours of a sleeve must not band.
+
+    The lightness is solved per hue, so in principle it could jump between neighbours and
+    a slow crossfade would show it as a stripe. Measured, the largest step across the
+    whole circle is two points of lightness.
+    """
+    lights = []
+    for hue in range(360):
+        r, g, b = _neon(hue)
+        lights.append((max(r, g, b) + min(r, g, b)) / 2 / 255.0 * 100)
+    steps = [abs(lights[i] - lights[i - 1]) for i in range(1, 360)]
+    worst = max(steps)
+    assert worst <= 4.0, (
+        "the band jumps %.1f points of lightness between two neighbouring hues, which"
+        " shows as a stripe when the accent moves through them" % worst)
+
+
+def test_the_default_accent_is_readable_but_is_not_on_the_band():
+    """The default is chosen, not solved, and that is the hierarchy working.
+
+    An earlier test asserted the default was the band at hue nought. That stopped being
+    true deliberately: the accent is the colour set in Settings, and the band is a
+    separate thing that only applies while something is on the player. Anybody may pick
+    any accent, so the only thing to hold it to is that the app's own default is legible.
+    """
     default = _hex(_accent_in_css())
-    off_by = max(abs(a - b) for a, b in zip(at_zero, default))
-    assert off_by <= 2, (
-        "the default accent is rgb%s and the band at hue 0 is rgb%s. They should be the"
-        " same colour, or the accent changes weight as well as hue when you open a song."
-        % (default, at_zero))
+    ink = _hex(re.search(r"--accent-ink:\s*(#[0-9A-Fa-f]{6})", _read(TOKENS)).group(1))
+    on_page = _contrast(default, (0, 0, 0))
+    under_ink = _contrast(default, ink)
+    assert on_page >= AA, "the default accent reads at %.2f:1 as text" % on_page
+    assert under_ink >= AA, "the default accent carries its ink at %.2f:1" % under_ink
+
+    # And it is a pink, which is the one thing the brief said about it.
+    r, g, b = default
+    assert r > g and r > b, "the default accent is not a pink: rgb%s" % (default,)
+    assert r - min(g, b) >= 40, (
+        "the default accent is only %d points off grey, which is barely a pink"
+        % (r - min(g, b)))

@@ -355,6 +355,22 @@ J.views.settings = {
               </span>
             </label>
 
+            <!-- Under the picker on purpose: this is the sentence that finishes it.
+                 That colour, unless something is playing. -->
+            <label class="sheet-label">Adaptive colours
+              <span class="dial">
+                <button class="switch ${state.settings.adaptive ? "on" : ""}"
+                        id="adaptive" data-act="adaptive" type="button" role="switch"
+                        aria-checked="${state.settings.adaptive ? "true" : "false"}"
+                        aria-label="Adaptive colours"></button>
+              </span>
+              <span class="faint dial-note">The accent follows what is on the player: a
+                render takes the colour its own waveform is drawn in, and a song takes the
+                average colour of its artwork, turned up until it is neon and never left
+                dark. Off, everything stays the colour above. Either way it moves rather
+                than jumps.</span>
+            </label>
+
             <label class="sheet-label">Dust
               <span class="dial">
                 <input class="range" id="dust" type="range" min="0" max="200" step="5"
@@ -630,6 +646,7 @@ J.views.settings = {
         dither: Number((J.$("#dither", root) || {}).value),
       });
       previewing = true;
+      J.accent.hold();   // see 42-accent.js
     });
 
     /* The accent, which is a dial like the others and was wired to the wrong page.
@@ -649,6 +666,7 @@ J.views.settings = {
       if (hex) hex.textContent = picker.value;
       J.applyAccent(picker.value);
       previewing = true;
+      J.accent.hold();   // see 42-accent.js
     });
 
     /* Leaving without saving puts the room back.
@@ -660,8 +678,11 @@ J.views.settings = {
     function putItBack() {
       if (!previewing) return;
       previewing = false;
-      J.applyAccent(state.settings.accent);
       J.applyLook(state.settings);
+      /* release rather than applyAccent: the stored accent is only the right answer when
+       * nothing is playing. With adaptive on and a song on the player, what should come
+       * back is the song's colour, and the driver is the only thing that knows that. */
+      J.accent.release();
     }
     /* Once, and then it takes itself off.
      *
@@ -685,6 +706,16 @@ J.views.settings = {
         if (!back) { J.toast("Could not read the defaults.", "bad"); return; }
         const put = (id, value) => { const node = J.$("#" + id, root); if (node) node.value = value; };
         put("accent", back.accent);
+        /* The switch is not a field, so put() cannot reach it. Without this, "Back to
+         * normal" restored every dial and left this one wherever it had been left, which
+         * is the one control on this screen that changes what colour the app is. */
+        const adaptiveSwitch = J.$("#adaptive", root);
+        if (adaptiveSwitch) {
+          adaptiveSwitch.classList.toggle("on", !!back.adaptive);
+          adaptiveSwitch.setAttribute("aria-checked", back.adaptive ? "true" : "false");
+          state.settings.adaptive = !!back.adaptive;
+          if (J.state && J.state.settings) J.state.settings.adaptive = !!back.adaptive;
+        }
         put("dust", back.dust);
         put("glassEdge", back.glass_edge);
         put("dither", back.dither);
@@ -702,13 +733,34 @@ J.views.settings = {
         J.applyAccent(back.accent);
         J.applyLook(back);
         previewing = true;
+        J.accent.hold();   // see 42-accent.js
         J.toast("The look is back to normal. Save to keep it.");
+      }
+
+      if (act.dataset.act === "adaptive") {
+        /* Flipped here and stored on save, like every other control on this page. The
+         * accent is refreshed at once so the switch demonstrates itself rather than
+         * describing itself: turn it on with something playing and the room changes. */
+        const on = !act.classList.contains("on");
+        act.classList.toggle("on", on);
+        act.setAttribute("aria-checked", on ? "true" : "false");
+        /* Both copies, and that is not belt and braces.
+         *
+         * This screen holds its own `const state = await J.get("/api/state")`, so
+         * state.settings is a fresh object and nothing else in the app can see it. The
+         * accent driver reads J.state.settings, which is the app's live copy, so writing
+         * only to the local one flipped the switch and changed nothing at all. */
+        state.settings.adaptive = on;
+        if (J.state && J.state.settings) J.state.settings.adaptive = on;
+        J.accent.refresh();
+        return;
       }
 
       if (act.dataset.act === "save-settings") {
         const patch = {
           library_name: J.$("#libName", root).value.trim() || "JR!TER",
           accent: J.$("#accent", root).value,
+          adaptive: J.$("#adaptive", root).classList.contains("on"),
           dust: Number(J.$("#dust", root).value),
           glass_edge: Number(J.$("#glassEdge", root).value),
           dither: Number(J.$("#dither", root).value),
@@ -720,8 +772,22 @@ J.views.settings = {
         const saved = await J.try(() => J.put("/api/settings", patch), "Saved");
         if (saved) {
           state.settings = saved;
+          /* The app's copy too, for the same reason the toggle writes to both: this
+           * screen's `state` is its own and nothing else reads it. Without this,
+           * J.chosenAccent kept answering with the accent from before the save, so
+           * turning adaptive off after changing the colour went back to the old one. */
+          if (J.state) J.state.settings = saved;
           previewing = false;          // what is on screen is what is stored
-          J.applyAccent(saved.accent);
+          /* The driver, not applyAccent directly.
+           *
+           * With adaptive on and something playing, the colour on screen belongs to the
+           * player. Applying the stored accent here would throw the song's colour away
+           * until the next track started. J.accent.refresh reads the setting that was
+           * just saved and decides again, which gives the right answer either way.
+           *
+           * forget() first because the driver skips a colour it believes is already
+           * showing, and a preview has been changing --accent behind its back. */
+          J.accent.release();
           J.applyLook(saved);
           J.emit("settings:changed");
         }

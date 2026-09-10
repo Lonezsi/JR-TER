@@ -28,16 +28,20 @@ J.applyAccent = function (hex) {
    * this colour at some alpha, and before this they had the green written out by hand and
    * stayed green whatever was chosen here. */
   const { r, g, b } = J.rgb(hex);
+  /* Only the numbers, and only because the canvases read them with getComputedStyle and
+   * build their own rgba() from them. A list of numbers cannot be interpolated, so this
+   * one snaps where --accent glides, which is invisible: a canvas redraws continuously
+   * while it is being used and the accent only moves when the player does.
+   *
+   * -hi, -lo, -soft and -line are gone from here on purpose. They are color-mix of
+   * --accent in the stylesheet now, so setting them inline would pin them to whatever
+   * they were at the moment of the change and they would stop following it. */
   root.style.setProperty("--accent-rgb", `${r}, ${g}, ${b}`);
-  root.style.setProperty("--accent-hi", J.lighten(hex, 0.14));
-  root.style.setProperty("--accent-lo", J.lighten(hex, -0.18));
-  root.style.setProperty("--accent-soft", J.alpha(hex, 0.14));
-  root.style.setProperty("--accent-line", J.alpha(hex, 0.4));
   // The dust is stamped from a prebuilt sprite rather than recoloured every frame, so it
   // has to be told. Nothing happens unless it is actually drifting.
   J.dust.retint();
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = getComputedStyle(document.body).backgroundColor || "#0F1311";
+  if (meta) meta.content = getComputedStyle(document.body).backgroundColor || "#000000";
 };
 
 J.rgb = (hex) => {

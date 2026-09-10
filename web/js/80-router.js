@@ -113,9 +113,14 @@ J.router = (function () {
     // old one left every previous screen's listeners attached.
     root.className = old.className + (inPlace ? "" : " entering");
     const wasScrolled = old.scrollTop;
-    // The ground belongs to whichever view is arriving. Cleared here rather than by each
-    // view on the way out, because a view does not know it is leaving.
-    if (!inPlace) J.pageWash(null);
+    /* The ground belongs to whichever view is arriving, and a view does not know it is
+     * leaving, so the decision stays here. It is no longer made here, though.
+     *
+     * Clearing at this moment faded the whole page out and back in on every navigation,
+     * because the arriving view sets its own ground only once its fetches return. This
+     * says "somebody may claim this" and the answer is read in settle(), after the view
+     * has rendered. */
+    if (!inPlace) J.pageWash.expect();
     if (inPlace) root.innerHTML = old.innerHTML;
     old.replaceWith(root);
     // After the in place copy above, which serialises the previous screen's foot into
@@ -139,6 +144,8 @@ J.router = (function () {
 
     const settle = () => {
       hideProgress();
+      // Nobody claimed the ground, so this screen wants none. See J.pageWash.expect.
+      J.pageWash.settle();
       // Next frame, so the browser has the starting state to animate away from.
       requestAnimationFrame(() => root.classList.remove("entering"));
     };

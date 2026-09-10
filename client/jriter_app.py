@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
-"""JR!TER on the desktop: a window, an icon on the taskbar, and the watcher inside it.
+"""JR!TER on the desktop: the library in a window of its own, and the watcher behind it.
 
-    python jriter_app.py                opens the window
-    python jriter_app.py --minimised    starts it minimised, which is how logon starts it
+    python jriter_app.py                opens the library
+    python jriter_app.py --minimised    watches without opening anything, which is how
+                                        logon starts it
 
-Why this exists at all. The folder watcher used to run as a headless scheduled task, and a
-headless task is a thing you have to take on faith: no window, no icon, no way to tell "it
-is watching and nothing new has landed" from "it stopped in March". Both of the bugs the
-tests next door pin down lived in that loop for exactly that reason. A window that says what
-it last did is not a nicety here, it is the only way anybody would ever have noticed.
+Why this exists. The folder watcher used to run as a headless scheduled task, and a
+headless task is a thing you have to take on faith: no window, no icon, no way to tell
+"it is watching and nothing new has landed" from "it stopped in March". Both of the bugs
+the tests next door pin down lived in that loop for exactly that reason.
 
-So this is the same watcher with a face on it. It is also where the two folder verbs live,
-so they can be reached without a right click and without a console.
+What changed is where the face is. This drew its own: a tkinter window with its own
+background, panel, line and accent colours, which is a second design system kept in step
+with the real one by hand. It was not kept in step. Changing the accent in Settings
+changed the library and left this green, because nothing here read the stylesheet and
+nothing here could.
 
-tkinter, because it is in the standard library and this project does not take dependencies.
-That rules out a system tray icon, which on Windows needs Shell_NotifyIcon through ctypes or
-a package; a normal window that minimises to the taskbar is what was asked for anyway.
+So it opens the library instead. Edge, Chrome and Brave all take --app=URL, which is a
+window with no tabs and no address bar, wearing the page's own icon and its own CSS. The
+watcher's state is answered by the app: the sync screen lists every watched folder with
+when it was last looked at, which is the glance the panel existed to provide.
 
-Threading rule, and it is the one that matters: tkinter may only be touched from the thread
-that made it. The watcher runs on its own thread and says everything through a queue that
-the window drains on a timer. No worker here ever touches a widget.
+No dependency was added. A real webview on Windows means a package or a great deal of
+ctypes, and a browser in app mode is the same window without either.
 """
 import os
 import sys
 import time
 import queue
 import threading
+import shutil
+import subprocess
 import webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,43 +39,16 @@ if HERE not in sys.path:
 
 import jriter_client as agent                                      # noqa: E402
 
-try:
-    import tkinter as tk
-    from tkinter import ttk, filedialog, messagebox
-except ImportError:                                                # pragma: no cover
-    tk = None
 
 ICON = os.path.join(os.path.dirname(HERE), "web", "favicon.ico")
-
-#: The app's own colours, close enough to the library's that the two look related.
-INK = {
-    "bg": "#0B0B0C", "panel": "#121214", "line": "#2A2A2E",
-    "text": "#F2F3F4", "faint": "#9EA1A6", "dim": "#6B6E74",
-    "accent": "#54B37A", "bad": "#D4685E",
-}
-
-
-def _own_the_taskbar_button():
-    """Tell Windows this is its own application, not an instance of Python.
-
-    Without this the taskbar groups the window under python.exe and shows the Python icon
-    however carefully the window's own icon is set, because the icon on the taskbar button
-    comes from the application model id and not from the window. Harmless anywhere else.
-    """
-    if os.name != "nt":
-        return
-    try:
-        import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Lonezsi.JRITER.Agent")
-    except Exception:
-        pass                        # an icon is a nicety; not having it is not a failure
-
 
 class Watcher(threading.Thread):
     """The scan and send loop, on its own thread, saying what it does through a queue.
 
-    Every message is a (kind, text) pair and nothing else crosses: no widgets, no tkinter
-    objects, no shared mutable state beyond the queue and two events.
+    Every message is a (kind, text) pair and nothing else crosses: no shared mutable
+    state beyond the two events. That was written when a window on another thread was
+    reading them and it is still the right shape now they go to stdout, because the rule
+    it encodes is that this thread owns nothing anybody else touches.
     """
 
     daemon = True
@@ -125,249 +103,141 @@ class Watcher(threading.Thread):
         self.say("ok", "%d render(s) waiting in the library." % sent)
 
 
-class App:
-    def __init__(self, root, minimised=False):
-        self.root = root
-        self.news = queue.Queue()
-        self.stop = threading.Event()
+#: Browsers that take --app, and where they install themselves.
+#:
+#: which() first, because somebody who has put one on PATH means that one. The paths
+#: after it are the defaults: a browser is usually not on PATH on Windows, so a which()
+#: only answer would fall back to a tab on most machines.
+BROWSERS = ("msedge", "chrome", "brave")
+BROWSER_PLACES = (
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+    r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+)
 
-        root.title("JR!TER")
-        root.configure(bg=INK["bg"])
-        root.geometry("560x460")
-        root.minsize(460, 380)
-        if os.path.isfile(ICON):
-            try:
-                root.iconbitmap(ICON)
-            except tk.TclError:
-                pass
 
-        self._build()
-        self._read_config()
+#: Where the watcher writes what it did, and how much of it is kept.
+#:
+#: Beside the client's own config, because they belong to the same agent and somebody
+#: looking for one will look for the other in the same place.
+LOG = os.path.join(os.path.dirname(agent.CONFIG_PATH), "watch.log")
+LOG_MOST = 256 * 1024
 
-        self.watcher = Watcher(self._post, self.stop)
-        self.watcher.start()
 
-        root.protocol("WM_DELETE_WINDOW", self.quit)
-        root.after(120, self._drain)
-        if minimised:
-            root.iconify()
+def find_browser():
+    """One that can open a window without tabs, or None.
 
-    # ── the window ───────────────────────────────────────────────────────────
-    def _build(self):
-        pad = {"padx": 14, "pady": 8}
+    Returned rather than acted on, so a test can ask what would be used without starting
+    anything and so that finding none is the caller's to report.
+    """
+    for name in BROWSERS:
+        found = shutil.which(name)
+        if found:
+            return found
+    for path in BROWSER_PLACES:
+        if os.path.isfile(path):
+            return path
+    return None
 
-        head = tk.Frame(self.root, bg=INK["bg"])
-        head.pack(fill="x", **pad)
-        tk.Label(head, text="JR!TER", bg=INK["bg"], fg=INK["text"],
-                 font=("Segoe UI", 17, "bold")).pack(side="left")
-        self.dot = tk.Label(head, text="●", bg=INK["bg"], fg=INK["dim"],
-                            font=("Segoe UI", 11))
-        self.dot.pack(side="right")
-        self.state = tk.Label(head, text="starting", bg=INK["bg"], fg=INK["faint"],
-                              font=("Segoe UI", 9))
-        self.state.pack(side="right", padx=(0, 6))
 
-        self.where = tk.Label(self.root, text="", bg=INK["bg"], fg=INK["faint"],
-                              font=("Segoe UI", 9), anchor="w")
-        self.where.pack(fill="x", padx=14)
+def window_command(url, exe, profile):
+    """The command line that opens the library as a window.
 
-        self.folders = tk.Label(self.root, text="", bg=INK["bg"], fg=INK["dim"],
-                                font=("Segoe UI", 9), anchor="w", justify="left")
-        self.folders.pack(fill="x", padx=14, pady=(2, 8))
+    Its own line rather than inline, so the flags can be tested without launching a
+    browser. --app is the one that matters: no tabs, no address bar, no back button, and
+    the page's own favicon and theme colour on the window itself.
 
-        # Two rows, because five buttons on one line is a window nobody can make narrow.
-        top = tk.Frame(self.root, bg=INK["bg"])
-        top.pack(fill="x", padx=14, pady=2)
-        bottom = tk.Frame(self.root, bg=INK["bg"])
-        bottom.pack(fill="x", padx=14, pady=2)
+    A profile of its own, under the app's data directory, so the window does not depend on
+    which browser window happened to be open, does not inherit an extension that rewrites
+    pages, and remembers its own size.
+    """
+    return [exe, "--app=" + url,
+            "--user-data-dir=" + profile,
+            "--window-size=1180,860"]
 
-        self._button(top, "Open library", self.open_library, main=True)
-        self._button(top, "Check now", self.check_now)
-        self._button(top, "Watch a folder", self.watch_folder)
-        self._button(bottom, "Upload a folder", self.upload_folder)
-        self._button(bottom, "Render a folder", self.render_folder)
 
-        tk.Frame(self.root, bg=INK["line"], height=1).pack(fill="x", padx=14, pady=(10, 0))
+def open_window(url, exe=None):
+    """The library, in a window of its own. Returns what opened it, or None for a tab.
 
-        wrap = tk.Frame(self.root, bg=INK["bg"])
-        wrap.pack(fill="both", expand=True, padx=14, pady=10)
-        bar = ttk.Scrollbar(wrap)
-        bar.pack(side="right", fill="y")
-        self.log = tk.Text(wrap, bg=INK["panel"], fg=INK["faint"], bd=0,
-                           font=("Consolas", 9), wrap="word", state="disabled",
-                           yscrollcommand=bar.set, padx=10, pady=8,
-                           highlightthickness=1, highlightbackground=INK["line"])
-        self.log.pack(fill="both", expand=True)
-        bar.config(command=self.log.yview)
-        for kind, colour in (("sent", INK["accent"]), ("bad", INK["bad"]),
-                             ("ok", INK["faint"]), ("idle", INK["dim"]),
-                             ("work", INK["text"])):
-            self.log.tag_configure(kind, foreground=colour)
-
-    def _button(self, parent, label, command, main=False):
-        button = tk.Button(
-            parent, text=label, command=command, relief="flat", bd=0, cursor="hand2",
-            bg=INK["accent"] if main else INK["panel"],
-            fg="#05130B" if main else INK["text"],
-            activebackground="#74D398" if main else "#1A1A1D",
-            activeforeground="#05130B" if main else INK["text"],
-            font=("Segoe UI", 9, "bold" if main else "normal"), padx=12, pady=6)
-        button.pack(side="left", padx=(0, 6))
-        return button
-
-    # ── state ────────────────────────────────────────────────────────────────
-    def _read_config(self):
-        cfg = agent.load_config()
-        self.where.config(text=cfg.get("server", ""))
-        folders = cfg.get("folders") or []
-        if folders:
-            shown = "\n".join("   " + f for f in folders[:4])
-            if len(folders) > 4:
-                shown += "\n   and %d more" % (len(folders) - 4)
-            self.folders.config(text="Watching %d folder(s):\n%s" % (len(folders), shown))
-        else:
-            self.folders.config(
-                text="No folders watched. Use the Watch a folder button to add one.")
-        return cfg
-
-    def _post(self, kind, text):
-        """Called from the watcher thread. Only ever puts on the queue."""
-        self.news.put((kind, text))
-
-    def _drain(self):
-        """Called on the tkinter thread by a timer. The only place widgets are written."""
-        try:
-            while True:
-                kind, text = self.news.get_nowait()
-                self._write(kind, text)
-                if kind == "bad":
-                    self._light(INK["bad"], "not connected")
-                elif kind in ("ok", "sent", "work"):
-                    self._light(INK["accent"], "watching")
-                elif kind == "idle":
-                    self._light(INK["dim"], "idle")
-        except queue.Empty:
-            pass
-        self.root.after(300, self._drain)
-
-    def _light(self, colour, words):
-        self.dot.config(fg=colour)
-        self.state.config(text=words)
-
-    def _write(self, kind, text):
-        self.log.config(state="normal")
-        self.log.insert("end", "%s  %s\n" % (time.strftime("%H:%M"), text), kind)
-        # Bounded, or a machine left on for a month holds a month of log in memory.
-        if int(self.log.index("end-1c").split(".")[0]) > 500:
-            self.log.delete("1.0", "200.0")
-        self.log.see("end")
-        self.log.config(state="disabled")
-
-    # ── the buttons ──────────────────────────────────────────────────────────
-    def open_library(self):
-        webbrowser.open(agent.load_config().get("server", ""))
-
-    def check_now(self):
-        self._write("work", "Checking now…")
-        self.watcher.wake.set()
-
-    def watch_folder(self):
-        folder = filedialog.askdirectory(title="Watch which folder?")
-        if not folder:
-            return
-        cfg = agent.load_config()
-        folder = os.path.abspath(folder)
-        if folder in cfg["folders"]:
-            self._write("idle", "Already watching %s" % folder)
-            return
-        cfg["folders"].append(folder)
-        agent.save_config(cfg)
-        self._read_config()
-        self._write("ok", "Watching %s" % folder)
-        self.watcher.wake.set()
-
-    def upload_folder(self):
-        folder = filedialog.askdirectory(title="Upload every sound file in which folder?")
-        if not folder:
-            return
-        paths = sorted(agent.walk([folder]))
-        if not paths:
-            messagebox.showinfo("JR!TER", "No sound files in there.")
-            return
-        if not messagebox.askyesno(
-                "JR!TER", "Send %d sound file(s) from\n%s?" % (len(paths), folder)):
-            return
-        self._in_background("Uploading %d file(s)" % len(paths), self._upload, folder)
-
-    def render_folder(self):
-        folder = filedialog.askdirectory(title="Render every FL project in which folder?")
-        if not folder:
-            return
-        self._in_background("Rendering", self._render, folder)
-
-    def _in_background(self, what, work, *args):
-        """Run something slow off the tkinter thread, saying so at both ends.
-
-        A button that renders a folder of projects on the thread drawing the window is a
-        window that stops repainting for twenty minutes, which every operating system
-        eventually offers to close for you.
-        """
-        self._write("work", what + "…")
-
-        def go():
-            try:
-                work(*args)
-            except SystemExit as e:
-                self._post("bad", str(e).splitlines()[0])
-            except Exception as e:
-                self._post("bad", "%s: %s" % (type(e).__name__, e))
-
-        threading.Thread(target=go, daemon=True, name="jriter-job").start()
-
-    def _upload(self, folder):
-        cfg = agent.load_config()
-        server = agent.Server(cfg["server"], cfg.get("token"))
-        sent = failed = 0
-        for path in sorted(agent.walk([folder])):
-            try:
-                if agent.send_one(cfg, server, path, yes=True):
-                    sent += 1
-                    self._post("sent", os.path.basename(path))
-            except Exception as e:
-                failed += 1
-                self._post("bad", "%s: %s" % (os.path.basename(path), e))
-        self._post("ok", "%d sent, %d could not be sent." % (sent, failed))
-
-    def _render(self, folder):
-        cfg = agent.load_config()
-        fl = agent.flrender.find_fl(cfg.get("fl_path"))
-        if not fl:
-            self._post("bad", "FL Studio was not found. Set it with `flpath`.")
-            return
-        out = os.path.join(folder, "renders")
-        done, failed = agent.flrender.render_folder(
-            folder, out, "wav", fl, on_step=lambda text: self._post("work", text))
-        self._post("ok", "%d rendered, %d failed. They are in %s"
-                   % (len(done), len(failed), out))
-
-    def quit(self):
-        self.stop.set()
-        # So the watcher's wait returns at once rather than the window hanging around for
-        # the rest of the interval.
-        self.watcher.wake.set()
-        self.root.destroy()
+    A tab is the fallback and not a failure: it is still the library, and a machine with
+    no Chromium browser on it should not be a machine with no interface.
+    """
+    exe = exe or find_browser()
+    if not exe:
+        webbrowser.open(url)
+        return None
+    profile = os.path.join(os.environ.get("LOCALAPPDATA") or HERE, "JRITER", "window")
+    try:
+        os.makedirs(profile, exist_ok=True)
+        subprocess.Popen(window_command(url, exe, profile))
+        return exe
+    except OSError:
+        webbrowser.open(url)
+        return None
 
 
 def main(argv=None):
+    """Start the watcher, and unless told not to, open the library.
+
+    The watcher is the reason this process exists and it outlives the window. Closing the
+    library should no more stop it collecting bounces than closing a mail client stops
+    mail arriving, so --minimised, which is how logon starts it, means watch and put
+    nothing on screen.
+    """
     argv = sys.argv[1:] if argv is None else argv
-    if tk is None:
-        print("This build of Python has no tkinter, so there is no window to open.")
-        print("The watcher still works: python jriter_client.py watch")
-        return 1
-    _own_the_taskbar_button()
-    root = tk.Tk()
-    App(root, minimised="--minimised" in argv)
-    root.mainloop()
+    url = (agent.load_config().get("server") or "").strip()
+
+    def say(kind, text):
+        """Where the log panel used to be.
+
+        A file as well as stdout, and the file is the part that matters: logon starts this
+        under pythonw.exe precisely so no console appears, and pythonw discards stdout. So
+        printing alone would have quietly thrown away every message the watcher has ever
+        had to give, which is the failure the window was built to prevent, reintroduced by
+        the change that removed the window.
+
+        Trimmed when it gets long rather than rotated. This is a few lines a day about
+        whether files arrived; a rotation scheme for that is more machinery than the thing
+        it manages.
+        """
+        line = "%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                             "!" if kind == "bad" else "-", text)
+        print(line, flush=True)
+        try:
+            with open(LOG, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+            if os.path.getsize(LOG) > LOG_MOST:
+                with open(LOG, "r", encoding="utf-8", errors="replace") as f:
+                    kept = f.readlines()[-400:]
+                with open(LOG, "w", encoding="utf-8") as f:
+                    f.writelines(kept)
+        except OSError:
+            pass                    # a log that cannot be written is not worth stopping for
+
+    stop = threading.Event()
+    watcher = Watcher(say, stop)
+    watcher.start()
+
+    if "--minimised" not in argv:
+        if not url:
+            print("No library address set yet. Run: python jriter_client.py server <url>")
+        else:
+            opened = open_window(url)
+            say("ok", "opened %s%s" % (url, "" if opened else " in a browser tab"))
+
+    # Joining in a loop rather than one blocking join, so a Ctrl+C is actually delivered:
+    # on Windows an interrupt does not interrupt a join with no timeout.
+    try:
+        while watcher.is_alive():
+            watcher.join(timeout=1.0)
+    except KeyboardInterrupt:
+        say("ok", "stopping")
+        stop.set()
+        watcher.wake.set()          # break the wait rather than sit out the interval
+        watcher.join(timeout=5.0)
     return 0
 
 

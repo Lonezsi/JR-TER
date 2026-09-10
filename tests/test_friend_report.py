@@ -449,7 +449,12 @@ def test_a_preview_is_taken_back_when_you_walk_away():
     the first touch of a slider handed the form's values to applyLook and snapped the lot."""
     view = js("74-view-sync.js")
     assert "function putItBack()" in view
-    assert "J.applyAccent(state.settings.accent);" in view
+    assert "J.accent.release();" in view, (
+        "putItBack has to hand the colour back to the accent driver rather than apply the"
+        " stored accent itself. It used to apply it, and that was right while the stored"
+        " accent was the only possible answer; with adaptive colours on and something"
+        " playing, what belongs on screen after an abandoned preview is the player's"
+        " colour, and only the driver knows that.")
     assert 'if (e.detail !== "settings") return;' in view, \
         "J.on hands over the event, so the name is on .detail"
     assert 'J.bus.removeEventListener("view:leaving", leaving);' in view, \
@@ -466,8 +471,18 @@ def test_there_is_a_way_back_to_the_defaults():
         "read from the server, not four numbers written down a second time"
     assert "J.applyLook(back);" in view
     # And it previews rather than saving, so the page has one rule.
+    #
+    # Bounded by where the branch ends rather than by a byte count. It was 1400
+    # characters, which is a guess at the same thing, and restoring the adaptive switch
+    # pushed the line it was looking for past it.
     at = view.index('if (act.dataset.act === "reset-look")')
-    assert "previewing = true;" in view[at:at + 1400]
+    end = view.index('if (act.dataset.act ===', at + 20)
+    branch = view[at:end]
+    assert "previewing = true;" in branch, \
+        "Back to normal saves instead of previewing, so this screen has two rules"
+    assert 'J.$("#adaptive", root)' in branch, \
+        "Back to normal leaves the adaptive switch wherever it was, and that switch is" \
+        " the one control here that decides what colour the app is"
 
 
 def test_the_defaults_are_served_from_the_table_the_server_falls_back_to():

@@ -24,6 +24,21 @@
    because a sleeve that is nearly black would otherwise hand back an accent nobody can
    read. */
 
+/* --accent is a colour, not a string.
+ *
+ * Custom properties are strings to the engine unless it is told otherwise, and strings do
+ * not interpolate, so every accent change was a jump on every tinted surface at once.
+ * Registered as a <color> it interpolates, and the one transition on :root below carries
+ * the whole app with it.
+ *
+ * The initial value has to be here as well as in :root: it is what the property falls
+ * back to before the cascade runs and if anything ever sets an invalid value. */
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #FAA8B8;
+}
+
 :root {
   /* ── the ground ─────────────────────────────────────────────────────────── */
   --bg:          #000000;
@@ -57,11 +72,18 @@
   --text:        #F2F3F4;
   --text-2:      #9EA1A6;
   --text-3:      #6B6E74;
-  --text-on-accent: #2A1015;
+  --text-on-accent: #16080C;
 
-  --accent:      #F4C2C2;
-  --accent-hi:   #F6CBCB;
-  --accent-lo:   #C89F9F;
+  /* The one value anything sets. Everything below is made out of it, so there is
+     nothing to keep in step and nothing that can be left behind on a change. */
+  --accent:      #FAA8B8;
+
+  /* Derived, not set. color-mix means these follow --accent's transition without being
+     animated themselves, and it means a change of accent cannot leave one of them
+     holding the old colour, which is exactly the bug that produced a pink button with a
+     green halo. */
+  --accent-hi:   color-mix(in srgb, var(--accent) 86%, white);
+  --accent-lo:   color-mix(in srgb, var(--accent) 82%, black);
   /* The same colour as three numbers, for the tints.
    *
    * Ten rules across the stylesheets wrote the green out by hand to get a translucent
@@ -69,9 +91,17 @@
    * a pink accent came out as a pink button with a green halo. A token per alpha would be
    * eight names to keep straight, so this is the colour and rgba() supplies the alpha.
    * Set at runtime by J.applyAccent alongside the rest. */
-  --accent-rgb:  244, 194, 194;
-  --accent-soft: rgba(var(--accent-rgb), 0.16);
-  --accent-line: rgba(var(--accent-rgb), 0.42);
+  --accent-rgb:  250, 168, 184;
+  /* Out of --accent rather than out of the numbers, so a tint is never a frame behind
+     the thing it is tinting. The numbers above are only for the canvases. */
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 42%, transparent);
+
+  /* Every accent the app can reach carries this ink, checked at all 360 hues of the
+     adaptive band as well as at the default: the worst case is 4.65 to 1, above the 4.5
+     a body of text needs. One ink rather than one per hue, because it turned out not to
+     need flipping. */
+  --accent-ink: #16080C;
 
   --warn:        #D9A441;
   --bad:         #D4685E;
@@ -127,6 +157,19 @@
 
      Plain in the fallback, like the other two. */
   --glass-filter-edge: blur(22px) saturate(180%) brightness(1.06);
+
+  /* The accent moves, it does not cut.
+   *
+   * On :root because --accent is inherited: transitioning it here carries every element
+   * that reads it, which is the whole app, with one declaration. var(--slow) is already
+   * 1ms under prefers-reduced-motion, so this respects that without a second rule.
+   *
+   * This only works because of the @property above. Without the registration the engine
+   * treats the value as a string, and a transition on a string is a jump. */
+  /* No easing of its own: --slow is a duration AND a curve, "420ms cubic-bezier(...)".
+     Adding one here made two curves in one shorthand, which is invalid, so the whole
+     declaration was dropped and the accent went back to cutting. */
+  transition: --accent var(--slow);
 
   /* The lit top edge every real pane has, and the shadow it sits in. */
   --edge-top: inset 0 1px 0 rgba(255, 255, 255, 0.14);

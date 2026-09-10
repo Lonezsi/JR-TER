@@ -832,8 +832,11 @@ def test_the_dust_is_only_there_when_no_artwork_is():
     Left running under artwork it is a full screen canvas repainting under the glass for
     something nobody can see."""
     text = pathlib.Path(JS_DIR, "00-util.js").read_text(encoding="utf-8")
-    wash = text[text.index("J.pageWash = function"):]
-    wash = wash[:wash.index("\n};")]
+    # Anchored on the name, not on how it is assigned. This read "J.pageWash = function",
+    # and the wash became a closure when it learned to coalesce its calls, so the test
+    # failed for a reason with nothing to do with dust.
+    start = text.index("J.pageWash = ")
+    wash = text[start:text.index("\n}());", start)]
     assert "if (url) J.dust.stop(); else J.dust.start(hue);" in wash, \
         "pageWash no longer turns the dust off when a song has artwork"
 

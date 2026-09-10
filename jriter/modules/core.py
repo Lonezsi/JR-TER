@@ -45,8 +45,13 @@ def get_defaults(req):
 
 def put_settings(req):
     patch = req.json()
-    allowed = {"library_name", "accent", "auto_update", "sync_interval_minutes",
-               "ffmpeg_path", "dust", "glass_edge", "dither"}
+    # The keys of the defaults table, rather than a list written out again here.
+    #
+    # It was written out, and the two matched exactly, which is the state a hand kept copy
+    # is in right up until it is not: adding "adaptive" to the defaults left this rejecting
+    # it as "not a setting", so the switch saved on every machine except the one it was
+    # tested on. A setting that exists is a setting that can be set.
+    allowed = set(config.defaults())
     unknown = set(patch) - allowed
     if unknown:
         raise Error("not a setting: " + ", ".join(sorted(unknown)))

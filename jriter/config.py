@@ -173,7 +173,12 @@ IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif")
 
 _DEFAULTS = {
     "library_name": "JR!TER",
-    "accent": "#F4C2C2",
+    "accent": "#FAA8B8",
+    # The accent follows what is playing: a render's own waveform colour, or a song's
+    # artwork neonised. On by default, because a colour that follows the music is the
+    # point rather than an option, and the switch is there for a room where it is not
+    # wanted. The chosen accent above is what it falls back to, always.
+    "adaptive": True,
     "auto_update": True,
     "sync_interval_minutes": 5,
     # Two dials, nought to a hundred, for the two things on this page that are taste
