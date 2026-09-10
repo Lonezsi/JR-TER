@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(HERE, "client"))
 import jriter_app   # noqa: E402
 
 APP = os.path.join(HERE, "client", "jriter_app.py")
-TOKENS = os.path.join(HERE, "web", "css", "00-tokens.css")
+#: Where the accent is defined, which is the shared material rather than this repo.
+TOKENS = os.path.join(os.path.dirname(HERE), "foyer", "shared", "glass.css")
 
 
 def _source():

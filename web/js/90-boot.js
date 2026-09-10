@@ -18,6 +18,27 @@
 J.canRefract = CSS.supports("background", "paint(x)")
   || CSS.supports("-webkit-app-region", "no-drag");
 
+/* Where the front door is.
+ *
+ * Foyer is the site this one backs out to, and it holds everything else running on this
+ * machine. It is on the same host, which is the arrangement that lets the two of them
+ * share a stylesheet off one disk rather than fetch it from each other.
+ *
+ * Derived from where this page is rather than written down, so moving the library between
+ * a Tailscale name and localhost needs no second edit. If Foyer ever moves behind a
+ * domain of its own, this constant is the one line to change.
+ */
+J.FOYER_PORT = 7000;
+J.foyer = () => `${location.protocol}//${location.hostname}:${J.FOYER_PORT}/`;
+
+/* The rail's way out is a real link with a real href in the markup, and pointed at Foyer
+ * here. A page whose only exit depends on the bundle having parsed is a page with no exit
+ * on the morning it does not. */
+document.addEventListener("DOMContentLoaded", () => {
+  const out = document.getElementById("railFoyer");
+  if (out) out.href = J.foyer();
+});
+
 J.applyAccent = function (hex) {
   if (!hex) return;
   const root = document.documentElement;
@@ -558,13 +579,13 @@ async function boot() {
    * holding the screen down on has not been made yet, and a two second timer that started
    * while the finger was down would run out under it.
    */
-  function letAboutFade() {
+  function letBubbleFade() {
     if (!armed) return;
     clearTimeout(fadeTimer);
-    fadeTimer = setTimeout(withdrawAbout, OFFERED);
+    fadeTimer = setTimeout(withdrawBubble, OFFERED);
   }
 
-  function withdrawAbout() {
+  function withdrawBubble() {
     if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
     if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
     if (!armed) return;
@@ -581,8 +602,8 @@ async function boot() {
    * The bubble is a button now, so there are two ways in and one of them happens long after
    * the gesture is over.
    */
-  function goToAbout() {
-    withdrawAbout();
+  function goToFoyer() {
+    withdrawBubble();
     shell.classList.add("leaving");
     /* setRail with the drag still in hand, where there is one.
      *
@@ -602,7 +623,7 @@ async function boot() {
     const ms = Math.max(0, parseFloat(med) || 220);
     setTimeout(() => {
       shell.classList.remove("leaving");
-      location.hash = "#/about";
+      location.assign(J.foyer());
     }, ms + 40);
   }
 
@@ -610,11 +631,11 @@ async function boot() {
     bubble.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      goToAbout();
+      goToFoyer();
     });
     // A thumb resting on it should not have it vanish mid press.
     bubble.addEventListener("pointerdown", () => clearTimeout(fadeTimer));
-    bubble.addEventListener("pointerleave", letAboutFade);
+    bubble.addEventListener("pointerleave", letBubbleFade);
   }
 
   /* How far the rail moves between shut and open. Measured rather than written down a
@@ -738,7 +759,7 @@ async function boot() {
     if (drag.at >= PAST) {
       if (!holdTimer && !armed) holdTimer = setTimeout(offerAbout, HOLD);
     } else {
-      withdrawAbout();
+      withdrawBubble();
     }
   }, { passive: true });
 
@@ -782,7 +803,7 @@ async function boot() {
       // The rail stays where the gesture put it: open, with the offer beside it. Shutting
       // it here would take the thing being offered off the screen along with the offer.
       setRail(false);
-      letAboutFade();
+      letBubbleFade();
       return;
     }
 
@@ -805,7 +826,7 @@ async function boot() {
      * The offer has already been made by then, and it is a button now rather than
      * something only a clean release could take, so it survives and simply times out like
      * any other. What the cancel still does is put the rail back, below. */
-    letAboutFade();
+    letBubbleFade();
     const wasShut = drag.base < 0;
     const tracking = drag.axis && !drag.mouse;
     if (!tracking) { drag = null; return; }

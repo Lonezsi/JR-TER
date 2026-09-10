@@ -1,7 +1,12 @@
-"""The way to the about page on a phone.
+"""The way out of the app on a phone.
 
 Hold the rail out past its stop, an arrow appears on the left edge, press it. It takes
 itself away after two seconds if nobody does.
+
+It used to reach an About page inside this app, whose own docstring said it would one day
+become the way to everything else on this server. It could not be, as a page in here: the
+front door cannot be a room in one of the buildings. So that page is Foyer, its own site on
+its own port, and this gesture leaves for it. Everything here was called about until then.
 
 It used to be a different gesture: the arrow appeared and *letting go* opened the page. Two
 things were wrong with that, and the second is the one that made it look broken.
@@ -25,7 +30,7 @@ import re
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOOT = open(os.path.join(HERE, "web", "js", "90-boot.js"), encoding="utf-8").read()
-CSS = open(os.path.join(HERE, "web", "css", "48-about.css"), encoding="utf-8").read()
+CSS = open(os.path.join(HERE, "web", "css", "48-edge-bubble.css"), encoding="utf-8").read()
 INDEX = open(os.path.join(HERE, "web", "index.html"), encoding="utf-8").read()
 
 
@@ -49,9 +54,46 @@ def test_it_is_inert_while_it_is_not_being_offered():
 
 
 def test_pressing_it_is_what_opens_the_page():
-    assert "goToAbout" in BOOT
+    assert "goToFoyer" in BOOT
     assert 'bubble.addEventListener("click"' in BOOT, \
         "nothing listens for a press on the arrow"
+
+
+def test_it_leaves_the_app_rather_than_navigating_inside_it():
+    """Foyer is a site, not a route.
+
+    location.assign, because a hash would be handled by this app's own router and land on
+    nothing. The destination used to be `location.hash = "#/about"`, and that spelling is
+    one edit away and would look right.
+    """
+    body = BOOT[BOOT.index("function goToFoyer()"):]
+    body = body[:body.index("\n  }")]
+    assert "location.assign(J.foyer())" in body, (
+        "the gesture does not leave for Foyer. Whatever it does now, a hash or a path is"
+        " handled by this app's router and Foyer is not in it: %s" % body[-200:])
+    assert "location.hash" not in body, \
+        "the gesture sets a hash, which this app's own router will try to handle"
+
+
+def test_the_rail_has_a_way_out_for_a_machine_with_a_pointer():
+    """The gesture is a thumb gesture, so without this there is no way out on a desktop.
+
+    A real link with a real href in the markup, and the href pointed at whichever host
+    served the page. A page whose only exit needs the bundle to have parsed is a page with
+    no exit on the morning it does not.
+    """
+    found = re.search(r'<a[^>]*id="(\w+)"[^>]*>Foyer</a>', INDEX)
+    assert found, "there is no link to Foyer in the rail"
+    wanted = found.group(1)
+    assert 'getElementById("%s")' % wanted in BOOT, (
+        "the rail's link is id=%r and nothing in the boot script fills in an element by"
+        " that name, so its href stays whatever the markup says" % wanted)
+    assert re.search(r'<a[^>]*id="%s"[^>]*href=' % wanted, INDEX), (
+        "the rail's link has no href in the markup, so it is dead until the bundle has"
+        " parsed and run")
+    assert "data-link" not in found.group(0), (
+        "the rail's link is marked data-link, which is how this app claims a link for its"
+        " own router. This one leaves the building.")
 
 
 def test_letting_go_no_longer_navigates_on_its_own():
@@ -63,7 +105,7 @@ def test_letting_go_no_longer_navigates_on_its_own():
     release = release[:release.index("return;")]
     assert "location.hash" not in release, \
         "letting go still navigates, so the arrow can never be reached to be pressed"
-    assert "letAboutFade" in release, \
+    assert "letBubbleFade" in release, \
         "letting go does not start the clock on the offer"
 
 
@@ -75,21 +117,21 @@ def test_a_cancelled_gesture_keeps_the_offer():
     """
     cancel = BOOT[BOOT.index('addEventListener("pointercancel"'):]
     cancel = cancel[:cancel.index("}, { passive: true });")]
-    assert "letAboutFade()" in cancel, "a cancelled gesture still throws the offer away"
-    assert "withdrawAbout()" not in cancel
+    assert "letBubbleFade()" in cancel, "a cancelled gesture still throws the offer away"
+    assert "withdrawBubble()" not in cancel
 
 
 def test_it_takes_itself_away_after_a_couple_of_seconds():
     found = re.search(r"const OFFERED = (\d+);", BOOT)
     assert found, "there is no timeout on the offer"
     assert int(found.group(1)) == 2000
-    assert "setTimeout(withdrawAbout, OFFERED)" in BOOT
+    assert "setTimeout(withdrawBubble, OFFERED)" in BOOT
 
 
 def test_the_clock_starts_when_the_thumb_comes_off():
     """Not when the arrow appears. An offer you are still holding the screen down on has
     not been made yet, and a timer started then would run out under the finger."""
-    fade = BOOT[BOOT.index("function letAboutFade()"):]
+    fade = BOOT[BOOT.index("function letBubbleFade()"):]
     fade = fade[:fade.index("\n  }")]
     assert "if (!armed) return;" in fade
     # And the thing that appears does not start it.
@@ -119,6 +161,6 @@ def test_it_is_out_of_the_way_of_a_screen_reader_until_it_is_there():
     offer = BOOT[BOOT.index("function offerAbout()"):]
     offer = offer[:offer.index("\n  }")]
     assert 'removeAttribute("aria-hidden")' in offer and "tabIndex = 0" in offer
-    withdraw = BOOT[BOOT.index("function withdrawAbout()"):]
+    withdraw = BOOT[BOOT.index("function withdrawBubble()"):]
     withdraw = withdraw[:withdraw.index("\n  }")]
     assert 'setAttribute("aria-hidden", "true")' in withdraw and "tabIndex = -1" in withdraw

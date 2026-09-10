@@ -22,7 +22,13 @@ import re
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-TOKENS = os.path.join(HERE, "web", "css", "00-tokens.css")
+#: The glass, which is shared and therefore not in this repo.
+#:
+#: This file is about the accent and the tiers, and both of those are material: they moved
+#: to foyer/shared/glass.css when Foyer was split out, and bundle() serves that in front of
+#: web/css. JR!TER's own 00-tokens.css still exists and still holds this app's furniture,
+#: which is not what any of these tests are about.
+TOKENS = os.path.join(os.path.dirname(HERE), "foyer", "shared", "glass.css")
 CONFIG = os.path.join(HERE, "jriter", "config.py")
 FAVICON = os.path.join(HERE, "web", "img", "make-favicon.py")
 UTIL = os.path.join(HERE, "web", "js", "00-util.js")

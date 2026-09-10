@@ -22,6 +22,30 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.6.0",
+        "date": "2026-09-10",
+        "name": JRITER,
+        "title": "The front door is its own building",
+        "notes": [
+            "Backing out of the library lands on Foyer now, which is a site of its own and "
+            "holds everything else running on this machine. Pull the rail past its stop and "
+            "press the arrow, or use the Foyer link in the rail on a desktop. The About "
+            "page inside the app is gone: its own notes said it would one day become the "
+            "way to everything else here, and a page in this app could never be that. The "
+            "front door should not be shut because the music library is restarting.",
+            "The glass is one file now, and it is not in this repo. Every colour, radius, "
+            "space and all three engine tiers live in Foyer and both sites read the same "
+            "file off the same disk. Two faults that week were one design existing twice: "
+            "the desktop app kept its own palette and stayed green after the accent went "
+            "pink, and the login page kept its own copy of the filter definitions which "
+            "had quietly fallen one behind. Neither raised anything, which is the whole "
+            "trouble with two of anything. If the shared file ever goes missing the app now "
+            "says so across the top of the page instead of arriving with no styling at all.",
+            "Foyer's first room besides the front page is a timetable, which is why this "
+            "release exists at all.",
+        ],
+    },
+    {
         "version": "3.5.1",
         "date": "2026-09-10",
         "name": JRITER,

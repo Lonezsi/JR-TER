@@ -73,30 +73,20 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 </head>
 <body>
 
-<!-- The glass.
-     feTurbulence makes a field of smooth noise; feDisplacementMap uses its red and green
-     channels to push each pixel of what is behind sideways and up. That is a real
-     refraction rather than a blur pretending to be one: straight edges passing under a
-     panel bend, which is the thing your eye actually reads as glass.
-     Two strengths, because a thin bar wants far less bending than a whole sheet. -->
-<svg class="glass-defs" aria-hidden="true" focusable="false">
-  <filter id="glass" x="-25%" y="-25%" width="150%" height="150%"
-          color-interpolation-filters="sRGB">
-    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="2"
-                  seed="17" result="noise"/>
-    <feGaussianBlur in="noise" stdDeviation="3" result="soft"/>
-    <feDisplacementMap in="SourceGraphic" in2="soft" scale="26"
-                       xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-  <filter id="glass-thin" x="-25%" y="-25%" width="150%" height="150%"
-          color-interpolation-filters="sRGB">
-    <feTurbulence type="fractalNoise" baseFrequency="0.009 0.016" numOctaves="2"
-                  seed="9" result="noise"/>
-    <feGaussianBlur in="noise" stdDeviation="2.5" result="soft"/>
-    <feDisplacementMap in="SourceGraphic" in2="soft" scale="12"
-                       xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-</svg>
+<!-- GLASS-DEFS -->
+<!-- The filters used to be written out here as well as in index.html, and this copy had
+     fallen behind: it carried #glass and #glass-thin and never got #glass-ca.
+
+     What that cost, measured rather than assumed: nothing, on this page. The door is a
+     gradient with a border and a shadow and there is no backdrop-filter anywhere on it, so
+     it references no filter and was not missing an effect. It was a second definition
+     drifting from the first with nothing watching, which is the argument against keeping
+     two copies of anything even when neither one is currently wrong.
+
+     They are in foyer/shared/glass-defs.html now and the server drops all three in here.
+     Kept on this page although the door does not use one: this page wears the whole
+     application stylesheet, so anything added to it can be glass without also having to
+     know that this particular page cannot. -->
 
 
 <form class="door" id="door" autocomplete="on">

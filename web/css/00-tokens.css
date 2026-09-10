@@ -1,53 +1,40 @@
-/* Tokens.
-
-   Black, and glass on top of it.
-
-   The ground is actually black, not a very dark grey and not a gradient. Nothing is
-   shaded and nothing fades into anything: every surface is one flat value. What
-   separates one plane from another is not a change of colour, it is that the near plane
-   is translucent and bends what is behind it.
-
-   That bending is real. The chrome carries an SVG displacement filter, so content
-   scrolling under the rail or the player is pushed sideways as it passes and a straight
-   edge crossing behind a panel visibly bows. A blur on its own reads as frosted plastic,
-   because blurring is what distance does, not what glass does. Refraction is the thing
-   the eye actually recognises.
-
-   Glass only says anything when there is something behind it, which is why the chrome is
-   glass and the content is not. A translucent card floating on a black page over nothing
-   is a grey card with extra steps.
-
-   One colour in the room, and it belongs to whatever is playing. Baby pink by default,
-   and on a song it is not the default: the accent takes the hue of the song's own
-   background, so the room is tinted by what you are looking at and goes back to pink when
-   you leave. The saturation and lightness do not come from the artwork, only the hue,
-   because a sleeve that is nearly black would otherwise hand back an accent nobody can
-   read. */
-
-/* --accent is a colour, not a string.
+/* JR!TER's own furniture.
  *
- * Custom properties are strings to the engine unless it is told otherwise, and strings do
- * not interpolate, so every accent change was a jump on every tinted surface at once.
- * Registered as a <color> it interpolates, and the one transition on :root below carries
- * the whole app with it.
+ * THE MATERIAL IS NOT IN THIS REPO. The ground, the surfaces, the lines, the type colours,
+ * the accent and everything derived from it, the three tiers of glass, the field that
+ * bends them, the radii, the spacing, the shadows and the timings all live in one file
+ * that every site on this machine reads off the same disk:
  *
- * The initial value has to be here as well as in :root: it is what the property falls
- * back to before the cascade runs and if anything ever sets an invalid value. */
-@property --accent {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #FAA8B8;
-}
+ *     foyer/shared/glass.css
+ *
+ * It is served in front of this file, so everything below may refer to it and may override
+ * it. If it goes missing the stylesheet says so at the top and the page wears a red band,
+ * because an app with no colours, no radii and no spacing presents as a hundred unrelated
+ * bugs rather than as one missing file.
+ *
+ * WHY IT IS SHARED RATHER THAN COPIED. Two bugs in one week had the same cause: a design
+ * that existed twice. Ten rules wrote the accent out by hand and stayed green when it
+ * became pink, and the desktop app kept its own palette and stayed green for the same
+ * reason. A look with two definitions is one look until the first time somebody changes
+ * one of them.
+ *
+ * WHAT IS LEFT HERE. The things that are JR!TER rather than things that are glass: the
+ * wash behind the library, the knocked out discs on a render row, the two panel tints, the
+ * warning colours, the flattened gradient names, the faces, and the two measurements this
+ * layout is built on.
+ *
+ * One colour in the room, and it belongs to whatever is playing: a song's artwork or a
+ * render's own waveform colour, neonised, and the colour you chose when nothing is on.
+ * That decision is in web/js/42-accent.js; the scaffolding it writes to is in the shared
+ * file.
+ */
 
 :root {
-  /* ── the ground ─────────────────────────────────────────────────────────── */
-  --bg:          #000000;
-
   /* One soft blob on the black, and the reason it is worth having is the glass.
-     The main panel is a pane now, and on the library screens there is nothing behind it
-     to bend: a flat black backdrop through a displacement map is still flat black. This
-     gives it something. Barely there on purpose, and in the accent rather than a neutral
-     so it reads as part of the room rather than as a smudge on the screen. */
+     The main panel is a pane, and on the library screens there is nothing behind it to
+     bend: a flat black backdrop through a displacement map is still flat black. This gives
+     it something. Barely there on purpose, and in the accent rather than a neutral so it
+     reads as part of the room rather than as a smudge on the screen. */
   --bg-dot: radial-gradient(58% 44% at 26% 12%,
                             rgba(var(--accent-rgb), 0.07), transparent 72%);
 
@@ -56,130 +43,30 @@
      into the surface. At 78 per cent the colour behind comes through it a little, which
      is what puts it in the same material as everything else. */
   --cut: rgba(255, 255, 255, 0.78);
-  --bg-deep:     #000000;
-  --bg-high:     #000000;
 
-  /* Solid planes, for the few things that must not be seen through. */
-  --surface:     #0B0B0C;
-  --surface-2:   #121214;
-  --elevated:    #1A1A1D;
-  --hover:       rgba(255, 255, 255, 0.06);
-  --pressed:     rgba(255, 255, 255, 0.11);
+  /* Kept because rules across this app still ask for it by name. Black, like the ground:
+     this app has no raised plane that is a different colour, only ones that are glass. */
+  --bg-high: #000000;
 
-  --line:        rgba(255, 255, 255, 0.09);
-  --line-2:      rgba(255, 255, 255, 0.16);
-
-  --text:        #F2F3F4;
-  --text-2:      #9EA1A6;
-  --text-3:      #6B6E74;
-  --text-on-accent: #16080C;
-
-  /* The one value anything sets. Everything below is made out of it, so there is
-     nothing to keep in step and nothing that can be left behind on a change. */
-  --accent:      #FAA8B8;
-
-  /* Derived, not set. color-mix means these follow --accent's transition without being
-     animated themselves, and it means a change of accent cannot leave one of them
-     holding the old colour, which is exactly the bug that produced a pink button with a
-     green halo. */
-  --accent-hi:   color-mix(in srgb, var(--accent) 86%, white);
-  --accent-lo:   color-mix(in srgb, var(--accent) 82%, black);
-  /* The same colour as three numbers, for the tints.
-   *
-   * Ten rules across the stylesheets wrote the green out by hand to get a translucent
-   * version of it, and none of them followed the accent when it was changed in Settings:
-   * a pink accent came out as a pink button with a green halo. A token per alpha would be
-   * eight names to keep straight, so this is the colour and rgba() supplies the alpha.
-   * Set at runtime by J.applyAccent alongside the rest. */
-  --accent-rgb:  250, 168, 184;
-  /* Out of --accent rather than out of the numbers, so a tint is never a frame behind
-     the thing it is tinting. The numbers above are only for the canvases. */
-  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
-  --accent-line: color-mix(in srgb, var(--accent) 42%, transparent);
-
-  /* Every accent the app can reach carries this ink, checked at all 360 hues of the
-     adaptive band as well as at the default: the worst case is 4.65 to 1, above the 4.5
-     a body of text needs. One ink rather than one per hue, because it turned out not to
-     need flipping. */
-  --accent-ink: #16080C;
-
-  --warn:        #D9A441;
-  --bad:         #D4685E;
-  --bad-hi:      #F0A79E;
-  --text-on-color: #FFFFFF;
-
-  /* ── glass ──────────────────────────────────────────────────────────────── */
-
-  /* The tint. Barely a colour: a pane is mostly whatever is behind it, lifted just
-     enough that type has something to sit on. */
   /* The main panel's own tint. Darker than the chrome's white veil rather than lighter:
      the rail and the player float over the library and read as brighter than it, while
-     this is the room those float in and has to stay the darker of the two or the
-     hierarchy inverts. Thinner with artwork open, so more of it comes through. */
-  --pane:        rgba(11, 11, 12, 0.78);
-  --pane-thin:   rgba(11, 11, 12, 0.55);
-  /* The fallback tint, for engines that cannot have the refraction.
-   *
-   * This is the bottom of two layers. What is written here has to be readable with no
-   * filter working at all, because the engines that land on it are the engines whose
-   * backdrop-filter cannot be trusted: dark, and mostly opaque. The real glass is in the
-   * @supports block below and overrides all of it.
-   *
-   * Why this is the base rather than the exception: a five per cent white film is a tint
-   * and nothing else, so every bit of its legibility comes from the blur behind it. Where
-   * the blur does not arrive that leaves a dialog as clear glass with text on it and the
-   * page's own text sharp underneath, which is how it was reported, three times, from two
-   * devices. Between "looks wrong" and "cannot be read", the base case has to be the one
-   * that can be read.
-   *
-   * --glass-2 is what carries text you are reading now: dialogs, menus, dropdowns. It is
-   * nearly solid on purpose. --glass is the large chrome, which sits over the artwork wash
-   * rather than over words, and can afford to let more through. */
-  --glass:       rgba(17, 18, 21, 0.74);
-  --glass-2:     rgba(20, 21, 25, 0.96);
-  --glass-line:  rgba(255, 255, 255, 0.13);
+     this is the room those float in and has to stay the darker of the two or the hierarchy
+     inverts. Thinner with artwork open, so more of it comes through.
+     Not shared: a main panel is a thing this app has and the front door does not. */
+  --pane:      rgba(11, 11, 12, 0.78);
+  --pane-thin: rgba(11, 11, 12, 0.55);
 
-  /* Blur, then lift. Filter functions only: blur, saturate and brightness are as old as
-     the property and nothing in this chain can fail. */
-  --glass-filter:      blur(22px) saturate(180%) brightness(1.06);
-  --glass-filter-thin: blur(14px) saturate(170%) brightness(1.05);
-
-  /* The same glass with the colours coming apart slightly, for the two big panes that
-     have a real edge to them. Experimental, and deliberately one line: three
-     displacements instead of one is three times the work on a surface the compositor
-     already re reads whenever anything moves behind it, and I could not measure that
-     cost in the environment this was built in. If the rail or the player ever feels
-     heavy on a phone, put --glass-filter here and the effect is gone everywhere at once.
-
-     Not on the topbar, which sits over the one list that scrolls, and not on sheets or
-     menus, which are small and short lived. The cost is worth paying where the glass is
-     large and mostly still.
-
-     Plain in the fallback, like the other two. */
-  --glass-filter-edge: blur(22px) saturate(180%) brightness(1.06);
-
-  /* The accent moves, it does not cut.
-   *
-   * On :root because --accent is inherited: transitioning it here carries every element
-   * that reads it, which is the whole app, with one declaration. var(--slow) is already
-   * 1ms under prefers-reduced-motion, so this respects that without a second rule.
-   *
-   * This only works because of the @property above. Without the registration the engine
-   * treats the value as a string, and a transition on a string is a jump. */
-  /* No easing of its own: --slow is a duration AND a curve, "420ms cubic-bezier(...)".
-     Adding one here made two curves in one shorthand, which is invalid, so the whole
-     declaration was dropped and the accent went back to cutting. */
-  transition: --accent var(--slow);
-
-  /* The lit top edge every real pane has, and the shadow it sits in. */
-  --edge-top: inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  /* Something is wrong, and something is wrong enough to be red. Not shared, because
+     "warn" and "bad" are states an application has and a page of links has no use for. */
+  --warn:   #D9A441;
+  --bad:    #D4685E;
+  --bad-hi: #F0A79E;
 
   /* ── gradients, off ─────────────────────────────────────────────────────────
-
-     These names are spent all over the stylesheets. Rather than chase every one, they
-     are flat values now, so "the gradients are off" is true at the single place that
-     decides it and cannot quietly come back on somewhere else. */
+   *
+   * These names are spent all over the stylesheets. Rather than chase every one, they are
+   * flat values, so "the gradients are off" is true at the single place that decides it
+   * and cannot quietly come back on somewhere else. */
   --grad-app:       none;
   --grad-surface:   var(--surface);
   --grad-raised:    var(--elevated);
@@ -189,142 +76,17 @@
   --grad-accent:    var(--accent);
   --grad-accent-hi: var(--accent-hi);
 
-  --font:  "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  /* "Jriter Display" is whatever font has been uploaded in Settings, registered at runtime.
-     Orbitron is the openly licensed stand in until one is. */
+  --font: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* "Jriter Display" is whatever font has been uploaded in Settings, registered at
+     runtime. Orbitron is the openly licensed stand in until one is. Not shared: an
+     uploaded display face belongs to the library it was uploaded to. */
   --display: "Jriter Display", "Orbitron", "Manrope", ui-sans-serif, system-ui, sans-serif;
 
-  /* Rounder than before. Glass with tight corners looks like a cut tile. */
-  --r-pill: 999px;
-  --r-xl:  24px;
-  --r-lg:  18px;
-  --r-md:  13px;
-  --r-sm:  9px;
-
-  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
-  --s5: 20px; --s6: 28px; --s7: 40px; --s8: 56px;
-
+  /* The two measurements this app's layout is built on. */
   --rail-w: 244px;
   --player-h: 84px;
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.6);
-  --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.6);
-  --shadow-3: 0 24px 70px rgba(0, 0, 0, 0.75);
-  --glow:     0 0 0 1px var(--accent-line), 0 8px 30px rgba(var(--accent-rgb), 0.2);
-
-  --ease: cubic-bezier(0.22, 0.7, 0.3, 1);
-  --fast: 130ms var(--ease);
-  --med:  220ms var(--ease);
-  --slow: 420ms var(--ease);
+  /* The accent, as a ring and a bloom. Built out of the shared tokens, but the shape of it
+     belongs here: it is what a focused control in this app looks like. */
+  --glow: 0 0 0 1px var(--accent-line), 0 8px 30px rgba(var(--accent-rgb), 0.2);
 }
-
-/* ── the real glass ─────────────────────────────────────────────────────────────
- *
- * Distort, then blur, then lift. The order matters: displacing an image that has already
- * been blurred bends a smudge, which looks like nothing at all. A blur on its own reads as
- * frosted plastic, because blurring is what distance does and bending is what glass does,
- * and refraction is the thing the eye actually recognises. This is what the app looks
- * like; the values above are what is left when it cannot be drawn.
- *
- * The gate is the engine, and it cannot be anything else. WebKit parses an SVG filter
- * reference inside a backdrop-filter, reports it supported, and then never renders it, so
- * @supports on the thing itself says yes and the blur silently does not happen. There is
- * no probe for "and did it work".
- *
- * So it is written the safe way round: asked for only where it is known to render, rather
- * than refused only where it is known to fail. Both of these are Blink only, and either
- * is enough, so one of them being dropped from the engine costs the effect rather than the
- * legibility:
- *
- *   background: paint(x)    the CSS Paint API, which only Blink has ever shipped
- *   -webkit-app-region      Chrome and Electron's own window drag property
- *
- * Everything else, which today means WebKit and Gecko, keeps the readable tint above.
- * Gecko is in that group because I have no way to test it, and a surface you can read is
- * the safe end of a guess.
- */
-@supports (background: paint(x)) or (-webkit-app-region: no-drag) {
-  :root {
-    --glass:       rgba(255, 255, 255, 0.055);
-    --glass-2:     rgba(255, 255, 255, 0.085);
-
-    --glass-filter:      url(#glass) blur(22px) saturate(180%) brightness(1.06);
-    --glass-filter-thin: url(#glass-thin) blur(14px) saturate(170%) brightness(1.05);
-    --glass-filter-edge: url(#glass-ca) blur(22px) saturate(180%) brightness(1.06);
-  }
-}
-
-
-/* ── glass for the engines that cannot bend light ──────────────────────────────
- *
- * WebKit and Gecko, which is every browser on an iPhone, Safari on a Mac, and Firefox
- * everywhere. They were being handed the flat tier, and the flat tier is dark and mostly
- * opaque for one reason: it has to survive a backdrop-filter that never arrives.
- *
- * That is the wrong reason to apply to these. Only url() is broken in WebKit's
- * backdrop-filter. blur(), saturate() and brightness() have worked for years, which is
- * why this tier is gated on the filter existing at all: below it, the flat tier stands.
- *
- * So blur for real, and then do the part the blur cannot. A displacement map is what is
- * missing and there is no way to fake one in CSS. There is no need to fake the whole
- * thing: what the eye reads as glass happens at the rim, and every bit of that is
- * reachable with inset shadows.
- *
- * All of it rides on --edge-top, which every glass surface already draws and already
- * composes with its own shadow, so this changes one token and no rules. */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  @supports not ((background: paint(x)) or (-webkit-app-region: no-drag)) {
-    :root {
-      /* Lighter than the flat tier, because here the blur behind it is real. Still far
-         from the five per cent film Blink gets: that one is riding a displacement map as
-         well, and this is not.
-         *
-         * The floor under both numbers is legibility with the blur contributing nothing,
-         * measured over white, which is the state the friend's iPhone was actually in.
-         * --glass bottoms out at 0.61 and --glass-2 has room to spare, so:
-         *
-         *     --glass    0.55  3.72:1  under AA, which is where this started
-         *     --glass    0.64  5.07:1  what it is
-         *     --glass-2  0.88 11.68:1
-         *
-         * 0.55 was the first guess and the test next door threw it out. */
-      --glass:       rgba(17, 18, 21, 0.64);
-      --glass-2:     rgba(20, 21, 25, 0.88);
-      --glass-line:  rgba(255, 255, 255, 0.16);
-
-      /* More blur than Blink asks for, deliberately. Blink spends part of its effect
-         budget on the bend; this has only the blur, so the blur does more of the work. */
-      --glass-filter:      blur(30px) saturate(190%) brightness(1.08);
-      --glass-filter-thin: blur(20px) saturate(180%) brightness(1.06);
-      --glass-filter-edge: blur(30px) saturate(190%) brightness(1.08);
-
-      /* The lens, in six lines.
-       *
-       * Read top to bottom: the lit edge, then the rim gathering light and letting it
-       * fall inward, then the two sides coming apart in colour the way a real edge
-       * splits it, then the bounce off whatever is underneath. The third and fourth are
-       * what url(#glass-ca) was for; the second is the one a flat panel can never have,
-       * because a panel is lit and a lens collects. */
-      --edge-top:
-        inset 0   1px  0    rgba(255, 255, 255, 0.24),
-        inset 0   18px 24px -20px rgba(255, 255, 255, 0.16),
-        inset 1px 0    0    rgba(150, 200, 255, 0.11),
-        inset -1px 0   0    rgba(255, 205, 165, 0.10),
-        inset 0  -1px  0    rgba(255, 255, 255, 0.06),
-        inset 0  -16px 20px -20px rgba(120, 180, 255, 0.10);
-
-      /* A little deeper, so the pane sits off the page rather than on it. Glass has
-         thickness and the shadow is the only place left to say so. */
-      --glass-shadow: 0 16px 44px rgba(0, 0, 0, 0.58);
-    }
-  }
-}
-
-
-@media (prefers-reduced-motion: reduce) {
-  :root { --fast: 1ms linear; --med: 1ms linear; --slow: 1ms linear; }
-  * { animation-duration: 1ms !important; scroll-behavior: auto !important; }
-}
-
-/* The filter definitions carry no picture of their own. */
-.glass-defs { position: absolute; width: 0; height: 0; pointer-events: none; }

@@ -13,6 +13,13 @@ import re
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSS = os.path.join(HERE, "web", "css")
+#: The material, which is not in this repo any more.
+#:
+#: bundle() serves this in front of web/css, so the tokens below are as much a part of
+#: what the app sends as anything in it. A sibling checkout, matching how the machine is
+#: laid out and what jriter/config.py defaults to.
+MATERIAL = os.path.join(os.path.dirname(HERE), "foyer", "shared", "glass.css")
+
 JS = os.path.join(HERE, "web", "js")
 
 
@@ -25,15 +32,40 @@ def js(name):
 
 
 def every_css():
-    return {n: css(n) for n in sorted(os.listdir(CSS)) if n.endswith(".css")}
+    """Every stylesheet this app serves, the shared material included.
+
+    bundle() puts the material in front of web/css, so a helper that listed only web/css
+    was looking at part of what the browser gets and drawing conclusions about all of it.
+    """
+    out = {n: css(n) for n in sorted(os.listdir(CSS)) if n.endswith(".css")}
+    if os.path.isfile(MATERIAL):
+        out["glass.css (shared)"] = io.open(MATERIAL, encoding="utf-8").read()
+    return out
+
+
+def material():
+    """The shared stylesheet, whole.
+
+    Most callers want one token and should use token(), which asks both files. This is for
+    the one test that needs the material as a document: it splits it at the engine gate and
+    checks the half on either side, which is a question about the file's shape.
+    """
+    return io.open(MATERIAL, encoding="utf-8").read()
 
 
 def token(name):
-    """One custom property's value from the :root block."""
-    found = re.search(r"^\s*%s:\s*([^;]+);" % re.escape(name), css("00-tokens.css"),
-                      flags=re.M)
-    assert found, "no %s token" % name
-    return found.group(1).strip()
+    """One custom property's value, from whichever served stylesheet defines it.
+
+    It used to read 00-tokens.css, which held every token. Most of them are in the shared
+    material now, and which of the two a name lives in is a fact about the split rather
+    than about the token, so this asks both in the order the browser sees them.
+    """
+    for source in (io.open(MATERIAL, encoding="utf-8").read()
+                   if os.path.isfile(MATERIAL) else "", css("00-tokens.css")):
+        found = re.search(r"^\s*%s:\s*([^;]+);" % re.escape(name), source, flags=re.M)
+        if found:
+            return found.group(1).strip()
+    raise AssertionError("no %s token in the shared material or in this app's own" % name)
 
 
 # ── the glass, which was three of their reports ──────────────────────────────
@@ -55,7 +87,10 @@ def test_the_refraction_is_only_asked_for_behind_the_engine_gate():
     Refusing it only where it is known to fail would leave every future engine defaulting
     to broken, and broken here is invisible to feature detection.
     """
-    tokens = css("00-tokens.css")
+    # The material, not this app's own tokens. The gate is part of the glass, and the glass
+    # is shared with Foyer now, so a copy of this rule living in JR!TER would be a second
+    # answer to the same question about the same engine.
+    tokens = material()
     assert tokens.count(BLINK_GATE) == 1, "one gate, spelled exactly once"
 
     base, gated = tokens.split(BLINK_GATE, 1)

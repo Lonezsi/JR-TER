@@ -249,7 +249,15 @@ def test_no_stylesheet_reaches_for_a_token_that_does_not_exist():
     one of those a fault.
     """
     def read_all(folder, *exts):
+        # The material first, when a stylesheet is being asked for: it defines most of the
+        # tokens now and a var() naming one of them is not a fault. Without this the check
+        # would report the whole shared palette as undefined.
         out = ""
+        if ".css" in exts:
+            material = os.path.join(os.path.dirname(ROOT), "foyer", "shared", "glass.css")
+            if os.path.isfile(material):
+                with open(material, encoding="utf-8") as f:
+                    out += f.read()
         for name in sorted(os.listdir(folder)):
             if os.path.splitext(name)[1] in exts:
                 with open(os.path.join(folder, name), encoding="utf-8") as f:

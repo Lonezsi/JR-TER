@@ -12,6 +12,20 @@ import json
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(BASE, "web")
 
+#: The glass, which this app does not own.
+#:
+#: The material every site on this machine is made of lives in one file that each of them
+#: reads off the same disk. It is not fetched from Foyer over HTTP: the music library
+#: should not stop having colours because the front door is restarting, and the front door
+#: should not stop having them because this is.
+#:
+#: A sibling checkout by default, which is how this machine is laid out, and an environment
+#: variable for anywhere it is not.
+SHARED_GLASS = (os.environ.get("JRITER_GLASS")
+                or os.path.join(os.path.dirname(BASE), "foyer", "shared", "glass.css"))
+SHARED_DEFS = (os.environ.get("JRITER_GLASS_DEFS")
+               or os.path.join(os.path.dirname(SHARED_GLASS), "glass-defs.html"))
+
 # Everything the user owns lives under one directory, so a backup is one copy.
 #
 # The JONG_ names are still read. A library moved somewhere else lives entirely behind

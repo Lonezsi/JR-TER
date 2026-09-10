@@ -1,79 +1,10 @@
-/* ── the page behind the rail ──────────────────────────────────────────────── */
-
-/* One column, generous, and nothing in it that looks like a feature of the library.
-   This is the only screen in the app that is about the app rather than about a song. */
-.about { max-width: 620px; }
-
-/* The photograph and the words beside it, and stacked on a phone where a 400px portrait
-   next to a paragraph would leave both of them too narrow to be worth having. */
-.about-top {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--s6);
-  margin-bottom: var(--s7);
-}
-.about-photo {
-  flex: none;
-  width: 168px;
-  height: auto;
-  border-radius: var(--r-lg);
-  border: 1px solid var(--glass-line);
-  box-shadow: var(--glass-shadow);
-  /* A portrait of a person is the one image in this app that must not be cropped by a
-     container guessing at its shape. */
-  object-fit: cover;
-  aspect-ratio: 4 / 5;
-  background: var(--elevated);
-}
-.about-intro { min-width: 0; }
-
-.about-title {
-  font-family: var(--display); font-weight: 800;
-  font-size: clamp(30px, 7vw, 42px);
-  letter-spacing: -0.03em;
-  margin: 0;
-}
-.about-slogan {
-  margin: var(--s2) 0 var(--s4);
-  font-size: 11.5px; letter-spacing: 0.06em;
-  color: var(--text-3);
-}
-.about-blurb {
-  margin: 0 0 var(--s4);
-  color: var(--text-2); font-size: 15px; line-height: 1.7;
-}
-
-.about-links { margin: 0; }
-.about-links a {
-  display: inline-flex; align-items: center; gap: var(--s2);
-  padding: 7px var(--s4) 7px var(--s3);
-  border: 1px solid var(--glass-line);
-  border-radius: var(--r-pill);
-  background: var(--glass);
-  color: var(--text);
-  font-size: 13px; font-weight: 650;
-  transition: background var(--fast), border-color var(--fast);
-}
-.about-links a:hover { background: var(--glass-2); border-color: var(--accent-line); }
-.about-links svg { flex: none; color: var(--accent); }
-
-.about-later h3 {
-  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-3);
-  margin: 0 0 var(--s2);
-}
-.about-later p {
-  margin: 0 0 var(--s6);
-  color: var(--text-2); font-size: 14px; line-height: 1.7;
-}
-
-@media (max-width: 560px) {
-  .about-top { flex-direction: column; gap: var(--s5); }
-  .about-photo { width: min(200px, 60%); }
-}
-
-/* ── the bubble that says the shortcut is armed ────────────────────────────── */
-
+/* The bubble that says the shortcut is armed.
+ *
+ * What is left of a file that also styled the page behind the rail. That page is
+ * Foyer now, a site of its own, and the gesture goes there instead, so the rules for
+ * it went with it. This did not: the bubble is the only thing that says the gesture
+ * exists, and it was never about the page.
+ */
 /* Anchored to the left edge and pushed off it, so it arrives from outside the screen.
  *
  * The same edge as the rail, on purpose. It is not a destination somewhere else on the

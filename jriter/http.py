@@ -77,13 +77,46 @@ def content_type_for(name):
     return CONTENT_TYPES.get(os.path.splitext(name)[1].lower(), "application/octet-stream")
 
 
+def shared_glass():
+    """The material, or a stylesheet that says why there is none.
+
+    This app used to define the glass and now reads it, so the file missing is not a
+    degraded look, it is no look: no colours, no radii, no spacing. That renders as
+    unstyled text and presents as a hundred unrelated bugs, so it says so instead, in the
+    three places somebody would look: the page, the console, and the app's own list of
+    problems. The banner is inside the stylesheet because the stylesheet is the thing that
+    failed.
+    """
+    try:
+        with open(config.SHARED_GLASS, "rb") as f:
+            return b"/* shared glass, from " + config.SHARED_GLASS.encode() + b" */\n" + f.read()
+    except OSError as e:
+        sys.stderr.write("the shared glass is missing: %s (%s)\n"
+                         % (config.SHARED_GLASS, e))
+        problems.record("shared glass: %s" % config.SHARED_GLASS, e)
+        return (b"/* THE SHARED GLASS IS MISSING.\n"
+                b"   Looked for it at: " + config.SHARED_GLASS.encode() + b"\n"
+                b"   That file holds every colour, radius and space this app uses, so\n"
+                b"   without it nothing below has anything to work with. Check out foyer\n"
+                b"   beside this repo, or set JRITER_GLASS to wherever it is. */\n"
+                b"body::before {\n"
+                b"  content: 'The shared stylesheet is missing. See the console.';\n"
+                b"  position: fixed; inset: 0 0 auto 0; z-index: 99999;\n"
+                b"  padding: 10px 14px; font: 14px system-ui;\n"
+                b"  background: #7f1d1d; color: #fff;\n"
+                b"}\n")
+
+
 def bundle(directory, ext):
     """Every file in a directory, in filename order, joined into one response.
 
     Ordering is the numeric prefix on each filename, which is how a plain directory gets
     a dependency order without a module system.
+
+    For CSS the shared glass goes in front of all of it, so the material is defined before
+    anything in this repo refers to it and this repo can still override any of it.
     """
-    parts = []
+    parts = [shared_glass()] if ext == ".css" else []
     try:
         names = sorted(n for n in os.listdir(directory) if n.endswith(ext))
     except OSError:
@@ -236,6 +269,43 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(data, default=str).encode("utf-8")
         self._send(status, body, "application/json", {"Cache-Control": "no-store"})
 
+    #: The one marker a page uses to say where the shared filter goes.
+    DEFS_MARK = b"<!-- GLASS-DEFS -->"
+
+    def _page_with_glass(self, path, stat):
+        """A page with the shared filter dropped in, and a tag that knows about both files.
+
+        Returns None when this file does not want it, which is every file but the three
+        pages, so the ordinary streaming path is untouched.
+
+        The tag is the part that is easy to get wrong. A document's ETag is its own mtime
+        and size, and the filter is not in the document, so editing the shared fragment
+        would change nothing any browser could notice and every page would keep the old
+        one. Both mtimes go in.
+        """
+        try:
+            with open(path, "rb") as f:
+                body = f.read()
+        except OSError:
+            return None
+        if self.DEFS_MARK not in body:
+            return None
+        try:
+            defs_stat = os.stat(config.SHARED_DEFS)
+            with open(config.SHARED_DEFS, "rb") as f:
+                defs = f.read()
+            defs_mtime = int(defs_stat.st_mtime)
+        except OSError as e:
+            # No filter to inject. The page still works: the stylesheet's own tiers
+            # already cover engines that cannot bend light, and this is now one of them.
+            # Said out loud anyway, because "looks flat" is not a thing anybody reports.
+            sys.stderr.write("the shared glass filter is missing: %s (%s)\n"
+                             % (config.SHARED_DEFS, e))
+            problems.record("shared glass filter: %s" % config.SHARED_DEFS, e)
+            defs, defs_mtime = b"", 0
+        etag = '"%x-%x-%x"' % (int(stat.st_mtime), stat.st_size, defs_mtime)
+        return body.replace(self.DEFS_MARK, defs), etag
+
     def _file(self, path, content_type=None, download_name=None, once=False):
         """Serve a file, honouring Range so the player can seek without refetching."""
         try:
@@ -244,6 +314,17 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             return self._json({"error": "not found"}, 404)
         ctype = content_type or content_type_for(path)
+
+        # A page that wants the shared filter is built rather than streamed. Before the
+        # Range handling below, because a built body has no file to seek in and no page
+        # is ever asked for by range anyway.
+        built = self._page_with_glass(path, stat)
+        if built is not None:
+            body, etag = built
+            if self._etag_hit(etag):
+                return
+            return self._send(200, body, ctype,
+                              {"ETag": etag, "Cache-Control": "no-cache"})
 
         # A page revalidates; audio and artwork are reached through an id that can never
         # come to mean different bytes, so those may be held.
