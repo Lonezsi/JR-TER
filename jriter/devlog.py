@@ -22,6 +22,32 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.5.1",
+        "date": "2026-09-10",
+        "name": JRITER,
+        "title": "An open song outranks the one that is playing",
+        "notes": [
+            "A song's page being open now decides the colour, whatever is on the player. "
+            "Open one song while another plays and the room takes the colour of the one "
+            "you are looking at; walk away and it goes back to what is playing. Looking "
+            "at a song says more about what you are doing than what happens to be "
+            "sounding behind it, and when they are the same song they agree and nothing "
+            "changes at all.",
+            "Tracking that invites the flicker this was just rewritten to remove, by a "
+            "different route: clear the open song when a screen is left, set it when a "
+            "song page arrives, and because the two are separated by the fetches in "
+            "between you get the playing colour on the way out and the new one on the way "
+            "in. One step too many, on every navigation into a song. So it is claimed "
+            "rather than cleared, the same way the page background is: leaving changes "
+            "nothing, the arriving page says what it wants, and only what nobody claimed "
+            "is cleared once it has drawn. Measured: one colour change per navigation, "
+            "and none at all when the song you open is the song already playing.",
+            "The song page hands over the picture it has already found rather than "
+            "letting the colour go looking for one, so what is sampled is the artwork "
+            "actually on screen.",
+        ],
+    },
+    {
         "version": "3.5.0",
         "date": "2026-09-10",
         "name": JRITER,

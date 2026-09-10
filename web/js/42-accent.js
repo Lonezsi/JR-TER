@@ -3,10 +3,15 @@
  * One rule, in order:
  *
  *   the accent chosen in Settings, pink until somebody changes it       always the base
- *   and if adaptive colours are on, whatever is on the player:
- *     a render   its own waveform colour, which it already has
- *     a song     the average colour of its artwork, neonised
- *     nothing    back to the chosen accent
+ *   and if adaptive colours are on:
+ *     a song page open   that song's colour, whatever happens to be playing
+ *     otherwise          what is on the player: a render's own waveform colour, or a
+ *                        song's artwork, neonised
+ *     nothing at all     back to the chosen accent
+ *
+ * An open page outranks the player because looking at a song is a more specific statement
+ * about what you are doing than what is playing behind it, and the two agree whenever
+ * they are the same song.
  *
  * The player, and not the page being looked at. That distinction is the whole of this
  * file. The first version of this hung off pageWash, which runs on navigation, and
@@ -39,6 +44,18 @@ J.accent = (function () {
    * out. */
   let held = false;
 
+  /* The song whose page is open, and the picture that page is showing.
+   *
+   * An open page outranks the player: looking at a song is a more specific statement
+   * about what you are doing than what happens to be playing behind it. The cover is
+   * carried rather than looked up so the accent samples the exact image on screen.
+   */
+  let open = null;
+
+  /* Whether this navigation has had its open song claimed. See expect and settle below,
+   * and the same pattern in J.pageWash, which exists for the same reason. */
+  let claimed = true;
+
   function adaptive() {
     return !!(J.state && J.state.settings && J.state.settings.adaptive);
   }
@@ -67,18 +84,21 @@ J.accent = (function () {
    * the one now playing.
    */
   let token = 0;
-  async function fromSong(song) {
+  async function fromSong(song, known) {
     const mine = ++token;
 
-    /* artwork_id, not a request. A decorated song row already carries the id of its
-     * first image, which songs.decorate looks up for the whole list in one query, so the
-     * accent costs no round trip. Asking /api/songs/<id>/artwork here would be a second
-     * request per track played, to learn something the row already said.
+    /* The cover the caller already has, or the one the row names.
      *
-     * No id means no artwork, or the artwork module switched off. Either way the answer
-     * is the colour built from the title, which is the same colour the app already draws
-     * that song's placeholder cover in. */
-    const cover = song.artwork_id ? `/api/artwork/${song.artwork_id}/image` : null;
+     * The song page has resolved the real image url before it draws, so it passes it and
+     * the accent samples exactly what is on screen. The player has not, but a decorated
+     * song row carries the id of its first image, which songs.decorate looks up for a
+     * whole list in one query, so this still costs no round trip either way.
+     *
+     * Neither means no artwork, or the artwork module switched off. The answer then is
+     * the colour built from the title, which is the colour the app already draws that
+     * song's placeholder cover in. */
+    const cover = known
+      || (song.artwork_id ? `/api/artwork/${song.artwork_id}/image` : null);
 
     let hue = null;
     if (cover) hue = await J.hueOfImage(cover);
@@ -94,6 +114,13 @@ J.accent = (function () {
       apply(J.chosenAccent());
       return;
     }
+    /* An open song page wins. Looking at a song says more about what you are doing than
+     * what is playing behind it, and the two agree whenever they are the same song. */
+    if (open) {
+      fromSong(open.song, open.cover);
+      return;
+    }
+
     const player = J.player && J.player.state;
     const item = player && player.song;
     if (!item) {
@@ -122,9 +149,37 @@ J.accent = (function () {
     /* For the settings screen, which previews an accent while you drag the picker and has
      * to be able to put the real one back afterwards. */
     forget: () => { showing = null; },
-    /* Take the wheel, and give it back. Releasing decides again, so whatever is on the
-     * player wins the moment the preview ends. */
+    /* Take the wheel, and give it back. Releasing decides again, so whatever should be on
+     * screen wins the moment the preview ends. */
     hold: () => { held = true; },
     release: () => { held = false; showing = null; decide(); },
+
+    /* A navigation has started and a view may be about to claim the open song.
+     *
+     * Nothing changes here, and that is the point. Clearing the open song at this moment
+     * would set the accent to the player's colour on the way out of a song and then to
+     * the next song's colour on the way in, which is one visible step too many and is
+     * the fault this file was rewritten to remove. */
+    expect: () => { claimed = false; },
+
+    /* This song's page is open. Called by the song view with the cover it has resolved. */
+    viewing: (song, cover) => {
+      claimed = true;
+      open = song ? { song: song, cover: cover || null } : null;
+      decide();
+    },
+
+    /* The arriving view has rendered. If it never claimed a song, no song page is open.
+     *
+     * After the render rather than before, so the change lands on a screen that is
+     * already showing rather than in the gap between two. */
+    settle: () => {
+      if (claimed) return;
+      claimed = true;
+      if (open) {
+        open = null;
+        decide();
+      }
+    },
   };
 }());

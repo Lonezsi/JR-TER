@@ -120,7 +120,13 @@ J.router = (function () {
      * because the arriving view sets its own ground only once its fetches return. This
      * says "somebody may claim this" and the answer is read in settle(), after the view
      * has rendered. */
-    if (!inPlace) J.pageWash.expect();
+    if (!inPlace) {
+      J.pageWash.expect();
+      // And the accent, for the same reason and by the same rule: an open song page
+      // decides the colour, and clearing that here rather than after the render would
+      // put one extra colour on screen on the way into every song.
+      J.accent.expect();
+    }
     if (inPlace) root.innerHTML = old.innerHTML;
     old.replaceWith(root);
     // After the in place copy above, which serialises the previous screen's foot into
@@ -146,6 +152,8 @@ J.router = (function () {
       hideProgress();
       // Nobody claimed the ground, so this screen wants none. See J.pageWash.expect.
       J.pageWash.settle();
+      // Nor the colour, so no song page is open and the player decides again.
+      J.accent.settle();
       // Next frame, so the browser has the starting state to animate away from.
       requestAnimationFrame(() => root.classList.remove("entering"));
     };

@@ -84,6 +84,13 @@ J.views.song = {
     // too, rather than stopping at the edge of this panel.
     J.pageWash(cover, cover ? undefined : J.hue(song.title));
 
+    /* This page is open, so this song's colour is the app's colour, whatever is playing.
+     *
+     * The cover is handed over because it has already been resolved here, out of the
+     * artwork list, so the accent samples the same image this page is showing rather
+     * than looking one up for itself. */
+    J.accent.viewing(song, cover);
+
     root.innerHTML = `
       <div class="hero">
         <div class="hero-art ${cover ? "" : "flat"}" id="heroArt"
