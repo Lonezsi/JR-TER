@@ -240,6 +240,7 @@ const NAV_ICONS = {
   sync: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 7h6l2 2h10v10H3z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/></svg>',
   shared: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.4"/><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
   renders: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 3v10m0 0l3.5-3.5M12 13L8.5 9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>',
+  orarend: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 4.5V2.5M16 4.5V2.5M7.5 13h3M7.5 16.5h6"/></svg>',
   settings: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 
@@ -255,6 +256,9 @@ async function buildRail(state) {
    * can be told "it will turn up under Shared with me" about a place that does not exist
    * yet, and the empty screen is where that promise is made. */
   if (state.modules.includes("sharing")) items.push(["shared", "Shared with me"]);
+  /* Last before Settings, because it is the one screen here that is not about music and
+   * putting it among the ones that are would suggest it was. */
+  if (state.modules.includes("orarend")) items.push(["orarend", "Órarend"]);
   items.push(["settings", "Settings"]);
   nav.innerHTML = items.map(([view, label]) =>
     `<a href="#/${view === "library" ? "" : view}" data-link data-view="${view}">

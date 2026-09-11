@@ -1,0 +1,247 @@
+/* The week, as a grid.
+ *
+ * Built out of the app's own tokens: the same glass, the same lines, the same radii and
+ * the same spacing scale as everything else, so this reads as a page of JR!TER rather
+ * than as a page that happens to live in it.
+ *
+ * One colour is added, and only one. --tt-friend means "not mine", which is the single
+ * distinction on this page that is genuinely about a different kind of thing rather than
+ * about a category of the same thing. Lectures and practicals are told apart by a tag
+ * that says which, because "Ea" is legible and slate-versus-indigo is not.
+ *
+ * It is deliberately NOT the accent. The accent follows whatever is playing, so a category
+ * built on it would change colour when a song changed. This means "not mine", which is a
+ * fact about the class and not about the room it is drawn in.
+ *
+ * --tt-hour, how tall one hour is, is NOT defined here. The view works out every position
+ * from a number the server sends and sets it on the grid, so there is one place the scale
+ * is decided rather than two that have to be kept equal. It is used below as if it were
+ * defined here, because by the time anything below is drawn it is.
+ */
+
+:root {
+  /* Not mine. A rose that sits beside the app's pinks without being one of them, and
+     stays clear of the amber --warn already means. Fixed on purpose: see above. */
+  --tt-friend: #E0679E;
+
+  /* How wide the collapsed strip of a lecture that is not attended is, and therefore how
+     far the class beside it has to start. One number, used by both, so they cannot
+     disagree and leave a gap or an overlap. */
+  --tt-skip-w: 22px;
+}
+
+
+/* ── the grid ─────────────────────────────────────────────────────────────── */
+
+/* Its own scroll container, so the grid scrolls sideways and the page does not.
+ *
+ * Five days cannot be read on a phone at any width that fits, so below it keeps a minimum
+ * width and moves. Without something here to do the moving, that minimum makes the whole
+ * document scroll sideways instead: the rail, the player and the heading all slide, which
+ * is the thing a phone browser does worst. */
+.tt-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* Room for the shadow under the pane, which a scroll container would otherwise clip. */
+  padding-bottom: var(--s2);
+}
+
+.tt-grid {
+  display: grid;
+  grid-template-columns: 58px repeat(5, minmax(0, 1fr));
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  /* .pane already gives it the glass, the border and the shadow. */
+}
+
+.tt-head,
+.tt-corner {
+  padding: var(--s3) var(--s2);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--line-2);
+  border-right: 1px solid var(--line);
+}
+.tt-head:last-child { border-right: 0; }
+
+.tt-hours { border-right: 1px solid var(--line); }
+.tt-hour {
+  height: var(--tt-hour);
+  padding: 4px 8px 0 0;
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  /* The line belongs to the hour it starts, so it lines up with the day columns'
+     repeating gradient rather than sitting half a pixel off it. */
+  border-bottom: 1px solid var(--line);
+}
+.tt-hour:last-child { border-bottom: 0; }
+
+.tt-day {
+  position: relative;
+  border-right: 1px solid var(--line);
+  /* The hour lines, as one paint rather than fifteen elements. */
+  background: repeating-linear-gradient(to bottom,
+    transparent 0,
+    transparent calc(var(--tt-hour) - 1px),
+    var(--line) calc(var(--tt-hour) - 1px),
+    var(--line) var(--tt-hour));
+}
+.tt-day:last-child { border-right: 0; }
+
+
+/* ── a class ──────────────────────────────────────────────────────────────── */
+
+.tt-card {
+  position: absolute;
+  left: var(--s1);
+  /* Room down the right for the stripes, and for a second lane of them. */
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  text-align: left;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  transition: transform var(--fast), background var(--fast), border-color var(--fast);
+}
+.tt-card:hover,
+.tt-card:focus-visible {
+  background: var(--elevated);
+  border-color: var(--text-3);
+  transform: translateY(-1px);
+  z-index: 3;
+}
+
+/* A lecture is the quieter of the two, because it is the one you sit through. */
+.tt-ea { background: var(--glass-2); }
+/* A practical has a lit edge, which is the app's own way of saying "this one is active". */
+.tt-gy { box-shadow: var(--edge-top); }
+.tt-both { box-shadow: var(--edge-top); border-color: var(--text-3); }
+
+.tt-when {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.tt-tag {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  color: var(--text-2);
+}
+.tt-name { font-size: 12px; font-weight: 600; line-height: 1.25; }
+.tt-where { font-size: 9.5px; color: var(--text-3); line-height: 1.3; }
+
+/* The one that is not attended.
+ *
+ * Collapsed rather than hidden, because an empty hour and an hour you are choosing not to
+ * spend are different facts, and the second one is worth a glance. Nothing inside it is
+ * drawn: at this width any text is a smear. */
+.tt-skip {
+  right: auto;
+  width: var(--tt-skip-w);
+  padding: 0;
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  opacity: 0.7;
+}
+.tt-skip:hover, .tt-skip:focus-visible {
+  opacity: 1;
+  transform: none;
+  background: var(--hover);
+}
+.tt-skip > * { display: none; }
+
+
+/* ── somebody else's class ────────────────────────────────────────────────── */
+
+.tt-stripe {
+  position: absolute;
+  /* One lane per clashing class, worked out by the view. */
+  right: calc(var(--s1) + var(--lane, 0) * 9px);
+  width: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--tt-friend);
+  cursor: pointer;
+  transition: transform var(--fast), filter var(--fast);
+}
+.tt-stripe:hover,
+.tt-stripe:focus-visible {
+  transform: scaleX(1.6);
+  filter: brightness(1.15);
+  z-index: 4;
+}
+
+
+/* ── the legend, and the facts in the sheet ───────────────────────────────── */
+
+.tt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  align-items: center;
+  margin-top: var(--s4);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.tt-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tt-key {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  border: 1px solid var(--line-2);
+}
+.tt-key-ea { background: var(--glass-2); }
+.tt-key-gy { background: var(--surface-2); box-shadow: var(--edge-top); }
+.tt-key-skip { background: transparent; border-style: dashed; }
+.tt-key-friend {
+  background: var(--tt-friend);
+  border-color: transparent;
+  border-radius: var(--r-pill);
+  width: 6px; height: 12px;
+}
+
+/* Inside the app's own sheet, which is where the details open. There is no second dialog
+   here: a page with two kinds of modal on it is a page with two answers for Escape. */
+.tt-facts { display: flex; flex-direction: column; gap: var(--s2); }
+.tt-fact { display: flex; gap: var(--s3); font-size: 13px; }
+.tt-fact span { color: var(--text-3); min-width: 74px; flex: none; }
+.tt-fact b { font-weight: 600; color: var(--text); }
+.tt-friend-name { color: var(--tt-friend); }
+.tt-sheet-note {
+  margin: var(--s4) 0 0;
+  color: var(--text-3); font-size: 12px; line-height: 1.5;
+}
+
+
+/* ── narrow ───────────────────────────────────────────────────────────────── */
+
+/* Five days do not fit on a phone, and shrinking them to fit makes five columns nothing
+   can be read in. So the grid keeps a width and scrolls inside .tt-scroll, which is how a
+   paper timetable behaves when it is wider than the desk. */
+@media (max-width: 900px) {
+  .tt-grid {
+    grid-template-columns: 46px repeat(5, minmax(132px, 1fr));
+    min-width: 700px;
+  }
+  .tt-name { font-size: 11px; }
+  .tt-where { display: none; }
+}

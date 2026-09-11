@@ -280,26 +280,57 @@ def _class_lists(text):
     every attribute containing one, which is nearly all of them: .sheet-tab went
     undefined for a whole release and rendered as white default buttons. The expressions
     are stripped and the literal names either side are kept.
+
+    A NAME HALF MADE OF AN EXPRESSION IS NOT A NAME. class="tt-card tt-${entry.kind}"
+    leaves `tt-` behind once the expression is gone, and `tt-` is not a class anybody
+    styles: the real ones are tt-ea, tt-gy and tt-both. So the expression leaves a mark
+    where it was, and a token still touching that mark is a fragment and is dropped. A
+    token with whitespace between it and the mark is a whole name and is kept, which is
+    the ordinary class="a ${x} b" case this has always handled.
     """
+    # Stands in for a stripped expression. Not a character that can appear in a class
+    # attribute, so a token containing it is a token the expression was part of.
+    MARK = "\x00"
+    # Far longer than any class attribute here, and short enough that a missing closing
+    # quote reads the rest of one line rather than the rest of the file.
+    LIMIT = 600
     elements = []
-    for raw in re.findall(r'class="([^"]*)"', text):
-        cleaned, depth, out = raw, 0, []
-        i = 0
-        while i < len(cleaned):
-            if cleaned.startswith("${", i):
+    # WALKED, NOT MATCHED. class="([^"]*)" ends at the first double quote, and a quote
+    # inside an expression is one:
+    #
+    #     class="${cond ? "a" : "b"} panel"
+    #
+    # The regex reads that attribute as far as the quote before `a`, so `panel` is never
+    # seen, and a name this cannot see is a name it says nothing about, which is the worst
+    # thing a guard can do quietly. A quote at depth zero ends the attribute; a quote
+    # inside ${...} does not.
+    #
+    # Measured: on this tree it changes nothing, 437 classes either way. Nothing here puts
+    # a literal name after a quoted expression yet. It is written this way because the
+    # difference between the two is invisible when it starts mattering.
+    for found in re.finditer(r'class="', text):
+        depth, out = 0, []
+        i = found.end()
+        stop = min(len(text), i + LIMIT)
+        while i < stop:
+            if text.startswith("${", i):
+                if not depth:
+                    out.append(MARK)
                 depth += 1
                 i += 2
                 continue
             if depth:
-                if cleaned[i] == "{":
+                if text[i] == "{":
                     depth += 1
-                elif cleaned[i] == "}":
+                elif text[i] == "}":
                     depth -= 1
                 i += 1
                 continue
-            out.append(cleaned[i])
+            if text[i] == '"':
+                break
+            out.append(text[i])
             i += 1
-        names = [n for n in "".join(out).split() if n]
+        names = [n for n in "".join(out).split() if n and MARK not in n]
         if names:
             elements.append(names)
     return elements

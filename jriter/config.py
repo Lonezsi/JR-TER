@@ -175,6 +175,14 @@ MODULES = [
     # Letting a friend work on one of your songs. Off is a server where everybody still
     # has their own library and nobody can show anybody anything.
     "sharing",
+    # A week, and where the classes fall in it. Nothing to do with music, and it is here
+    # rather than in Foyer because of how each site can be reached: this one is behind
+    # Tailscale Funnel and a login, so it answers on a phone, and Foyer is on the tailnet
+    # only. A timetable you cannot open on a phone is a timetable you do not have.
+    #
+    # Off is a library with no such screen and no link to one. The week itself is a file in
+    # each account's own directory and is not in this repository.
+    "orarend",
 ]
 
 # The repository JR!TER updates itself from. JR-TER, not JR!TER: GitHub allows only

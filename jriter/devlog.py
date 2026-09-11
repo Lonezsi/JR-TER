@@ -22,6 +22,31 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.7.0",
+        "date": "2026-09-11",
+        "name": JRITER,
+        "title": "A week, on the one address that opens on a phone",
+        "notes": [
+            "There is an Órarend screen in the rail now. It was Foyer's, and it moved here "
+            "for one reason: this library is behind Tailscale Funnel and a login, so it "
+            "answers from anywhere and hands a stranger the login page, and Foyer is on "
+            "the tailnet only, which is this machine and one laptop. A timetable you "
+            "cannot open on a phone is a timetable you do not have. Foyer's front page "
+            "links across to it, and there is only one of them, because two would mean "
+            "the right one was whichever you happened to open.",
+            "The week itself is not in this repository, which is public. It is a file "
+            "called orarend.json in your own account's directory, beside its database, "
+            "read fresh on every request: edit it and reload. Per account like everything "
+            "else, so somebody else signing in gets their own empty week rather than a "
+            "view of yours. A missing file says how to make one, and a file that will not "
+            "parse says which line stopped it, because those are different problems.",
+            "Every position on the grid is worked out from the times, so moving a class is "
+            "changing one number. Classes that clash take the first free lane rather than "
+            "the next one, and the lecture that is not attended is a narrow strip, so the "
+            "hour does not read as free, with whatever is beside it moved over.",
+        ],
+    },
+    {
         "version": "3.6.0",
         "date": "2026-09-10",
         "name": JRITER,
