@@ -118,5 +118,24 @@ $out = Join-Path $LogDir 'host-jriter-out.log'
 # Rolled before the server is started rather than while it runs: the redirect below holds
 # the file open for the life of the process, and this is the one moment nothing does.
 Roll $out
+# A LINE ON THE SERVER'S STDERR MUST NOT KILL THIS SCRIPT.
+#
+# PowerShell 5.1 wraps every line a native command writes to redirected stderr in an
+# ErrorRecord, and under $ErrorActionPreference = 'Stop' that is a terminating error. This
+# script would die in the middle of the statement below and take the server with it, which
+# is why the line after it, the one that writes the exit code down, would never run.
+#
+# This has never fired here only because log_message is a pass, so nothing is written per
+# request. The hazard that remains is the other kind of line: ThreadingHTTPServer prints a
+# request handler's traceback to stderr and carries on serving, so under 'Stop' the response
+# to one bad request would be to kill a server that was still working, at three in the
+# morning, on a machine nobody is sitting at.
+#
+# Measured on Foyer, which has the same launcher and did write a line per request: it bound
+# its port, answered one request, and both processes vanished with no traceback and no exit
+# code in the log. Then the watchdog started it again three minutes later, for one more
+# request. Fixed there and here.
+$ErrorActionPreference = 'Continue'
 & $py -u (Join-Path $Root 'server.py') *>> $out
+$ErrorActionPreference = 'Stop'
 Say ("server exited with {0}" -f $LASTEXITCODE)
