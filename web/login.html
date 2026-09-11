@@ -145,6 +145,27 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 </form>
 
 <script>
+  /* Where to go once the door opens.
+   *
+   * The server sends an unauthenticated caller to /login and keeps the fragment, so the
+   * destination arrives here as /login#/orarend. This page used to finish with
+   * location.href = "/" and throw it away, so every deep link into the app landed on the
+   * library: a shared song, a timetable, an album somebody sent you.
+   *
+   * ONLY THE FRAGMENT, and only when it looks like one of this app's routes. Taking a
+   * redirect target out of the address bar is how open redirects are built; a fragment
+   * cannot leave this origin, and requiring it to start with #/ means nothing but a route
+   * can be carried through.
+   */
+  function onwards() {
+    const hash = location.hash || "";
+    // No "//" anywhere, which is what makes "#//evil.example.com" a route and not an
+    // address. It could not have left this origin as a fragment either; the point is that
+    // the pattern refuses it on its own, without depending on that.
+    const route = /^#\/[\w\-/?=&.%]*$/.test(hash) && hash.indexOf("//") === -1;
+    return "/" + (route ? hash : "");
+  }
+
 "use strict";
 const $ = (id) => document.getElementById(id);
 let mode = "login";
@@ -180,7 +201,7 @@ async function decideMode() {
         + 'src:url("/api/appearance/font");font-display:swap}';
       document.head.appendChild(face);
     }
-    if (state.signed_in) { location.href = "/"; return; }
+    if (state.signed_in) { location.href = onwards(); return; }
     mode = state.has_password ? "login" : "setup";
     canSignUp = !!state.can_sign_up;
   } catch (e) {
@@ -263,7 +284,7 @@ $("door").addEventListener("submit", async (e) => {
     } else {
       await api("/api/auth/login", { password, handle: $("handle").value.trim() });
     }
-    location.href = "/";
+    location.href = onwards();
   } catch (err) {
     problem(err.message);
     button.disabled = false;
