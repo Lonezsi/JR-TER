@@ -22,7 +22,7 @@
 :root {
   /* Not mine. A rose that sits beside the app's pinks without being one of them, and
      stays clear of the amber --warn already means. Fixed on purpose: see above. */
-  --tt-friend: #E0679E;
+  --tt-friend: #e0679e;
 
   /* And one each for the people after the first.
    *
@@ -39,15 +39,14 @@
    *
    * Three because a fourth person would have to share, and sharing silently is worse
    * than the view saying so. */
-  --tt-friend-2: #679DE0;
-  --tt-friend-3: #9DE067;
+  --tt-friend-2: #679de0;
+  --tt-friend-3: #9de067;
 
   /* How wide the collapsed strip of a lecture that is not attended is, and therefore how
      far the class beside it has to start. One number, used by both, so they cannot
      disagree and leave a gap or an overlap. */
   --tt-skip-w: 22px;
 }
-
 
 /* ── the grid ─────────────────────────────────────────────────────────────── */
 
@@ -67,31 +66,17 @@
 .tt-grid {
   display: grid;
 
-  /* The hour gutter, which is the only fixed column.
-   *
-   * It holds "08:00" and nothing else, so it is sized from that: enough for five digits at
-   * whatever the type has come down to, and no more. Fluid rather than fixed, because on a
-   * phone every pixel it keeps is a pixel five day columns do not get. */
-  --tt-gutter: clamp(28px, 8vw, 58px);
+  --tt-gutter: 58px;
 
-  /* Five equal days, and no minimum.
-   *
-   * There was one, 176px, and it is what put Friday two screens to the right. minmax(0,1fr)
-   * lets a column be as narrow as it has to be; what stops that being a squash is that the
-   * type comes down with it, below.
-   *
-   * minmax(0, 1fr) and not 1fr: the default minimum for a grid track is min-content, so
-   * with plain 1fr a long unbroken course name would push its column wider than its share
-   * and the week would stop fitting because of one word. */
-  grid-template-columns: var(--tt-gutter) repeat(5, minmax(0, 1fr));
+  /* Keep the timetable at a readable desktop-like width.
+     The outer .tt-scroll handles horizontal scrolling on small screens. */
+  grid-template-columns: var(--tt-gutter) repeat(5, 160px);
 
-  /* Tighter than .pane's own padding, which is written for reading rather than for a grid.
-     Twenty a side is forty pixels, and forty pixels is most of a day column here. */
+  min-width: calc(58px + 5 * 160px);
+
   padding: var(--s2);
-
   border-radius: var(--r-lg);
   overflow: hidden;
-  /* .pane already gives it the glass, the border and the shadow. */
 }
 
 .tt-head,
@@ -107,9 +92,13 @@
   border-bottom: 1px solid var(--line-2);
   border-right: 1px solid var(--line);
 }
-.tt-head:last-child { border-right: 0; }
+.tt-head:last-child {
+  border-right: 0;
+}
 
-.tt-hours { border-right: 1px solid var(--line); }
+.tt-hours {
+  border-right: 1px solid var(--line);
+}
 .tt-hour {
   height: var(--tt-hour);
   padding: 2px 4px 0 0;
@@ -124,7 +113,9 @@
      repeating gradient rather than sitting half a pixel off it. */
   border-bottom: 1px solid var(--line);
 }
-.tt-hour:last-child { border-bottom: 0; }
+.tt-hour:last-child {
+  border-bottom: 0;
+}
 
 .tt-day {
   position: relative;
@@ -140,14 +131,17 @@
   --tt-lane-step: clamp(4px, 5.1cqw, 9px);
   border-right: 1px solid var(--line);
   /* The hour lines, as one paint rather than fifteen elements. */
-  background: repeating-linear-gradient(to bottom,
+  background: repeating-linear-gradient(
+    to bottom,
     transparent 0,
     transparent calc(var(--tt-hour) - 1px),
     var(--line) calc(var(--tt-hour) - 1px),
-    var(--line) var(--tt-hour));
+    var(--line) var(--tt-hour)
+  );
 }
-.tt-day:last-child { border-right: 0; }
-
+.tt-day:last-child {
+  border-right: 0;
+}
 
 /* ── a class ──────────────────────────────────────────────────────────────── */
 
@@ -173,7 +167,10 @@
   color: var(--text);
   cursor: pointer;
   font: inherit;
-  transition: transform var(--fast), background var(--fast), border-color var(--fast);
+  transition:
+    transform var(--fast),
+    background var(--fast),
+    border-color var(--fast);
 }
 .tt-card:hover,
 .tt-card:focus-visible {
@@ -184,10 +181,17 @@
 }
 
 /* A lecture is the quieter of the two, because it is the one you sit through. */
-.tt-ea { background: var(--glass-2); }
+.tt-ea {
+  background: var(--glass-2);
+}
 /* A practical has a lit edge, which is the app's own way of saying "this one is active". */
-.tt-gy { box-shadow: var(--edge-top); }
-.tt-both { box-shadow: var(--edge-top); border-color: var(--text-3); }
+.tt-gy {
+  box-shadow: var(--edge-top);
+}
+.tt-both {
+  box-shadow: var(--edge-top);
+  border-color: var(--text-3);
+}
 
 .tt-when {
   display: flex;
@@ -238,14 +242,20 @@
  * is when things are and how they line up.
  */
 @container day (max-width: 112px) {
-  .tt-where { display: none; }
-  .tt-tag { display: none; }
+  .tt-where {
+    display: none;
+  }
+  .tt-tag {
+    display: none;
+  }
 }
 
 /* And narrower still, the time loses its minutes rather than the title losing its line.
  * 08:00 is the hour the row is already labelled with, so the useful half is the end. */
 @container day (max-width: 74px) {
-  .tt-name { -webkit-line-clamp: 3; }
+  .tt-name {
+    -webkit-line-clamp: 3;
+  }
 }
 
 /* The one that is not attended.
@@ -261,13 +271,15 @@
   border: 1px dashed var(--line-2);
   opacity: 0.7;
 }
-.tt-skip:hover, .tt-skip:focus-visible {
+.tt-skip:hover,
+.tt-skip:focus-visible {
   opacity: 1;
   transform: none;
   background: var(--hover);
 }
-.tt-skip > * { display: none; }
-
+.tt-skip > * {
+  display: none;
+}
 
 /* ── somebody else's class ────────────────────────────────────────────────── */
 
@@ -281,7 +293,9 @@
   border-radius: var(--r-pill);
   background: var(--who, var(--tt-friend));
   cursor: pointer;
-  transition: transform var(--fast), filter var(--fast);
+  transition:
+    transform var(--fast),
+    filter var(--fast);
 }
 .tt-stripe:hover,
 .tt-stripe:focus-visible {
@@ -289,7 +303,6 @@
   filter: brightness(1.15);
   z-index: 4;
 }
-
 
 /* ── the legend, and the facts in the sheet ───────────────────────────────── */
 
@@ -302,20 +315,34 @@
   font-size: 11px;
   color: var(--text-3);
 }
-.tt-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tt-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .tt-key {
-  width: 10px; height: 10px;
+  width: 10px;
+  height: 10px;
   border-radius: 3px;
   border: 1px solid var(--line-2);
 }
-.tt-key-ea { background: var(--glass-2); }
-.tt-key-gy { background: var(--surface-2); box-shadow: var(--edge-top); }
-.tt-key-skip { background: transparent; border-style: dashed; }
+.tt-key-ea {
+  background: var(--glass-2);
+}
+.tt-key-gy {
+  background: var(--surface-2);
+  box-shadow: var(--edge-top);
+}
+.tt-key-skip {
+  background: transparent;
+  border-style: dashed;
+}
 .tt-key-friend {
   background: var(--who, var(--tt-friend));
   border-color: transparent;
   border-radius: var(--r-pill);
-  width: 6px; height: 12px;
+  width: 6px;
+  height: 12px;
 }
 
 /* Which person a stripe, a swatch or a name belongs to.
@@ -324,21 +351,43 @@
  * an attribute rather than a colour written inline because a colour written by a script is
  * a colour the stylesheet cannot see, and everything else on this page that has a hue has
  * it here. */
-[data-who="1"] { --who: var(--tt-friend-2); }
-[data-who="2"] { --who: var(--tt-friend-3); }
+[data-who="1"] {
+  --who: var(--tt-friend-2);
+}
+[data-who="2"] {
+  --who: var(--tt-friend-3);
+}
 
 /* Inside the app's own sheet, which is where the details open. There is no second dialog
    here: a page with two kinds of modal on it is a page with two answers for Escape. */
-.tt-facts { display: flex; flex-direction: column; gap: var(--s2); }
-.tt-fact { display: flex; gap: var(--s3); font-size: 13px; }
-.tt-fact span { color: var(--text-3); min-width: 74px; flex: none; }
-.tt-fact b { font-weight: 600; color: var(--text); }
-.tt-friend-name { color: var(--who, var(--tt-friend)); }
+.tt-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.tt-fact {
+  display: flex;
+  gap: var(--s3);
+  font-size: 13px;
+}
+.tt-fact span {
+  color: var(--text-3);
+  min-width: 74px;
+  flex: none;
+}
+.tt-fact b {
+  font-weight: 600;
+  color: var(--text);
+}
+.tt-friend-name {
+  color: var(--who, var(--tt-friend));
+}
 .tt-sheet-note {
   margin: var(--s4) 0 0;
-  color: var(--text-3); font-size: 12px; line-height: 1.5;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.5;
 }
-
 
 /* ── narrow ───────────────────────────────────────────────────────────────── */
 
@@ -353,7 +402,6 @@
    So the grid keeps its shape at every width and .tt-scroll moves it, which is what a paper
    timetable does when it is wider than the desk. The minimum column width on .tt-grid above
    is the whole of the arrangement. */
-
 
 /* ── what I write about a subject ─────────────────────────────────────────── */
 /*
@@ -371,25 +419,40 @@
  * One number shown as three boxes rather than three independent facts: ticking the second
  * ticks the first, because "absent the second time but not the first" is not a thing
  * anybody means by a row of boxes. */
-.tt-miss { display: flex; align-items: center; gap: var(--s2); }
+.tt-miss {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
 .tt-miss-box {
-  width: 26px; height: 26px;
-  display: grid; place-items: center;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
   padding: 0;
   border: 1px solid var(--line-2);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text-on-accent);
   cursor: pointer;
-  transition: background var(--fast), border-color var(--fast), transform var(--fast);
+  transition:
+    background var(--fast),
+    border-color var(--fast),
+    transform var(--fast);
 }
-.tt-miss-box:hover { border-color: var(--accent-line); }
-.tt-miss-box:active { transform: scale(0.94); }
+.tt-miss-box:hover {
+  border-color: var(--accent-line);
+}
+.tt-miss-box:active {
+  transform: scale(0.94);
+}
 .tt-miss-box.on {
   background: var(--grad-accent, var(--accent));
   border-color: transparent;
 }
-.tt-miss-box .menu-icon { display: block; }
+.tt-miss-box .menu-icon {
+  display: block;
+}
 .tt-miss-said {
   margin-left: var(--s2);
   font-size: 12px;
@@ -398,7 +461,9 @@
 
 /* The notebook. One page at a time, because a subject is a term of them and a single box
    that grows for ever is a box you scroll through looking for the week you meant. */
-.tt-pages { margin-top: var(--s5); }
+.tt-pages {
+  margin-top: var(--s5);
+}
 .tt-pages-head,
 .tt-pages-bar {
   display: flex;
@@ -406,7 +471,10 @@
   gap: var(--s2);
   margin-bottom: var(--s2);
 }
-.tt-pages-head { font-size: 12px; color: var(--text-3); }
+.tt-pages-head {
+  font-size: 12px;
+  color: var(--text-3);
+}
 .tt-pages-at {
   font-size: 12px;
   color: var(--text-2);
@@ -414,7 +482,10 @@
   min-width: 42px;
   text-align: center;
 }
-.tt-pages-none { margin: 0; font-size: 13px; }
+.tt-pages-none {
+  margin: 0;
+  font-size: 13px;
+}
 .tt-page {
   width: 100%;
   resize: vertical;
@@ -432,5 +503,9 @@
   font-size: 13px;
   color: var(--text-2);
 }
-.tt-page-read > :first-child { margin-top: 0; }
-.tt-page-read > :last-child { margin-bottom: 0; }
+.tt-page-read > :first-child {
+  margin-top: 0;
+}
+.tt-page-read > :last-child {
+  margin-bottom: 0;
+}

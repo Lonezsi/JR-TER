@@ -22,6 +22,15 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.10.1",
+        "date": "2026-09-14",
+        "name": JRITER,
+        "title": 'Polish timetable stylesheet',
+        "notes": [
+            'Polish timetable stylesheet',
+        ],
+    },
+    {
         "version": "3.10.0",
         "date": "2026-09-14",
         "name": JRITER,
