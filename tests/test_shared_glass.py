@@ -87,21 +87,45 @@ def test_the_material_is_the_one_foyer_serves():
 
 
 def test_the_app_agrees_with_foyer_about_where_foyer_is():
-    """The rail's link and the pull past the stop both go to a port written in the boot
-    script, and Foyer's default is written in its own server. Two numbers, one door."""
+    """One hostname, two sites, and both of them have to mean the same thing by /foyer.
+
+    The rail's link and the pull past the stop go to a path on this origin now. It used to
+    be a host and a port, which is reachable only from the tailnet: following it from a
+    phone that is not on the tailnet, which is how anybody actually arrives, reached
+    nothing. The tunnel puts the library at / and Foyer at /foyer, so the way out is a path.
+
+    Foyer's end of the same string is the prefix it strips off requests, since the tunnel
+    takes it off before proxying. If these two disagree, the way out of the library lands on
+    a page whose stylesheet does not load, which reads as a broken site rather than a
+    misrouted one.
+    """
     sibling = os.path.join(os.path.dirname(HERE), "foyer", "server.py")
     if not os.path.isfile(sibling):
         import pytest
         pytest.skip("foyer is not checked out beside this repo")
 
     boot = read(os.path.join(JS, "90-boot.js"))
-    ours = re.search(r"J\.FOYER_PORT\s*=\s*(\d+);", boot)
-    assert ours, "90-boot.js no longer says which port Foyer is on"
-    theirs = re.search(r'"--port",\s*type=int,\s*default=(\d+)', read(sibling))
-    assert theirs, "foyer/server.py no longer says which port it defaults to"
+    ours = re.search(r'J\.FOYER_PATH\s*=\s*"([^"]+)"', boot)
+    assert ours, "90-boot.js no longer says where Foyer is"
+    theirs = re.search(r'^MOUNT\s*=\s*"([^"]+)"', read(sibling), flags=re.M)
+    assert theirs, "foyer/server.py no longer says what it is mounted at"
     assert ours.group(1) == theirs.group(1), (
-        "this app sends people to port %s and Foyer listens on %s by default, so backing"
-        " out of the library lands on nothing" % (ours.group(1), theirs.group(1)))
+        "this app sends people to %s and Foyer answers to %s, so backing out of the library"
+        " lands on a page that cannot load its own stylesheet"
+        % (ours.group(1), theirs.group(1)))
+
+
+def test_the_way_out_does_not_name_a_host_or_a_port():
+    """Which is what made the old one unreachable from a phone.
+
+    A path on this origin works wherever the library itself worked: through the tunnel, over
+    the tailnet, on localhost. A hostname written down here works in exactly one of those.
+    """
+    boot = read(os.path.join(JS, "90-boot.js"))
+    where = boot[boot.index("J.FOYER_PATH"):]
+    where = where[:where.index("\n\n")]
+    assert "://" not in where and "hostname" not in where and ":7000" not in where, (
+        "the way out names a host or a port again: %s" % where.strip())
 
 
 # ── the boundary ─────────────────────────────────────────────────────────────

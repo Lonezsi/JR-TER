@@ -63,6 +63,17 @@ GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
 # to sign up to a library a friend has pointed them at is exactly the person it is for. It
 # says nothing about the library itself: no titles, no counts, not even its name.
 OPEN_PAGES = {"/login", "/legal", "/jriter.css", "/favicon.ico"}
+
+#: Screens that have an address of their own, and the route each one opens.
+#:
+#: The tunnel puts this app at / and Foyer at /foyer on one hostname, so the timetable needs
+#: to be something you can type, send, or put on a home screen. Inside, this app routes on
+#: the fragment, so each of these is one redirect rather than a second router that could
+#: disagree with the first.
+#:
+#: The value is a fragment for a reason that is not cosmetic: see where this is answered,
+#: above the door. A path is lost on the way to /login and a fragment is not.
+PRETTY = {"/orarend": "/#/orarend"}
 OPEN_API = {"/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/health",
             # Making an account, which by definition happens before you have one. It needs
             # an invite and it is behind the same guess limiter as a password, so being
@@ -71,6 +82,17 @@ OPEN_API = {"/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/healt
             "/api/auth/signup",
             # the door wears the same typeface as the library behind it
             "/api/appearance/font"}
+
+#: Open routes whose last segment is a secret rather than a fixed word.
+#:
+#: OPEN_API is literal paths, which is the right shape for everything in it and cannot
+#: match a share link: the token is the address. A prefix, and a deliberately narrow one,
+#: rather than making the whole of /api/shares open.
+#:
+#: What stands in for the door here is the token itself. It is not guessable, it is kept
+#: only as a digest, it is spent the first time it works, and both routes behind this are
+#: under the same guess limiter as a password.
+OPEN_API_UNDER = ("/api/shares/invitation/",)
 
 
 def content_type_for(name):
@@ -438,6 +460,9 @@ class Handler(BaseHTTPRequestHandler):
             return False
         if path in OPEN_PAGES or path in OPEN_API:
             return False
+        if any(path.startswith(under) and len(path) > len(under)
+               for under in OPEN_API_UNDER):
+            return False
         from .modules import auth
         if who.now() is not None:
             return False
@@ -519,6 +544,21 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/"):
                 return self._json({"error": body, "locked": True}, 503)
             return self._send(503, body.encode("utf-8"), "text/plain; charset=utf-8")
+
+        # A screen with an address of its own, sent to the route that draws it.
+        #
+        # Before the door on purpose. A redirect says nothing about the library, and going
+        # through the door first would lose where you were going: the server sends an
+        # unauthenticated caller to /login, and a path does not survive that the way a
+        # fragment does. This turns the path into a fragment first, and a fragment is never
+        # sent to a server at all, so the browser carries it across both redirects and
+        # /orarend arrives at /login#/orarend with the destination intact.
+        if method == "GET" and path in PRETTY:
+            self.send_response(303)
+            self.send_header("Location", PRETTY[path])
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
 
         if self._locked_out(path):
             if path.startswith("/api/"):

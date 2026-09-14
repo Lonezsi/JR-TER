@@ -24,7 +24,7 @@ import json
 import time
 
 from .. import db, who, accounts, registry
-from ..wire import Error, need
+from ..wire import Error, need, as_int, Response
 
 NAME = "sharing"
 
@@ -142,6 +142,9 @@ def shared_with_me(req):
             "as_name": row["as_name"],
             "created_at": row["created_at"],
             "can_play": bool(song["current_version_id"]),
+            # The cover, so the row looks like the song rather than like a letter in a box.
+            # The id is the sharer's, and is only ever usable through the share route below.
+            "art": (_artwork_in(row) or [{}])[0].get("id"),
         })
     return {"shared": out}
 
@@ -177,6 +180,10 @@ def open_share(req):
     return {
         "share": share["id"],
         "song": {"title": song["title"]},
+        # Everything hanging on the song. Shown because it was shared on purpose: a share
+        # is one song handed to one person, and holding back the artwork made it look like
+        # a title and a waveform.
+        "artwork": _artwork_in(share),
         "from": from_who["name"] if from_who else "somebody",
         "as_name": share["as_name"],
         "version": version,
@@ -186,6 +193,48 @@ def open_share(req):
         "sheets": sheets,
         "mine": _my_copies(share),
     }
+
+
+def _artwork_in(share):
+    """The shared song's pictures, read out of the sharer's library.
+
+    Returns the rows the recipient is allowed to name, which is the ones hanging on the song
+    that was shared and nothing else in that library.
+    """
+    if not registry.has("artwork"):
+        return []
+    with who.acting_as(_theirs(share)):
+        if not db.table_exists("artwork"):
+            return []
+        return [dict(r) for r in db.query(
+            "SELECT id, caption, position FROM artwork WHERE song_id = ? "
+            "ORDER BY position, id", (share["song_id"],))]
+
+
+def shared_artwork(req):
+    """One picture from a shared song.
+
+    Guests could not see the artwork at all. Every route that serves an image is scoped to
+    the caller's own library, which is right, and it left a share as a title and a waveform
+    when the person it was sent to had been shown the cover deliberately.
+
+    THE IMAGE ID IS CHECKED AGAINST THE SHARE, not merely used. The id arrives from the
+    caller, and an id used as given here would be a way to read any picture in any library
+    on the server from any share. So the share names the song, the song names its pictures,
+    and an id that is not one of those is refused before anything is opened. Same shape as
+    shared_audio, which resolves the version through the share for the same reason.
+    """
+    share = _share(req.params["id"])
+    want = as_int(req.params["image"], "image")
+    allowed = {row["id"] for row in _artwork_in(share)}
+    if want not in allowed:
+        # The same answer as for a picture that does not exist. Telling somebody which ids
+        # are real in a library they cannot see is telling them what to ask for next.
+        raise Error("That picture is not part of this share.", 404)
+
+    from . import artwork
+    with who.acting_as(_theirs(share)):
+        return artwork.image(_AsRequest({"id": want}, req.headers))
 
 
 def shared_audio(req):
@@ -378,12 +427,31 @@ def list_shares(req):
 
 
 def make_share(req):
-    """Share one of your songs with one other account."""
+    """Share one of your songs: with a handle you know, or as a link.
+
+    The link exists because the other way round the wrong way. Sharing needed the
+    recipient's handle up front, so the sharer had to know an account already existed and
+    what it was called, and somebody with no account could not be sent a song at all
+    without first being sent an invite and told to sign up. Two messages and a spare
+    concept to explain, before anybody has heard anything.
+
+    With a link there is one thing to send. Whoever opens it either signs in, or picks a
+    handle and a password there and then, and the song is theirs on the next screen.
+    """
     data = req.json()
     song_id = int(need(data, "song"))
     song = db.one("SELECT id, title FROM songs WHERE id = ?", (song_id,))
     if not song:
         raise Error("no song with id %s" % song_id, 404)
+
+    as_name = (data.get("as_name") or "").strip()[:60]
+
+    if not (data.get("handle") or "").strip():
+        # A link, for somebody who has not been named. The code is shown once and only its
+        # digest is kept, the same as an invite.
+        share_id, token = accounts.make_share_link(_me(), song_id, as_name)
+        return {"share": share_id, "token": token, "path": "/#/join/" + token,
+                "note": "This is the only time the link is shown."}
 
     handle = (data.get("handle") or "").strip()
     them = accounts.by_handle(handle)
@@ -392,15 +460,94 @@ def make_share(req):
     if them["id"] == _me():
         raise Error("That song is already yours.", 400)
 
-    # Optional, and the whole reason their copies can be named after them.
-    as_name = (data.get("as_name") or "").strip()[:60]
-
     held = accounts.share_between(_me(), song_id, them["id"])
     if held and not held["revoked_at"]:
         raise Error("%s already has this song." % (them["name"] or handle), 409)
 
     made = accounts.add_share(_me(), song_id, them["id"], as_name)
     return {"share": made, "to": accounts.public(them)}
+
+
+# ── a link, and whoever opens it ─────────────────────────────────────────────
+#
+# Both of these answer without a session, because the whole point is that they are what
+# somebody meets before they have one. What makes that safe is that the token is the secret:
+# it is not guessable, it is kept only as a digest, and it is spent the first time it works.
+
+
+def _by_token(req):
+    """The share a link opens, or the same refusal for every way it can fail.
+
+    One answer for expired, claimed, revoked and never existed. A link is a secret, and a
+    reply that tells them apart tells somebody feeding in guesses which ones were close.
+    """
+    token = (req.params.get("token") or "").strip()
+    share = accounts.share_by_token(token) if token else None
+    if not share:
+        raise Error("That link is not open. It may have been used already, or taken back.",
+                    404)
+    return share
+
+
+def invitation(req):
+    """What the link is for, so the page can say who shared what before asking for anything.
+
+    Deliberately thin: a song title and a name. Somebody holding the link is going to be
+    given the song anyway, and everything else about the library stays behind the door.
+    """
+    share = _by_token(req)
+    song = _song_in(share)
+    from_who = accounts.public(accounts.by_id(share["from_account"]))
+    return {
+        "song": {"title": song["title"]},
+        "from": from_who["name"] if from_who else "somebody",
+        "as_name": share["as_name"],
+        # Whether there is anybody signed in on this browser already, so the page can offer
+        # the short way round rather than always asking for a handle and a password.
+        "signed_in": who.now() is not None,
+    }
+
+
+def accept(req):
+    """Take the share, as whoever is signed in, or as a new account made here.
+
+    THE TOKEN IS THE INVITE. Somebody who has never been here has no account and no way to
+    make one: signing up needs a code from the owner, which is a second thing to send and
+    the reason sharing with a stranger took two messages and an explanation. A link the
+    owner deliberately sent is exactly as much permission as an invite is, so it counts as
+    one, and it is spent the same way.
+
+    Claiming is one UPDATE with the token in its WHERE clause, so a link that was forwarded
+    to five people opens for the first of them and is simply not open for the rest.
+    """
+    share = _by_token(req)
+    data = req.json()
+
+    me = who.now()
+    if me is None:
+        from . import auth
+        handle = (data.get("handle") or "").strip()
+        if not handle:
+            raise Error("Pick a handle so the song has somebody to belong to.", 400)
+        made = auth.sign_up_for_share(req, handle, data.get("password") or "",
+                                      (data.get("name") or "").strip())
+        me = made["account"]["id"]
+        session = made["cookie"]
+    else:
+        session = None
+
+    if share["from_account"] == me:
+        raise Error("That song is already yours.", 400)
+
+    if not accounts.claim_share(share["id"], me):
+        raise Error("That link is not open. It may have been used already, or taken back.",
+                    404)
+
+    body = json.dumps({"share": share["id"]}).encode("utf-8")
+    if session:
+        return Response(status=200, body=body, content_type="application/json",
+                        headers={"Set-Cookie": session})
+    return {"share": share["id"]}
 
 
 def revoke_share(req):
@@ -431,9 +578,12 @@ def ROUTES():
         ("GET", "/api/shared"): shared_with_me,
         ("GET", "/api/shared/<id>"): open_share,
         ("GET", "/api/shared/<id>/audio"): shared_audio,
+        ("GET", "/api/shared/<id>/artwork/<image>"): shared_artwork,
         ("POST", "/api/shared/<id>/preset"): save_preset,
         ("POST", "/api/shared/<id>/sheet"): save_sheet,
         ("GET", "/api/shares"): list_shares,
         ("POST", "/api/shares"): make_share,
+        ("GET", "/api/shares/invitation/<token>"): invitation,
+        ("POST", "/api/shares/invitation/<token>"): accept,
         ("DELETE", "/api/shares/<id>"): revoke_share,
     }

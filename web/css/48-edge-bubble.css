@@ -53,6 +53,33 @@
   opacity: 1;
   pointer-events: auto;
 }
+/* Gone the moment the rail is not open, without anything having to ask.
+
+   The offer is made by holding the rail out past its stop, and it stands for two seconds
+   after the thumb comes off so that it can be pressed. That is right when the rail stays
+   open, which is what a clean release does. It is wrong after a pointercancel: the browser
+   decides the gesture was an edge swipe after all, the rail goes back to shut, and the
+   bubble sits there for the rest of its two seconds pointing at a panel that is not there.
+
+   In the stylesheet rather than in the timers, because the rail's state is already a class
+   and a class is already a thing the browser watches. A check would have to run on every
+   release, every cancel and every resize, and would still be a frame behind; this is none
+   of those and cannot be.
+
+   :not(.rail-dragging) matters. Dragging out from a shut rail leaves rail-shut on for the
+   whole gesture, since it is only toggled when the rail is let go, so without this the rule
+   would hide the bubble during the exact gesture that arms it. setRail calls stopDrag
+   first and both classes settle in the same task, so there is no frame where one is on
+   without the other. */
+.shell.rail-shut:not(.rail-dragging) ~ .edge-bubble {
+  /* No transition: immediately means immediately. It is leaving with the rail rather than
+     on its own, and two things sliding away on different clocks reads as a glitch. */
+  transition: none;
+  transform: translate(-100%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
 .edge-bubble.on:hover,
 .edge-bubble.on:focus-visible { background: var(--glass-2); }
 .edge-bubble.on:active { transform: translate(2px, -50%); }

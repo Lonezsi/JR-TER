@@ -411,6 +411,97 @@ def test_the_grid_scrolls_rather_than_the_page():
         "the scroll container has no overflow of its own, so it absorbs nothing"
 
 
+def test_there_is_no_second_layout_for_a_phone():
+    """A narrow screen gets the same table, moved, not a rearranged one.
+
+    There was a phone layout: narrower columns, smaller type, and the room names taken
+    away. It fitted more of the week on the screen and made every cell a squashed version
+    of itself. A timetable on a phone is read one day at a time anyway, so narrow columns
+    bought nothing and cost the room name, which is the part you are looking for when you
+    are already on your way somewhere.
+
+    So: nothing in a media query may touch the grid's columns, the type, or whether the
+    room name is drawn.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    sheet = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)
+
+    for found in re.finditer(r"@media([^{]*)\{", sheet):
+        start = found.end()
+        depth, i = 1, start
+        while i < len(sheet) and depth:
+            if sheet[i] == "{":
+                depth += 1
+            elif sheet[i] == "}":
+                depth -= 1
+            i += 1
+        body = sheet[start:i]
+        condition = found.group(1).strip()
+        # Reduced motion is about movement, not about shape, and is allowed to say so.
+        if "prefers-reduced-motion" in condition:
+            continue
+        for banned in ("grid-template-columns", "font-size", ".tt-where"):
+            assert banned not in body, (
+                "@media %s changes %s, which is a second layout for a narrow screen. The"
+                " table is meant to keep its shape and scroll." % (condition, banned))
+
+
+def test_the_grid_is_as_wide_as_its_own_columns():
+    """Otherwise the columns overflow the box and nothing scrolls.
+
+    Found in a browser rather than reasoned about: with the minimum on the tracks alone,
+    the six tracks measured 938px inside a grid box 317px wide on a 375px phone, and
+    .tt-scroll had nothing to scroll because its child was never wider than it was. The
+    right hand days were drawn outside the pane and clipped by its own overflow.
+
+    So the box carries a minimum too, and it is the same two numbers the columns are made
+    of rather than a third one written out.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    rule = re.search(r"\.tt-grid\s*\{([^}]*)\}", sheet)
+    assert rule, "the grid rule is gone"
+    body = re.sub(r"/\*.*?\*/", "", rule.group(1), flags=re.S)
+
+    assert "min-width" in body, (
+        "the grid has no minimum width of its own, so its columns overflow it and the"
+        " scroll container has nothing to scroll")
+
+    day = re.search(r"--tt-day:\s*(\d+)px", body)
+    gutter = re.search(r"--tt-gutter:\s*(\d+)px", body)
+    assert day and gutter, (
+        "the day and gutter widths are not named, so the columns and the minimum width are"
+        " two independent copies of the same two numbers: %s" % body.strip())
+    # Used, not merely declared: the point is that there is one of each.
+    assert "var(--tt-day)" in body and "var(--tt-gutter)" in body, \
+        "the tokens are declared and then not used, which is worse than not having them"
+    assert "minmax(var(--tt-day)" in body, \
+        "the columns do not use the day width, so a wide window and a narrow one disagree"
+    assert re.search(r"min-width:\s*calc\(var\(--tt-gutter\)\s*\+\s*5\s*\*\s*var\(--tt-day\)\)",
+                     body), (
+        "the minimum width is not worked out from the same two numbers as the columns, so"
+        " changing one will leave the table either overflowing or padded: %s" % body.strip())
+
+
+def test_the_timetable_is_not_in_the_rail():
+    """It is reached from Foyer, which is the room that holds everything on this machine.
+
+    A nav item for somebody's university week, in a music library, between Renders and
+    Settings, was the shortest way to it while it was being built. The rail is for the
+    library.
+    """
+    boot = io.open(os.path.join(ROOT, "web", "js", "90-boot.js"), encoding="utf-8").read()
+    nav = boot[boot.index("async function buildRail("):]
+    nav = nav[:nav.index("\n}")]
+    assert "orarend" not in nav, (
+        "the rail still builds an Órarend item. It is reached from Foyer now: %s"
+        % [line.strip() for line in nav.splitlines() if "orarend" in line])
+    # The screen itself is still there and still reachable by its route.
+    assert os.path.isfile(os.path.join(ROOT, "web", "js", "56-view-orarend.js")), \
+        "the view is gone, so removing it from the rail removed the whole screen"
+
+
 # ── the two nothings ─────────────────────────────────────────────────────────
 
 def test_a_week_that_is_not_there_says_how_to_make_one():

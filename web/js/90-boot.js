@@ -24,12 +24,18 @@ J.canRefract = CSS.supports("background", "paint(x)")
  * machine. It is on the same host, which is the arrangement that lets the two of them
  * share a stylesheet off one disk rather than fetch it from each other.
  *
- * Derived from where this page is rather than written down, so moving the library between
- * a Tailscale name and localhost needs no second edit. If Foyer ever moves behind a
- * domain of its own, this constant is the one line to change.
+ * A PATH ON THIS ORIGIN, NOT A PORT. It used to be `${hostname}:7000`, which is the port
+ * Foyer listens on and is reachable only from the tailnet. The library is on the public
+ * internet through a tunnel, so anybody following that link from a phone that is not on
+ * the tailnet, which is the ordinary case, got nothing at all. The tunnel puts the two
+ * sites on one hostname, this one at / and Foyer at /foyer, so the way out is a path and
+ * works from wherever the library itself worked.
+ *
+ * Relative on purpose: no hostname written down, so the library keeps working the same
+ * whether it is opened through the tunnel, over the tailnet, or on localhost.
  */
-J.FOYER_PORT = 7000;
-J.foyer = () => `${location.protocol}//${location.hostname}:${J.FOYER_PORT}/`;
+J.FOYER_PATH = "/foyer";
+J.foyer = () => J.FOYER_PATH;
 
 /* The rail's way out is a real link with a real href in the markup, and pointed at Foyer
  * here. A page whose only exit depends on the bundle having parsed is a page with no exit
@@ -258,7 +264,6 @@ async function buildRail(state) {
   if (state.modules.includes("sharing")) items.push(["shared", "Shared with me"]);
   /* Last before Settings, because it is the one screen here that is not about music and
    * putting it among the ones that are would suggest it was. */
-  if (state.modules.includes("orarend")) items.push(["orarend", "Órarend"]);
   items.push(["settings", "Settings"]);
   nav.innerHTML = items.map(([view, label]) =>
     `<a href="#/${view === "library" ? "" : view}" data-link data-view="${view}">
@@ -564,7 +569,7 @@ async function boot() {
   let fadeTimer = null;
   let armed = false;
 
-  function offerAbout() {
+  function offerFoyer() {
     holdTimer = null;
     armed = true;
     if (navigator.vibrate) {
@@ -761,7 +766,7 @@ async function boot() {
      * Only set when there is no timer already, or every move event inside the band would
      * push the deadline out and a thumb that trembles would never get there. */
     if (drag.at >= PAST) {
-      if (!holdTimer && !armed) holdTimer = setTimeout(offerAbout, HOLD);
+      if (!holdTimer && !armed) holdTimer = setTimeout(offerFoyer, HOLD);
     } else {
       withdrawBubble();
     }

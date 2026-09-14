@@ -22,6 +22,43 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.8.0",
+        "date": "2026-09-14",
+        "name": JRITER,
+        "title": "A link you can send, and a Previous that works",
+        "notes": [
+            "Sharing a song no longer needs the other person's handle. Press Share, pick "
+            "Anyone with the link, and send the one link that comes back. Whoever opens it "
+            "signs in, or picks a handle and a password there and then, and the song is "
+            "theirs on the next screen. The link works once, so a forwarded one opens for "
+            "the first person and nobody else, and taking the share back closes it.",
+            "Guests can see the artwork now. Every route that serves a picture is scoped "
+            "to your own library, which is right, and it meant a song you had deliberately "
+            "handed somebody arrived as a title and a waveform. It comes through the share "
+            "itself, so it stops when the share does, and a picture from any of your other "
+            "songs is still refused.",
+            "Previous used to do nothing after the player had chosen a song for you. What "
+            "plays next when a list runs out arrives as a queue of one, so there was "
+            "nothing behind it to step back to. It remembers where you have been now, and "
+            "the list you were in comes back with it, so Next still means the rest of the "
+            "album you came from.",
+            "A phone showed the library's name instead of the song. There was nothing "
+            "telling the phone anything, and a browser with nothing to go on falls back to "
+            "the page title. Lock screens, car stereos and headset buttons all get the "
+            "song, the artwork and working next and previous buttons now, with the "
+            "library's name on the artist line where it belongs.",
+            "The timetable is at /orarend, Foyer is at /foyer, and both are on the one "
+            "address that already works from a phone. It is not in the sidebar any more: "
+            "it is reached from Foyer, which is what Foyer is for. The timetable also "
+            "stopped rearranging itself on a narrow screen, since squashing five days into "
+            "a phone made five columns nothing could be read in; it keeps its shape and "
+            "moves sideways instead.",
+            "The arrow that says the rail's shortcut is armed says Foyer rather than "
+            "About, and goes as soon as the rail does rather than hanging over a panel "
+            "that is not there.",
+        ],
+    },
+    {
         "version": "3.7.0",
         "date": "2026-09-11",
         "name": JRITER,

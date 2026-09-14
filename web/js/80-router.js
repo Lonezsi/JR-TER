@@ -35,6 +35,11 @@ J.router = (function () {
     if (parts[0] === "shared" && parts[1]) {
       return { view: "share", params: Object.assign({ id: parts[1] }, query) };
     }
+    /* A share link. Its own path because the token is the address, and because this is
+     * the one screen somebody may reach before they have an account at all. */
+    if (parts[0] === "join" && parts[1]) {
+      return { view: "join", params: Object.assign({ token: parts[1] }, query) };
+    }
     if (J.views[parts[0]]) return { view: parts[0], params: query };
     return { view: "missing", params: { path: pathPart } };
   }

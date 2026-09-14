@@ -594,6 +594,30 @@ def sign_up(req):
                                                           SESSION_DAYS)})
 
 
+def sign_up_for_share(req, handle, password, name=""):
+    """An account made by opening a share link, and a session for it.
+
+    Called from the sharing module rather than routed, because the permission being spent
+    is the share token and that module is the only place allowed to say a token was good.
+    This one does the parts that belong to the door: the rate limit, making the account,
+    and handing back a cookie.
+
+    Under the same limit as a password and an invite. Every one of these is somewhere a
+    stranger can push on repeatedly, and the arithmetic that makes a short secret survive
+    the public internet is the limit rather than the secret.
+    """
+    ip = _who(req)
+    wait = _wait_for(ip)
+    if wait:
+        raise Error("Too many attempts. Try again in %d seconds." % wait, 429)
+    if not accounts.count():
+        raise Error("This library has no owner yet.", 409)
+    made = accounts.create(handle, password or "", name=name)
+    _clear(ip)
+    return {"account": made,
+            "cookie": _cookie_header(req, issue(made["id"]), SESSION_DAYS)}
+
+
 def login(req):
     ip = _who(req)
     wait = _wait_for(ip)

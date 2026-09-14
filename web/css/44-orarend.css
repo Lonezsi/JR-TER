@@ -48,7 +48,29 @@
 
 .tt-grid {
   display: grid;
-  grid-template-columns: 58px repeat(5, minmax(0, 1fr));
+
+  /* The shape of the table, in two numbers used twice each.
+     A narrow day column and a wide hour gutter are the same mistake seen from either end,
+     so neither number is written down more than once. */
+  --tt-day: 176px;
+  --tt-gutter: 58px;
+
+  /* One layout, at every width. 1fr wins wherever there is room, so a wide window is
+     unchanged; the minimum is what stops the columns closing up on a narrow one.
+
+     176px is just under what the columns come to on a desktop, which measured 196px each
+     in a 1400px window. Picked from that rather than from what fits a phone: the point is
+     that a phone gets the same table, and scrolls. */
+  grid-template-columns: var(--tt-gutter) repeat(5, minmax(var(--tt-day), 1fr));
+
+  /* And the box has to be as wide as the columns, or they simply overflow it.
+     Without this the tracks measure 176px each while the grid stays the width of the
+     screen, so nothing scrolls and the right hand days are drawn outside the pane, clipped
+     by the overflow below. Measured on a 375px phone: six tracks totalling 938px inside a
+     box 317px wide, and .tt-scroll with nothing to scroll because its child was never
+     wider than it was. */
+  min-width: calc(var(--tt-gutter) + 5 * var(--tt-day));
+
   border-radius: var(--r-lg);
   overflow: hidden;
   /* .pane already gives it the glass, the border and the shadow. */
@@ -234,14 +256,14 @@
 
 /* ── narrow ───────────────────────────────────────────────────────────────── */
 
-/* Five days do not fit on a phone, and shrinking them to fit makes five columns nothing
-   can be read in. So the grid keeps a width and scrolls inside .tt-scroll, which is how a
-   paper timetable behaves when it is wider than the desk. */
-@media (max-width: 900px) {
-  .tt-grid {
-    grid-template-columns: 46px repeat(5, minmax(132px, 1fr));
-    min-width: 700px;
-  }
-  .tt-name { font-size: 11px; }
-  .tt-where { display: none; }
-}
+/* THERE IS NO PHONE LAYOUT, AND THAT IS THE POINT.
+
+   There was one: narrower columns, smaller type, and the room names taken away. It fitted
+   more of the week on the screen and made every cell a squashed version of itself, which is
+   the thing that was actually complained about. A timetable read on a phone is read one day
+   at a time anyway, so the columns being narrow bought nothing and cost the room name,
+   which is the part you are looking for when you are already on your way somewhere.
+
+   So the grid keeps its shape at every width and .tt-scroll moves it, which is what a paper
+   timetable does when it is wider than the desk. The minimum column width on .tt-grid above
+   is the whole of the arrangement. */

@@ -34,6 +34,65 @@ CSS = open(os.path.join(HERE, "web", "css", "48-edge-bubble.css"), encoding="utf
 INDEX = open(os.path.join(HERE, "web", "index.html"), encoding="utf-8").read()
 
 
+def test_it_says_where_it_goes():
+    """Foyer, not About.
+
+    The About page has not existed since the room it described became its own site, and a
+    label naming a screen that is gone is a promise the app cannot keep. This is the only
+    word on the control, so it is the only thing saying what pressing it does.
+    """
+    found = re.search(r'id="edgeBubble".*?</button>', INDEX, flags=re.S)
+    assert found, "the bubble is not in the markup"
+    assert ">Foyer<" in found.group(0), (
+        "the bubble does not say Foyer: %s"
+        % re.sub(r"\s+", " ", found.group(0))[:200])
+    assert "About" not in found.group(0), \
+        "the bubble still names the page that was replaced by Foyer"
+
+
+def test_it_goes_the_moment_the_rail_is_not_open():
+    """The bubble used to hang over a shut rail for the rest of its two seconds.
+
+    Letting go cleanly leaves the rail open with the offer beside it, which is right. A
+    pointercancel does not: the browser decides the gesture was an edge swipe after all,
+    the rail is put back to where it started, and the bubble is left pointing at a panel
+    that is not on the screen.
+
+    In the stylesheet rather than in the timers. The rail's state is already a class, so
+    the browser is already watching it; a check would have to run on every release, every
+    cancel and every resize and would still be a frame late.
+    """
+    rule = re.search(r"\.shell\.rail-shut([^{]*)~\s*\.edge-bubble\s*\{([^}]*)\}", CSS)
+    assert rule, (
+        "nothing in 48-edge-bubble.css takes the bubble away when the rail is shut, so it"
+        " outlives the panel it belongs to after a cancelled gesture")
+    body = rule.group(2)
+    assert "opacity: 0" in body and "pointer-events: none" in body, (
+        "the rule leaves the bubble visible or clickable over a shut rail: %s" % body)
+    assert "transition: none" in body, (
+        "the bubble fades out over its usual 160ms when the rail shuts. It is leaving with"
+        " the rail rather than on its own, and two things sliding away on different clocks"
+        " reads as a glitch: %s" % body)
+
+
+def test_the_gesture_that_arms_it_is_not_caught_by_that_rule():
+    """Dragging out of a shut rail leaves rail-shut on for the whole gesture.
+
+    It is only toggled when the rail is let go, so without an exemption for the drag the
+    rule above would hide the bubble during the exact gesture that arms it, and the feature
+    would be gone rather than fixed. This is the half of that rule that is easy to leave
+    out and impossible to notice in a test that only checks the bubble disappears.
+    """
+    rule = re.search(r"\.shell\.rail-shut([^{]*)~\s*\.edge-bubble\s*\{", CSS)
+    assert rule, "the rule is gone"
+    assert ":not(.rail-dragging)" in rule.group(1), (
+        "the rule fires while the rail is being dragged, which is when the bubble is armed."
+        " Pulling a shut rail out would arm a bubble that is hidden by this very rule.")
+    # And the class it exempts is really the one the drag sets.
+    assert 'classList.add("rail-dragging")' in BOOT, \
+        "nothing sets rail-dragging any more, so the exemption above matches nothing"
+
+
 def test_the_arrow_is_something_you_can_press():
     """A div with pointer-events: none is not a control, whatever it looks like."""
     assert re.search(r'<button[^>]*id="edgeBubble"', INDEX), \
@@ -135,7 +194,7 @@ def test_the_clock_starts_when_the_thumb_comes_off():
     fade = fade[:fade.index("\n  }")]
     assert "if (!armed) return;" in fade
     # And the thing that appears does not start it.
-    offer = BOOT[BOOT.index("function offerAbout()"):]
+    offer = BOOT[BOOT.index("function offerFoyer()"):]
     offer = offer[:offer.index("\n  }")]
     assert "fadeTimer" not in offer, \
         "the countdown starts while the finger is still down"
@@ -158,7 +217,7 @@ def test_it_is_out_of_the_way_of_a_screen_reader_until_it_is_there():
     out of display: none. That is not a reason to have it read out or tabbed to."""
     assert re.search(r'id="edgeBubble"[^>]*aria-hidden="true"', INDEX)
     assert re.search(r'id="edgeBubble"[^>]*tabindex="-1"', INDEX)
-    offer = BOOT[BOOT.index("function offerAbout()"):]
+    offer = BOOT[BOOT.index("function offerFoyer()"):]
     offer = offer[:offer.index("\n  }")]
     assert 'removeAttribute("aria-hidden")' in offer and "tabIndex = 0" in offer
     withdraw = BOOT[BOOT.index("function withdrawBubble()"):]

@@ -10,7 +10,9 @@ has to stay out of reach: their other songs, their samples, their renders, their
 Most of these tests are about that, and several of them are written as an attacker would
 write them, by asking for something plausible and checking the answer is no.
 """
+import io
 import json
+import os
 import time
 
 import pytest
@@ -65,6 +67,23 @@ def _share(owner, friend, song_id, as_name="Jozsef"):
         made = sharing.make_share(Ask(body={"song": song_id, "handle": friend["handle"],
                                             "as_name": as_name}))
     return made["share"]
+
+
+def _artwork(song_id, caption="", bytes_=b"not really a jpeg", ext=".jpg", position=0):
+    """One picture on a song in whichever library is bound, with a real file behind it.
+
+    The bytes matter. Without them artwork.image raises "that image is missing from
+    storage", which is an Error like any other, and a test asking only whether an Error was
+    raised then passes whatever the share said. One of these did exactly that: the revoked
+    share test went green with the revocation check taken out, because it was catching a
+    missing file rather than a closed door.
+    """
+    from jriter import blobs, config
+    config.ensure_home()
+    digest, _, _ = blobs.put_stream(io.BytesIO(bytes_), len(bytes_))
+    return db.insert("artwork", {"song_id": song_id, "digest": digest, "ext": ext,
+                                 "caption": caption, "position": position,
+                                 "created_at": time.time()})
 
 
 # ── it works ─────────────────────────────────────────────────────────────────
@@ -379,3 +398,147 @@ def test_the_thread_is_handed_back_after_every_crossing(pair):
                                                  body={"name": "m", "data": {"bands": []}}))):
         call()
         assert who.now() == friend["id"], "a share left the thread on the wrong library"
+
+
+# ── the artwork, which they were shown on purpose ────────────────────────────
+#
+# Guests saw a letter in a box. Every route that serves an image is scoped to the caller's
+# own library, which is right, and it left a share looking like a title and a waveform when
+# the cover had been handed over deliberately.
+
+def test_the_route_is_registered():
+    """A handler nothing routes to is a feature that exists only in this file."""
+    routes = sharing.ROUTES()
+    assert ("GET", "/api/shared/<id>/artwork/<image>") in routes, (
+        "there is no address a guest could fetch a picture from: %s"
+        % sorted(p for m, p in routes))
+    assert routes[("GET", "/api/shared/<id>/artwork/<image>")] is sharing.shared_artwork
+
+
+def test_a_guest_is_told_what_pictures_are_on_a_shared_song(pair):
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        song = _song("Kettle")
+        first = _artwork(song, caption="the cover", position=0)
+        second = _artwork(song, caption="the back", bytes_=b"a second picture", position=1)
+    share_id = _share(owner, friend, song)
+
+    with who.acting_as(friend["id"]):
+        opened = sharing.open_share(Ask(params={"id": share_id}))
+
+    assert [a["id"] for a in opened["artwork"]] == [first, second], (
+        "the share does not carry its pictures, so a guest has nothing to draw: %s"
+        % opened.get("artwork"))
+    assert [a["caption"] for a in opened["artwork"]] == ["the cover", "the back"]
+
+
+def test_the_list_says_which_picture_is_the_cover(pair):
+    """So a row in the list can look like the song rather than like a letter."""
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        song = _song("Kettle")
+        cover = _artwork(song, position=0)
+        _artwork(song, bytes_=b"a second picture", position=1)
+    _share(owner, friend, song)
+
+    with who.acting_as(friend["id"]):
+        shown = sharing.shared_with_me(Ask())["shared"]
+    assert shown[0]["art"] == cover, \
+        "the list points at %r rather than the first picture" % shown[0]["art"]
+
+
+def test_a_song_with_no_pictures_says_so_quietly(pair):
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        song = _song("Bare")
+    share_id = _share(owner, friend, song)
+
+    with who.acting_as(friend["id"]):
+        assert sharing.open_share(Ask(params={"id": share_id}))["artwork"] == []
+        assert sharing.shared_with_me(Ask())["shared"][0]["art"] is None
+
+
+def test_a_guest_can_fetch_a_picture_from_the_share(pair):
+    """The whole point. The bytes come back through the share's own address."""
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        song = _song("Kettle")
+        image = _artwork(song)
+    share_id = _share(owner, friend, song)
+
+    with who.acting_as(friend["id"]):
+        got = sharing.shared_artwork(Ask(params={"id": share_id, "image": str(image)}))
+    assert got.path and os.path.isfile(got.path), \
+        "the picture did not come back as a file a guest could be sent"
+
+
+def test_a_picture_on_another_song_is_not_part_of_the_share(pair):
+    """The id arrives from the caller, so it is checked against the share rather than used.
+
+    Written the way the rest of the boundary tests here are. Given a free choice of image
+    id, this route would be a way to read every picture in every library on the server, and
+    the sharer's other songs are the nearest thing to hand.
+    """
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        shared_song = _song("The one they were given")
+        _artwork(shared_song)
+        private_song = _song("The one they were not")
+        private_image = _artwork(private_song, bytes_=b"a private picture")
+    share_id = _share(owner, friend, shared_song)
+
+    with who.acting_as(friend["id"]):
+        with pytest.raises(Error) as raised:
+            sharing.shared_artwork(Ask(params={"id": share_id,
+                                               "image": str(private_image)}))
+    assert raised.value.status == 404, (
+        "asking for a picture from another of the sharer's songs answered %d. It has to be"
+        " the same answer as a picture that does not exist, or the reply says which ids are"
+        " real in a library they cannot see." % raised.value.status)
+
+
+def test_a_picture_id_that_is_nobodys_answers_the_same_way(pair):
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        song = _song("Kettle")
+        _artwork(song)
+    share_id = _share(owner, friend, song)
+
+    with who.acting_as(friend["id"]):
+        with pytest.raises(Error) as raised:
+            sharing.shared_artwork(Ask(params={"id": share_id, "image": "99999"}))
+    assert raised.value.status == 404
+
+
+def test_a_revoked_share_stops_handing_over_pictures(pair):
+    """Everything else stops at revocation, and this is not an exception to that."""
+    owner, friend = pair
+    with who.acting_as(owner["id"]):
+        song = _song("Kettle")
+        image = _artwork(song)
+    share_id = _share(owner, friend, song)
+    with who.acting_as(owner["id"]):
+        sharing.revoke_share(Ask(params={"id": share_id}))
+
+    with who.acting_as(friend["id"]):
+        with pytest.raises(Error) as raised:
+            sharing.shared_artwork(Ask(params={"id": share_id, "image": str(image)}))
+    assert raised.value.status == 404, (
+        "a revoked share answered %d. A picture that cannot be reached because the share is"
+        " closed and one that cannot be reached because the file is gone are different"
+        " things, and only the first is this test's business." % raised.value.status)
+
+
+def test_a_stranger_cannot_fetch_a_shared_picture(pair):
+    """Not the sender, not the recipient, no."""
+    owner, friend = pair
+    stranger = accounts.create("nosy", "a password", name="Nosy")
+    with who.acting_as(owner["id"]):
+        song = _song("Kettle")
+        image = _artwork(song)
+    share_id = _share(owner, friend, song)
+
+    with who.acting_as(stranger["id"]):
+        with pytest.raises(Error) as raised:
+            sharing.shared_artwork(Ask(params={"id": share_id, "image": str(image)}))
+    assert raised.value.status == 404

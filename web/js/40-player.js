@@ -41,7 +41,26 @@ J.player = (function () {
     /* The last few songs autoplay has chosen, so a small library does not loop three of
      * them. Ids only, never written down anywhere but this tab's memory. */
     lately: [],
+    /* Whatever was handed over to be played, kept so it can be played again.
+     *
+     * state.song is what the bar draws, and for a loose render it is a stand in with an id
+     * like "render:43" that nothing can be played from. This is the real thing.
+     */
+    entry: null,
+    /* Where you have been, newest last, so Previous has somewhere to go.
+     *
+     * The queue cannot answer this on its own. When the queue runs out, autoplay plays one
+     * song as a queue of one, so the index is 0 with nothing behind it: Previous worked out
+     * -1, returned, and then did nothing at all for the rest of the evening. The whole point
+     * of what plays next is that it was never in a list, so the list cannot remember it.
+     *
+     * Never shown and never written down: this tab's memory, the same as lately.
+     */
+    history: [],
   };
+
+  //: How far back Previous can go. Fifty is a long evening and a trivial amount of memory.
+  const HISTORY = 50;
 
   //: The order the repeat button cycles in, and the only values state.repeat takes.
   //:
@@ -82,6 +101,20 @@ J.player = (function () {
   } catch (e) { /* a private window, or something that is not JSON */ }
 
   const el = () => J.$("#player");
+
+  /* The picture for whatever is playing, wherever it comes from.
+   *
+   * Two kinds. A song in your own library has an artwork_id and the ordinary route serves
+   * it. A shared song has neither: its pictures live in somebody else's library and are
+   * only reachable through the share, so whoever started it hands over a ready address.
+   *
+   * One function because there were two copies of the first form, in the bar and in what
+   * the lock screen is told, and a guest would have had to be given a cover twice. */
+  const coverOf = (song) => {
+    if (!song) return null;
+    if (song.art) return song.art;
+    return song.artwork_id ? `/api/artwork/${song.artwork_id}/image` : null;
+  };
   const audioOf = (slot) => J.audio.deck(slot).element;
 
   /* Is the compositor driving playback for the song on screen.
@@ -249,7 +282,86 @@ J.player = (function () {
     });
   }
 
+  /* True while Previous is replaying something out of the history.
+   *
+   * Without it, going back would remember the thing it is going back from, and Previous
+   * twice would walk between two songs for ever instead of walking backwards.
+   */
+  let goingBack = false;
+
+  /* Put what is playing now on the stack, before something else takes its place. */
+  function remember() {
+    if (goingBack || !state.entry) return;
+    /* The list as well as the song. Coming back into the middle of an album with the one
+     * song queue still on the player would leave Next meaning nothing.
+     *
+     * Where in the list is deliberately NOT kept. Both ways back in re-find the entry by
+     * id, so a position carried here would be overwritten by the one they work out, and a
+     * line that cannot change the outcome is a line that looks like it can. The case it
+     * would be for, the same song twice in one list, is not reachable from here anyway:
+     * stepping forward onto the second copy already lands on the first. */
+    state.history.push({
+      entry: state.entry,
+      kind: state.queueKind,
+      queue: state.queue.slice(),
+    });
+    while (state.history.length > HISTORY) state.history.shift();
+  }
+
+  /* What the phone shows while the screen is off.
+   *
+   * There was none of this, and a browser with nothing to go on falls back to the page
+   * title. This app's title is the library's name, so every song on a lock screen was
+   * announced as the library rather than as itself: one name, for everything, for ever.
+   *
+   * The name is not wrong, it is just not the title: it goes in the artist line, which is
+   * what it actually is here.
+   */
+  let toldTheSystem = "";
+  function tellTheSystem() {
+    if (!("mediaSession" in navigator)) return;
+    const session = navigator.mediaSession;
+    if (!state.song) {
+      session.metadata = null;
+      session.playbackState = "none";
+      toldTheSystem = "";
+      return;
+    }
+    const song = state.song;
+    const art = coverOf(song);
+    /* Rebuilt only when it would say something different. A MediaMetadata is a new object
+     * every time, and handing the system a new one on every redraw makes some phones blink
+     * the artwork on each position update. */
+    const key = [song.id, song.title, art || ""].join("|");
+    if (key !== toldTheSystem) {
+      toldTheSystem = key;
+      try {
+        session.metadata = new MediaMetadata({
+          title: song.title || "",
+          artist: (J.state && J.state.name) || "JR!TER",
+          artwork: art ? [{ src: art }] : [],
+        });
+      } catch (e) { /* an engine without MediaMetadata; the rest still works */ }
+    }
+    session.playbackState = state.playing ? "playing" : "paused";
+    /* The scrubber. Only with a real duration: a live or still loading source reports 0 or
+     * Infinity, and both throw here rather than being ignored. */
+    if (session.setPositionState && Number.isFinite(state.duration) && state.duration > 0) {
+      try {
+        session.setPositionState({
+          duration: state.duration,
+          position: J.clamp(state.position, 0, state.duration),
+          playbackRate: 1,
+        });
+      } catch (e) { /* a position the engine did not like; not worth a broken bar */ }
+    }
+  }
+
   function render() {
+    /* First, and outside the early returns below. The lock screen has to be cleared when
+     * the player empties just as much as it has to be filled when it does not, and both of
+     * those leave here before the bar is drawn. */
+    tellTheSystem();
     const node = el();
     if (!node) return;
     if (!state.song) { node.hidden = true; return; }
@@ -257,7 +369,7 @@ J.player = (function () {
 
     const slot = state.slots[state.active];
     const version = slot.version;
-    const art = state.song.artwork_id ? `/api/artwork/${state.song.artwork_id}/image` : null;
+    const art = coverOf(state.song);
     const hasB = !!state.slots.B.version || arranged();
 
     // The whole block leads somewhere, cover and words alike, rather than only the title.
@@ -386,7 +498,12 @@ J.player = (function () {
       const changed = !state.song || state.song.id !== song.id;
       const before = { song: state.song, playing: state.playing };
 
+      // Before anything is overwritten, and only when this is a different song: choosing
+      // another version of the one already playing is not somewhere you can go back from.
+      if (changed) remember();
+
       state.song = song;
+      state.entry = song;
       state.active = "A";
       state.playing = true;
       if (queue) {
@@ -440,10 +557,18 @@ J.player = (function () {
       const item = { id: entry.id, kind: "render", duration: entry.duration || 0,
                      url: entry.url || null };
       const asSong = { id: `render:${entry.id}`, kind: "render",
-                       title: entry.name || entry.filename || "render" };
+                       title: entry.name || entry.filename || "render",
+                       // A share is played through here and its cover is not in this
+                       // library, so whoever started it says where the picture is.
+                       art: entry.art || null };
       const before = { song: state.song, playing: state.playing };
 
+      if (!state.song || state.song.id !== asSong.id) remember();
+
       state.song = asSong;
+      // The render itself, not the stand in above: asSong's id is "render:43", which is
+      // something to draw and nothing that can be played again.
+      state.entry = entry;
       state.active = "A";
       state.playing = true;
       state.slots.A = { version: item, preset: null };
@@ -619,7 +744,15 @@ J.player = (function () {
      * renders. Handing one of those to playSong reads its id as a song id: in a library
      * where that number happens to be a song it plays something unrelated, and in one
      * where it is not, Next silently does nothing. */
-    step(delta) {
+    async step(delta) {
+      /* Backwards off the front of the queue is the history's question, not the queue's.
+       *
+       * Which is most of the time, once autoplay has been involved at all: it plays what it
+       * chose as a queue of one, so the index is 0 and there is nothing before it. Previous
+       * used to work this out, find -1, and return, so from the first autoplayed song
+       * onwards the button did nothing and there was no way to tell it from a dead control.
+       */
+      if (delta < 0 && state.index + delta < 0) return api.back();
       if (!state.queue.length) return;
       const next = state.index + delta;
       if (next < 0 || next >= state.queue.length) return;
@@ -629,8 +762,43 @@ J.player = (function () {
        * Nothing is inferred here any more: the row's own kind is still honoured when it
        * carries one, because a playlist row does, but the queue has the final say. */
       const renders = state.queueKind === "render" || (entry && entry.kind === "render");
-      if (renders) api.playRender(entry, state.queue);
-      else J.playSong(entry, state.queue);
+
+      /* Going backwards spends the history rather than adding to it, whichever route
+       * answers. The queue answers Previous while there is something behind you in it, and
+       * that is still going back: without this it remembered each song as it left it, and
+       * the next Previous popped that same song straight off again. Two presses walked A to
+       * B to A to B for ever instead of walking backwards, which is a worse Previous than
+       * the one that did nothing.
+       */
+      const was = goingBack;
+      if (delta < 0) goingBack = true;
+      try {
+        if (renders) await api.playRender(entry, state.queue);
+        else await J.playSong(entry, state.queue);
+      } finally {
+        goingBack = was;
+      }
+    },
+
+    /* One step back through where you have actually been.
+     *
+     * The queue answers Previous while there is something behind you in it. This answers it
+     * the rest of the time, which after any autoplayed song is all of the time.
+     *
+     * The list it was playing in goes back with it, not just the song, so arriving back in
+     * the middle of an album leaves Next meaning the rest of that album rather than
+     * whatever the one song queue said.
+     */
+    async back() {
+      const was = state.history.pop();
+      if (!was) return;                    // the beginning of the evening; nothing to do
+      goingBack = true;
+      try {
+        if (was.kind === "render") await api.playRender(was.entry, was.queue);
+        else await J.playSong(was.entry, was.queue);
+      } finally {
+        goingBack = false;
+      }
     },
 
     /* Remembered per browser, so the two switches survive a reload.
@@ -676,6 +844,31 @@ J.player = (function () {
 
   J.on("boot", () => {
     const node = el();
+
+    /* The buttons that are not on this page: a lock screen, a headset, a car.
+     *
+     * Set once. Each one separately, because an engine that does not know an action throws
+     * on it, and a single try around the lot would lose every handler after the first
+     * unknown one. Previous goes through step, so it falls back to the history the same way
+     * the button in the bar does.
+     */
+    if ("mediaSession" in navigator) {
+      const acts = {
+        play: () => api.toggle(),
+        pause: () => api.toggle(),
+        stop: () => { if (state.playing) api.toggle(); },
+        previoustrack: () => api.step(-1),
+        nexttrack: () => api.step(1),
+        seekbackward: (d) => api.seek(Math.max(
+          0, state.position - ((d && d.seekOffset) || 10))),
+        seekforward: (d) => api.seek(Math.min(
+          state.duration, state.position + ((d && d.seekOffset) || 10))),
+        seekto: (d) => { if (d && typeof d.seekTime === "number") api.seek(d.seekTime); },
+      };
+      for (const [name, run] of Object.entries(acts)) {
+        try { navigator.mediaSession.setActionHandler(name, run); } catch (e) { /* not known here */ }
+      }
+    }
 
     /* Right clicking whatever is playing. The bar is the one thing on screen at all
      * times, so it is the fastest way to reach the song you are listening to. */

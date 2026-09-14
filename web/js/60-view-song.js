@@ -704,10 +704,6 @@ async function shareSong(ctx) {
   const state = await J.try(() => J.get(`/api/shares?song=${ctx.songId}`));
   if (!state) return;
   const people = state.people || [];
-  if (!people.length) {
-    J.toast("Nobody else has an account on this library yet.");
-    return;
-  }
   const already = state.shares || [];
 
   /* The fields carry name attributes because that is how J.sheet hands them back: it
@@ -720,6 +716,10 @@ async function shareSong(ctx) {
     body: `
       <label class="sheet-label">Who
         <select class="field" name="handle">
+          <!-- First, and the only option at all until somebody else has an account.
+               Choosing a handle needs the other person to already be here and to have told
+               you what they are called; a link needs neither, which is the whole point. -->
+          <option value="">Anyone with the link</option>
           ${people.map((p) => `<option value="${J.esc(p.handle)}">${
             J.esc(p.name)} (${J.esc(p.handle)})</option>`).join("")}
         </select>
@@ -756,9 +756,48 @@ async function shareSong(ctx) {
     },
   });
   if (!answer) return;
-  await J.try(() => J.post("/api/shares", {
+  const made = await J.try(() => J.post("/api/shares", {
     song: ctx.songId, handle: answer.handle, as_name: (answer.as_name || "").trim(),
-  }), "Shared.");
+  }), answer.handle ? "Shared." : "");
+  if (!made || !made.token) return;
+
+  /* The link, shown once, because only its digest is kept. A sheet rather than a toast:
+   * this is the thing that has to be copied somewhere, and a toast takes itself away while
+   * you are still looking for the button. */
+  const url = location.origin + made.path;
+  await J.sheet({
+    title: "Send this link",
+    sub: "Whoever opens it gets this song. They can sign in, or pick a handle and a "
+       + "password there and then. It works once.",
+    confirm: "",
+    cancel: "Done",
+    body: `
+      <input class="field" id="shareLink" readonly value="${J.esc(url)}">
+      <div class="share-play">
+        <button class="btn" type="button" data-copy>Copy the link</button>
+      </div>
+      <p class="faint" style="font-size:12px">
+        This is the only time it is shown. Lose it and you can take the share back and
+        make another.
+      </p>`,
+    onMount(sheet) {
+      const box = sheet.querySelector("#shareLink");
+      if (box) { box.focus(); box.select(); }
+      sheet.addEventListener("click", async (e) => {
+        if (!e.target.closest("[data-copy]")) return;
+        e.preventDefault();
+        try {
+          await navigator.clipboard.writeText(url);
+          J.toast("Copied.");
+        } catch (err) {
+          // No clipboard permission, or an insecure origin. The box is selected and
+          // readable, so saying what to do beats saying that something failed.
+          if (box) { box.focus(); box.select(); }
+          J.toast("Press copy on the selected text.");
+        }
+      });
+    },
+  });
 }
 
 

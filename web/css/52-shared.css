@@ -18,6 +18,43 @@
   margin-top: var(--s4);
 }
 
+/* The artwork, which a guest could not see at all before.
+ *
+ * A row rather than a grid: most songs have one picture and a grid of one is a single cell
+ * stretched across the page. Several scroll, the same answer the timetable gives to being
+ * wider than the space, and for the same reason: shrinking five things to fit makes five
+ * things you cannot see. */
+.share-art {
+  display: flex;
+  gap: var(--s3);
+  margin-top: var(--s4);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: var(--s2);
+}
+.share-art-one {
+  margin: 0;
+  flex: none;
+  max-width: 260px;
+}
+.share-art-one img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  /* A cover is usually square and a photograph is not, so the box follows the picture
+     rather than the picture being cropped into the box. */
+  object-fit: contain;
+  background: var(--surface-2);
+}
+.share-art-one figcaption {
+  margin-top: var(--s2);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
 /* One thing of theirs, with the button that makes it yours.
  *
  * Bordered rather than plain, so it reads as a container with a boundary: what is inside is
@@ -69,3 +106,22 @@
   user-select: all;
 }
 .code-out:hover { border-color: var(--accent-line); }
+
+/* The screen a share link opens.
+ *
+ * The song's name is the one thing somebody is looking for when they follow a link from a
+ * message, so it is the one thing set larger than everything around it. */
+.join-song {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin: var(--s3) 0 var(--s2);
+}
+.join-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  margin-top: var(--s5);
+  max-width: 360px;
+}

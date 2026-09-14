@@ -76,7 +76,13 @@ SCHEMA = [
       -- inside one account's database, so the pair is the address.
       from_account INTEGER NOT NULL,
       song_id      INTEGER NOT NULL,
+      -- Who it is for. NOBODY_YET until a link share is opened by somebody, which is why
+      -- this is a sentinel rather than a null: the column is NOT NULL in every database
+      -- that already exists, and a rebuild to relax that is a lot of risk for a zero.
       to_account   INTEGER NOT NULL,
+      -- A link share, kept the way invites are: only the digest, so the file cannot hand
+      -- anybody a working link. Empty for a share made straight to a handle.
+      token_digest TEXT NOT NULL DEFAULT '',
       -- What the recipient is called on this share. Optional: given one, their edits are
       -- named after them.
       as_name      TEXT NOT NULL DEFAULT '',
@@ -126,9 +132,22 @@ def _conn():
         if not _ready:
             for statement in SCHEMA:
                 conn.execute(statement)
+            _migrate(conn)
             conn.commit()
             _ready = True
     return conn
+
+
+def _migrate(conn):
+    """Columns added to a table that already exists somewhere.
+
+    SCHEMA is CREATE TABLE IF NOT EXISTS, so a column added up there reaches a fresh
+    database and never an old one. This is the other half, and it is deliberately the
+    dullest kind of migration there is: add a column, with a default, if it is not there.
+    """
+    have = {row["name"] for row in conn.execute("PRAGMA table_info(shares)")}
+    if "token_digest" not in have:
+        conn.execute("ALTER TABLE shares ADD COLUMN token_digest TEXT NOT NULL DEFAULT ''")
 
 
 def close():
@@ -358,11 +377,60 @@ def drop_invite(invite_id, made_by):
 # the whole of the permission model. jriter/modules/sharing.py is the only caller, and it is
 # the only place that turns one of these into an actual crossing.
 
-def add_share(from_account, song_id, to_account, as_name=""):
-    cur = _run("INSERT INTO shares (from_account, song_id, to_account, as_name, created_at) "
-               "VALUES (?, ?, ?, ?, ?)",
-               (from_account, song_id, to_account, as_name, time.time()))
+#: A share that has been made but not yet opened by anybody.
+#:
+#: Zero rather than null, because to_account is NOT NULL in every database that already
+#: exists and relaxing that means rebuilding the table. No account has id 0.
+NOBODY_YET = 0
+
+
+def _share_digest(raw):
+    return hashlib.sha256(("jriter-share:" + (raw or "")).encode("utf-8")).hexdigest()
+
+
+def add_share(from_account, song_id, to_account, as_name="", token_digest=""):
+    cur = _run("INSERT INTO shares (from_account, song_id, to_account, as_name, "
+               "created_at, token_digest) VALUES (?, ?, ?, ?, ?, ?)",
+               (from_account, song_id, to_account, as_name, time.time(), token_digest))
     return cur.lastrowid
+
+
+def make_share_link(from_account, song_id, as_name=""):
+    """A share with nobody on the other end yet, and the one link that claims it.
+
+    The code comes back once and only its digest is kept, the same as an invite, so this
+    file never holds anything that would open somebody's song.
+    """
+    raw = secrets.token_urlsafe(18)
+    share_id = add_share(from_account, song_id, NOBODY_YET, as_name, _share_digest(raw))
+    return share_id, raw
+
+
+def share_by_token(raw):
+    """The unclaimed, unrevoked share this link opens, or None."""
+    row = _one("SELECT * FROM shares WHERE token_digest = ? AND token_digest != ''",
+               (_share_digest(raw),))
+    if not row or row["revoked_at"] or row["to_account"] != NOBODY_YET:
+        return None
+    return row
+
+
+def claim_share(share_id, to_account):
+    """Hand a link share to whoever opened it, once.
+
+    The token is cleared in the same statement, so a link works exactly once however many
+    people it was forwarded to.
+
+    Two things enforce that and they are not the same thing. share_by_token refuses a share
+    that already has an owner, which is what a forwarded link meets. The WHERE clause here
+    is for the case that one cannot see: two people opening the same link close enough
+    together that both get past the lookup. Then exactly one UPDATE matches, and the other
+    is told the link is closed, which it is.
+    """
+    cur = _run("UPDATE shares SET to_account = ?, token_digest = '' "
+               "WHERE id = ? AND to_account = ? AND revoked_at = 0",
+               (to_account, share_id, NOBODY_YET))
+    return cur.rowcount == 1
 
 
 def share(share_id):

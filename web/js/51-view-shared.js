@@ -27,7 +27,9 @@ J.views.shared = {
           <div class="tracks">
             ${rows.map((row) => `
               <a class="track shared-row" href="#/shared/${row.share}" data-link>
-                ${J.cover({ title: row.title })}
+                ${J.cover({ title: row.title,
+                            url: row.art
+                              ? `/api/shared/${row.share}/artwork/${row.art}` : null })}
                 <span class="grow truncate">
                   <span class="t truncate">${J.esc(row.title)}</span>
                   <span class="s truncate">from ${J.esc(row.from)}${
@@ -57,6 +59,18 @@ J.views.share = {
           <h2>${J.esc(data.song.title)}</h2><span class="grow"></span>
           <span class="tag">from ${J.esc(data.from)}</span>
         </div>
+
+        <!-- The cover, which a guest could not see at all before. It was shared on
+             purpose, so there is nothing here to hold back. -->
+        ${(data.artwork || []).length ? `
+          <div class="share-art">
+            ${data.artwork.map((image) => `
+              <figure class="share-art-one">
+                <img src="/api/shared/${data.share}/artwork/${image.id}"
+                     alt="${J.esc(image.caption || data.song.title)}" loading="lazy">
+                ${image.caption ? `<figcaption>${J.esc(image.caption)}</figcaption>` : ""}
+              </figure>`).join("")}
+          </div>` : ""}
         <p class="faint" style="margin-top:0">
           ${data.as_name
             ? `You are <b>${J.esc(data.as_name)}</b> on this, so anything you save is
@@ -140,6 +154,11 @@ J.views.share = {
           id: `share-${params.id}`, kind: "render",
           name: data.song.title, title: data.song.title,
           url: `/api/shared/${params.id}/audio`,
+          // The cover travels with it, so the bar and the lock screen show the song
+          // rather than a letter in a box. Its own address, because these pictures are
+          // in somebody else's library and only the share reaches them.
+          art: (data.artwork || []).length
+            ? `/api/shared/${params.id}/artwork/${data.artwork[0].id}` : null,
         }, []);
         return;
       }
