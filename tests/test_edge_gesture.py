@@ -34,6 +34,75 @@ CSS = open(os.path.join(HERE, "web", "css", "48-edge-bubble.css"), encoding="utf
 INDEX = open(os.path.join(HERE, "web", "index.html"), encoding="utf-8").read()
 
 
+def test_holding_it_open_is_not_the_same_as_pulling_it_out():
+    """The rail has to come visibly past its stop, not merely twitch.
+
+    Reported: "foyer comes up even if i just open the sidpanel a bit and hold it". It did.
+    The threshold was 16 and it was compared against the raw finger position, while the
+    comment worked out that 16 came to about fifty pixels of thumb "under the band", which
+    is the arithmetic backwards: past the stop the rail returns BAND of what the finger
+    asks, so 16 of finger is five of rail and not the other way about.
+
+    Measured on a 375px phone before the change: ten pixels of thumb past the stop armed it
+    and the rail moved six. After: it arms at 56 of thumb, which is 18 of rail.
+
+    So the two numbers are derived from one another now rather than written down separately.
+    A comment can be wrong about a multiplication; it cannot be wrong about the division
+    that produces the value.
+    """
+    band = re.search(r"const BAND = ([\d.]+);", BOOT)
+    assert band, "the overscroll band is gone, so nothing here can be worked out"
+    band = float(band.group(1))
+
+    rail = re.search(r"const PAST_RAIL = (\d+);", BOOT)
+    assert rail, (
+        "the threshold is no longer expressed as a distance the rail visibly moves. That is"
+        " the half a person can see, and writing the finger distance down instead is what"
+        " let the two disagree.")
+    rail = int(rail.group(1))
+
+    derived = re.search(r"const PAST = ([^;]+);", BOOT)
+    assert derived, "there is no threshold at all"
+    assert "PAST_RAIL" in derived.group(1) and "BAND" in derived.group(1), (
+        "PAST is written down as %s rather than worked out from the rail distance and the"
+        " band, so the two can drift apart again." % derived.group(1).strip())
+
+    # And what that comes to has to be a pull rather than a nudge.
+    thumb = round(rail / band)
+    assert thumb >= 40, (
+        "the gesture arms after %d pixels of thumb, which is a nudge. A rail that has moved"
+        " %d pixels is not one somebody is deliberately holding out." % (thumb, rail))
+    assert rail >= 12, (
+        "the rail only comes %d pixels past its stop before this arms, which is not a"
+        " movement anybody would see they were making." % rail)
+
+
+def test_the_threshold_is_measured_against_the_finger_and_not_the_rail():
+    """Which is the mistake, stated as a test.
+
+    railTo() applies the band for the drawing only; drag.at stays the raw finger position.
+    So the comparison has to be against drag.at, and the number it is compared to has to be
+    in finger pixels, which is what deriving it from the band makes true.
+    """
+    guard = re.search(r"if \((drag\.\w+) >= PAST\)", BOOT)
+    assert guard, "nothing compares anything to PAST any more"
+    assert guard.group(1) == "drag.at", (
+        "the threshold is compared against %s. drag.at is the finger; anything that has"
+        " been through railTo is the rail, and mixing them is what caused this."
+        % guard.group(1))
+
+
+def test_coming_back_inside_the_threshold_takes_the_offer_away():
+    """Pulling out and easing back is a change of mind, not a slower version of the same
+    gesture."""
+    move = BOOT[BOOT.index("if (drag.at >= PAST)"):]
+    move = move[:move.index("}, { passive: true });")]
+    assert "else" in move and "withdrawBubble()" in move, (
+        "nothing withdraws the offer when the rail comes back inside the threshold, so it"
+        " stands from the moment it is crossed however far back the thumb comes: %s"
+        % move.strip()[:200])
+
+
 def test_it_says_where_it_goes():
     """Foyer, not About.
 

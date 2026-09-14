@@ -22,6 +22,24 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.9.1",
+        "date": "2026-09-14",
+        "name": JRITER,
+        "title": "Foyer came up when you had only opened the menu",
+        "notes": [
+            "Holding the rail out is meant to offer the way to Foyer, and it was arming on "
+            "a twitch: sixteen pixels of thumb past the stop, which moved the rail about "
+            "five. Open the menu a little briskly, keep your thumb still for a second, and "
+            "you were being offered another site.",
+            "The number was in the wrong units. Past its stop the rail follows about a "
+            "third of the finger, and the threshold was being compared against the finger "
+            "while its note worked out what it would mean for the rail. It is written as "
+            "the distance the rail visibly comes out now, eighteen pixels, and the thumb "
+            "travel is divided out from it, so the two cannot disagree again. Measured on "
+            "a phone: it used to arm at ten pixels of thumb and now takes fifty six.",
+        ],
+    },
+    {
         "version": "3.9.0",
         "date": "2026-09-14",
         "name": JRITER,

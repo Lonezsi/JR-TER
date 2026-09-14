@@ -518,11 +518,26 @@ async function boot() {
   //: the rail the offer has not been made yet: you cannot press a thing you are holding
   //: the screen down with.
   const OFFERED = 2000;
-  //: How far past open counts as holding it there rather than merely having opened it.
-  //: Under the overscroll band, which moves the rail a third of the finger, so this is
-  //: about fifty pixels of actual thumb travel past the stop: far enough that nobody
-  //: arrives here by opening the rail briskly.
-  const PAST = 16;
+  /* How far past open counts as holding it there rather than merely having opened it.
+   *
+   * TWO NUMBERS, AND ONLY ONE OF THEM IS WRITTEN DOWN. The first is how far the rail has to
+   * visibly come out past its stop: eighteen pixels, which is a movement you can see and
+   * would not make by accident. The second is the thumb travel that produces it, and it is
+   * derived, because past the stop the rail gives back only BAND of what the finger asks
+   * for.
+   *
+   * They used to be one number and the wrong way round. The threshold was 16, compared
+   * against the raw finger position, with a comment saying that came to about fifty pixels
+   * of thumb "under the band" - which is the arithmetic backwards: 16 of finger is five of
+   * rail, not the other way about. So the gesture armed on a nudge. Measured on a phone
+   * before it was changed: ten pixels of thumb past the stop armed it, and the rail moved
+   * six. A six pixel twitch, held for a second, opened another site.
+   *
+   * Derived rather than written down so the two cannot disagree again. The comment was the
+   * half that was wrong last time, and a comment cannot be wrong about a division.
+   */
+  const PAST_RAIL = 18;
+  const PAST = Math.round(PAST_RAIL / BAND);
 
   /* There is no list of things that are too pressable to swipe over any more.
    *
