@@ -393,51 +393,86 @@ J.views.orarend = {
     const frame = J.$("#ttFit");
     let told = { hour: null, fit: null, height: null };
 
+
+    /* EVERY MEASUREMENT BEFORE EVERY CHANGE, and both of them once.
+     *
+     * Reading a width after writing a style makes the browser lay the page out there and
+     * then, in the middle of this function, because the answer it is about to give depends
+     * on what was just written. Three reads with two writes between them is three layouts
+     * of a grid of forty five cards, on a resize that sends one of these a frame: it ran
+     * at twenty frames a second while the rail was opening, which is the one moment this
+     * is asked to do anything at all.
+     *
+     * So: the three numbers this needs are taken together, off one layout, and then the
+     * three it writes go out together. The one exception is the height, which cannot be
+     * known until the hour is set, and is measured once at the end. */
+    function measure() {
+      const day = grid.querySelector(".tt-day");
+      if (!day) return null;
+      const have = frame.clientWidth;
+      const wide = grid.offsetWidth;         // laid out, before the scale is applied
+      const hour = day.offsetWidth * HOUR_OF_DAY;
+      return have && wide ? { have: have, wide: wide, hour: hour } : null;
+    }
+
     function fitToRoom() {
       if (!frame || !grid.isConnected) return;
-      const day = grid.querySelector(".tt-day");
-      const have = frame.clientWidth;
-      if (!day || !have) return;
+      const now = measure();
+      if (!now) return;
 
-      // First how tall an hour is, because the table's height depends on it.
-      const hour = day.offsetWidth * HOUR_OF_DAY;
-      if (hour !== told.hour) {
-        told.hour = hour;
-        grid.style.setProperty("--tt-hour", hour.toFixed(2) + "px");
-      }
+      // Never above one: a screen with room for the whole table gets it at its own size,
+      // so a desktop is untouched and nothing is blown up.
+      const fit = Math.min(1, now.have / now.wide);
+      if (now.hour === told.hour && fit === told.fit) return;
 
-      // Then how much of it fits. Never above one: a screen with room for the whole table
-      // gets it at its own size, so a desktop is untouched and nothing is blown up.
-      const wide = grid.offsetWidth;        // laid out, before the scale is applied
-      if (!wide) return;
-      const fit = Math.min(1, have / wide);
-      if (fit !== told.fit) {
-        told.fit = fit;
-        grid.style.setProperty("--tt-fit", fit);
-      }
+      told.hour = now.hour;
+      told.fit = fit;
+      grid.style.setProperty("--tt-hour", now.hour.toFixed(2) + "px");
+      grid.style.setProperty("--tt-fit", fit);
 
       /* And the room it ends up taking. A transform does not change the box a parent
        * reserves, so without this a third height table sits in a full height hole.
        *
-       * Written only when it changes, because this element is the one being watched and
-       * writing the same height back on every notification is a loop looking for a reason. */
+       * MEASURED, THOUGH IT COULD BE WORKED OUT. The grid's height is a straight line in
+       * the hour, so this could be the constant part plus fourteen hours of it, learned
+       * once and never read again. It was, briefly. It came to nothing worth having: the
+       * cost of this whole function is under a millisecond either way, and the version
+       * that does arithmetic is the version that is wrong the day something else changes
+       * the height of the header. */
       const height = Math.ceil(grid.offsetHeight * fit) + "px";
       if (height !== told.height) {
         told.height = height;
         frame.style.height = height;
       }
     }
+
+    /* One fit per frame, however many notifications arrive.
+     *
+     * A drag sends these faster than the screen redraws, and every one of them past the
+     * first in a frame is arithmetic nobody will ever see. */
+    let due = 0;
+    function fitSoon() {
+      if (due) return;
+      due = requestAnimationFrame(function () { due = 0; fitToRoom(); });
+    }
     fitToRoom();
 
     /* And again whenever there is a different amount of room: a rotated phone, a resized
-     * window, the rail opening or closing beside it. Watching the frame rather than the
-     * window catches all three with one answer. */
+     * window, the rail opening or closing beside it. Watching the room rather than the
+     * window catches all three with one answer.
+     *
+     * THE ROOM, AND NOT THE FRAME. The frame is the element this writes a height onto, and
+     * an observer watching something it also changes is handed its own writing back as a
+     * new notification: the width it cares about never moved, so the extra round decides
+     * nothing, and it arrives on every frame of a drag. The room's width is the question
+     * being asked, and nothing here ever answers it. */
+    const room = frame.parentElement || frame;
     if (window.ResizeObserver) {
       if (J.orarendFit) J.orarendFit.disconnect();
-      J.orarendFit = new ResizeObserver(fitToRoom);
-      J.orarendFit.observe(frame);
+      J.orarendFit = new ResizeObserver(fitSoon);
+      J.orarendFit.observe(room);
     } else {
-      window.addEventListener("resize", fitToRoom);
+      window.addEventListener("resize", fitSoon);
     }
 
     grid.addEventListener("click", (e) => {

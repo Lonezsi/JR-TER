@@ -641,7 +641,7 @@ def test_the_grid_is_never_scaled_up():
     heading. The desktop picture is the picture, and it is already the right size there.
     """
     view = io.open(VIEW, encoding="utf-8").read()
-    assert re.search(r"Math\.min\(1,\s*have / wide\)", view), (
+    assert re.search(r"Math\.min\(1,\s*[\w.]*have / [\w.]*wide\)", view), (
         "the fit is not held at one, so a wide screen blows the week up rather than leaving"
         " it alone")
 
