@@ -64,6 +64,12 @@ TAKEN = {
     "youtube_posts": ("id", "song_id", "version_id", "url", "title", "status", "note",
                       "created_at", "updated_at", "video_id", "mix_digest"),
     "sync_folders": ("id", "path", "enabled", "last_scan", "created_at"),
+    # The week itself is a file rather than a table, so it is not here and does not need to
+    # be: a copy of the library is a copy of what the library holds, and it holds these.
+    # They are somebody's own writing about their own subjects, which is exactly the kind of
+    # thing "take a copy" is for.
+    "orarend_notes": ("id", "subject", "absences", "created_at", "updated_at"),
+    "orarend_pages": ("id", "note_id", "position", "text", "created_at", "updated_at"),
     # The name and the scope of each machine token, so you can see what has been let in.
     # Never `digest`: that column is what the token is checked against.
     "auth_tokens": ("id", "name", "scope", "created_at", "last_used"),

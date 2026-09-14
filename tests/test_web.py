@@ -1175,3 +1175,39 @@ def test_a_sample_library_is_never_offered_as_a_render():
     # And without the exclusion it plainly would, so the check above is not vacuous.
     everything = sorted(os.path.basename(p) for p in sync._walk(top))
     assert len(everything) == 5, everything
+
+
+def test_a_request_body_can_be_read_more_than_once(server):
+    """The body is a socket, so reading it twice used to read it once and then read nothing.
+
+    The second call got an empty string and raised "that request body is not JSON", which is
+    a true sentence about an empty string and a thoroughly misleading thing to be told about
+    a request that was perfectly good. Found by writing a handler that checked one field
+    before using the rest, which is an obvious way to write one, so the fix is here rather
+    than in that handler.
+    """
+    from jriter.wire import Request
+
+    class Socket:
+        """A body that can only be handed over once, like the real one."""
+
+        def __init__(self, raw):
+            self.raw = raw
+            self.reads = 0
+
+        def read(self, n):
+            self.reads += 1
+            out, self.raw = self.raw[:n], self.raw[n:]
+            return out
+
+    raw = b'{"subject": "Logika Gy", "absences": 2}'
+    body = Socket(raw)
+    req = Request("PUT", "/api/orarend/notes", {},
+                  {"Content-Length": str(len(raw))}, body)
+
+    first = req.json()
+    second = req.json()
+    assert first == second == {"subject": "Logika Gy", "absences": 2}
+    assert body.reads == 1, (
+        "the body was read %d times. Every read after the first gets what is left of a"
+        " stream that has already been drained." % body.reads)

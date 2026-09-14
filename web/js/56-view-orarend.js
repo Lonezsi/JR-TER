@@ -92,6 +92,7 @@ J.views.orarend = {
 
     function stripe(entry) {
       return `<button class="tt-stripe" data-at="${entry.key}" type="button"
+                      data-who="${whoIndex(entry.whose)}"
                       style="top:${top(entry)}px;height:${tall(entry)}px;--lane:${
                         entry.lane}"
                       aria-label="${J.esc(entry.whose)}: ${J.esc(entry.name)}, ${
@@ -103,6 +104,135 @@ J.views.orarend = {
      * Foyer used a bare <dialog> because it had nothing else. Here there is a sheet that
      * every other screen opens, and a second kind of modal on one page is a second set of
      * rules for Escape, for the backdrop and for where focus goes. */
+    /* One subject's notes, drawn into the sheet a class opens.
+     *
+     * Kept out of the sheet's own resolve value on purpose. J.sheet hands back the fields
+     * inside it when it is confirmed, which suits a form; this is not one. Everything here
+     * saves as it is pressed, because a note you typed and lost because you closed the
+     * wrong way is worse than no note.
+     */
+    async function notebook(sheet, entry) {
+      const box = sheet.querySelector("[data-notes]");
+      if (!box) return;
+      const subject = entry.name;
+      const where = "/api/orarend/notes?subject=" + encodeURIComponent(subject);
+
+      let state = null;
+      let at = 0;              // which page is open
+      let saving = null;       // the timer that writes the page being typed
+
+      function ticks() {
+        /* Three boxes, and the count is the number of them ticked.
+         *
+         * Ticking the second ticks the first: they are one number shown as three boxes,
+         * not three independent facts, and "absent on the second occasion but not the
+         * first" is not a thing anybody means. Pressing the one that is already the last
+         * ticked unticks it, so a miscount is one press to fix. */
+        return `<div class="tt-miss" role="group" aria-label="Hiányzások">
+          ${Array.from({ length: state.allowed }, (_, i) => `
+            <button type="button" class="tt-miss-box${i < state.absences ? " on" : ""}"
+                    data-miss="${i + 1}"
+                    aria-pressed="${i < state.absences}"
+                    aria-label="${i + 1}. hiányzás">${
+              i < state.absences ? J.menu.icon("check", 14) : ""}</button>`).join("")}
+          <span class="tt-miss-said">${state.absences} / ${state.allowed} hiányzás</span>
+        </div>`;
+      }
+
+      function pager() {
+        if (!state.pages.length) {
+          return `<p class="faint tt-pages-none">Nincs még jegyzet.</p>`;
+        }
+        const page = state.pages[at];
+        return `
+          <div class="tt-pages-bar">
+            <button type="button" class="icon-btn" data-page="-1" aria-label="Előző oldal"
+                    ${at === 0 ? "disabled" : ""}>&lsaquo;</button>
+            <span class="tt-pages-at">${at + 1} / ${state.pages.length}</span>
+            <button type="button" class="icon-btn" data-page="1" aria-label="Következő oldal"
+                    ${at >= state.pages.length - 1 ? "disabled" : ""}>&rsaquo;</button>
+            <span class="grow"></span>
+            <button type="button" class="btn sm ghost" data-drop-page="${page.id}">
+              Oldal törlése</button>
+          </div>
+          <textarea class="field tt-page" data-page-id="${page.id}" rows="9"
+                    placeholder="Markdown. Amit ide írsz, mentődik."
+                    >${J.esc(page.text)}</textarea>
+          <div class="tt-page-read" data-preview>${
+            page.text.trim() ? J.md(page.text) : ""}</div>`;
+      }
+
+      function draw() {
+        box.innerHTML = `
+          ${ticks()}
+          <div class="tt-pages">
+            <div class="tt-pages-head">
+              <span>Jegyzetek</span>
+              <span class="grow"></span>
+              <button type="button" class="btn sm" data-add-page>Új oldal</button>
+            </div>
+            ${pager()}
+          </div>`;
+      }
+
+      async function send(method, path, body) {
+        const got = await J.try(() => J[method](path, body));
+        if (!got) return;
+        state = got;
+        if (at >= state.pages.length) at = Math.max(0, state.pages.length - 1);
+        draw();
+      }
+
+      state = await J.try(() => J.get(where));
+      if (!state) return;
+      draw();
+
+      box.addEventListener("click", (e) => {
+        const miss = e.target.closest("[data-miss]");
+        if (miss) {
+          const n = Number(miss.dataset.miss);
+          // Pressing the last ticked box unticks it, so the row is its own undo.
+          const want = n === state.absences ? n - 1 : n;
+          return send("put", "/api/orarend/notes", { subject, absences: want });
+        }
+        if (e.target.closest("[data-add-page]")) {
+          at = state.pages.length;
+          return send("post", "/api/orarend/notes/pages", { subject, text: "" });
+        }
+        const drop = e.target.closest("[data-drop-page]");
+        if (drop) {
+          return send("del", `/api/orarend/notes/pages/${drop.dataset.dropPage}`);
+        }
+        const turn = e.target.closest("[data-page]");
+        if (turn) {
+          at = J.clamp(at + Number(turn.dataset.page), 0, state.pages.length - 1);
+          draw();
+        }
+      });
+
+      /* Typing saves itself, a moment after the typing stops.
+       *
+       * Not on every keystroke, which is a write per character, and not only on close,
+       * because the sheet can be dismissed with Escape, with the backdrop, or by the phone
+       * going away, and none of those are a decision to throw the page out. The preview
+       * follows the same beat rather than every keystroke: re-rendering markdown under the
+       * caret on every letter is what makes a text box feel slow.
+       */
+      box.addEventListener("input", (e) => {
+        const field = e.target.closest("[data-page-id]");
+        if (!field) return;
+        clearTimeout(saving);
+        saving = setTimeout(() => {
+          const preview = box.querySelector("[data-preview]");
+          if (preview) preview.innerHTML = field.value.trim() ? J.md(field.value) : "";
+          const page = state.pages.find((x) => String(x.id) === field.dataset.pageId);
+          if (page) page.text = field.value;
+          J.try(() => J.put(`/api/orarend/notes/pages/${field.dataset.pageId}`,
+                            { text: field.value }));
+        }, 600);
+      });
+    }
+
     function detail(entry) {
       J.sheet({
         title: entry.name,
@@ -115,11 +245,14 @@ J.views.orarend = {
             <div class="tt-fact"><span>Típus</span><b>${
               J.esc(KIND_SAID[entry.kind] || entry.kind)}</b></div>
             <div class="tt-fact"><span>Kinek</span><b class="${
-              entry.whose === "me" ? "" : "tt-friend-name"}">${
+              entry.whose === "me" ? "" : "tt-friend-name"}" data-who="${
+              entry.whose === "me" ? "" : whoIndex(entry.whose)}">${
               J.esc(entry.whose === "me" ? "Saját" : entry.whose)}</b></div>
           </div>
           ${entry.skip ? `<p class="tt-sheet-note">Erre az előadásra nem járok, ezért csak
-            egy csík jelöli. Az idősáv így nem látszik szabadnak.</p>` : ""}`,
+            egy csík jelöli. Az idősáv így nem látszik szabadnak.</p>` : ""}
+          <div class="tt-notes" data-notes></div>`,
+        onMount(sheet) { notebook(sheet, entry); },
       });
     }
 
@@ -149,6 +282,19 @@ J.views.orarend = {
 
     CLASSES.forEach((entry, i) => { entry.key = String(i); });
 
+    /* Everybody on this timetable who is not me, numbered.
+     *
+     * Sorted rather than in the order they happen to appear, so a person keeps the same
+     * colour when a class is added, moved or dropped. A colour that changes because
+     * somebody's Monday was cancelled is worse than no colour.
+     *
+     * The number is all this decides. Which colour it means is in the stylesheet, with
+     * every other colour on the page.
+     */
+    const people = [...new Set(CLASSES.filter((e) => e.whose !== "me")
+                                      .map((e) => e.whose))].sort();
+    const whoIndex = (name) => Math.max(0, people.indexOf(name));
+
     const hours = [];
     // Up to but not including TO: the label "21:00" is the row from 21:00 to 22:00, so a
     // label for 22:00 would be an hour of grid after the day has ended.
@@ -167,9 +313,6 @@ J.views.orarend = {
           ${theirs.map(stripe).join("")}
         </div>`;
     }).join("");
-
-    const whose = [...new Set(CLASSES.filter((e) => e.whose !== "me")
-                                     .map((e) => e.whose))];
 
     root.innerHTML = `
       <div class="section">
@@ -194,8 +337,8 @@ J.views.orarend = {
         <span><i class="tt-key tt-key-ea"></i>Előadás</span>
         <span><i class="tt-key tt-key-gy"></i>Gyakorlat</span>
         <span><i class="tt-key tt-key-skip"></i>Nem látogatott</span>
-        ${whose.length ? `<span><i class="tt-key tt-key-friend"></i>${
-          J.esc(whose.join(", "))} órája</span>` : ""}
+        ${people.map((name, i) => `<span><i class="tt-key tt-key-friend"
+          data-who="${i}"></i>${J.esc(name)} órája</span>`).join("")}
       </div>
       </div>`;
 

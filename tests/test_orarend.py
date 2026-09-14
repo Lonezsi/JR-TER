@@ -55,6 +55,19 @@ FROM, TO, HOUR = orarend.FROM, orarend.TO, orarend.HOUR
 #:   Thursday   a class ending on a half hour, so the height is not a whole number of rows
 #:   Friday     nothing, because an empty day is a real day
 WEEK = {"classes": [
+    # A second person, so "whose stripe is that" is a question the week can ask. One colour
+    # answered it while there was one of them and stopped answering it at two.
+    #
+    # FIRST IN THIS LIST AND LAST IN THE ALPHABET, both deliberately. The numbering is by
+    # name, so that a person keeps their colour when a class is added or dropped; with the
+    # two orders agreeing, taking the sort out changed nothing and the test for it passed
+    # against either rule.
+    #
+    # Wednesday, not Tuesday: Tuesday is the three-at-once fixture and a fourth stripe in
+    # that hour makes it four, which is a different test.
+    {"day": 2, "at": "16:00", "to": "17:00", "kind": "gy", "whose": "Zed",
+     "name": "A másik vendég órája", "where": "H terem"},
+
     {"day": 0, "at": "08:00", "to": "10:00", "kind": "ea", "whose": "me",
      "name": "Első tárgy Ea", "where": "A terem"},
     {"day": 0, "at": "08:00", "to": "09:00", "kind": "gy", "whose": "Vendég",
@@ -145,6 +158,7 @@ class Grid(html.parser.HTMLParser):
             self._box = {
                 "classes": classes,
                 "at": at.get("data-at"),
+                "who": at.get("data-who"),
                 "label": at.get("aria-label", ""),
                 "text": "",
                 "tag": "",
@@ -317,6 +331,84 @@ def test_three_at_once_get_three_lanes():
     assert sorted(int(b["lane"]) for b in clashing) == [0, 1, 2], (
         "three classes at the same hour landed in lanes %s"
         % sorted(int(b["lane"]) for b in clashing))
+
+
+# ── whose stripe is that ─────────────────────────────────────────────────────
+
+def test_each_person_gets_their_own_number():
+    """The view hands out a number per person; the stylesheet decides what it looks like.
+
+    A colour written by a script is a colour the stylesheet cannot see, and every other hue
+    on this page is in the stylesheet. So the script says which person, and nothing else.
+    """
+    got, _ = grid()
+    stripes = [b for _, boxes in got.days for b in boxes if b["stripe"]]
+    assert stripes, "there are no stripes at all, so this says nothing"
+
+    by_person = {}
+    for _, boxes in got.days:
+        for box in boxes:
+            if not box["stripe"]:
+                continue
+            # The label starts with the name, which is how a screen reader hears it.
+            who = box["label"].split(":")[0]
+            by_person.setdefault(who, set()).add(box["who"])
+
+    assert len(by_person) >= 2, (
+        "only one person is on this timetable, so nothing here is being tested: %s"
+        % sorted(by_person))
+    for name, numbers in by_person.items():
+        assert numbers and len(numbers) == 1, (
+            "%s's stripes carry %s. One person is one colour, or the week is unreadable."
+            % (name, sorted(numbers)))
+    handed = [next(iter(v)) for v in by_person.values()]
+    assert len(set(handed)) == len(handed), (
+        "two people were given the same number, so their stripes are the same colour: %s"
+        % {k: next(iter(v)) for k, v in by_person.items()})
+
+
+def test_the_numbering_is_by_name_rather_than_by_appearance():
+    """So a person keeps their colour when a class is added, moved or dropped.
+
+    In the order they first appear, somebody's Monday being cancelled would repaint the
+    whole week. Sorted, nothing moves but the thing that changed.
+    """
+    got, _ = grid()
+    seen = {}
+    for _, boxes in got.days:
+        for box in boxes:
+            if box["stripe"]:
+                seen.setdefault(box["label"].split(":")[0], box["who"])
+    in_order = [name for name, _ in sorted(seen.items(), key=lambda kv: int(kv[1]))]
+    assert in_order == sorted(seen), (
+        "the numbers do not follow the names in order: %s" % seen)
+
+
+def test_there_is_a_colour_for_every_number_the_view_can_hand_out():
+    """A person with no colour of their own falls back to the first one, silently.
+
+    Which is the bug this whole thing is about, reappearing at whatever number the palette
+    runs out at. If a fourth person is ever added, this fails rather than quietly drawing
+    them as the first.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    covered = set(re.findall(r'\[data-who="(\d+)"\]', sheet))
+
+    got, _ = grid()
+    handed = {b["who"] for _, boxes in got.days for b in boxes if b["stripe"]}
+    assert handed, "no stripe carries a number, so there is nothing to colour"
+
+    # Nought is the one the base rule already draws; every other number needs its own.
+    #
+    # Counted per number rather than as a total on purpose. A total lets a gap hide: drop
+    # the rule for 1 while 2 is still there and the count is unchanged, so the first
+    # version of this passed with the second person drawn as the first.
+    for number in sorted(handed - {"0"}):
+        assert number in covered, (
+            "somebody is drawn as data-who=%s and the stylesheet has no rule for it, so"
+            " they fall back to the first person's colour. Rules present: %s"
+            % (number, sorted(covered) or "none"))
 
 
 # ── the lecture that is not attended ─────────────────────────────────────────

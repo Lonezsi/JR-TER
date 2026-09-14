@@ -24,6 +24,24 @@
      stays clear of the amber --warn already means. Fixed on purpose: see above. */
   --tt-friend: #E0679E;
 
+  /* And one each for the people after the first.
+   *
+   * One colour was right while there was one other person on the page: "not mine" was a
+   * single category and a single hue said it. With two, every stripe still said "not
+   * mine" and nine of them on a Wednesday said nothing about which of them was whose,
+   * which is the one question the stripes are there to answer.
+   *
+   * Evenly spaced round the wheel from the first, same saturation and lightness, so no
+   * one person reads as louder than another: 333, 213 and 93 degrees. Measured against
+   * what is already spoken for rather than picked by eye. All three clear the amber of
+   * --warn and the red of --bad by a wide margin, none of them sits near the accent at
+   * 348, and on the panel they come to 6.2, 7.0 and 12.5 to 1.
+   *
+   * Three because a fourth person would have to share, and sharing silently is worse
+   * than the view saying so. */
+  --tt-friend-2: #679DE0;
+  --tt-friend-3: #9DE067;
+
   /* How wide the collapsed strip of a lecture that is not attended is, and therefore how
      far the class beside it has to start. One number, used by both, so they cannot
      disagree and leave a gap or an overlap. */
@@ -202,7 +220,7 @@
   padding: 0;
   border: 0;
   border-radius: var(--r-pill);
-  background: var(--tt-friend);
+  background: var(--who, var(--tt-friend));
   cursor: pointer;
   transition: transform var(--fast), filter var(--fast);
 }
@@ -235,11 +253,20 @@
 .tt-key-gy { background: var(--surface-2); box-shadow: var(--edge-top); }
 .tt-key-skip { background: transparent; border-style: dashed; }
 .tt-key-friend {
-  background: var(--tt-friend);
+  background: var(--who, var(--tt-friend));
   border-color: transparent;
   border-radius: var(--r-pill);
   width: 6px; height: 12px;
 }
+
+/* Which person a stripe, a swatch or a name belongs to.
+ *
+ * The view hands out the number, in a stable order, and the colour is decided here. It is
+ * an attribute rather than a colour written inline because a colour written by a script is
+ * a colour the stylesheet cannot see, and everything else on this page that has a hue has
+ * it here. */
+[data-who="1"] { --who: var(--tt-friend-2); }
+[data-who="2"] { --who: var(--tt-friend-3); }
 
 /* Inside the app's own sheet, which is where the details open. There is no second dialog
    here: a page with two kinds of modal on it is a page with two answers for Escape. */
@@ -247,7 +274,7 @@
 .tt-fact { display: flex; gap: var(--s3); font-size: 13px; }
 .tt-fact span { color: var(--text-3); min-width: 74px; flex: none; }
 .tt-fact b { font-weight: 600; color: var(--text); }
-.tt-friend-name { color: var(--tt-friend); }
+.tt-friend-name { color: var(--who, var(--tt-friend)); }
 .tt-sheet-note {
   margin: var(--s4) 0 0;
   color: var(--text-3); font-size: 12px; line-height: 1.5;
@@ -267,3 +294,84 @@
    So the grid keeps its shape at every width and .tt-scroll moves it, which is what a paper
    timetable does when it is wider than the desk. The minimum column width on .tt-grid above
    is the whole of the arrangement. */
+
+
+/* ── what I write about a subject ─────────────────────────────────────────── */
+/*
+ * Inside the sheet a class already opens, under the facts. A second place to keep notes
+ * about a subject would be a second place to look for them.
+ */
+.tt-notes {
+  margin-top: var(--s5);
+  border-top: 1px solid var(--line);
+  padding-top: var(--s4);
+}
+
+/* Three boxes and the count they add up to.
+ *
+ * One number shown as three boxes rather than three independent facts: ticking the second
+ * ticks the first, because "absent the second time but not the first" is not a thing
+ * anybody means by a row of boxes. */
+.tt-miss { display: flex; align-items: center; gap: var(--s2); }
+.tt-miss-box {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: background var(--fast), border-color var(--fast), transform var(--fast);
+}
+.tt-miss-box:hover { border-color: var(--accent-line); }
+.tt-miss-box:active { transform: scale(0.94); }
+.tt-miss-box.on {
+  background: var(--grad-accent, var(--accent));
+  border-color: transparent;
+}
+.tt-miss-box .menu-icon { display: block; }
+.tt-miss-said {
+  margin-left: var(--s2);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* The notebook. One page at a time, because a subject is a term of them and a single box
+   that grows for ever is a box you scroll through looking for the week you meant. */
+.tt-pages { margin-top: var(--s5); }
+.tt-pages-head,
+.tt-pages-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+}
+.tt-pages-head { font-size: 12px; color: var(--text-3); }
+.tt-pages-at {
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+  text-align: center;
+}
+.tt-pages-none { margin: 0; font-size: 13px; }
+.tt-page {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+/* What the markdown comes to, under the box it was typed in rather than behind a switch.
+   A preview you have to ask for is a preview nobody looks at, and the point of writing in
+   markdown is the headings and the lists. Empty until there is something to show, so an
+   empty page is a text box and not a text box with a gap under it. */
+.tt-page-read:not(:empty) {
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.tt-page-read > :first-child { margin-top: 0; }
+.tt-page-read > :last-child { margin-bottom: 0; }

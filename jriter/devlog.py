@@ -22,6 +22,34 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.9.0",
+        "date": "2026-09-14",
+        "name": JRITER,
+        "title": "Three boxes and a notebook, on every subject",
+        "notes": [
+            "Open any class and there are three boxes for absences and a notebook under "
+            "them. The notes are markdown, one page at a time, and each page saves itself "
+            "a moment after you stop typing rather than when you close anything. A page is "
+            "a sitting: you write today's, and last week's is one press away instead of "
+            "three screens up.",
+            "Both belong to the subject rather than to the slot. Webprogramozás is on a "
+            "Monday and a Wednesday and it is one subject, so whichever one you open shows "
+            "the same pages and the same count. Ticking the second box ticks the first, "
+            "because that is one number shown three ways rather than three separate facts, "
+            "and pressing the last ticked box again unticks it.",
+            "A second person's week can go on the timetable now and be told apart. One "
+            "colour was right while there was one other person: every stripe said \"not "
+            "mine\" and that was the whole question. With two it was still saying \"not "
+            "mine\" nine times on a Wednesday and answering nothing. Each person has their "
+            "own colour, evenly spaced from the others and picked against what the app "
+            "already uses rather than by eye, and the legend names them.",
+            "A handler that read the request body twice got an error saying the body was "
+            "not JSON, about a request that was perfectly good. The body is a socket, so "
+            "the second read got what was left of it, which was nothing. It is read once "
+            "now however many times a handler asks.",
+        ],
+    },
+    {
         "version": "3.8.0",
         "date": "2026-09-14",
         "name": JRITER,

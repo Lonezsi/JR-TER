@@ -45,11 +45,30 @@ class Request:
         self.headers = headers
         self.rfile = rfile
         self.params = params or {}    # captured path segments
+        #: The body once it has been read. See json(): the body is a socket and can only be
+        #: read once, so this is what makes a second call give the same answer as the first
+        #: rather than an error about a request that was fine.
+        self._parsed = None
 
     def json(self):
+        """The body, parsed. Read once however many times this is called.
+
+        The body is a socket, so reading it twice reads it once and then reads nothing: the
+        second call got an empty string and reported "that request body is not JSON", which
+        is a true sentence about an empty string and a completely misleading thing to be
+        told about a request that was perfectly good.
+
+        Found by writing a handler that checked one field before using the rest, which is an
+        obvious way to write one. Kept here rather than fixed in that handler, because
+        nothing about calling this twice looks wrong at the call site and the next person
+        would spend the same hour.
+        """
+        if self._parsed is not None:
+            return self._parsed
         length = int(self.headers.get("Content-Length") or 0)
         if not length:
-            return {}
+            self._parsed = {}
+            return self._parsed
         raw = self.rfile.read(length)
         try:
             value = json.loads(raw.decode("utf-8"))
@@ -57,6 +76,7 @@ class Request:
             raise Error("that request body is not JSON")
         if not isinstance(value, dict):
             raise Error("expected a JSON object")
+        self._parsed = value
         return value
 
     def q(self, name, default=None):

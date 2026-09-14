@@ -27,10 +27,52 @@ import io
 import json
 import os
 
-from .. import config
+import time
+
+from .. import config, db
+from ..wire import Error, need, as_int
 
 NAME = "orarend"
-SCHEMA = []
+
+#: What this app writes, as opposed to the week, which it only reads.
+#:
+#: The timetable itself is a file somebody edits. Notes and absences are the other way
+#: round: they are made here, a few characters at a time, by pressing things. That is a
+#: database's job, and it is the account's own database, so one person's notes are as far
+#: from another's as their songs are.
+#:
+#: KEYED ON THE SUBJECT'S NAME, not on a class. "Webprogramozás Ea+Gy" happens twice a week
+#: and it is one subject with one set of notes and one count of absences; opening either of
+#: them has to reach the same page. The name is what a person sees and what the file says,
+#: so it is the thing they mean by "this subject". A course renamed in the file starts a new
+#: note, which is the honest answer: nothing here can know it is the same course.
+SCHEMA = [
+    """
+    CREATE TABLE IF NOT EXISTS orarend_notes (
+      id         INTEGER PRIMARY KEY,
+      subject    TEXT NOT NULL UNIQUE,
+      -- 0 to 3. Three is the number of checkboxes, and the cap is here rather than only in
+      -- the page so that it is true of the data and not just of the screen.
+      absences   INTEGER NOT NULL DEFAULT 0,
+      created_at REAL NOT NULL,
+      updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS orarend_pages (
+      id         INTEGER PRIMARY KEY,
+      note_id    INTEGER NOT NULL REFERENCES orarend_notes(id) ON DELETE CASCADE,
+      position   INTEGER NOT NULL DEFAULT 0,
+      text       TEXT NOT NULL DEFAULT '',
+      created_at REAL NOT NULL,
+      updated_at REAL NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS orarend_pages_note ON orarend_pages(note_id, position)",
+]
+
+#: How many absences the checkboxes offer, and therefore the most that can be stored.
+ABSENCES = 3
 
 #: The window the grid draws, and how tall an hour is, in pixels.
 #:
@@ -89,6 +131,119 @@ def week(req):
     }
 
 
+# ── notes, and how many times I was not there ────────────────────────────────
+
+
+def _subject(req):
+    """The subject a call is about, which is a name rather than a number.
+
+    A class has no id: the week is a file somebody edits, and a row in it is identified by
+    what it says. So the key is the name, trimmed, and an empty one is refused rather than
+    quietly becoming a note called "" that every unnamed thing would share.
+    """
+    name = (req.q("subject") or (req.json() or {}).get("subject") or "").strip()
+    if not name:
+        raise Error("which subject?", 400)
+    return name[:200]
+
+
+def _note(subject, make=False):
+    """The row for one subject, made on demand or not at all.
+
+    Not made on reading. Opening a class to look at it should not write anything, or every
+    class anybody ever glanced at would have a row, and "which subjects have I made notes
+    on" would stop being answerable.
+    """
+    row = db.one("SELECT * FROM orarend_notes WHERE subject = ?", (subject,))
+    if row or not make:
+        return row
+    now = time.time()
+    db.insert("orarend_notes", {"subject": subject, "absences": 0,
+                                "created_at": now, "updated_at": now})
+    return db.one("SELECT * FROM orarend_notes WHERE subject = ?", (subject,))
+
+
+def _pages(note_id):
+    return [dict(r) for r in db.query(
+        "SELECT id, position, text, updated_at FROM orarend_pages "
+        "WHERE note_id = ? ORDER BY position, id", (note_id,))]
+
+
+def _out(subject, row):
+    if not row:
+        return {"subject": subject, "absences": 0, "allowed": ABSENCES, "pages": []}
+    return {"subject": subject, "absences": row["absences"], "allowed": ABSENCES,
+            "pages": _pages(row["id"])}
+
+
+def notes(req):
+    """Everything kept about one subject. Reading makes nothing."""
+    subject = _subject(req)
+    return _out(subject, _note(subject))
+
+
+def set_absences(req):
+    """How many times I was not there, 0 to 3.
+
+    Clamped rather than refused. The screen offers three boxes so it cannot ask for four,
+    and a stored number outside the range would draw as a row of boxes that disagrees with
+    the count beside it.
+    """
+    subject = _subject(req)
+    want = as_int((req.json() or {}).get("absences"), "absences", minimum=0)
+    want = min(want, ABSENCES)
+    row = _note(subject, make=True)
+    db.update("orarend_notes", row["id"], {"absences": want, "updated_at": time.time()})
+    return _out(subject, _note(subject))
+
+
+def add_page(req):
+    """A new page at the end."""
+    subject = _subject(req)
+    row = _note(subject, make=True)
+    now = time.time()
+    held = _pages(row["id"])
+    db.insert("orarend_pages", {
+        "note_id": row["id"], "position": (held[-1]["position"] + 1) if held else 0,
+        "text": (req.json() or {}).get("text") or "", "created_at": now,
+        "updated_at": now})
+    db.update("orarend_notes", row["id"], {"updated_at": now})
+    return _out(subject, _note(subject))
+
+
+def _page_in(page_id):
+    """One page, and the note it belongs to, or a refusal.
+
+    Both are read here so that a page id from a caller is checked against this library
+    before anything is written to it.
+    """
+    page = db.one("SELECT * FROM orarend_pages WHERE id = ?", (page_id,))
+    if not page:
+        raise Error("no page with id %s" % page_id, 404)
+    note = db.one("SELECT * FROM orarend_notes WHERE id = ?", (page["note_id"],))
+    if not note:
+        raise Error("no page with id %s" % page_id, 404)
+    return page, note
+
+
+def save_page(req):
+    """The text of one page. Markdown, which is rendered when it is read rather than here."""
+    page, note = _page_in(as_int(req.params["id"], "id"))
+    now = time.time()
+    db.update("orarend_pages", page["id"],
+              {"text": (req.json() or {}).get("text") or "", "updated_at": now})
+    db.update("orarend_notes", note["id"], {"updated_at": now})
+    return _out(note["subject"], note)
+
+
+def drop_page(req):
+    page, note = _page_in(as_int(req.params["id"], "id"))
+    db.run("DELETE FROM orarend_pages WHERE id = ?", (page["id"],))
+    db.update("orarend_notes", note["id"], {"updated_at": time.time()})
+    return _out(note["subject"], db.one(
+        "SELECT * FROM orarend_notes WHERE id = ?", (note["id"],)))
+
+
 def SUMMARY():
     """What the home screen is told. Nothing, when there is no week."""
     found = read()
@@ -100,4 +255,9 @@ def SUMMARY():
 def ROUTES():
     return {
         ("GET", "/api/orarend"): week,
+        ("GET", "/api/orarend/notes"): notes,
+        ("PUT", "/api/orarend/notes"): set_absences,
+        ("POST", "/api/orarend/notes/pages"): add_page,
+        ("PUT", "/api/orarend/notes/pages/<id>"): save_page,
+        ("DELETE", "/api/orarend/notes/pages/<id>"): drop_page,
     }

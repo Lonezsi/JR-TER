@@ -113,6 +113,23 @@ J.menu = (function () {
     get isOpen() { return !!open; },
     close,
 
+    /* The icon set, for anything outside a menu that wants one of the same drawings.
+     *
+     * There is one tick in this app and it is the one in this file. A second drawing of a
+     * checkmark somewhere else is two checkmarks that drift apart in weight and cap, which
+     * is exactly what the shared stylesheet exists to stop happening to colours.
+     *
+     * Size is a parameter because a menu row and a checkbox are not the same size; the
+     * menu's own calls take the default and are unchanged.
+     */
+    icon(name, size) {
+      if (!size) return icon(name);
+      return ICONS[name]
+        ? `<svg class="menu-icon" viewBox="0 0 24 24" width="${size}" height="${size}"
+                aria-hidden="true">${ICONS[name]}</svg>`
+        : '<span class="menu-icon"></span>';
+    },
+
     /* items, and where. `where` is a pointer event, or {anchor: element}. */
     show(items, where) {
       /* Pressing the button again puts the menu away.
