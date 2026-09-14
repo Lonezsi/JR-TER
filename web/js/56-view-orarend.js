@@ -44,8 +44,15 @@ J.views.orarend = {
       return parts[0] * 60 + (parts[1] || 0);
     }
 
-    const top = (entry) => (minutes(entry.at) - FROM * 60) / 60 * HOUR;
-    const tall = (entry) => (minutes(entry.to) - minutes(entry.at)) / 60 * HOUR;
+    /* Where a class sits and how long it runs, in hours from the top of the grid.
+     *
+     * Hours rather than pixels. How tall an hour is depends on how wide a day column came
+     * out, which is not known here and changes when the window does, so a pixel written
+     * into a card now is a pixel that disagrees with the hour lines later. The stylesheet
+     * multiplies these by --tt-hour, so there is one number to change and nothing to keep
+     * in step with it. */
+    const at = (entry) => (minutes(entry.at) - FROM * 60) / 60;
+    const runs = (entry) => (minutes(entry.to) - minutes(entry.at)) / 60;
     const clash = (a, b) =>
       minutes(a.at) < minutes(b.to) && minutes(b.at) < minutes(a.to);
 
@@ -76,12 +83,12 @@ J.views.orarend = {
         // A strip, so the hour does not read as free, with nothing in it to read. Words
         // here would say "you have this", which is the opposite of what it means.
         return `<button class="tt-card tt-skip" data-at="${entry.key}" type="button"
-                        style="top:${top(entry)}px;height:${tall(entry)}px"
+                        style="--at:${at(entry)};--for:${runs(entry)}"
                         aria-label="${J.esc(entry.name)}, nem látogatott"></button>`;
       }
       return `
         <button class="tt-card tt-${entry.kind}" data-at="${entry.key}" type="button"
-                style="top:${top(entry)}px;height:${tall(entry)}px${
+                style="--at:${at(entry)};--for:${runs(entry)}${
                   inset ? ";left:calc(var(--tt-skip-w) + var(--s2))" : ""}">
           <span class="tt-when">${entry.at}–${entry.to}<i class="tt-tag">${
             KIND_TAG[entry.kind] || ""}</i></span>
@@ -93,7 +100,7 @@ J.views.orarend = {
     function stripe(entry) {
       return `<button class="tt-stripe" data-at="${entry.key}" type="button"
                       data-who="${whoIndex(entry.whose)}"
-                      style="top:${top(entry)}px;height:${tall(entry)}px;--lane:${
+                      style="--at:${at(entry)};--for:${runs(entry)};--lane:${
                         entry.lane}"
                       aria-label="${J.esc(entry.whose)}: ${J.esc(entry.name)}, ${
                         entry.at}–${entry.to}"></button>`;
@@ -328,10 +335,9 @@ J.views.orarend = {
           A hét, ahogy van. Kattints bármelyikre a részletekért.
         </p>
 
-      <!-- The grid scrolls sideways on a phone, and the page does not. Without a
-           container of its own the grid's minimum width makes the whole document slide,
-           rail and player included. -->
-      <div class="tt-scroll">
+      <!-- The table is laid out at its full width whatever the screen is, and this is
+           what it gets zoomed down into. Nothing scrolls. -->
+      <div class="tt-fit" id="ttFit">
         <div class="tt-grid pane" id="ttGrid">
           <div class="tt-corner"></div>
           ${DAYS.map((name) => `<div class="tt-head">${name}</div>`).join("")}
@@ -357,7 +363,82 @@ J.views.orarend = {
      * one and the stylesheet reads it off the grid. It comes from the server with the
      * week, so even that one number is decided in a single place. */
     const grid = J.$("#ttGrid");
-    grid.style.setProperty("--tt-hour", HOUR + "px");
+
+    /* Zoom the whole table down until it fits, and reserve the room it ends up taking.
+     *
+     * This is what leaving width=device-width out of a page does, done to one element: the
+     * table is laid out at its desktop width whatever the screen is, and the result is
+     * scaled. Every proportion is the one a desktop gets, which is the point; narrowing
+     * the columns instead reflows the words and changes the shape, and that has been the
+     * wrong answer twice.
+     *
+     * A transform does not change the box a parent reserves, so the frame's height has to
+     * be written on by hand. Without it a third height table sits in a full height hole.
+     *
+     * Never above 1: a screen with room for the whole thing gets it at its own size, so a
+     * desktop is untouched and nothing is ever blown up.
+     */
+    /* How tall an hour is, as a share of how wide a day is.
+     *
+     * A quarter. The table used to be 60px an hour against a 160px column, which is nearly
+     * four tenths, and fourteen hours of that is a table taller than it is wide: on a phone
+     * it had to shrink a long way to fit and the answer to being too tall was more
+     * shrinking. A quarter keeps the same week in two thirds of the height, so what gives
+     * when there is less room is the size of the type and not the shape of the day.
+     *
+     * Measured off the real column rather than written down, so the shape holds whatever
+     * width the days came out at. */
+    const HOUR_OF_DAY = 1 / 4;
+
+    const frame = J.$("#ttFit");
+    let told = { hour: null, fit: null, height: null };
+
+    function fitToRoom() {
+      if (!frame || !grid.isConnected) return;
+      const day = grid.querySelector(".tt-day");
+      const have = frame.clientWidth;
+      if (!day || !have) return;
+
+      // First how tall an hour is, because the table's height depends on it.
+      const hour = day.offsetWidth * HOUR_OF_DAY;
+      if (hour !== told.hour) {
+        told.hour = hour;
+        grid.style.setProperty("--tt-hour", hour.toFixed(2) + "px");
+      }
+
+      // Then how much of it fits. Never above one: a screen with room for the whole table
+      // gets it at its own size, so a desktop is untouched and nothing is blown up.
+      const wide = grid.offsetWidth;        // laid out, before the scale is applied
+      if (!wide) return;
+      const fit = Math.min(1, have / wide);
+      if (fit !== told.fit) {
+        told.fit = fit;
+        grid.style.setProperty("--tt-fit", fit);
+      }
+
+      /* And the room it ends up taking. A transform does not change the box a parent
+       * reserves, so without this a third height table sits in a full height hole.
+       *
+       * Written only when it changes, because this element is the one being watched and
+       * writing the same height back on every notification is a loop looking for a reason. */
+      const height = Math.ceil(grid.offsetHeight * fit) + "px";
+      if (height !== told.height) {
+        told.height = height;
+        frame.style.height = height;
+      }
+    }
+    fitToRoom();
+
+    /* And again whenever there is a different amount of room: a rotated phone, a resized
+     * window, the rail opening or closing beside it. Watching the frame rather than the
+     * window catches all three with one answer. */
+    if (window.ResizeObserver) {
+      if (J.orarendFit) J.orarendFit.disconnect();
+      J.orarendFit = new ResizeObserver(fitToRoom);
+      J.orarendFit.observe(frame);
+    } else {
+      window.addEventListener("resize", fitToRoom);
+    }
 
     grid.addEventListener("click", (e) => {
       const hit = e.target.closest("[data-at]");

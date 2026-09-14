@@ -50,31 +50,54 @@
 
 /* ── the grid ─────────────────────────────────────────────────────────────── */
 
-/* Its own scroll container, so the grid scrolls sideways and the page does not.
+/* The frame the timetable is zoomed to fit inside.
  *
- * Five days cannot be read on a phone at any width that fits, so below it keeps a minimum
- * width and moves. Without something here to do the moving, that minimum makes the whole
- * document scroll sideways instead: the rail, the player and the heading all slide, which
- * is the thing a phone browser does worst. */
-.tt-scroll {
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  /* Room for the shadow under the pane, which a scroll container would otherwise clip. */
+ * It does not scroll. The table is laid out at its full desktop width whatever the screen
+ * is, and then the whole thing is scaled down to fit, which is the same trick as leaving
+ * width=device-width out of a page: the browser lays the document out wide and zooms the
+ * result. Every proportion is the one a desktop gets, just smaller.
+ *
+ * Not the same as narrowing the columns, which is what was here before and twice now has
+ * been the wrong answer. Narrow columns reflow the words and the shape changes; a scale
+ * changes nothing but the size.
+ *
+ * The height is written on by the view. A transform does not change the box a parent
+ * reserves, so without it there would be a full height table's worth of blank page under a
+ * third height table. */
+.tt-fit {
+  overflow: hidden;
+  /* Room for the shadow under the pane, which the overflow above would otherwise clip. */
   padding-bottom: var(--s2);
 }
 
 .tt-grid {
   display: grid;
 
+  /* The desktop shape, in the three numbers it is made of. */
   --tt-gutter: 58px;
+  --tt-day: 160px;
+  --tt-pad: var(--s2);
 
-  /* Keep the timetable at a readable desktop-like width.
-     The outer .tt-scroll handles horizontal scrolling on small screens. */
-  grid-template-columns: var(--tt-gutter) repeat(5, 160px);
+  /* A floor, not a fixed width. Below this the table stops shrinking and gets scaled
+     instead; above it the days share out whatever room there is, which is what a desktop
+     has always done. Fixed tracks would leave two hundred pixels of nothing to the right
+     of Friday on a wide window. */
+  grid-template-columns: var(--tt-gutter) repeat(5, minmax(var(--tt-day), 1fr));
 
-  min-width: calc(58px + 5 * 160px);
+  /* The width the table is drawn at when there is room, and laid out at when there is not.
+   *
+   * The tracks, plus this element's own padding, plus the one pixel of border .pane puts on
+   * each side. Everything here is border-box, so a width that leaves the padding out is a
+   * width the columns do not fit inside: that is what cut twenty one pixels off Friday. */
+  width: max(100%, calc(var(--tt-gutter) + 5 * var(--tt-day)
+                        + 2 * var(--tt-pad) + 2px));
 
-  padding: var(--s2);
+  /* And then shrunk to whatever room there actually is. One at any width wide enough to
+     hold it, so a desktop is untouched. The view works it out and writes it here. */
+  transform: scale(var(--tt-fit, 1));
+  transform-origin: top left;
+
+  padding: var(--tt-pad);
   border-radius: var(--r-lg);
   overflow: hidden;
 }
@@ -83,10 +106,7 @@
 .tt-corner {
   padding: var(--s2) 2px;
   text-align: center;
-  /* Against the viewport, not a container: a heading is a child of the grid rather than
-     of a day, so there is no day to measure it against. It was written in cqw and was
-     quietly resolving against the viewport anyway, which is the same answer by accident. */
-  font-size: clamp(8px, 2.6vw, 12px);
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-2);
   border-bottom: 1px solid var(--line-2);
@@ -103,10 +123,7 @@
   height: var(--tt-hour);
   padding: 2px 4px 0 0;
   text-align: right;
-  /* Against the viewport rather than a container: the gutter is not inside a day, and it
-     is the one column whose width is set from this number rather than the other way
-     round. */
-  font-size: clamp(7px, 2.2vw, 10px);
+  font-size: 10px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
   /* The line belongs to the hour it starts, so it lines up with the day columns'
@@ -119,16 +136,11 @@
 
 .tt-day {
   position: relative;
-  /* Everything inside a day is sized from how wide the day is, not from how wide the
-     screen is. A narrow window on a desktop has exactly the same problem as a phone and
-     gets exactly the same answer, without either of them being named. */
-  container-type: inline-size;
-  container-name: day;
-
-  /* How wide a stripe is and how far apart two of them sit. Both come down with the
-     column: six pixels of stripe and nine of spacing is a third of a phone's day. */
-  --tt-stripe-w: clamp(3px, 3.4cqw, 6px);
-  --tt-lane-step: clamp(4px, 5.1cqw, 9px);
+  /* How wide a stripe is and how far apart two of them sit.
+     Plain numbers: a day column is a fixed width now and the whole table is scaled, so a
+     size that responds to the column would be a constant dressed up as a rule. */
+  --tt-stripe-w: 5.4px;
+  --tt-lane-step: 8.2px;
   border-right: 1px solid var(--line);
   /* The hour lines, as one paint rather than fifteen elements. */
   background: repeating-linear-gradient(
@@ -145,6 +157,17 @@
 
 /* ── a class ──────────────────────────────────────────────────────────────── */
 
+/* Where a class sits, worked out here rather than written into every card.
+ *
+ * The view says which hour a class starts at and how many it runs for; how tall an hour is
+ * belongs to the table. A pixel written into a card is a pixel that stops agreeing with the
+ * hour lines the moment the table is a different size. */
+.tt-card,
+.tt-stripe {
+  top: calc(var(--at, 0) * var(--tt-hour));
+  height: calc(var(--for, 0) * var(--tt-hour));
+}
+
 .tt-card {
   position: absolute;
   left: var(--s1);
@@ -158,7 +181,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: clamp(2px, 3.4cqw, 6px) clamp(3px, 4.5cqw, 8px);
+  padding: 5.4px 7.2px;
   text-align: left;
   overflow: hidden;
   border-radius: var(--r-sm);
@@ -197,7 +220,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: clamp(6.5px, 5.7cqw, 10px);
+  font-size: 9.1px;
   /* One line, whatever happens. A time that wraps is two lines of a three line card. */
   white-space: nowrap;
   color: var(--text-3);
@@ -214,7 +237,7 @@
   color: var(--text-2);
 }
 .tt-name {
-  font-size: clamp(7px, 6.8cqw, 12px);
+  font-size: 10.9px;
   font-weight: 600;
   line-height: 1.2;
   /* Cut rather than wrapped past a couple of lines. A title that wraps to six lines in a
@@ -226,36 +249,12 @@
   overflow: hidden;
 }
 .tt-where {
-  font-size: clamp(6px, 5.4cqw, 9.5px);
+  font-size: 8.6px;
   color: var(--text-3);
   line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* What a column too narrow to hold them simply does not draw.
- *
- * Not a phone rule: a day column under about a hundred and thirty pixels cannot show a room
- * name or a kind badge without them taking the space the title needs. Both are in the sheet
- * a tap away, which is where they were read from anyway; what a glance at the week is for
- * is when things are and how they line up.
- */
-@container day (max-width: 112px) {
-  .tt-where {
-    display: none;
-  }
-  .tt-tag {
-    display: none;
-  }
-}
-
-/* And narrower still, the time loses its minutes rather than the title losing its line.
- * 08:00 is the hour the row is already labelled with, so the useful half is the end. */
-@container day (max-width: 74px) {
-  .tt-name {
-    -webkit-line-clamp: 3;
-  }
 }
 
 /* The one that is not attended.

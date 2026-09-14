@@ -133,6 +133,7 @@ class Grid(html.parser.HTMLParser):
         self.lanes = {}
         self.legend = []
         self.scrolls = 0
+        self.frames = 0
         self._day = None
         self._box = None
         self._hour = False
@@ -143,6 +144,8 @@ class Grid(html.parser.HTMLParser):
         classes = at.get("class", "").split()
         if "tt-scroll" in classes:
             self.scrolls += 1
+        if "tt-fit" in classes:
+            self.frames += 1
         if "tt-day" in classes:
             self._day = (at.get("aria-label", ""), [])
             self.days.append(self._day)
@@ -167,8 +170,13 @@ class Grid(html.parser.HTMLParser):
                 "label": at.get("aria-label", ""),
                 "text": "",
                 "tag": "",
-                "top": px(style, "top"),
-                "height": px(style, "height"),
+                # Hours, turned into the design's pixels. The view says when a class is and
+                # how long it runs and the stylesheet multiplies both by --tt-hour, so a box
+                # carries --at: 2 rather than top: 120px. Read here in the server's own hour
+                # height so every question below is still asked in pixels: an hour is an
+                # hour whatever the grid is currently scaled to.
+                "top": hours(style, "--at", HOUR),
+                "height": hours(style, "--for", HOUR),
                 "lane": px(style, "--lane"),
                 "inset": "left:" in style,
                 "skip": "tt-skip" in classes,
@@ -198,6 +206,11 @@ class Grid(html.parser.HTMLParser):
 def px(style, name):
     found = re.search(r"(?:^|;)\s*%s:\s*([-\d.]+)" % re.escape(name), style)
     return float(found.group(1)) if found else None
+
+
+def hours(style, name, tall):
+    found = px(style, name)
+    return None if found is None else found * tall
 
 
 def grid(week=None):
@@ -494,23 +507,30 @@ def test_the_kind_written_on_a_class_matches_the_kind_it_is_styled_as():
     assert checked, "no card on the grid carries a kind at all"
 
 
-def test_the_grid_scrolls_rather_than_the_page():
-    """Five days keep a minimum width on a phone, and something has to absorb it.
+def test_nothing_scrolls_sideways_to_reach_the_week():
+    """The whole week is on the screen, not somewhere to the right of it.
 
-    Without a container of its own that width makes the whole document slide sideways, rail
-    and player included, which is the thing a phone browser does worst. Foyer's copy of
-    this stylesheet had the rule on a class no element carried, so it never worked there.
+    It scrolled once, and a timetable you have to drag is one you cannot answer "when are
+    we both free" from. It is drawn at its full width and then made smaller, the way a
+    phone browser used to handle a page that never asked to be laid out for a phone, so
+    there is nothing left over to scroll to.
     """
     got, _ = grid()
-    assert got.scrolls == 1, (
-        "the grid is inside %d scroll containers. The stylesheet gives it a minimum width"
-        " on a narrow screen, so with none the page itself scrolls sideways." % got.scrolls)
+    assert got.frames == 1, (
+        "the grid is in %d frames. One holds it, clips nothing off the week, and is the"
+        " thing the view measures to decide how far down to scale." % got.frames)
+    assert got.scrolls == 0, \
+        "the week is back inside a scroll container, so part of it is off the screen"
 
     sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
                     encoding="utf-8").read()
-    rule = re.search(r"\.tt-scroll\s*\{([^}]*)\}", sheet)
-    assert rule and "overflow-x" in rule.group(1), \
-        "the scroll container has no overflow of its own, so it absorbs nothing"
+    rule = re.search(r"\.tt-fit\s*\{([^}]*)\}", sheet)
+    assert rule, "the frame has no rule of its own"
+    assert re.search(r"overflow:\s*hidden", rule.group(1)), (
+        "the frame does not clip, so the room the grid leaves under itself once it is"
+        " scaled becomes empty page rather than nothing at all")
+    assert "overflow-x: auto" not in sheet and "overflow-x: scroll" not in sheet, \
+        "something on this page still scrolls sideways"
 
 
 def test_there_is_no_second_layout_for_a_phone():
@@ -549,16 +569,17 @@ def test_there_is_no_second_layout_for_a_phone():
                 " table is meant to keep its shape and scroll." % (condition, banned))
 
 
-def test_the_whole_week_fits_whatever_width_there_is():
-    """Five days on the screen at once, down to a phone.
+def test_the_week_is_laid_out_wide_and_then_made_smaller():
+    """The one decision this layout rests on, and the third answer to the same question.
 
-    It used to keep a fixed 176px per day and move sideways, which put Friday two screens
-    to the right: a poor answer to "when are we both free". Nothing may put a floor under a
-    day column now, because a floor is what pushes the last day off the edge.
+    First it kept a fixed day column and scrolled, and Friday was two screens to the right.
+    Then the columns were free to shrink and the type shrank with them, and a cell became a
+    narrow paragraph: the same table, squashed to a different shape.
 
-    minmax(0, 1fr) rather than 1fr, and that is not a detail: a grid track's default minimum
-    is min-content, so with plain 1fr one long unbroken course name widens its own column
-    past its share and the week stops fitting because of a single word.
+    So neither. The grid is laid out at the width it would have on a desktop, and the whole
+    thing is then scaled down as one piece. A phone gets the desktop picture, smaller,
+    which is the same thing as leaving width=device-width out of the page: every proportion
+    is kept and the only thing that changes is how big it all is.
     """
     sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
                     encoding="utf-8").read()
@@ -566,53 +587,93 @@ def test_the_whole_week_fits_whatever_width_there_is():
     assert rule, "the grid rule is gone"
     body = re.sub(r"/\*.*?\*/", "", rule.group(1), flags=re.S)
 
-    assert "min-width" not in body, (
-        "the grid has a minimum width again, which is what pushed Friday off the screen:"
-        " %s" % body.strip())
+    width = re.search(r"(?:^|;)\s*width:([^;]+);", body)
+    assert width and "max(100%" in width.group(1), (
+        "the grid takes its width from the room it is in (%s), so on a phone it is laid out"
+        " narrow and squashed rather than laid out wide and scaled."
+        % (width.group(1).strip() if width else "nothing"))
+
+    scaled = re.search(r"transform:\s*scale\(var\(--tt-fit", body)
+    assert scaled, "the grid is never scaled, so on a phone it simply hangs off the edge"
+    assert re.search(r"transform-origin:\s*top left", body), (
+        "the grid scales about its middle, which moves the week up and to the left of the"
+        " frame that is meant to hold it")
 
     columns = re.search(r"grid-template-columns:([^;]+);", body)
     assert columns, "the grid has no columns"
-    assert "minmax(0, 1fr)" in columns.group(1), (
-        "the day columns are %s. Anything but a zero minimum is a floor, and a floor is"
-        " what stops five days fitting." % columns.group(1).strip())
+    assert "1fr" in columns.group(1), (
+        "the day columns are %s, so on a wide screen the week stays at its design width and"
+        " leaves dead space to the right of Friday." % columns.group(1).strip())
 
 
-def test_the_type_comes_down_with_the_columns():
-    """Which is the whole difference between scaling and squishing.
+def test_an_hour_is_a_quarter_of_a_day_and_stays_one():
+    """So the week is always the same shape, and never answers a narrow screen by growing.
 
-    Narrow columns with full sized words wrap into something unreadable and make every cell
-    a paragraph tall. That was the complaint the first time round, and a fixed font size
-    with fluid columns is exactly how it comes back.
+    A fixed hour height with a column that can be any width is a table that gets taller as
+    it gets narrower, and a tall week is scaled down further to fit, which makes the type
+    smaller than it had to be. Tying the row to the column keeps the picture proportional:
+    the same rectangle at every size, and the only thing that changes is the scale.
+    """
+    view = io.open(VIEW, encoding="utf-8").read()
+    ratio = re.search(r"const HOUR_OF_DAY = ([^;]+);", view)
+    assert ratio, "the view no longer says what an hour is worth"
+    top, bottom = ratio.group(1).split("/")
+    assert float(top) / float(bottom) == 0.25, (
+        "an hour is %s of a day column. It is a quarter: wider than that and the week is"
+        " too tall to fit, narrower and the cells cannot hold two lines."
+        % ratio.group(1).strip())
+
+    assert re.search(r"day\.offsetWidth \* HOUR_OF_DAY", view), (
+        "the hour height is not worked out from the drawn column, so it is a guess about a"
+        " width rather than a measurement of one")
+
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    assert "--tt-hour" not in re.sub(r"/\*.*?\*/", "", sheet, flags=re.S).split("{")[0], \
+        "the stylesheet defines its own hour height, so there are two answers to the scale"
+
+
+def test_the_grid_is_never_scaled_up():
+    """Down to fit, never up to fill.
+
+    have / wide alone is a number above one on any screen wider than the design, and the
+    week would grow to fill a desktop: twenty pixel type and a room name the size of a
+    heading. The desktop picture is the picture, and it is already the right size there.
+    """
+    view = io.open(VIEW, encoding="utf-8").read()
+    assert re.search(r"Math\.min\(1,\s*have / wide\)", view), (
+        "the fit is not held at one, so a wide screen blows the week up rather than leaving"
+        " it alone")
+
+
+def test_nothing_about_the_week_is_measured_against_the_screen():
+    """Because the scaling has already done all of it.
+
+    Type in cqw, a column in vw, a room name dropped by a container query: each of those is
+    a second opinion about how big things should be, applied on top of the scale, and two
+    of them fighting is how the table got squashed the first time. One rule decides the
+    size of the whole picture and nothing underneath it is allowed to have its own.
     """
     sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
                     encoding="utf-8").read()
-    for what in (".tt-name", ".tt-when"):
-        rule = re.search(re.escape(what) + r"\s*\{([^}]*)\}", sheet)
-        assert rule, "%s has no rule" % what
-        size = re.search(r"font-size:([^;]+);", rule.group(1))
-        assert size, "%s has no size" % what
-        assert "clamp(" in size.group(1), (
-            "%s is a fixed %s. A fixed size in a column that is free to become 54 pixels"
-            " wide is the squash this was meant to stop." % (what, size.group(1).strip()))
+    sheet = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)
+    for banned in ("cqw", "cqi", "vw", "@container", "container-type", "clamp("):
+        assert banned not in sheet, (
+            "the stylesheet still sizes something by %s. The grid is scaled as one piece"
+            " now, so anything that measures the screen again fights it." % banned)
 
 
-def test_what_will_not_fit_is_dropped_on_space_and_not_on_device():
-    """The room name goes when the column cannot hold it, and a phone is not the rule.
+def test_the_room_name_is_always_drawn():
+    """It used to be dropped on a narrow column, and it is the part you are looking for.
 
-    A narrow window on a desktop has exactly the same problem and gets exactly the same
-    answer, without either being named. A width breakpoint would be guessing the column
-    width from outside the column.
+    When the question is "where am I going", the room is the answer, and a phone is exactly
+    where that question gets asked. Nothing is left out now, because nothing needs to be:
+    the cell is the desktop cell, only smaller.
     """
-    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
-                    encoding="utf-8").read()
-    assert "container-type: inline-size" in sheet, (
-        "no element offers itself as something to measure against, so the rules below"
-        " cannot be about how much room there is")
-    hidden = re.search(r"@container[^{]*\{[^{]*\.tt-where\s*\{\s*display:\s*none",
-                       sheet)
-    assert hidden, (
-        "the room name is not dropped by a container query. On a 54px column it takes the"
-        " space the title needs, and it is one tap away in the sheet.")
+    got, _ = grid()
+    rooms = [b for _, boxes in got.days for b in boxes
+             if not b["skip"] and "terem" in b["text"]]
+    assert rooms, "no card shows a room at all, so the week cannot say where anything is"
 
 
 def test_a_day_keeps_room_for_exactly_its_own_stripes():

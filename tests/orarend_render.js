@@ -72,6 +72,18 @@ const J = {
   sheet(opts) { sheets.push(opts); return Promise.resolve(null); },
 };
 
+/* A window with nothing in it.
+ *
+ * The view watches the frame it was drawn in and rescales the week when that frame
+ * changes width, which is a thing only a browser can answer: nothing here has been laid
+ * out, so nothing here has a width. The measuring gives up on its own when it finds no
+ * width to measure, and this is here so that asking for the watcher is not a crash.
+ *
+ * No ResizeObserver on purpose, so the fallback is the path that runs: if the view ever
+ * stops having one, this fails at the listener rather than drawing a grid that never
+ * resizes. */
+globalThis.window = { addEventListener() {} };
+
 /* new Function rather than eval, so the source cannot see anything in this file except
  * what it is handed. Its own "use strict" is the first line of the body it makes. */
 new Function("J", fs.readFileSync(SRC, "utf8"))(J);

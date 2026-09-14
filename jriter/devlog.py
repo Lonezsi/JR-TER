@@ -22,6 +22,22 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.11.0",
+        "date": "2026-09-14",
+        "name": JRITER,
+        "title": "The desktop week, smaller",
+        "notes": [
+            "The timetable on a phone is now the same picture it is on a desktop, scaled "
+            "down as one piece. The week is laid out at its full width and then made "
+            "smaller, so every proportion is kept and nothing scrolls, nothing is dropped "
+            "and nothing is squashed into a narrow paragraph.",
+            "An hour is a quarter of a day column, so the week is always the same shape. "
+            "When there is less room it answers with smaller type rather than with more "
+            "height, which is what made it shrink twice before.",
+            "A wide screen is untouched: the week is only ever scaled down, never up.",
+        ],
+    },
+    {
         "version": "3.10.1",
         "date": "2026-09-14",
         "name": JRITER,
