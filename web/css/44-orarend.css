@@ -67,27 +67,27 @@
 .tt-grid {
   display: grid;
 
-  /* The shape of the table, in two numbers used twice each.
-     A narrow day column and a wide hour gutter are the same mistake seen from either end,
-     so neither number is written down more than once. */
-  --tt-day: 176px;
-  --tt-gutter: 58px;
+  /* The hour gutter, which is the only fixed column.
+   *
+   * It holds "08:00" and nothing else, so it is sized from that: enough for five digits at
+   * whatever the type has come down to, and no more. Fluid rather than fixed, because on a
+   * phone every pixel it keeps is a pixel five day columns do not get. */
+  --tt-gutter: clamp(28px, 8vw, 58px);
 
-  /* One layout, at every width. 1fr wins wherever there is room, so a wide window is
-     unchanged; the minimum is what stops the columns closing up on a narrow one.
+  /* Five equal days, and no minimum.
+   *
+   * There was one, 176px, and it is what put Friday two screens to the right. minmax(0,1fr)
+   * lets a column be as narrow as it has to be; what stops that being a squash is that the
+   * type comes down with it, below.
+   *
+   * minmax(0, 1fr) and not 1fr: the default minimum for a grid track is min-content, so
+   * with plain 1fr a long unbroken course name would push its column wider than its share
+   * and the week would stop fitting because of one word. */
+  grid-template-columns: var(--tt-gutter) repeat(5, minmax(0, 1fr));
 
-     176px is just under what the columns come to on a desktop, which measured 196px each
-     in a 1400px window. Picked from that rather than from what fits a phone: the point is
-     that a phone gets the same table, and scrolls. */
-  grid-template-columns: var(--tt-gutter) repeat(5, minmax(var(--tt-day), 1fr));
-
-  /* And the box has to be as wide as the columns, or they simply overflow it.
-     Without this the tracks measure 176px each while the grid stays the width of the
-     screen, so nothing scrolls and the right hand days are drawn outside the pane, clipped
-     by the overflow below. Measured on a 375px phone: six tracks totalling 938px inside a
-     box 317px wide, and .tt-scroll with nothing to scroll because its child was never
-     wider than it was. */
-  min-width: calc(var(--tt-gutter) + 5 * var(--tt-day));
+  /* Tighter than .pane's own padding, which is written for reading rather than for a grid.
+     Twenty a side is forty pixels, and forty pixels is most of a day column here. */
+  padding: var(--s2);
 
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -96,9 +96,12 @@
 
 .tt-head,
 .tt-corner {
-  padding: var(--s3) var(--s2);
+  padding: var(--s2) 2px;
   text-align: center;
-  font-size: 12px;
+  /* Against the viewport, not a container: a heading is a child of the grid rather than
+     of a day, so there is no day to measure it against. It was written in cqw and was
+     quietly resolving against the viewport anyway, which is the same answer by accident. */
+  font-size: clamp(8px, 2.6vw, 12px);
   font-weight: 600;
   color: var(--text-2);
   border-bottom: 1px solid var(--line-2);
@@ -109,9 +112,12 @@
 .tt-hours { border-right: 1px solid var(--line); }
 .tt-hour {
   height: var(--tt-hour);
-  padding: 4px 8px 0 0;
+  padding: 2px 4px 0 0;
   text-align: right;
-  font-size: 10px;
+  /* Against the viewport rather than a container: the gutter is not inside a day, and it
+     is the one column whose width is set from this number rather than the other way
+     round. */
+  font-size: clamp(7px, 2.2vw, 10px);
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
   /* The line belongs to the hour it starts, so it lines up with the day columns'
@@ -122,6 +128,16 @@
 
 .tt-day {
   position: relative;
+  /* Everything inside a day is sized from how wide the day is, not from how wide the
+     screen is. A narrow window on a desktop has exactly the same problem as a phone and
+     gets exactly the same answer, without either of them being named. */
+  container-type: inline-size;
+  container-name: day;
+
+  /* How wide a stripe is and how far apart two of them sit. Both come down with the
+     column: six pixels of stripe and nine of spacing is a third of a phone's day. */
+  --tt-stripe-w: clamp(3px, 3.4cqw, 6px);
+  --tt-lane-step: clamp(4px, 5.1cqw, 9px);
   border-right: 1px solid var(--line);
   /* The hour lines, as one paint rather than fifteen elements. */
   background: repeating-linear-gradient(to bottom,
@@ -138,12 +154,17 @@
 .tt-card {
   position: absolute;
   left: var(--s1);
-  /* Room down the right for the stripes, and for a second lane of them. */
-  right: 20px;
+  /* Room down the right for exactly as many stripes as this day has.
+   *
+   * It was a fixed twenty, which is a third of a day column on a phone and was being given
+   * up by every day whether anybody else had a class that day or not. --tt-lanes is written
+   * on the day by the view, which is the only thing that knows: a Friday with nobody else
+   * on it reserves nothing, and a Wednesday with four overlapping reserves four. */
+  right: calc(var(--s1) + var(--tt-lanes, 0) * var(--tt-lane-step));
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 6px 8px;
+  gap: 1px;
+  padding: clamp(2px, 3.4cqw, 6px) clamp(3px, 4.5cqw, 8px);
   text-align: left;
   overflow: hidden;
   border-radius: var(--r-sm);
@@ -171,8 +192,10 @@
 .tt-when {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 10px;
+  gap: 4px;
+  font-size: clamp(6.5px, 5.7cqw, 10px);
+  /* One line, whatever happens. A time that wraps is two lines of a three line card. */
+  white-space: nowrap;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -186,8 +209,44 @@
   border: 1px solid var(--line-2);
   color: var(--text-2);
 }
-.tt-name { font-size: 12px; font-weight: 600; line-height: 1.25; }
-.tt-where { font-size: 9.5px; color: var(--text-3); line-height: 1.3; }
+.tt-name {
+  font-size: clamp(7px, 6.8cqw, 12px);
+  font-weight: 600;
+  line-height: 1.2;
+  /* Cut rather than wrapped past a couple of lines. A title that wraps to six lines in a
+     narrow column pushes everything else out of the card and still cannot be read; two
+     lines and an ellipsis says "this one, and tap for the rest", which is true. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.tt-where {
+  font-size: clamp(6px, 5.4cqw, 9.5px);
+  color: var(--text-3);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* What a column too narrow to hold them simply does not draw.
+ *
+ * Not a phone rule: a day column under about a hundred and thirty pixels cannot show a room
+ * name or a kind badge without them taking the space the title needs. Both are in the sheet
+ * a tap away, which is where they were read from anyway; what a glance at the week is for
+ * is when things are and how they line up.
+ */
+@container day (max-width: 112px) {
+  .tt-where { display: none; }
+  .tt-tag { display: none; }
+}
+
+/* And narrower still, the time loses its minutes rather than the title losing its line.
+ * 08:00 is the hour the row is already labelled with, so the useful half is the end. */
+@container day (max-width: 74px) {
+  .tt-name { -webkit-line-clamp: 3; }
+}
 
 /* The one that is not attended.
  *
@@ -215,8 +274,8 @@
 .tt-stripe {
   position: absolute;
   /* One lane per clashing class, worked out by the view. */
-  right: calc(var(--s1) + var(--lane, 0) * 9px);
-  width: 6px;
+  right: calc(var(--s1) + var(--lane, 0) * var(--tt-lane-step));
+  width: var(--tt-stripe-w);
   padding: 0;
   border: 0;
   border-radius: var(--r-pill);

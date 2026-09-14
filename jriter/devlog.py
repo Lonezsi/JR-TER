@@ -22,6 +22,32 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.10.0",
+        "date": "2026-09-14",
+        "name": JRITER,
+        "title": "The whole week on the screen, and Friday all of it",
+        "notes": [
+            "The timetable fits now, at any width. It used to keep a fixed column width and "
+            "move sideways, which put Friday two screens to the right, and the last column "
+            "was also being cut off by twenty one pixels that nothing could scroll to: the "
+            "pane's own padding was coming out of the columns rather than sitting around "
+            "them.",
+            "Everything comes down together rather than the columns alone. Narrow columns "
+            "with full sized words is the squash that was rejected before, so the type, the "
+            "padding and the stripes all scale with the column, and below about a hundred "
+            "pixels the room name and the kind badge step out, since both are a tap away in "
+            "the sheet and what a glance at the week is for is when things are. A desktop "
+            "is unchanged: the sizes it had are exactly the sizes the scale reaches.",
+            "The rules are about how much room a column has rather than about what device "
+            "it is, so a narrow window on a laptop gets the same answer as a phone without "
+            "either being named.",
+            "Cards also stopped reserving room for stripes that are not there. It was a "
+            "flat twenty pixels down the right of every card, which is a third of a day "
+            "column on a phone, and Monday was giving it up for one stripe while Wednesday "
+            "needed four. Each day now says how many it came to.",
+        ],
+    },
+    {
         "version": "3.9.1",
         "date": "2026-09-14",
         "name": JRITER,

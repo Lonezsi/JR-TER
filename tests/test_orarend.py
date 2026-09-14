@@ -130,6 +130,7 @@ class Grid(html.parser.HTMLParser):
         html.parser.HTMLParser.__init__(self)
         self.hours = []
         self.days = []
+        self.lanes = {}
         self.legend = []
         self.scrolls = 0
         self._day = None
@@ -145,6 +146,10 @@ class Grid(html.parser.HTMLParser):
         if "tt-day" in classes:
             self._day = (at.get("aria-label", ""), [])
             self.days.append(self._day)
+            # How many stripe lanes the view says this day came to. The cards reserve room
+            # down their right from it.
+            found = re.search(r"--tt-lanes:\s*(\d+)", at.get("style", ""))
+            self.lanes[at.get("aria-label", "")] = found.group(1) if found else None
         if "tt-hour" in classes:
             self._hour = True
         if "tt-tag" in classes:
@@ -544,16 +549,16 @@ def test_there_is_no_second_layout_for_a_phone():
                 " table is meant to keep its shape and scroll." % (condition, banned))
 
 
-def test_the_grid_is_as_wide_as_its_own_columns():
-    """Otherwise the columns overflow the box and nothing scrolls.
+def test_the_whole_week_fits_whatever_width_there_is():
+    """Five days on the screen at once, down to a phone.
 
-    Found in a browser rather than reasoned about: with the minimum on the tracks alone,
-    the six tracks measured 938px inside a grid box 317px wide on a 375px phone, and
-    .tt-scroll had nothing to scroll because its child was never wider than it was. The
-    right hand days were drawn outside the pane and clipped by its own overflow.
+    It used to keep a fixed 176px per day and move sideways, which put Friday two screens
+    to the right: a poor answer to "when are we both free". Nothing may put a floor under a
+    day column now, because a floor is what pushes the last day off the edge.
 
-    So the box carries a minimum too, and it is the same two numbers the columns are made
-    of rather than a third one written out.
+    minmax(0, 1fr) rather than 1fr, and that is not a detail: a grid track's default minimum
+    is min-content, so with plain 1fr one long unbroken course name widens its own column
+    past its share and the week stops fitting because of a single word.
     """
     sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
                     encoding="utf-8").read()
@@ -561,24 +566,77 @@ def test_the_grid_is_as_wide_as_its_own_columns():
     assert rule, "the grid rule is gone"
     body = re.sub(r"/\*.*?\*/", "", rule.group(1), flags=re.S)
 
-    assert "min-width" in body, (
-        "the grid has no minimum width of its own, so its columns overflow it and the"
-        " scroll container has nothing to scroll")
+    assert "min-width" not in body, (
+        "the grid has a minimum width again, which is what pushed Friday off the screen:"
+        " %s" % body.strip())
 
-    day = re.search(r"--tt-day:\s*(\d+)px", body)
-    gutter = re.search(r"--tt-gutter:\s*(\d+)px", body)
-    assert day and gutter, (
-        "the day and gutter widths are not named, so the columns and the minimum width are"
-        " two independent copies of the same two numbers: %s" % body.strip())
-    # Used, not merely declared: the point is that there is one of each.
-    assert "var(--tt-day)" in body and "var(--tt-gutter)" in body, \
-        "the tokens are declared and then not used, which is worse than not having them"
-    assert "minmax(var(--tt-day)" in body, \
-        "the columns do not use the day width, so a wide window and a narrow one disagree"
-    assert re.search(r"min-width:\s*calc\(var\(--tt-gutter\)\s*\+\s*5\s*\*\s*var\(--tt-day\)\)",
-                     body), (
-        "the minimum width is not worked out from the same two numbers as the columns, so"
-        " changing one will leave the table either overflowing or padded: %s" % body.strip())
+    columns = re.search(r"grid-template-columns:([^;]+);", body)
+    assert columns, "the grid has no columns"
+    assert "minmax(0, 1fr)" in columns.group(1), (
+        "the day columns are %s. Anything but a zero minimum is a floor, and a floor is"
+        " what stops five days fitting." % columns.group(1).strip())
+
+
+def test_the_type_comes_down_with_the_columns():
+    """Which is the whole difference between scaling and squishing.
+
+    Narrow columns with full sized words wrap into something unreadable and make every cell
+    a paragraph tall. That was the complaint the first time round, and a fixed font size
+    with fluid columns is exactly how it comes back.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    for what in (".tt-name", ".tt-when"):
+        rule = re.search(re.escape(what) + r"\s*\{([^}]*)\}", sheet)
+        assert rule, "%s has no rule" % what
+        size = re.search(r"font-size:([^;]+);", rule.group(1))
+        assert size, "%s has no size" % what
+        assert "clamp(" in size.group(1), (
+            "%s is a fixed %s. A fixed size in a column that is free to become 54 pixels"
+            " wide is the squash this was meant to stop." % (what, size.group(1).strip()))
+
+
+def test_what_will_not_fit_is_dropped_on_space_and_not_on_device():
+    """The room name goes when the column cannot hold it, and a phone is not the rule.
+
+    A narrow window on a desktop has exactly the same problem and gets exactly the same
+    answer, without either being named. A width breakpoint would be guessing the column
+    width from outside the column.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    assert "container-type: inline-size" in sheet, (
+        "no element offers itself as something to measure against, so the rules below"
+        " cannot be about how much room there is")
+    hidden = re.search(r"@container[^{]*\{[^{]*\.tt-where\s*\{\s*display:\s*none",
+                       sheet)
+    assert hidden, (
+        "the room name is not dropped by a container query. On a 54px column it takes the"
+        " space the title needs, and it is one tap away in the sheet.")
+
+
+def test_a_day_keeps_room_for_exactly_its_own_stripes():
+    """Not for the most any day might have.
+
+    The card reserved a flat twenty pixels down its right for them, which is a third of a
+    phone's day column, and every day gave it up whether anybody else had a class that day
+    or not. Only the view knows how many lanes a day came to, because only the view has run
+    lanes(), so it says.
+    """
+    got, _ = grid()
+    seen = 0
+    for name, boxes in got.days:
+        stripes = [b for b in boxes if b["stripe"]]
+        used = len({int(b["lane"]) for b in stripes})
+        assert got.lanes.get(name) is not None, (
+            "%s does not say how many stripe lanes it uses, so the cards on it cannot"
+            " reserve the right amount of room" % name)
+        assert int(got.lanes[name]) == used, (
+            "%s says it uses %s lanes and draws %d. Too few and a stripe is under a card;"
+            " too many and the card gives up room for nothing."
+            % (name, got.lanes[name], used))
+        seen += used
+    assert seen, "no day uses any lane, so this test watched nothing"
 
 
 def test_the_timetable_is_not_in_the_rail():

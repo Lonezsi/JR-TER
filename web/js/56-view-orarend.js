@@ -306,8 +306,15 @@ J.views.orarend = {
       const mine = CLASSES.filter((e) => e.day === day && e.whose === "me");
       const skips = mine.filter((e) => e.skip);
       const theirs = lanes(CLASSES.filter((e) => e.day === day && e.whose !== "me"));
+      /* How many stripe lanes this day actually uses.
+       *
+       * The card reserves room down its right for them, and a fixed reserve meant every
+       * day gave up the same third of a phone column whether anybody else had a class that
+       * day or not. Only the view knows, because only the view has run lanes(). */
+      const used = theirs.length
+        ? Math.max(...theirs.map((e) => e.lane)) + 1 : 0;
       return `
-        <div class="tt-day" role="group" aria-label="${name}">
+        <div class="tt-day" role="group" aria-label="${name}" style="--tt-lanes:${used}">
           ${mine.map((entry) => card(
             entry, !entry.skip && skips.some((s) => clash(s, entry)))).join("")}
           ${theirs.map(stripe).join("")}
