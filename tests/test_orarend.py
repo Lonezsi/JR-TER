@@ -44,28 +44,33 @@ FROM, TO, HOUR = orarend.FROM, orarend.TO, orarend.HOUR
 
 #: A week with something wrong-able in every corner of it.
 #:
-#:   Monday     a plain two hour lecture, and one of hers at the same time
-#:   Tuesday    three of hers at once, which is what lanes exist for
+#: The other person is called Vendég here rather than anybody. This repository is public,
+#: the real week lives only on the host and is not committed, and there is no reason for a
+#: fixture about lane packing to carry somebody's name to GitHub. Everything below is
+#: invented: the courses, the rooms and the times.
+#:
+#:   Monday     a plain two hour lecture, and one of theirs at the same time
+#:   Tuesday    three of theirs at once, which is what lanes exist for
 #:   Wednesday  a lecture that is not attended, with a class of mine beside it
 #:   Thursday   a class ending on a half hour, so the height is not a whole number of rows
 #:   Friday     nothing, because an empty day is a real day
 WEEK = {"classes": [
     {"day": 0, "at": "08:00", "to": "10:00", "kind": "ea", "whose": "me",
      "name": "Első tárgy Ea", "where": "A terem"},
-    {"day": 0, "at": "08:00", "to": "09:00", "kind": "gy", "whose": "Hédi",
-     "name": "Az ő órája", "where": "B terem"},
+    {"day": 0, "at": "08:00", "to": "09:00", "kind": "gy", "whose": "Vendég",
+     "name": "A vendég órája", "where": "B terem"},
 
-    {"day": 1, "at": "10:00", "to": "12:00", "kind": "ea", "whose": "Hédi",
+    {"day": 1, "at": "10:00", "to": "12:00", "kind": "ea", "whose": "Vendég",
      "name": "Egyszerre egy", "where": "C terem"},
-    {"day": 1, "at": "10:00", "to": "11:00", "kind": "gy", "whose": "Hédi",
+    {"day": 1, "at": "10:00", "to": "11:00", "kind": "gy", "whose": "Vendég",
      "name": "Egyszerre kettő", "where": "D terem"},
-    {"day": 1, "at": "10:30", "to": "11:30", "kind": "both", "whose": "Hédi",
+    {"day": 1, "at": "10:30", "to": "11:30", "kind": "both", "whose": "Vendég",
      "name": "Egyszerre három", "where": "E terem"},
     # Later the same day, clashing with none of them. This is what tells "the first free
     # lane" apart from "the next lane": both rules put the three above in 0, 1 and 2, and
     # only the wrong one puts this in 3, leaving two stripes' width of nothing beside it.
     # Without this entry the packing test passes on either rule.
-    {"day": 1, "at": "14:00", "to": "15:00", "kind": "gy", "whose": "Hédi",
+    {"day": 1, "at": "14:00", "to": "15:00", "kind": "gy", "whose": "Vendég",
      "name": "Később, egyedül ő is", "where": "F terem"},
 
     {"day": 2, "at": "12:00", "to": "14:00", "kind": "ea", "whose": "me", "skip": True,
