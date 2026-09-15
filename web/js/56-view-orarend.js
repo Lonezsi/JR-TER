@@ -28,8 +28,15 @@ J.views.orarend = {
 
   async render(root) {
     const DAYS = ["Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek"];
-    const KIND_SAID = { ea: "Előadás", gy: "Gyakorlat", both: "Előadás és gyakorlat" };
-    const KIND_TAG = { ea: "Ea", gy: "Gy", both: "Ea+Gy" };
+    /* A konzultáció is neither a lecture nor a practical, and a band is neither a kind of
+     * class nor a thing with a tag on it: it is the reason an afternoon is not free. Both
+     * are named here so the sheet can say what it opened rather than showing the raw word
+     * out of the file. */
+    const KIND_SAID = {
+      ea: "Előadás", gy: "Gyakorlat", both: "Előadás és gyakorlat",
+      konz: "Konzultáció", band: "Elfoglaltság",
+    };
+    const KIND_TAG = { ea: "Ea", gy: "Gy", both: "Ea+Gy", konz: "Konz" };
 
     const data = await J.get("/api/orarend");
     const FROM = data.from;
@@ -76,6 +83,23 @@ J.views.orarend = {
         placed.push(entry);
       }
       return entries;
+    }
+
+    /* A stretch of the day that is spoken for, drawn behind everything.
+     *
+     * Work is not a class and putting it in as one was the obvious thing that does not
+     * work: eight hours of Monday as a card is a card on top of every lecture that
+     * morning, and only one of the two can be seen. It is not competing with them for the
+     * column, it is the reason the column is not free, so it goes behind: the width of the
+     * whole day, under the cards, tinted rather than drawn.
+     *
+     * Behind the stripes too. A friend's hour beside eight hours of work is still the one
+     * question the stripes answer, and a band that covered them would hide it. */
+    function band(entry) {
+      return `<button class="tt-band" data-at="${entry.key}" type="button"
+                      style="--at:${at(entry)};--for:${runs(entry)}"
+                      aria-label="${J.esc(entry.name)}, ${entry.at}–${entry.to}"
+              ><span class="tt-band-said">${J.esc(entry.name)}</span></button>`;
     }
 
     function card(entry, inset) {
@@ -310,7 +334,9 @@ J.views.orarend = {
     }
 
     const days = DAYS.map((name, day) => {
-      const mine = CLASSES.filter((e) => e.day === day && e.whose === "me");
+      const own = CLASSES.filter((e) => e.day === day && e.whose === "me");
+      const bands = own.filter((e) => e.kind === "band");
+      const mine = own.filter((e) => e.kind !== "band");
       const skips = mine.filter((e) => e.skip);
       const theirs = lanes(CLASSES.filter((e) => e.day === day && e.whose !== "me"));
       /* How many stripe lanes this day actually uses.
@@ -322,6 +348,7 @@ J.views.orarend = {
         ? Math.max(...theirs.map((e) => e.lane)) + 1 : 0;
       return `
         <div class="tt-day" role="group" aria-label="${name}" style="--tt-lanes:${used}">
+          ${bands.map(band).join("")}
           ${mine.map((entry) => card(
             entry, !entry.skip && skips.some((s) => clash(s, entry)))).join("")}
           ${theirs.map(stripe).join("")}
@@ -392,6 +419,11 @@ J.views.orarend = {
 
     const frame = J.$("#ttFit");
     let told = { hour: null, fit: null, height: null };
+    /* Set once the closer look below exists. A refit changes how much room there
+     * is, so a week that was panned to its right hand edge has to be caught up;
+     * the first fit happens before any of that is declared, which is why this is a
+     * hook and not a call. */
+    let settle = null;
 
 
     /* EVERY MEASUREMENT BEFORE EVERY CHANGE, and both of them once.
@@ -444,6 +476,7 @@ J.views.orarend = {
         told.height = height;
         frame.style.height = height;
       }
+      if (settle) settle();
     }
 
     /* One fit per frame, however many notifications arrive.
@@ -475,7 +508,135 @@ J.views.orarend = {
       window.addEventListener("resize", fitSoon);
     }
 
+    /* ── a closer look ──────────────────────────────────────────────────────
+     *
+     * The week is drawn small on purpose: five days at once is the question it answers,
+     * and it answers it at a glance. What it cannot do at that size is be read, so this
+     * is the other half: pinch it, or double tap it, and it comes up to a size where the
+     * room number is a room number.
+     *
+     * ON THE GRID AND NOT ON THE PAGE. The browser's own zoom would do this, and take the
+     * rail, the player and the top bar up with it, which means finding the week again
+     * afterwards. Here the frame stays exactly where it was and the week moves inside it.
+     *
+     * It is a second factor on the scale that is already there rather than a second
+     * transform: how much room there is and how much detail is wanted are two different
+     * questions, and multiplying the answers keeps both of them true.
+     */
+    const CLOSEST = 3.2;             // far enough in for the smallest line on a card
+    let zoom = 1;
+    let panX = 0;
+    let panY = 0;
+
+    /* Never past the edges. Dragging a zoomed week until it is off the side of its own
+     * frame leaves an empty box and nothing to say which way to drag back. */
+    function hold() {
+      const drawn = { x: grid.offsetWidth * told.fit * zoom,
+                      y: grid.offsetHeight * told.fit * zoom };
+      const room = { x: frame.clientWidth, y: parseFloat(told.height) || 0 };
+      panX = Math.min(0, Math.max(room.x - drawn.x, panX));
+      panY = Math.min(0, Math.max(room.y - drawn.y, panY));
+      // A week smaller than its frame sits at the top left rather than drifting.
+      if (drawn.x <= room.x) panX = 0;
+      if (drawn.y <= room.y) panY = 0;
+    }
+
+    function show() {
+      hold();
+      grid.style.setProperty("--tt-zoom", zoom);
+      grid.style.setProperty("--tt-x", panX.toFixed(1) + "px");
+      grid.style.setProperty("--tt-y", panY.toFixed(1) + "px");
+      frame.classList.toggle("is-zoomed", zoom > 1);
+    }
+    settle = show;
+
+    /* Towards a point, so what you pinched is what you end up looking at. */
+    function zoomTo(next, at) {
+      next = Math.min(CLOSEST, Math.max(1, next));
+      if (next === zoom) return;
+      const box = frame.getBoundingClientRect();
+      const x = at.x - box.left;
+      const y = at.y - box.top;
+      const by = next / zoom;
+      panX = x - (x - panX) * by;
+      panY = y - (y - panY) * by;
+      zoom = next;
+      show();
+    }
+
+    const touching = new Map();
+    let spread = 0;                  // how far apart two fingers were last time
+    let dragging = null;
+    let moved = false;               // whether this gesture was a drag rather than a tap
+
+    const middle = () => {
+      const [a, b] = [...touching.values()];
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
+    const apart = () => {
+      const [a, b] = [...touching.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    frame.addEventListener("pointerdown", (e) => {
+      touching.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touching.size === 2) {
+        spread = apart();
+        dragging = null;             // a pinch that began as a drag is a pinch
+      } else if (touching.size === 1 && zoom > 1) {
+        dragging = { x: e.clientX, y: e.clientY };
+        moved = false;
+        frame.setPointerCapture(e.pointerId);
+        frame.classList.add("is-held");
+      }
+    });
+
+    frame.addEventListener("pointermove", (e) => {
+      if (!touching.has(e.pointerId)) return;
+      touching.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touching.size === 2 && spread) {
+        const now = apart();
+        zoomTo(zoom * (now / spread), middle());
+        spread = now;
+        e.preventDefault();
+      } else if (dragging) {
+        panX += e.clientX - dragging.x;
+        panY += e.clientY - dragging.y;
+        dragging = { x: e.clientX, y: e.clientY };
+        moved = true;
+        show();
+        e.preventDefault();
+      }
+    });
+
+    function letGo(e) {
+      touching.delete(e.pointerId);
+      if (touching.size < 2) spread = 0;
+      if (!touching.size) {
+        dragging = null;
+        frame.classList.remove("is-held");
+      }
+    }
+    frame.addEventListener("pointerup", letGo);
+    frame.addEventListener("pointercancel", letGo);
+
+    /* A tap on a class opens it, so the second way in is a double tap on the week, which
+     * is the gesture a map has taught everybody anyway. Out again from wherever it is. */
+    frame.addEventListener("dblclick", (e) => {
+      if (e.target.closest("[data-at]")) return;   // that tap opened a class already
+      zoomTo(zoom > 1 ? 1 : CLOSEST, { x: e.clientX, y: e.clientY });
+    });
+
+    /* And the mouse's own version of a pinch, which is the trackpad's too. */
+    frame.addEventListener("wheel", (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;      // a plain wheel is the page scrolling
+      e.preventDefault();
+      zoomTo(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), { x: e.clientX, y: e.clientY });
+    }, { passive: false });
+
     grid.addEventListener("click", (e) => {
+      // Letting go of a pan is not a tap on whatever happened to be under the finger.
+      if (moved) { moved = false; return; }
       const hit = e.target.closest("[data-at]");
       if (!hit) return;
       const entry = CLASSES[Number(hit.dataset.at)];

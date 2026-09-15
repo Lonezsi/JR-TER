@@ -22,6 +22,27 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.12.0",
+        "date": "2026-09-15",
+        "name": JRITER,
+        "title": "Small enough to see the week, close enough to read it",
+        "notes": [
+            "The timetable can be pinched. Two fingers, a double tap on the week, or "
+            "ctrl and the wheel, and it comes up to a size where the room number is a "
+            "room number; drag to move around it and double tap again to come back. It "
+            "zooms the week and not the page, so the rail and the player stay where they "
+            "are.",
+            "Everything on a card is a notch smaller, now that there is a way to look "
+            "closer.",
+            "Hours that are spoken for without being a class, like a day at work, are "
+            "drawn as a hatched band behind the day rather than as a card. A card that "
+            "long lies on top of every lecture that morning, and only one of the two can "
+            "be read.",
+            "Pinching no longer pulls the rail out. It was taking whichever of the two "
+            "fingers landed second and reading it as a swipe.",
+        ],
+    },
+    {
         "version": "3.11.0",
         "date": "2026-09-14",
         "name": JRITER,

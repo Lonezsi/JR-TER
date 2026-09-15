@@ -593,7 +593,7 @@ def test_the_week_is_laid_out_wide_and_then_made_smaller():
         " narrow and squashed rather than laid out wide and scaled."
         % (width.group(1).strip() if width else "nothing"))
 
-    scaled = re.search(r"transform:\s*scale\(var\(--tt-fit", body)
+    scaled = re.search(r"transform:[^;]*scale\([^;]*var\(--tt-fit", body)
     assert scaled, "the grid is never scaled, so on a phone it simply hangs off the edge"
     assert re.search(r"transform-origin:\s*top left", body), (
         "the grid scales about its middle, which moves the week up and to the left of the"
@@ -698,6 +698,144 @@ def test_a_day_keeps_room_for_exactly_its_own_stripes():
             % (name, got.lanes[name], used))
         seen += used
     assert seen, "no day uses any lane, so this test watched nothing"
+
+
+# ── the hours that are spoken for without being a class ──────────────────────
+
+def test_work_is_drawn_behind_the_day_rather_than_on_it():
+    """Eight hours of Monday as a card is a card lying on top of every lecture that
+    morning, and a card is opaque, so exactly one of the two can be read.
+
+    It is not competing with the classes for the column: it is the reason the column is
+    not free. So it is a band the width of the day, underneath them.
+    """
+    week = {"classes": WEEK["classes"] + [
+        {"day": 0, "at": "08:30", "to": "16:30", "kind": "band", "whose": "me",
+         "name": "Munka", "where": ""}]}
+    got, _ = grid(week)
+
+    # A band and not a card. Asking only for the class was not enough: a band that went
+    # through the card path comes out as "tt-card tt-band", which reads as a band, is
+    # styled as a card, and lies on top of the morning exactly as before.
+    bands = [b for _, boxes in got.days for b in boxes
+             if "tt-band" in b["classes"] and "tt-card" not in b["classes"]]
+    assert len(bands) == 1, (
+        "the long stretch of the day was drawn as %s. A card that long covers the morning."
+        % ([b["classes"] for _, boxes in got.days for b in boxes
+            if b["label"].startswith("Munka")] or "nothing at all"))
+
+    monday = [b for name, boxes in got.days if name == "Hétfő" for b in boxes]
+    covered = [b for b in monday if not b["stripe"] and "tt-band" not in b["classes"]
+               and clash(b, bands[0])]
+    assert covered, "nothing on Monday runs during the band, so this watched nothing"
+
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    # Whichever of the band's rules carries the layer. It is named in more than one: the
+    # rule that places every box by the hours it says mentions it too, and has no layer.
+    layers = [re.search(r"z-index:\s*(\d+)", found.group(1))
+              for found in re.finditer(r"\.tt-band[^{}]*\{([^}]*)\}", sheet)]
+    layer = next((found for found in layers if found), None)
+    assert layer and int(layer.group(1)) == 0, \
+        "the band does not say which layer it is on, so it covers whatever it overlaps"
+    above = re.search(r"\.tt-card,\s*\.tt-stripe\s*\{\s*z-index:\s*(\d+)", sheet)
+    assert above and int(above.group(1)) > int(layer.group(1)), (
+        "the classes are not above the band, so a morning at work hides the lecture in it")
+
+
+def test_everything_drawn_on_a_day_is_placed_by_the_hours_it_says():
+    """The view writes --at and --for on every box it draws, and one rule turns those into
+    a top and a height. A box whose class is not in that rule is drawn nought pixels tall.
+
+    Which is exactly what happened to the band: it had a colour, a hatch, an edge and a
+    label, it was in the markup with the right hours on it, and it was invisible, because
+    the rule that makes hours into pixels named cards and stripes and nothing else.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    bare = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)
+    rule = re.search(r"([^{}]+)\{\s*top:\s*calc\(var\(--at", bare)
+    assert rule, "nothing turns the hours a box says into a place on the grid"
+    placed = {part.strip() for part in rule.group(1).split(",")}
+
+    view = io.open(VIEW, encoding="utf-8").read()
+    drawn = set(re.findall(r'class="(tt-(?:card|stripe|band))', view))
+    assert drawn, "the view draws no boxes at all"
+    for what in drawn:
+        assert "." + what in placed, (
+            "the view draws a %s and the stylesheet does not give it a top or a height, so"
+            " it is on the grid and nought pixels tall. Placed: %s" % (what, sorted(placed)))
+
+
+def test_a_band_is_not_one_of_the_kinds_of_class():
+    """It has no tag and it is not in the legend beside Ea and Gy, because it is not one.
+
+    The tag says which kind of teaching an hour is. A shift at work is not a kind of
+    teaching, and a card that wore "Munka" as though it were would be the sketch's old
+    mistake in a new place: a category invented by the drawing rather than by the thing.
+    """
+    week = {"classes": WEEK["classes"] + [
+        {"day": 4, "at": "08:30", "to": "16:30", "kind": "band", "whose": "me",
+         "name": "Munka", "where": ""}]}
+    got, _ = grid(week)
+    bands = [b for _, boxes in got.days for b in boxes if "tt-band" in b["classes"]]
+    assert bands, "no band was drawn"
+    for box in bands:
+        assert not box["tag"].strip(), \
+            "the band carries the tag %r, which says it is a kind of class" % box["tag"]
+        assert "tt-card" not in box["classes"], \
+            "the band is a card, so it is drawn over what it overlaps"
+    assert box["at"] is not None, "the band cannot be opened, so it cannot say what it is"
+
+
+# ── a closer look ────────────────────────────────────────────────────────────
+
+def test_the_week_can_be_zoomed_without_zooming_the_page():
+    """Small enough to see the week at once is too small to read a room number.
+
+    Both are wanted, so the week is drawn at the size that answers "when", and pinching it
+    answers "where". On the grid and not on the page: the browser's own zoom takes the
+    rail, the player and the top bar up with it, and then the week has to be found again.
+
+    The pinch is a second factor on the scale that is already there. A second transform
+    would be two answers to where the grid is, and the fit rewrites its one whenever the
+    window moves, which would throw the zoom away every time the rail opened.
+    """
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
+                    encoding="utf-8").read()
+    rule = re.search(r"\.tt-grid\s*\{([^}]*)\}", sheet)
+    body = re.sub(r"/\*.*?\*/", "", rule.group(1), flags=re.S)
+    moved = re.search(r"transform:([^;]+);", body).group(1)
+    assert "--tt-zoom" in moved and "--tt-fit" in moved, (
+        "the grid's transform is %s. The room there is and the detail wanted are two"
+        " separate scales and both belong in it." % moved.strip())
+    assert "--tt-x" in moved and "--tt-y" in moved, \
+        "a zoomed week cannot be moved, so everything but the top left corner is unreachable"
+
+    view = io.open(VIEW, encoding="utf-8").read()
+    assert 'frame.addEventListener("pointerdown"' in view, "nothing listens for a finger"
+    assert re.search(r"Math\.min\(CLOSEST,\s*Math\.max\(1,", view), (
+        "the zoom is not held between one and the closest it goes, so it can be pinched"
+        " down past the size that fits or up until a card is the whole screen")
+
+
+def test_a_pinched_week_cannot_be_dragged_off_its_own_frame():
+    """Which would leave an empty box, and nothing to say which way to drag back."""
+    view = io.open(VIEW, encoding="utf-8").read()
+    held = re.search(r"function hold\(\)\s*\{(.+?)\n    \}", view, flags=re.S)
+    assert held, "nothing holds the week inside its frame"
+    assert "Math.min(0, Math.max(" in held.group(1), (
+        "the pan is not clamped at both ends: %s" % held.group(1).strip()[:200])
+
+
+def test_letting_go_of_a_drag_does_not_open_whatever_was_under_it():
+    """A pan that ends on a class is a pan, not a tap on that class."""
+    view = io.open(VIEW, encoding="utf-8").read()
+    click = view[view.index('grid.addEventListener("click"'):]
+    click = click[:click.index("\n    });")]
+    assert "moved" in click, (
+        "the click handler does not know a drag happened, so panning the week opens the"
+        " class the finger stopped on")
 
 
 def test_the_timetable_is_not_in_the_rail():

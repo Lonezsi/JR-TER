@@ -237,6 +237,30 @@ def test_letting_go_no_longer_navigates_on_its_own():
         "letting go does not start the clock on the offer"
 
 
+def test_a_second_finger_is_not_a_swipe():
+    """A pinch is two fingers, and one of them was being read as a drag on the rail.
+
+    The press handler starts every gesture from scratch, which is right for a second press
+    after the first has finished and wrong for a second finger while the first is still
+    down: the rail took whichever landed second and slid out from under the timetable
+    being pinched. So it counts what is on the glass and leaves two fingers alone.
+    """
+    down = BOOT[BOOT.index('addEventListener("pointerdown", (e) => {\n    drag = null;'):]
+    down = down[:down.index("}, { passive: true });")]
+    assert "fingers > 1" in down, (
+        "the rail still takes a gesture while another finger is already down, so pinching"
+        " the timetable pulls the menu out")
+
+    # And put back down again, or the first pinch of a session is the last gesture the
+    # rail ever sees.
+    for what in ("pointerup", "pointercancel"):
+        handler = BOOT[BOOT.index('addEventListener("%s", (e) => {' % what):]
+        handler = handler[:handler.index("}, { passive: true });")]
+        assert "fewer()" in handler, (
+            "a finger lifting off is not counted in %s, so the count only ever goes up"
+            % what)
+
+
 def test_a_cancelled_gesture_keeps_the_offer():
     """The likeliest reason this did nothing on a real phone.
 

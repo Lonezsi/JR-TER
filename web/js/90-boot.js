@@ -477,6 +477,12 @@ async function boot() {
     // Modal while it is up, whichever way you drag on it.
     if (node.closest(".sheet, .slot-menu, .pick-list")) return true;
 
+    // A zoomed week pans under the finger, so a sideways drag on it is the week moving.
+    // Only once it is zoomed: at the size it fits there is nothing to pan, and the rail
+    // is welcome to the gesture over a screen that is mostly timetable.
+    const week = node.closest(".tt-fit");
+    if (week && week.classList.contains("is-zoomed")) return true;
+
     // Dragging sideways across words is selecting them, which is the one gesture the
     // lyric editor cannot afford to lose: it is a text box, and this rail would
     // otherwise slide out every time somebody tried to pick a line.
@@ -706,8 +712,20 @@ async function boot() {
     // would be one frame of a full width search box appearing over a closing rail.
   }
 
+  /* How many fingers are down, so a one finger gesture knows it is not one.
+   *
+   * This resets `drag` on every press and then starts again from the new one, which is
+   * right for a second press after a first has finished and wrong for a second finger
+   * that arrives while the first is still down. A pinch on the timetable is exactly
+   * that, and it was pulling the rail out from under the week being pinched: the rail
+   * took whichever of the two fingers landed second and read it as a swipe. */
+  let fingers = 0;
+  const fewer = () => { fingers = Math.max(0, fingers - 1); };
+
   document.addEventListener("pointerdown", (e) => {
     drag = null;
+    if (e.pointerType !== "mouse") fingers += 1;
+    if (fingers > 1) return;                                // two fingers is not a swipe
     if (e.button) return;                                   // a right or middle press
     if (!narrow()) return;                                  // wide screens collapse, not slide
     // The one question left: is this sideways drag already somebody's.
@@ -788,6 +806,7 @@ async function boot() {
   }, { passive: true });
 
   document.addEventListener("pointerup", (e) => {
+    fewer();                              // one fewer finger, whosever drag this was
     if (!drag || e.pointerId !== drag.id) return;
     if (!drag.axis || drag.mouse) { drag = null; return; }
     try { railNode.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
@@ -838,6 +857,7 @@ async function boot() {
   }, { passive: true });
 
   document.addEventListener("pointercancel", (e) => {
+    fewer();
     if (!drag) return;
     /* A cancelled gesture no longer throws the offer away.
      *

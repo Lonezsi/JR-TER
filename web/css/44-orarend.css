@@ -68,6 +68,19 @@
   overflow: hidden;
   /* Room for the shadow under the pane, which the overflow above would otherwise clip. */
   padding-bottom: var(--s2);
+
+  /* Two fingers are a pinch on the week; one is the page going past it.
+     pan-y rather than none: the week can be most of a phone screen, and a screen you
+     cannot scroll by putting your thumb on the middle of it is broken. */
+  touch-action: pan-y;
+}
+
+/* Being dragged. The cursor is the only thing that says a zoomed week can be moved. */
+.tt-fit.is-held {
+  cursor: grabbing;
+}
+.tt-fit.is-zoomed {
+  cursor: grab;
 }
 
 .tt-grid {
@@ -93,8 +106,13 @@
                         + 2 * var(--tt-pad) + 2px));
 
   /* And then shrunk to whatever room there actually is. One at any width wide enough to
-     hold it, so a desktop is untouched. The view works it out and writes it here. */
-  transform: scale(var(--tt-fit, 1));
+     hold it, so a desktop is untouched. The view works it out and writes it here.
+     --tt-zoom is the pinch on top of that, and is 1 until somebody asks for a closer
+     look: one scale for how much room there is, one for how much detail is wanted, and
+     the two multiplied rather than confused with each other. */
+  transform:
+    translate(var(--tt-x, 0px), var(--tt-y, 0px))
+    scale(calc(var(--tt-fit, 1) * var(--tt-zoom, 1)));
   transform-origin: top left;
 
   padding: var(--tt-pad);
@@ -106,7 +124,7 @@
 .tt-corner {
   padding: var(--s2) 2px;
   text-align: center;
-  font-size: 12px;
+  font-size: 10.2px;
   font-weight: 600;
   color: var(--text-2);
   border-bottom: 1px solid var(--line-2);
@@ -123,7 +141,7 @@
   height: var(--tt-hour);
   padding: 2px 4px 0 0;
   text-align: right;
-  font-size: 10px;
+  font-size: 8.5px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
   /* The line belongs to the hour it starts, so it lines up with the day columns'
@@ -163,7 +181,8 @@
  * belongs to the table. A pixel written into a card is a pixel that stops agreeing with the
  * hour lines the moment the table is a different size. */
 .tt-card,
-.tt-stripe {
+.tt-stripe,
+.tt-band {
   top: calc(var(--at, 0) * var(--tt-hour));
   height: calc(var(--for, 0) * var(--tt-hour));
 }
@@ -181,7 +200,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 5.4px 7.2px;
+  padding: 4.6px 6.1px;
   text-align: left;
   overflow: hidden;
   border-radius: var(--r-sm);
@@ -220,7 +239,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 9.1px;
+  font-size: 7.7px;
   /* One line, whatever happens. A time that wraps is two lines of a three line card. */
   white-space: nowrap;
   color: var(--text-3);
@@ -228,7 +247,7 @@
 }
 .tt-tag {
   font-style: normal;
-  font-size: 9px;
+  font-size: 7.6px;
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 1px 4px;
@@ -237,7 +256,7 @@
   color: var(--text-2);
 }
 .tt-name {
-  font-size: 10.9px;
+  font-size: 9.3px;
   font-weight: 600;
   line-height: 1.2;
   /* Cut rather than wrapped past a couple of lines. A title that wraps to six lines in a
@@ -249,7 +268,7 @@
   overflow: hidden;
 }
 .tt-where {
-  font-size: 8.6px;
+  font-size: 7.3px;
   color: var(--text-3);
   line-height: 1.25;
   white-space: nowrap;
@@ -507,4 +526,66 @@
 }
 .tt-page-read > :last-child {
   margin-bottom: 0;
+}
+
+/* ── a stretch that is spoken for ─────────────────────────────────────────── */
+
+/* Work, and anything else that takes a piece of the day without being a class.
+ *
+ * Behind everything in the column and the full width of it. Eight hours of Monday drawn
+ * as a card is a card lying on top of every lecture that morning; this is not competing
+ * with them for the column, it is the reason the column is not free.
+ *
+ * Tinted and unlit, with no border and no shadow: the cards are the things to read and a
+ * band that drew like one would be the loudest thing on the day. */
+.tt-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background-color: var(--surface-2);
+  color: var(--text-3);
+  cursor: pointer;
+  font: inherit;
+  overflow: hidden;
+  /* Diagonals, so it reads as time hatched out rather than as a pale card. Fine enough
+     to stay a texture at the size the week is drawn, and close enough together to survive
+     being scaled down to a third: at 8px apart the whole band came out as one flat tint
+     on a phone, which is the one thing it must not look like. */
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    var(--line) 4px 5px
+  );
+  /* And an edge down the left, which is what the eye finds first in a column of cards. */
+  box-shadow: inset 2px 0 0 var(--line-2);
+}
+.tt-band:hover,
+.tt-band:focus-visible {
+  color: var(--text-2);
+  background-color: var(--surface-2);
+}
+
+/* Down the left edge, out of the way of the cards that sit on top of it.
+ *
+ * Written along the band rather than across it: a card covers the middle of the column
+ * for most of a working day, and the one strip that is reliably clear is the edge. */
+.tt-band-said {
+  position: absolute;
+  top: 6px;
+  left: 1px;
+  transform-origin: left top;
+  transform: rotate(90deg) translateY(-100%);
+  white-space: nowrap;
+  font-size: 7.3px;
+  letter-spacing: 0.06em;
+}
+
+/* Above the band, which is the whole point of it being a band. */
+.tt-card,
+.tt-stripe {
+  z-index: 1;
 }
