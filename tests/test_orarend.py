@@ -606,7 +606,7 @@ def test_the_week_is_laid_out_wide_and_then_made_smaller():
         " leaves dead space to the right of Friday." % columns.group(1).strip())
 
 
-def test_an_hour_is_a_quarter_of_a_day_and_stays_one():
+def test_an_hour_is_a_sixth_of_a_day_and_stays_one():
     """So the week is always the same shape, and never answers a narrow screen by growing.
 
     A fixed hour height with a column that can be any width is a table that gets taller as
@@ -618,9 +618,10 @@ def test_an_hour_is_a_quarter_of_a_day_and_stays_one():
     ratio = re.search(r"const HOUR_OF_DAY = ([^;]+);", view)
     assert ratio, "the view no longer says what an hour is worth"
     top, bottom = ratio.group(1).split("/")
-    assert float(top) / float(bottom) == 0.25, (
-        "an hour is %s of a day column. It is a quarter: wider than that and the week is"
-        " too tall to fit, narrower and the cells cannot hold two lines."
+    assert abs(float(top) / float(bottom) - 1.0 / 6) < 1e-9, (
+        "an hour is %s of a day column. It is a sixth: it was a quarter, and before that"
+        " sixty pixels against a hundred and sixty, and each time the week was the tall"
+        " thing on the screen and had to be shrunk further to fit."
         % ratio.group(1).strip())
 
     assert re.search(r"day\.offsetWidth \* HOUR_OF_DAY", view), (
@@ -790,52 +791,170 @@ def test_a_band_is_not_one_of_the_kinds_of_class():
 
 # ── a closer look ────────────────────────────────────────────────────────────
 
-def test_the_week_can_be_zoomed_without_zooming_the_page():
-    """Small enough to see the week at once is too small to read a room number.
+def test_the_page_is_left_zoomable_by_the_browser():
+    """The week had a zoom of its own: pinch, drag, double tap, a scale on top of the fit.
 
-    Both are wanted, so the week is drawn at the size that answers "when", and pinching it
-    answers "where". On the grid and not on the page: the browser's own zoom takes the
-    rail, the player and the top bar up with it, and then the week has to be found again.
+    It worked, and it was the wrong thing to have built. A phone already knows how to zoom
+    a page and everybody already knows how to ask it to, and a second zoom inside the first
+    is two sets of rules for one gesture, each with its own idea of where the page is.
 
-    The pinch is a second factor on the scale that is already there. A second transform
-    would be two answers to where the grid is, and the fit rewrites its one whenever the
-    window moves, which would throw the zoom away every time the rail opened.
+    So nothing here may take a pinch away from the browser. touch-action on the frame is
+    how a page does that, and a maximum-scale or user-scalable=no in the viewport is the
+    other way, which is worse: it turns the zoom off for the whole document.
     """
     sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"),
                     encoding="utf-8").read()
-    rule = re.search(r"\.tt-grid\s*\{([^}]*)\}", sheet)
-    body = re.sub(r"/\*.*?\*/", "", rule.group(1), flags=re.S)
-    moved = re.search(r"transform:([^;]+);", body).group(1)
-    assert "--tt-zoom" in moved and "--tt-fit" in moved, (
-        "the grid's transform is %s. The room there is and the detail wanted are two"
-        " separate scales and both belong in it." % moved.strip())
-    assert "--tt-x" in moved and "--tt-y" in moved, \
-        "a zoomed week cannot be moved, so everything but the top left corner is unreachable"
+    bare = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)
+    rule = re.search(r"\.tt-fit\s*\{([^}]*)\}", bare)
+    assert rule, "the frame has no rule of its own"
+    assert "touch-action" not in rule.group(1), (
+        "the frame claims the gesture again, so two fingers on the week do not zoom the"
+        " page: %s" % rule.group(1).strip())
+
+    page = io.open(os.path.join(ROOT, "web", "index.html"), encoding="utf-8").read()
+    viewport = re.search(r'name="viewport" content="([^"]*)"', page)
+    assert viewport, "the page does not say how it wants to be laid out"
+    for banned in ("user-scalable=no", "user-scalable=0", "maximum-scale"):
+        assert banned not in viewport.group(1).replace(" ", ""), (
+            "the viewport says %s, which turns the browser's zoom off: %s"
+            % (banned, viewport.group(1)))
 
     view = io.open(VIEW, encoding="utf-8").read()
-    assert 'frame.addEventListener("pointerdown"' in view, "nothing listens for a finger"
-    assert re.search(r"Math\.min\(CLOSEST,\s*Math\.max\(1,", view), (
-        "the zoom is not held between one and the closest it goes, so it can be pinched"
-        " down past the size that fits or up until a card is the whole screen")
+    for gesture in ("pointerdown", "gesturestart", "wheel"):
+        assert 'frame.addEventListener("%s"' % gesture not in view, (
+            "the week is listening for %s again, which is the zoom that was taken out"
+            % gesture)
 
 
-def test_a_pinched_week_cannot_be_dragged_off_its_own_frame():
-    """Which would leave an empty box, and nothing to say which way to drag back."""
-    view = io.open(VIEW, encoding="utf-8").read()
-    held = re.search(r"function hold\(\)\s*\{(.+?)\n    \}", view, flags=re.S)
-    assert held, "nothing holds the week inside its frame"
-    assert "Math.min(0, Math.max(" in held.group(1), (
-        "the pan is not clamped at both ends: %s" % held.group(1).strip()[:200])
+def test_the_rail_gets_out_of_the_way_of_the_week():
+    """Five days wide, and a column of album links beside it is width the week does not get.
+
+    Tucked rather than taken away, and not remembered: the hamburger still opens it, and
+    the choice somebody made about the rail everywhere else is not overwritten by their
+    having opened the timetable once.
+    """
+    boot = io.open(os.path.join(ROOT, "web", "js", "90-boot.js"), encoding="utf-8").read()
+    roomy = re.search(r"const ROOMY = \[([^\]]*)\]", boot)
+    assert roomy and "orarend" in roomy.group(1), (
+        "no screen asks for the whole width, so the timetable is drawn beside the rail")
+
+    hook = re.search(r"J\.railForView = \(view\) => \{(.+?)\n  \};", boot, flags=re.S)
+    assert hook, "nothing tells the rail which screen is coming up"
+    assert "setRail(true, true)" in hook.group(1), (
+        "the rail is shut in a way that is written down, so visiting the timetable is a"
+        " decision about every other screen: %s" % hook.group(1).strip())
+    assert "setRail(remembered(), true)" in hook.group(1), (
+        "the rail is not put back on the way out")
+
+    router = io.open(os.path.join(ROOT, "web", "js", "80-router.js"),
+                     encoding="utf-8").read()
+    assert "J.railForView(view)" in router, (
+        "the router never says which screen it is showing, so the rail cannot answer")
 
 
-def test_letting_go_of_a_drag_does_not_open_whatever_was_under_it():
-    """A pan that ends on a class is a pan, not a tap on that class."""
+# ── making and changing one ──────────────────────────────────────────────────
+
+def test_a_class_is_found_by_its_name_and_not_by_where_it_sits():
+    """The bug this whole key exists to stop, and the one it caused on the way in.
+
+    The card carries whatever the server calls the class. That was its position while the
+    week was read only, and an index is a fine name for a row in a list nothing writes to.
+    It is an id now, so the card said data-at="1790086969781" and the handler, still
+    reading it as a position, asked the array for its one billion, seven hundred and
+    ninety millionth entry and got nothing back. Every card on the timetable stopped
+    opening, in a way nothing threw an error about.
+    """
     view = io.open(VIEW, encoding="utf-8").read()
     click = view[view.index('grid.addEventListener("click"'):]
     click = click[:click.index("\n    });")]
-    assert "moved" in click, (
-        "the click handler does not know a drag happened, so panning the week opens the"
-        " class the finger stopped on")
+    assert "CLASSES[Number(" not in click, (
+        "a class is looked up by its position again, so nothing opens as soon as one of"
+        " them has an id")
+    assert re.search(r"CLASSES\.find\(\(\w+\) => \w+\.key === ", click), (
+        "the click handler does not find the class by the name the card carries: %s"
+        % click.strip()[:200])
+
+
+def test_every_box_carries_the_name_the_server_gave_it():
+    """Rather than one the page made up, which is how the two got out of step."""
+    keyed = {"classes": [dict(WEEK["classes"][1], id=1790000000001),
+                         dict(WEEK["classes"][2])]}
+    got, _ = grid(keyed)
+    said = [b["at"] for _, boxes in got.days for b in boxes]
+    assert "1790000000001" in said, (
+        "a class with an id is drawn under some other name: %s" % said)
+    assert any(s.startswith("i:") for s in said), (
+        "a class with no id is not drawn under its position: %s" % said)
+
+
+def test_there_is_a_way_to_add_a_class_on_both_screens():
+    """Including, and especially, the screen for somebody who has no week at all.
+
+    That screen used to say: put your classes in orarend.json and reload. Which is fine at
+    a desk and useless on a bus, and the bus is where a timetable is actually read.
+    """
+    got = drawn()
+    assert 'id="ttNew"' in got["html"], "the week cannot be added to"
+
+    empty = drawn({"classes": [], "missing": True, "where": "orarend.json"})
+    assert 'id="ttNew"' in empty["html"], (
+        "an account with no week is still told to go and edit a file, with nothing on the"
+        " screen to make one with")
+    # And it still says where the week lives, because it is still a file.
+    assert "orarend.json" in empty["html"]
+
+
+def test_a_class_can_be_changed_and_dropped_from_the_one_it_opens():
+    """Both on the sheet that opens when a class is tapped, which is where somebody
+    already is when they notice the room has changed."""
+    view = io.open(VIEW, encoding="utf-8").read()
+    detail = view[view.index("function detail(entry) {"):]
+    detail = detail[:detail.index("\n    /* ── making and changing one")]
+    # The buttons themselves, not the handlers that look for them: asking only for the
+    # word "data-edit" was answered by the querySelector that wires it, so the test went
+    # on passing with the button taken out of the markup and nothing left to wire.
+    for what, said in (("data-edit", "change"), ("data-drop", "drop")):
+        assert re.search(r"<button[^>]*\b%s\b" % what, detail), (
+            "the sheet a class opens has no button to %s it" % said)
+    assert "form(entry)" in detail and "remove(entry)" in detail
+
+    drop = view[view.index("async function remove(entry) {"):]
+    drop = drop[:drop.index("\n    }")]
+    assert "const sure = await J.confirm(" in drop and "if (!sure) return;" in drop, (
+        "a class is deleted without being asked about, or the answer is not waited for."
+        " It is one tap on a phone, on a page made of tappable rectangles, and the week is"
+        " not anywhere else: %s" % drop.strip()[:200])
+
+
+def test_the_form_offers_every_kind_the_server_will_accept():
+    """A form that offers four of five kinds is a fifth kind you can only get by editing
+    the file, which is the thing this page is for not having to do."""
+    view = io.open(VIEW, encoding="utf-8").read()
+    said = re.search(r"const KIND_SAID = \{(.+?)\};", view, flags=re.S)
+    assert said, "the view no longer names the kinds"
+    offered = set(re.findall(r"(\w+):", said.group(1)))
+    assert offered == set(orarend.KINDS), (
+        "the page offers %s and the server accepts %s"
+        % (sorted(offered), sorted(orarend.KINDS)))
+
+
+def test_what_a_class_says_is_what_the_server_keeps():
+    """Every field on the form is one the module will write, and the other way round.
+
+    A form field the server drops is typing that disappears on save with nothing said
+    about it, which is the worst of the two directions.
+    """
+    view = io.open(VIEW, encoding="utf-8").read()
+    form = view[view.index("    async function form(entry) {"):]
+    form = form[:form.index("\n    async function remove")]
+    # Both shapes: the ones written out, and the ones the row helper is asked for.
+    asked = set(re.findall(r'name="(\w+)"', form)) | set(re.findall(r'line\("(\w+)"', form))
+    keeps = set(orarend.FIELDS)
+    assert asked <= keeps, (
+        "the form asks for %s, which the server does not keep" % sorted(asked - keeps))
+    # day, at and to are the ones without which a class cannot be drawn at all.
+    for must in ("name", "day", "at", "to", "kind", "whose", "where"):
+        assert must in asked, "the form has no way to say %s" % must
 
 
 def test_the_timetable_is_not_in_the_rail():

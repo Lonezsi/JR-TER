@@ -117,7 +117,8 @@ J.views.orarend = {
           <span class="tt-when">${entry.at}–${entry.to}<i class="tt-tag">${
             KIND_TAG[entry.kind] || ""}</i></span>
           <span class="tt-name">${J.esc(entry.name)}</span>
-          <span class="tt-where">${J.esc(entry.where)}</span>
+          <span class="tt-where">${[entry.where, entry.teacher, entry.group ?
+            "#" + entry.group : ""].filter(Boolean).map(J.esc).join(" · ")}</span>
         </button>`;
     }
 
@@ -264,6 +265,11 @@ J.views.orarend = {
       });
     }
 
+    /* One fact, when there is one. A row reading "Oktató —" is a row that says nothing
+     * and takes the height of one that does. */
+    const fact = (said, value) => (value
+      ? `<div class="tt-fact"><span>${said}</span><b>${J.esc(value)}</b></div>` : "");
+
     function detail(entry) {
       J.sheet({
         title: entry.name,
@@ -272,9 +278,11 @@ J.views.orarend = {
         cancel: "Bezárás",
         body: `
           <div class="tt-facts">
-            <div class="tt-fact"><span>Helyszín</span><b>${J.esc(entry.where)}</b></div>
-            <div class="tt-fact"><span>Típus</span><b>${
-              J.esc(KIND_SAID[entry.kind] || entry.kind)}</b></div>
+            ${fact("Helyszín", entry.where)}
+            ${fact("Típus", KIND_SAID[entry.kind] || entry.kind)}
+            ${fact("Oktató", entry.teacher)}
+            ${fact("Kurzus", entry.group)}
+            ${fact("Tárgykód", entry.code)}
             <div class="tt-fact"><span>Kinek</span><b class="${
               entry.whose === "me" ? "" : "tt-friend-name"}" data-who="${
               entry.whose === "me" ? "" : whoIndex(entry.whose)}">${
@@ -282,36 +290,108 @@ J.views.orarend = {
           </div>
           ${entry.skip ? `<p class="tt-sheet-note">Erre az előadásra nem járok, ezért csak
             egy csík jelöli. Az idősáv így nem látszik szabadnak.</p>` : ""}
+          <div class="tt-sheet-tools">
+            <button class="btn ghost" data-edit type="button">Szerkesztés</button>
+            <button class="btn ghost danger" data-drop type="button">Törlés</button>
+          </div>
           <div class="tt-notes" data-notes></div>`,
-        onMount(sheet) { notebook(sheet, entry); },
+        onMount(sheet) {
+          notebook(sheet, entry);
+          sheet.querySelector("[data-edit]").addEventListener("click", () => {
+            // Shut first. Two sheets at once is two dialogs arguing about Escape.
+            sheet.querySelector('[data-act="cancel"]').click();
+            form(entry);
+          });
+          sheet.querySelector("[data-drop]").addEventListener("click", () => {
+            sheet.querySelector('[data-act="cancel"]').click();
+            remove(entry);
+          });
+        },
       });
     }
 
-    if (data.missing || data.broken || !CLASSES.length) {
-      /* Two different nothings, said differently.
-       *
-       * A file that is not there is every account that has never written one, and the
-       * answer is how to make one. A file that will not parse is one somebody has just
-       * edited, and the answer is which character stopped it. Telling them apart costs a
-       * line and saves the second person looking for a file that is right in front of
-       * them. */
-      root.innerHTML = `
-        <div class="section">
-          <div class="section-head"><h2>Órarend</h2></div>
-          <div class="empty">
-            <h3>${data.broken ? "Ez az órarend nem olvasható"
-                              : "Nincs még órarend"}</h3>
-            <p>${data.broken
-              ? `A fájl ott van, de nem értelmezhető: ${J.esc(data.broken)}`
-              : `Tedd a heti órákat a könyvtárad <code>${
-                  J.esc(data.where || "orarend.json")}</code> fájljába, és frissítsd ezt
-                 az oldalt.`}</p>
+    /* ── making and changing one ─────────────────────────────────────────────
+     *
+     * The week was a file and nothing else: to add a class you opened orarend.json in an
+     * editor, which is fine at a desk and impossible on the bus, which is where the
+     * timetable is actually read. So the page writes it now.
+     *
+     * THE FILE IS STILL THE THING. This does not import the week into a table and leave
+     * the file behind as an export: it edits the file, in place, keeping every key it
+     * does not know about. Somebody can still open it in an editor tomorrow, and a
+     * semester typed in by hand is not stranded behind a form.
+     */
+    const NEW = { day: 0, at: "10:00", to: "11:30", kind: "gy", whose: "me",
+                  name: "", where: "", teacher: "", group: "", code: "" };
+
+    async function form(entry) {
+      const making = !entry;
+      const it = entry || NEW;
+      const pick = (value, said, now) =>
+        `<option value="${value}"${value === now ? " selected" : ""}>${said}</option>`;
+      const line = (name, said, value, extra) => `
+        <label class="sheet-label">${said}<input class="field" name="${name}"
+               value="${J.esc(value || "")}" ${extra || ""}></label>`;
+
+      const values = await J.sheet({
+        title: making ? "Új óra" : it.name,
+        sub: making ? "" : `${DAYS[it.day]} ${it.at}–${it.to}`,
+        confirm: making ? "Hozzáadás" : "Mentés",
+        cancel: "Mégse",
+        wide: true,
+        body: `<div class="sheet-fields">
+          ${line("name", "Tárgy", it.name, 'placeholder="Analízis II. Ea" required')}
+          <div class="tt-form-row">
+            <label class="sheet-label">Nap<select class="field" name="day">${
+              DAYS.map((said, i) => pick(String(i), said, String(it.day))).join("")
+            }</select></label>
+            ${line("at", "Kezdés", it.at, 'type="time" required')}
+            ${line("to", "Vége", it.to, 'type="time" required')}
           </div>
-        </div>`;
-      return;
+          <div class="tt-form-row">
+            <label class="sheet-label">Típus<select class="field" name="kind">${
+              Object.keys(KIND_SAID).map((k) => pick(k, KIND_SAID[k], it.kind)).join("")
+            }</select></label>
+            ${line("whose", "Kinek", it.whose || "me", 'list="ttPeople"')}
+            <datalist id="ttPeople">${
+              ["me"].concat(people).map((n) => `<option value="${J.esc(n)}">`).join("")
+            }</datalist>
+          </div>
+          ${line("where", "Helyszín", it.where, 'placeholder="Déli Tömb 0-821"')}
+          ${line("teacher", "Oktató", it.teacher)}
+          <div class="tt-form-row">
+            ${line("group", "Kurzus", it.group, 'inputmode="numeric"')}
+            ${line("code", "Tárgykód", it.code, 'placeholder="IP-18AB1E"')}
+          </div>
+          <label class="candidate" style="cursor:pointer">
+            <input type="checkbox" name="skip"${it.skip ? " checked" : ""}>
+            <span class="grow">Nem járok rá</span>
+          </label>
+        </div>`,
+      });
+      if (!values) return;
+
+      /* Checked again on the server, and that is the refusal that counts: this one is
+       * here so an obvious slip is answered without a round trip. */
+      if (!values.name.trim()) { J.toast("A tárgy neve kell."); return form(entry); }
+      if (values.to <= values.at) { J.toast("A vége a kezdés előtt van."); return form(entry); }
+
+      const sent = Object.assign({}, values, { day: Number(values.day) });
+      const done = await J.try(() => (making
+        ? J.post("/api/orarend/classes", sent)
+        : J.put("/api/orarend/classes/" + it.key, sent)), making ? "Hozzáadva" : "Mentve");
+      if (done !== null) J.router.reload();
     }
 
-    CLASSES.forEach((entry, i) => { entry.key = String(i); });
+    async function remove(entry) {
+      const sure = await J.confirm(
+        "Törlöd?",
+        `${entry.name}, ${DAYS[entry.day]} ${entry.at}–${entry.to}. Ez a hétből is kikerül.`,
+        "Törlés");
+      if (!sure) return;
+      const done = await J.try(() => J.del("/api/orarend/classes/" + entry.key), "Törölve");
+      if (done !== null) J.router.reload();
+    }
 
     /* Everybody on this timetable who is not me, numbered.
      *
@@ -325,6 +405,37 @@ J.views.orarend = {
     const people = [...new Set(CLASSES.filter((e) => e.whose !== "me")
                                       .map((e) => e.whose))].sort();
     const whoIndex = (name) => Math.max(0, people.indexOf(name));
+
+    if (data.missing || data.broken || !CLASSES.length) {
+      /* Two different nothings, said differently.
+       *
+       * A file that is not there is every account that has never written one, and the
+       * answer is how to make one. A file that will not parse is one somebody has just
+       * edited, and the answer is which character stopped it. Telling them apart costs a
+       * line and saves the second person looking for a file that is right in front of
+       * them. */
+      root.innerHTML = `
+        <div class="section">
+          <div class="section-head">
+            <h2>Órarend</h2>
+            <div class="head-tools">
+              <button class="btn primary" id="ttNew" type="button">Új óra</button>
+            </div>
+          </div>
+          <div class="empty">
+            <h3>${data.broken ? "Ez az órarend nem olvasható"
+                              : "Nincs még órarend"}</h3>
+            <p>${data.broken
+              ? `A fájl ott van, de nem értelmezhető: ${J.esc(data.broken)}`
+              : `Vedd fel az első órát az Új óra gombbal. A hét a könyvtárad <code>${
+                  J.esc(data.where || "orarend.json")}</code> fájljában marad, úgyhogy
+                 kézzel is szerkesztheted.`}</p>
+          </div>
+        </div>`;
+      const first = J.$("#ttNew");
+      if (first) first.addEventListener("click", () => form(null));
+      return;
+    }
 
     const hours = [];
     // Up to but not including TO: the label "21:00" is the row from 21:00 to 22:00, so a
@@ -357,7 +468,12 @@ J.views.orarend = {
 
     root.innerHTML = `
       <div class="section">
-        <div class="section-head"><h2>Órarend</h2></div>
+        <div class="section-head">
+          <h2>Órarend</h2>
+          <div class="head-tools">
+            <button class="btn primary" id="ttNew" type="button">Új óra</button>
+          </div>
+        </div>
         <p class="faint" style="margin-top:0">
           A hét, ahogy van. Kattints bármelyikre a részletekért.
         </p>
@@ -407,23 +523,19 @@ J.views.orarend = {
      */
     /* How tall an hour is, as a share of how wide a day is.
      *
-     * A quarter. The table used to be 60px an hour against a 160px column, which is nearly
-     * four tenths, and fourteen hours of that is a table taller than it is wide: on a phone
-     * it had to shrink a long way to fit and the answer to being too tall was more
-     * shrinking. A quarter keeps the same week in two thirds of the height, so what gives
-     * when there is less room is the size of the type and not the shape of the day.
+     * A sixth. It was 60px an hour against a 160px column, which is nearly four tenths,
+     * and fourteen hours of that is a table taller than it is wide: on a phone it had to
+     * shrink a long way to fit, and the answer to being too tall was more shrinking.
+     * A quarter halved that; a sixth is where the week stops being the tall thing on the
+     * screen at all. What gives when there is less room is the height of the rows, and
+     * the type stays the size it is, because the page can be zoomed now.
      *
      * Measured off the real column rather than written down, so the shape holds whatever
      * width the days came out at. */
-    const HOUR_OF_DAY = 1 / 4;
+    const HOUR_OF_DAY = 1 / 6;
 
     const frame = J.$("#ttFit");
     let told = { hour: null, fit: null, height: null };
-    /* Set once the closer look below exists. A refit changes how much room there
-     * is, so a week that was panned to its right hand edge has to be caught up;
-     * the first fit happens before any of that is declared, which is why this is a
-     * hook and not a call. */
-    let settle = null;
 
 
     /* EVERY MEASUREMENT BEFORE EVERY CHANGE, and both of them once.
@@ -476,7 +588,6 @@ J.views.orarend = {
         told.height = height;
         frame.style.height = height;
       }
-      if (settle) settle();
     }
 
     /* One fit per frame, however many notifications arrive.
@@ -508,138 +619,32 @@ J.views.orarend = {
       window.addEventListener("resize", fitSoon);
     }
 
-    /* ── a closer look ──────────────────────────────────────────────────────
+    /* THE WEEK IS NOT ZOOMED BY THIS PAGE ANY MORE.
      *
-     * The week is drawn small on purpose: five days at once is the question it answers,
-     * and it answers it at a glance. What it cannot do at that size is be read, so this
-     * is the other half: pinch it, or double tap it, and it comes up to a size where the
-     * room number is a room number.
-     *
-     * ON THE GRID AND NOT ON THE PAGE. The browser's own zoom would do this, and take the
-     * rail, the player and the top bar up with it, which means finding the week again
-     * afterwards. Here the frame stays exactly where it was and the week moves inside it.
-     *
-     * It is a second factor on the scale that is already there rather than a second
-     * transform: how much room there is and how much detail is wanted are two different
-     * questions, and multiplying the answers keeps both of them true.
+     * It was: pinch, drag, double tap, a scale of its own on top of the fit. It worked
+     * and it was the wrong thing to have built. A phone already knows how to zoom a page,
+     * everybody already knows how to ask it to, and a second zoom inside the first is two
+     * sets of rules for the same gesture. So the page allows the browser's own, the rail
+     * gets out of the way on this screen, and there is nothing here to keep in step with
+     * it.
      */
-    const CLOSEST = 3.2;             // far enough in for the smallest line on a card
-    let zoom = 1;
-    let panX = 0;
-    let panY = 0;
-
-    /* Never past the edges. Dragging a zoomed week until it is off the side of its own
-     * frame leaves an empty box and nothing to say which way to drag back. */
-    function hold() {
-      const drawn = { x: grid.offsetWidth * told.fit * zoom,
-                      y: grid.offsetHeight * told.fit * zoom };
-      const room = { x: frame.clientWidth, y: parseFloat(told.height) || 0 };
-      panX = Math.min(0, Math.max(room.x - drawn.x, panX));
-      panY = Math.min(0, Math.max(room.y - drawn.y, panY));
-      // A week smaller than its frame sits at the top left rather than drifting.
-      if (drawn.x <= room.x) panX = 0;
-      if (drawn.y <= room.y) panY = 0;
-    }
-
-    function show() {
-      hold();
-      grid.style.setProperty("--tt-zoom", zoom);
-      grid.style.setProperty("--tt-x", panX.toFixed(1) + "px");
-      grid.style.setProperty("--tt-y", panY.toFixed(1) + "px");
-      frame.classList.toggle("is-zoomed", zoom > 1);
-    }
-    settle = show;
-
-    /* Towards a point, so what you pinched is what you end up looking at. */
-    function zoomTo(next, at) {
-      next = Math.min(CLOSEST, Math.max(1, next));
-      if (next === zoom) return;
-      const box = frame.getBoundingClientRect();
-      const x = at.x - box.left;
-      const y = at.y - box.top;
-      const by = next / zoom;
-      panX = x - (x - panX) * by;
-      panY = y - (y - panY) * by;
-      zoom = next;
-      show();
-    }
-
-    const touching = new Map();
-    let spread = 0;                  // how far apart two fingers were last time
-    let dragging = null;
-    let moved = false;               // whether this gesture was a drag rather than a tap
-
-    const middle = () => {
-      const [a, b] = [...touching.values()];
-      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    };
-    const apart = () => {
-      const [a, b] = [...touching.values()];
-      return Math.hypot(a.x - b.x, a.y - b.y);
-    };
-
-    frame.addEventListener("pointerdown", (e) => {
-      touching.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (touching.size === 2) {
-        spread = apart();
-        dragging = null;             // a pinch that began as a drag is a pinch
-      } else if (touching.size === 1 && zoom > 1) {
-        dragging = { x: e.clientX, y: e.clientY };
-        moved = false;
-        frame.setPointerCapture(e.pointerId);
-        frame.classList.add("is-held");
-      }
-    });
-
-    frame.addEventListener("pointermove", (e) => {
-      if (!touching.has(e.pointerId)) return;
-      touching.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (touching.size === 2 && spread) {
-        const now = apart();
-        zoomTo(zoom * (now / spread), middle());
-        spread = now;
-        e.preventDefault();
-      } else if (dragging) {
-        panX += e.clientX - dragging.x;
-        panY += e.clientY - dragging.y;
-        dragging = { x: e.clientX, y: e.clientY };
-        moved = true;
-        show();
-        e.preventDefault();
-      }
-    });
-
-    function letGo(e) {
-      touching.delete(e.pointerId);
-      if (touching.size < 2) spread = 0;
-      if (!touching.size) {
-        dragging = null;
-        frame.classList.remove("is-held");
-      }
-    }
-    frame.addEventListener("pointerup", letGo);
-    frame.addEventListener("pointercancel", letGo);
-
-    /* A tap on a class opens it, so the second way in is a double tap on the week, which
-     * is the gesture a map has taught everybody anyway. Out again from wherever it is. */
-    frame.addEventListener("dblclick", (e) => {
-      if (e.target.closest("[data-at]")) return;   // that tap opened a class already
-      zoomTo(zoom > 1 ? 1 : CLOSEST, { x: e.clientX, y: e.clientY });
-    });
-
-    /* And the mouse's own version of a pinch, which is the trackpad's too. */
-    frame.addEventListener("wheel", (e) => {
-      if (!e.ctrlKey && !e.metaKey) return;      // a plain wheel is the page scrolling
-      e.preventDefault();
-      zoomTo(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), { x: e.clientX, y: e.clientY });
-    }, { passive: false });
+    /* The one way in that is not on the grid itself. Both screens have it, including the
+     * one for an account with no week at all, which is where it matters most: that screen
+     * used to say "write a file" and now it can be answered where it is read. */
+    const opener = J.$("#ttNew");
+    if (opener) opener.addEventListener("click", () => form(null));
 
     grid.addEventListener("click", (e) => {
-      // Letting go of a pan is not a tap on whatever happened to be under the finger.
-      if (moved) { moved = false; return; }
       const hit = e.target.closest("[data-at]");
       if (!hit) return;
-      const entry = CLASSES[Number(hit.dataset.at)];
+      /* Looked up by the name the server gave it, not by where it sits in the array.
+       *
+       * This was an index while the week was read only, and an index is a fine name for a
+       * row in a list that never changes. It is the wrong one now: the server names a
+       * class it has written by its id, so a card said data-at="1790086969781" and this
+       * asked for the one billion, seven hundred and ninety millionth class of the week
+       * and got nothing. Every card on the timetable stopped opening. */
+      const entry = CLASSES.find((c) => c.key === hit.dataset.at);
       if (entry) detail(entry);
     });
   },

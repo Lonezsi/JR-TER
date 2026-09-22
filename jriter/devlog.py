@@ -22,6 +22,26 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.13.0",
+        "date": "2026-09-22",
+        "name": JRITER,
+        "title": "The week can be written from the page it is read on",
+        "notes": [
+            "Classes can be added, changed and dropped on the timetable itself. Tap one "
+            "and the sheet has Szerkesztés and Törlés on it; the heading has Új óra. The "
+            "week is still the same file in your own directory, edited in place, so "
+            "anything you have typed into it by hand stays exactly as you left it.",
+            "A class can now carry its course code, its group number and who teaches it. "
+            "The room and the teacher share the line on the card; the rest is on the "
+            "sheet.",
+            "The timetable's own pinch zoom is gone and the page is simply zoomable, the "
+            "way every other page is. The rail tucks itself away on this screen so the "
+            "week gets the whole width, and the hamburger still opens it.",
+            "An hour is a sixth of a day column rather than a quarter, so the whole week "
+            "is a good deal shorter.",
+        ],
+    },
+    {
         "version": "3.12.0",
         "date": "2026-09-15",
         "name": JRITER,

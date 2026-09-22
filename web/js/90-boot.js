@@ -418,7 +418,7 @@ async function boot() {
    * the app would not start at all. */
   let drag = null;
 
-  function setRail(shut) {
+  function setRail(shut, keep) {
     // Whatever a finger pinned the rail to has to go, or the class it is being handed
     // back to has nothing to move it from.
     if (drag) stopDrag();
@@ -429,9 +429,31 @@ async function boot() {
     shell.style.setProperty("--rail-open", shut ? "0" : "1");
     // Only a deliberate choice on a wide screen is worth remembering. On a phone the
     // rail always starts out of the way.
-    if (!narrow()) localStorage.setItem(RAIL_KEY, shut ? "1" : "0");
+    // `keep` means "do not remember this one": a screen that wants the room is not a
+    // choice about the rail, and writing it down would make one visit here the setting
+    // for every other screen.
+    if (!narrow() && !keep) localStorage.setItem(RAIL_KEY, shut ? "1" : "0");
   }
-  setRail(narrow() ? true : localStorage.getItem(RAIL_KEY) === "1");
+  const remembered = () => (narrow() ? true : localStorage.getItem(RAIL_KEY) === "1");
+  setRail(remembered());
+
+  /* ONE SCREEN ASKS FOR THE ROOM.
+   *
+   * The timetable is five days wide whatever the screen is, and a two hundred pixel
+   * column of album links beside it is two hundred pixels the week does not get. It is
+   * also the one screen with nothing to navigate to: it is opened from Foyer, read, and
+   * closed.
+   *
+   * Tucked rather than taken away. The hamburger is still there and still opens it, and
+   * the choice somebody made about the rail on every other screen is not overwritten by
+   * having visited this one: it is put back on the way out, from what they last chose
+   * rather than from what this did. */
+  const ROOMY = ["orarend"];
+  J.railForView = (view) => {
+    const roomy = ROOMY.indexOf(view) !== -1;
+    if (roomy) setRail(true, true);
+    else setRail(remembered(), true);
+  };
 
   /* Sliding the rail.
    *
@@ -477,11 +499,6 @@ async function boot() {
     // Modal while it is up, whichever way you drag on it.
     if (node.closest(".sheet, .slot-menu, .pick-list")) return true;
 
-    // A zoomed week pans under the finger, so a sideways drag on it is the week moving.
-    // Only once it is zoomed: at the size it fits there is nothing to pan, and the rail
-    // is welcome to the gesture over a screen that is mostly timetable.
-    const week = node.closest(".tt-fit");
-    if (week && week.classList.contains("is-zoomed")) return true;
 
     // Dragging sideways across words is selecting them, which is the one gesture the
     // lyric editor cannot afford to lose: it is a text box, and this rail would

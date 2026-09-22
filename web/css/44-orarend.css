@@ -69,18 +69,10 @@
   /* Room for the shadow under the pane, which the overflow above would otherwise clip. */
   padding-bottom: var(--s2);
 
-  /* Two fingers are a pinch on the week; one is the page going past it.
-     pan-y rather than none: the week can be most of a phone screen, and a screen you
-     cannot scroll by putting your thumb on the middle of it is broken. */
-  touch-action: pan-y;
-}
-
-/* Being dragged. The cursor is the only thing that says a zoomed week can be moved. */
-.tt-fit.is-held {
-  cursor: grabbing;
-}
-.tt-fit.is-zoomed {
-  cursor: grab;
+  /* NOTHING HERE CLAIMS A PINCH ANY MORE. This used to say touch-action: pan-y, which is
+     how a page tells the browser to hand two fingers to the script instead of zooming.
+     The week had its own zoom then. The browser's is better and everybody already knows
+     it, so the gesture goes back to it. */
 }
 
 .tt-grid {
@@ -107,12 +99,9 @@
 
   /* And then shrunk to whatever room there actually is. One at any width wide enough to
      hold it, so a desktop is untouched. The view works it out and writes it here.
-     --tt-zoom is the pinch on top of that, and is 1 until somebody asks for a closer
-     look: one scale for how much room there is, one for how much detail is wanted, and
-     the two multiplied rather than confused with each other. */
-  transform:
-    translate(var(--tt-x, 0px), var(--tt-y, 0px))
-    scale(calc(var(--tt-fit, 1) * var(--tt-zoom, 1)));
+     One scale and only one: for a closer look than this, the page zooms, which is the
+     browser's job and not this stylesheet's. */
+  transform: scale(var(--tt-fit, 1));
   transform-origin: top left;
 
   padding: var(--tt-pad);
@@ -588,4 +577,28 @@
 .tt-card,
 .tt-stripe {
   z-index: 1;
+}
+
+/* ── the sheet's own buttons, and the form behind them ────────────────────── */
+
+/* Edit and delete, under the facts and above the notes.
+ *
+ * Under, because the facts are what the sheet was opened to read: nine times out of ten
+ * somebody is checking which room, not changing the week. */
+.tt-sheet-tools {
+  display: flex;
+  gap: var(--s2);
+  margin: var(--s3) 0 var(--s2);
+}
+
+/* Day, start and finish on one line, because they are one fact between them, and a form
+   that asks for them in three full width rows reads as three separate questions. */
+.tt-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.tt-form-row > .sheet-label {
+  flex: 1 1 8rem;
+  min-width: 0;
 }

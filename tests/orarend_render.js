@@ -54,10 +54,22 @@ function reach(selector) {
 }
 
 const week = JSON.parse(fs.readFileSync(WEEK, "utf8"));
+
+/* Every class carries the name the server gave it.
+ *
+ * The module does this on the way out: a class it has written before is called by its id,
+ * and one typed into the file by hand is called by where it sits, as "i:3". The view does
+ * not invent either. It used to number them itself, which is exactly why a card could go
+ * on carrying a position long after the server had stopped using one, so the rule is in
+ * one place now and this is here to be that place's shape rather than its own.
+ */
+const keyed = (week.classes || []).map((entry, at) =>
+  Object.assign({}, entry, { key: entry.id ? String(entry.id) : "i:" + at }));
+
 const served = Object.assign(
   { from: 8, to: 22, hour: 60 },
   week,
-  { classes: week.classes || [] });
+  { classes: keyed });
 
 const J = {
   views: {},

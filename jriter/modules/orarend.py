@@ -124,11 +124,189 @@ def week(req):
         return {"classes": [], "broken": found["broken"], "where": "orarend.json",
                 "from": FROM, "to": TO, "hour": HOUR}
     return {
-        "classes": found.get("classes") or [],
+        "classes": [_keyed(e, at) for at, e in enumerate(found.get("classes") or [])],
         "from": found.get("from", FROM),
         "to": found.get("to", TO),
         "hour": found.get("hour", HOUR),
     }
+
+
+def _keyed(entry, at):
+    """A class with something to call it by.
+
+    Every class this app has written has an id and keeps it. A class typed into the file
+    by hand has none, and is named by where it sits until something writes it, at which
+    point it gets one. Two shapes rather than one so that reading the week never writes
+    it: a file that is only ever looked at is left exactly as its author left it.
+    """
+    said = dict(entry)
+    said["key"] = str(entry["id"]) if entry.get("id") else "i:%d" % at
+    return said
+
+
+# ── writing the week ─────────────────────────────────────────────────────────
+
+#: What a class may say. Anything else in the file is left alone and written back
+#: untouched: it is somebody's file, and a key this app has never heard of is more likely
+#: to be a note to themselves than a mistake.
+FIELDS = ("day", "at", "to", "kind", "whose", "name", "where", "skip",
+          "code", "group", "teacher")
+
+#: The kinds a class can be. "band" is not a kind of teaching: it is an hour that is
+#: spoken for without being a class, like a shift at work, and it draws behind the day.
+KINDS = ("ea", "gy", "both", "konz", "band")
+
+
+def _id():
+    """A number no class in this file is using.
+
+    The week is a file somebody edits by hand, and this app now edits it too. An index
+    into the list cannot be the name of a row when both of those are true: delete the
+    second class and every class after it answers to a different number, so an edit sent a
+    moment later lands on a neighbour. So a class gets an id the first time it is written
+    and keeps it.
+    """
+    return int(time.time() * 1000)
+
+
+def _clock(said, what):
+    """"09:30" as minutes past midnight, or a refusal naming the field."""
+    parts = str(said or "").split(":")
+    try:
+        if len(parts) != 2:
+            raise ValueError
+        hour, minute = int(parts[0]), int(parts[1])
+    except (TypeError, ValueError):
+        raise Error("%s should be a time like 09:30, not %r" % (what, said), 400)
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise Error("%s is not a time of day: %r" % (what, said), 400)
+    return hour * 60 + minute
+
+
+def _entry(sent, onto=None):
+    """One class, checked, as it will be written.
+
+    Checked here rather than in the page. The page is one way in and the file is another,
+    and a form that refuses a finish before its start says nothing about what is already
+    on disk. What this refuses cannot be written by this app at all.
+    """
+    made = dict(onto or {})
+    for field in FIELDS:
+        if field in sent:
+            made[field] = sent[field]
+
+    made["day"] = as_int(made.get("day"), "day", minimum=0)
+    if made["day"] > 4:
+        raise Error("the week has five days, so day is 0 to 4", 400)
+
+    starts = _clock(made.get("at"), "at")
+    ends = _clock(made.get("to"), "to")
+    if ends <= starts:
+        raise Error("a class cannot finish before it starts", 400)
+
+    made["kind"] = (made.get("kind") or "gy").strip()
+    if made["kind"] not in KINDS:
+        raise Error("kind is one of %s" % ", ".join(KINDS), 400)
+
+    made["name"] = (made.get("name") or "").strip()[:200]
+    if not made["name"]:
+        raise Error("a class needs a name", 400)
+
+    made["whose"] = (made.get("whose") or "me").strip()[:100] or "me"
+    for field in ("where", "code", "group", "teacher"):
+        made[field] = str(made.get(field) or "").strip()[:200]
+    made["skip"] = bool(made.get("skip"))
+    return made
+
+
+def _save(found):
+    """The week back to disk, whole, and never half written.
+
+    Written beside itself and moved into place. This file is typed in by hand over a
+    semester and is not anywhere else; a process that dies halfway through writing it
+    would leave somebody with a broken file and nothing to put back.
+    """
+    where = path()
+    beside = where + ".writing"
+    with io.open(beside, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(found, f, ensure_ascii=False, indent=2)
+    os.replace(beside, where)
+
+
+def _week_now():
+    """The file, as something that can be written back, or a refusal.
+
+    A file that will not parse is not overwritten. Somebody is midway through editing it
+    and the honest answer is to say so, not to replace their afternoon's typing with
+    whatever this app happens to hold.
+    """
+    found = read()
+    if found is None:
+        found = {"classes": []}
+    if found.get("broken"):
+        raise Error("orarend.json cannot be read, so it is not being written over: %s"
+                    % found["broken"], 409)
+    found.setdefault("classes", [])
+    return found
+
+
+def _find(found, said):
+    """Which class a call is about, and where it sits in the list.
+
+    Either an id, for a class this app has written before, or i:3 for one typed into the
+    file by hand, which has no id yet and is named by its position. The second is checked
+    against the week the caller was actually looking at: the position is only a name for
+    as long as nothing above it has moved.
+    """
+    said = str(said)
+    if said.startswith("i:"):
+        at = as_int(said[2:], "id", minimum=0)
+        if at >= len(found["classes"]):
+            raise Error("there is no class at %s any more" % said, 404)
+        entry = found["classes"][at]
+        if entry.get("id"):
+            raise Error("the week has moved under this edit; open it again", 409)
+        return at, entry
+    wanted = as_int(said, "id")
+    for at, entry in enumerate(found["classes"]):
+        if entry.get("id") == wanted:
+            return at, entry
+    raise Error("no class with id %s" % wanted, 404)
+
+
+def add_class(req):
+    """A class the page has just made up."""
+    sent = req.json() or {}
+    need(sent, "name", "at", "to")       # complained about by name rather than in general
+    found = _week_now()
+    made = _entry(sent)
+    taken = {e.get("id") for e in found["classes"]}
+    made["id"] = _id()
+    while made["id"] in taken:
+        made["id"] += 1
+    found["classes"].append(made)
+    _save(found)
+    return week(req)
+
+
+def save_class(req):
+    """A class as it now is. Only what was sent changes."""
+    found = _week_now()
+    at, entry = _find(found, req.params["id"])
+    made = _entry(req.json() or {}, onto=entry)
+    # A class typed in by hand gets its id here, on the first thing written to it.
+    made["id"] = entry.get("id") or _id()
+    found["classes"][at] = made
+    _save(found)
+    return week(req)
+
+
+def drop_class(req):
+    found = _week_now()
+    at, _ = _find(found, req.params["id"])
+    found["classes"].pop(at)
+    _save(found)
+    return week(req)
 
 
 # ── notes, and how many times I was not there ────────────────────────────────
@@ -255,6 +433,9 @@ def SUMMARY():
 def ROUTES():
     return {
         ("GET", "/api/orarend"): week,
+        ("POST", "/api/orarend/classes"): add_class,
+        ("PUT", "/api/orarend/classes/<id>"): save_class,
+        ("DELETE", "/api/orarend/classes/<id>"): drop_class,
         ("GET", "/api/orarend/notes"): notes,
         ("PUT", "/api/orarend/notes"): set_absences,
         ("POST", "/api/orarend/notes/pages"): add_page,

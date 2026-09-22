@@ -163,6 +163,11 @@ J.router = (function () {
       requestAnimationFrame(() => root.classList.remove("entering"));
     };
 
+    /* Which screen this is, said out loud, so the shell can lay itself out for it. The
+     * rail listens: the timetable wants the whole width. */
+    document.body.dataset.view = view;
+    if (J.railForView) J.railForView(view);
+
     const screen = J.views[view];
     if (!screen) {
       settle();
