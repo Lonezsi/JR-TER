@@ -98,8 +98,13 @@ WEEK = {"classes": [
 ]}
 
 
-def drawn(week=None):
-    """Run the real view over a week and return what it made."""
+def drawn(week=None, who=None):
+    """Run the real view over a week and return what it made.
+
+    `who` is whose week to draw: the page keeps that choice in localStorage and the
+    harness hands it over, so a test can ask for the screen it is about rather than only
+    ever seeing the default one.
+    """
     node = shutil.which("node")
     if not node:
         pytest.fail(
@@ -112,7 +117,10 @@ def drawn(week=None):
         json.dump(week if week is not None else WEEK, f, ensure_ascii=False)
         path = f.name
     try:
-        out = subprocess.run([node, RENDER, path], capture_output=True, cwd=ROOT)
+        env = dict(os.environ)
+        if who:
+            env["ORAREND_WHO"] = who
+        out = subprocess.run([node, RENDER, path], capture_output=True, cwd=ROOT, env=env)
         assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
         return json.loads(out.stdout.decode("utf-8"))
     finally:
@@ -213,8 +221,8 @@ def hours(style, name, tall):
     return None if found is None else found * tall
 
 
-def grid(week=None):
-    made = drawn(week)
+def grid(week=None, who=None):
+    made = drawn(week, who)
     parser = Grid()
     parser.feed(made["html"])
     return parser, made
@@ -852,6 +860,69 @@ def test_the_rail_gets_out_of_the_way_of_the_week():
         "the router never says which screen it is showing, so the rail cannot answer")
 
 
+# ── whose week ───────────────────────────────────────────────────────────────
+
+def test_the_week_can_be_somebody_else_s():
+    """Two questions, two shapes.
+
+    The whole week answers "when are we both free": my classes as cards, everybody else's
+    as a stripe down the side. It cannot answer "when is Zita free on Wednesday", because
+    her hours there are a five pixel stripe with nothing written on them.
+
+    So picking a person draws their week the way mine is drawn. Cards, with the room and
+    the teacher on them, and nobody else's classes in the way.
+    """
+    got, _ = grid(who="Vendég")
+    cards = [b for _, boxes in got.days for b in boxes
+             if "tt-card" in b["classes"] and not b["skip"]]
+    assert cards, "picking somebody drew no classes at all"
+    for box in cards:
+        assert "vendég" in box["text"].lower() or "egyszerre" in box["text"].lower() \
+            or "később, egyedül ő is" in box["text"].lower(), (
+            "somebody else's class is drawn as a card on this person's week: %r"
+            % box["text"].strip())
+
+    stripes = [b for _, boxes in got.days for b in boxes if b["stripe"]]
+    assert not stripes, (
+        "one person's week still has stripes on it. There is nobody to tell apart from"
+        " anybody, so a stripe is a lane of nothing down every day.")
+
+
+def test_my_own_week_is_the_one_with_everybody_on_it():
+    """The default, and the reason the page exists. Picking nobody is not picking me."""
+    whole, _ = grid()
+    assert [b for _, boxes in whole.days for b in boxes if b["stripe"]], (
+        "the default week has nobody else on it, so the one question it was built to"
+        " answer cannot be asked")
+
+    mine, _ = grid(who="me")
+    assert not [b for _, boxes in mine.days for b in boxes if b["stripe"]], (
+        "picking my own week still draws everybody else's stripes")
+
+
+def test_everybody_on_the_week_can_be_picked():
+    """Including me, and including all of us. A person with classes on this timetable and
+    no way to ask for their week is a person you can see and cannot read."""
+    got = drawn()
+    offered = set(re.findall(r'name="ttWho" value="([^"]*)"', got["html"]))
+    people = {c["whose"] for c in WEEK["classes"] if c["whose"] != "me"}
+    assert offered == people | {"all", "me"}, (
+        "the switch offers %s and the week has %s on it" % (sorted(offered), sorted(people)))
+
+
+def test_redrawing_forgets_what_was_measured_about_the_week_before():
+    """The fit remembers the last hour height, scale and frame height it wrote, so that a
+    resize that changes nothing writes nothing. A redraw changes everything: a different
+    person's week is a different height, and the cache would answer for the old one."""
+    view = io.open(VIEW, encoding="utf-8").read()
+    redraw = view[view.index("    function redraw() {"):]
+    redraw = redraw[:redraw.index("\n    }")]
+    assert "told = { hour: null, fit: null, height: null }" in redraw, (
+        "the fit's cache survives a redraw, so the new week is drawn at the old one's"
+        " scale until something else resizes: %s" % redraw.strip()[:200])
+    assert "fitToRoom()" in redraw, "the redrawn week is never fitted"
+
+
 # ── making and changing one ──────────────────────────────────────────────────
 
 def test_a_class_is_found_by_its_name_and_not_by_where_it_sits():
@@ -865,7 +936,9 @@ def test_a_class_is_found_by_its_name_and_not_by_where_it_sits():
     opening, in a way nothing threw an error about.
     """
     view = io.open(VIEW, encoding="utf-8").read()
-    click = view[view.index('grid.addEventListener("click"'):]
+    # On the frame rather than the grid: the grid is replaced whenever the week is redrawn
+    # for somebody else, and a listener on a replaced element is a listener on nothing.
+    click = view[view.index('frame.addEventListener("click"'):]
     click = click[:click.index("\n    });")]
     assert "CLASSES[Number(" not in click, (
         "a class is looked up by its position again, so nothing opens as soon as one of"

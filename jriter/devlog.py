@@ -22,6 +22,20 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.14.0",
+        "date": "2026-09-22",
+        "name": JRITER,
+        "title": "Whose week",
+        "notes": [
+            "The timetable can be switched to one person at a time. Mind is the week as "
+            "it was, with everybody else's hours as stripes beside yours; pick a name and "
+            "you get their week drawn the way yours is, with the room and the teacher on "
+            "the cards. It remembers which one you were looking at.",
+            "The legend under the table is the switch now, rather than a second list of "
+            "the same people saying the same thing.",
+        ],
+    },
+    {
         "version": "3.13.0",
         "date": "2026-09-22",
         "name": JRITER,

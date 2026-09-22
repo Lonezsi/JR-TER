@@ -444,27 +444,77 @@ J.views.orarend = {
       hours.push(`<div class="tt-hour">${String(h).padStart(2, "0")}:00</div>`);
     }
 
-    const days = DAYS.map((name, day) => {
-      const own = CLASSES.filter((e) => e.day === day && e.whose === "me");
-      const bands = own.filter((e) => e.kind === "band");
-      const mine = own.filter((e) => e.kind !== "band");
-      const skips = mine.filter((e) => e.skip);
-      const theirs = lanes(CLASSES.filter((e) => e.day === day && e.whose !== "me"));
-      /* How many stripe lanes this day actually uses.
-       *
-       * The card reserves room down its right for them, and a fixed reserve meant every
-       * day gave up the same third of a phone column whether anybody else had a class that
-       * day or not. Only the view knows, because only the view has run lanes(). */
-      const used = theirs.length
-        ? Math.max(...theirs.map((e) => e.lane)) + 1 : 0;
-      return `
+    /* WHOSE WEEK IS BEING LOOKED AT.
+     *
+     * "Mind" is the week this page was built for: my classes as cards, everybody else's
+     * as a stripe down the side of the day. That answers "when are we both free" at a
+     * glance, without four people's lectures fighting over one column.
+     *
+     * It is the wrong shape for the other question, which is "when is Zita free on
+     * Wednesday": her hours are a five pixel stripe with nothing written on them. So one
+     * person can be picked instead, and then it is their week, drawn the way mine is,
+     * with everybody else out of the way.
+     *
+     * Remembered, because it is set once for an afternoon rather than every time the page
+     * is opened.
+     */
+    const SEEN_KEY = "jriter.orarend.who";
+    const CAN_SEE = ["all", "me"].concat(people);
+    let seeing = CAN_SEE[0];
+    try {
+      const said = localStorage.getItem(SEEN_KEY);
+      if (said && CAN_SEE.indexOf(said) !== -1) seeing = said;
+    } catch (e) { /* a browser with storage switched off still gets a timetable */ }
+
+    function weekOf(who) {
+      const everyone = who === "all";
+      /* Whose classes are cards. Mine when the whole week is up, theirs when one person
+       * is picked: a card is the only shape with room for a room number in it. */
+      const front = everyone ? "me" : who;
+      return DAYS.map((name, day) => {
+        const today = CLASSES.filter((e) => e.day === day);
+        const own = today.filter((e) => e.whose === front);
+        const bands = own.filter((e) => e.kind === "band");
+        const mine = own.filter((e) => e.kind !== "band");
+        const skips = mine.filter((e) => e.skip);
+        const theirs = everyone ? lanes(today.filter((e) => e.whose !== "me")) : [];
+        /* How many stripe lanes this day actually uses.
+         *
+         * The card reserves room down its right for them, and a fixed reserve meant every
+         * day gave up the same third of a phone column whether anybody else had a class
+         * that day or not. Only the view knows, because only the view has run lanes(). */
+        const used = theirs.length
+          ? Math.max(...theirs.map((e) => e.lane)) + 1 : 0;
+        return `
         <div class="tt-day" role="group" aria-label="${name}" style="--tt-lanes:${used}">
           ${bands.map(band).join("")}
           ${mine.map((entry) => card(
             entry, !entry.skip && skips.some((s) => clash(s, entry)))).join("")}
           ${theirs.map(stripe).join("")}
         </div>`;
-    }).join("");
+      }).join("");
+    }
+
+    /* The switch, and the legend, which are the same thing.
+     *
+     * There was a legend under the table saying which colour meant whom. Everything in it
+     * was already a person's name beside their colour, which is exactly what a row of
+     * radios needs, so it is the row of radios now rather than a second list of the same
+     * people under it. */
+    const said = (who) => (who === "all" ? "Mind"
+      : who === "me" ? "Saját" : who);
+
+    const chooser = CAN_SEE.map((who, i) => `
+      <label class="tt-who${who === seeing ? " on" : ""}">
+        <input type="radio" name="ttWho" value="${J.esc(who)}"${
+          who === seeing ? " checked" : ""}>
+        ${who === "all" ? "" : `<i class="tt-key ${
+          who === "me" ? "tt-key-gy" : "tt-key-friend"}"${
+          who === "me" ? "" : ` data-who="${whoIndex(who)}"`}></i>`}
+        <span>${J.esc(said(who))}</span>
+      </label>`).join("");
+
+    const days = weekOf(seeing);
 
     root.innerHTML = `
       <div class="section">
@@ -477,6 +527,12 @@ J.views.orarend = {
         <p class="faint" style="margin-top:0">
           A hét, ahogy van. Kattints bármelyikre a részletekért.
         </p>
+
+      <!-- Whose week. Above the table rather than under it: it decides what the table
+           says, so it is read before the table and not after it. -->
+      <div class="tt-whose" role="radiogroup" aria-label="Kinek az órarendje">
+        ${chooser}
+      </div>
 
       <!-- The table is laid out at its full width whatever the screen is, and this is
            what it gets zoomed down into. Nothing scrolls. -->
@@ -493,8 +549,6 @@ J.views.orarend = {
         <span><i class="tt-key tt-key-ea"></i>Előadás</span>
         <span><i class="tt-key tt-key-gy"></i>Gyakorlat</span>
         <span><i class="tt-key tt-key-skip"></i>Nem látogatott</span>
-        ${people.map((name, i) => `<span><i class="tt-key tt-key-friend"
-          data-who="${i}"></i>${J.esc(name)} órája</span>`).join("")}
       </div>
       </div>`;
 
@@ -505,7 +559,10 @@ J.views.orarend = {
      * 09:00 class ends up drawn beside 10:00 and still looks like a timetable, so there is
      * one and the stylesheet reads it off the grid. It comes from the server with the
      * week, so even that one number is decided in a single place. */
-    const grid = J.$("#ttGrid");
+    /* Reassigned when the week is redrawn for somebody else, which is why it is not a
+     * const: the fitting below measures this element, and after a redraw the element it
+     * measured is not on the page any more. */
+    let grid = J.$("#ttGrid");
 
     /* Zoom the whole table down until it fits, and reserve the room it ends up taking.
      *
@@ -634,7 +691,40 @@ J.views.orarend = {
     const opener = J.$("#ttNew");
     if (opener) opener.addEventListener("click", () => form(null));
 
-    grid.addEventListener("click", (e) => {
+    /* Switching to somebody else's week.
+     *
+     * The grid is redrawn rather than hidden and shown: which lane a stripe sits in and
+     * how much room a card gives up for stripes are both answers about one particular set
+     * of classes, so a rule that showed and hid boxes would leave the survivors laid out
+     * for the ones that went.
+     *
+     * The frame stays, so the click handler below and the observer that refits it are
+     * still attached to something that is on the page. */
+    root.addEventListener("change", (e) => {
+      const chosen = e.target.closest('input[name="ttWho"]');
+      if (!chosen) return;
+      seeing = chosen.value;
+      try { localStorage.setItem(SEEN_KEY, seeing); } catch (err) { /* fine without */ }
+      redraw();
+    });
+
+    function redraw() {
+      J.$$(".tt-who", root).forEach((label) => label.classList.toggle(
+        "on", label.querySelector("input").value === seeing));
+      frame.innerHTML = `
+        <div class="tt-grid pane" id="ttGrid">
+          <div class="tt-corner"></div>
+          ${DAYS.map((name) => `<div class="tt-head">${name}</div>`).join("")}
+          <div class="tt-hours">${hours.join("")}</div>
+          ${weekOf(seeing)}
+        </div>`;
+      grid = J.$("#ttGrid");
+      // Every number the fit last worked out was about the grid that has just gone.
+      told = { hour: null, fit: null, height: null };
+      fitToRoom();
+    }
+
+    frame.addEventListener("click", (e) => {
       const hit = e.target.closest("[data-at]");
       if (!hit) return;
       /* Looked up by the name the server gave it, not by where it sits in the array.

@@ -602,3 +602,49 @@
   flex: 1 1 8rem;
   min-width: 0;
 }
+
+/* ── whose week ───────────────────────────────────────────────────────────── */
+
+/* The switch, which used to be the legend.
+ *
+ * Every row of the old legend was a name beside a colour, which is what a row of radios
+ * needs anyway, so this is that list with the choice added rather than a second copy of
+ * the same people underneath it. */
+.tt-whose {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin: 0 0 var(--s2);
+}
+.tt-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--fast), border-color var(--fast), color var(--fast);
+}
+.tt-who:hover { border-color: var(--line-2); color: var(--text); }
+.tt-who.on {
+  background: var(--elevated);
+  border-color: var(--text-3);
+  color: var(--text);
+}
+/* The radio itself is the thing being pressed, and the chip is what it looks like. Hidden
+   rather than removed: it is what a keyboard tabs to and what a screen reader reads. */
+.tt-who input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.tt-who:focus-within {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}

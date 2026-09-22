@@ -96,6 +96,19 @@ const J = {
  * resizes. */
 globalThis.window = { addEventListener() {} };
 
+/* Somewhere to remember whose week is being looked at.
+ *
+ * The page keeps that choice in localStorage, which node does not have, so the view's own
+ * try/catch would quietly answer "nobody has chosen" for ever and every test here would
+ * only ever see the default. This is a real one for one value: ORAREND_WHO picks who the
+ * week is drawn for, so a test can ask for the screen it is actually about.
+ */
+globalThis.localStorage = {
+  getItem: (key) => (key === "jriter.orarend.who"
+    ? (process.env.ORAREND_WHO || null) : null),
+  setItem() {},
+};
+
 /* new Function rather than eval, so the source cannot see anything in this file except
  * what it is handed. Its own "use strict" is the first line of the body it makes. */
 new Function("J", fs.readFileSync(SRC, "utf8"))(J);
