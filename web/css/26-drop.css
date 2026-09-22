@@ -1,0 +1,47 @@
+/* Dropping a bounce on the app.
+ *
+ * Over everything, including the player and any sheet that happens to be open: a drag is
+ * already in progress and the answer to "where will this land" has to be the largest
+ * thing on the screen. It never takes a click, because it is only up while a file is
+ * being held over the window. */
+.dropping {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.dropping-said {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--s5) var(--s6);
+  border-radius: var(--r-lg);
+  border: 2px dashed var(--accent-line);
+  background: var(--glass-2);
+  box-shadow: var(--shadow-3);
+  text-align: center;
+}
+.dropping-said b {
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.dropping-said span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dropping-said { animation: dropping-in var(--fast) both; }
+  @keyframes dropping-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+}

@@ -25,6 +25,10 @@ def state(req):
         "summary": registry.summaries(),
         "settings": config.settings(),
         "storage": blobs.usage(),
+        # What counts as audio, so the page and the server agree about it. The page
+        # refuses a dropped file before uploading it, and a second list written into the
+        # browser is a list that disagrees with this one the week an extension is added.
+        "audio": list(config.AUDIO_EXT),
         "started": _STARTED,
         "uptime": round(time.time() - _STARTED, 1),
     }

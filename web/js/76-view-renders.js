@@ -358,6 +358,7 @@ J.views.renders = {
             ${waiting ? `<span class="tag accent">${waiting} waiting</span>` : ""}
             <span class="grow"></span>
             ${J.sort.control("renders", SORTS)}
+            <button class="btn sm primary" data-act="upload">Upload</button>
             <button class="btn sm ghost" data-act="ingest">Take in a folder</button>
             <button class="btn sm ghost" data-act="toggle">
               ${showAll ? "Only waiting" : "Show used"}
@@ -371,7 +372,10 @@ J.views.renders = {
                  of, and wait until you say which song they belong to. Right click an FL
                  project and choose Render and send to JR!TER, or take in a folder that is
                  already full of them.</p>
-              <button class="btn primary" data-act="ingest" style="margin-top:var(--s4)">
+              <button class="btn primary" data-act="upload" style="margin-top:var(--s4)">
+                Upload files
+              </button>
+              <button class="btn ghost" data-act="ingest" style="margin-top:var(--s4)">
                 Take in a folder
               </button>
             </div>`}
@@ -440,6 +444,11 @@ J.views.renders = {
       const render = holder && rows.find((r) => String(r.id) === holder.dataset.id);
 
       if (act.dataset.act === "toggle") { showAll = !showAll; return load(); }
+
+      /* The same thing a drop does, for a phone and for anybody who would rather pick a
+       * file than drag one. Both go through 26-drop.js, so there is one answer to what
+       * counts as audio and one line saying what happened to the batch. */
+      if (act.dataset.act === "upload") return J.pickRenders();
 
       if (act.dataset.act === "ingest") {
         const fields = await J.sheet({

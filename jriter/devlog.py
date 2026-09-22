@@ -22,6 +22,23 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.15.0",
+        "date": "2026-09-22",
+        "name": JRITER,
+        "title": "Drop a bounce anywhere",
+        "notes": [
+            "Drag one or more audio files onto JR!TER, on any screen, and they upload to "
+            "Renders. One line at the end says how many landed, how many were already "
+            "here, and how many of the things you dropped were not audio.",
+            "There is an Upload button on the Renders screen for the same thing, which is "
+            "the way to do it on a phone.",
+            "A drop always means Renders, whatever screen is behind it. Every render is "
+            "one press from being attached to a song, and guessing that a file dropped on "
+            "a song page belongs to that song is a guess that puts a take on the wrong "
+            "song.",
+        ],
+    },
+    {
         "version": "3.14.0",
         "date": "2026-09-22",
         "name": JRITER,
