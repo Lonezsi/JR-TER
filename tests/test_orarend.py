@@ -834,6 +834,63 @@ def test_the_page_is_left_zoomable_by_the_browser():
             % gesture)
 
 
+def test_nothing_over_the_week_claims_the_pinch():
+    """The viewport was never the problem. The stylesheet was.
+
+    The scrolling column carries touch-action: pan-y, which is how the rail swipe gets a
+    sideways drag to itself. What that also does, and what is easy to miss, is switch
+    pinch off: pan-y means "vertical panning, nothing else", and zooming is one of the
+    things it refuses. So the page said it could be zoomed, the browser agreed, and two
+    fingers on the week did nothing.
+
+    This checks the whole stack of rules that lands on the timetable, not just the ones
+    in its own file: an ancestor saying pan-y is exactly what this was.
+    """
+    here = os.path.join(ROOT, "web", "css")
+    sheets = {name: re.sub(r"/\*.*?\*/", "", io.open(os.path.join(here, name),
+                                                     encoding="utf-8").read(), flags=re.S)
+              for name in sorted(os.listdir(here)) if name.endswith(".css")}
+
+    #: Everything the week is drawn inside. A rule on any of these reaches it.
+    over = (".view", ".shell", "body", "html", ":root", ".tt-fit", ".tt-grid")
+    claimed = []
+    for name, text in sheets.items():
+        for found in re.finditer(r"([^{}]+)\{([^}]*)\}", text):
+            action = re.search(r"touch-action:\s*([^;]+)", found.group(2))
+            if not action or action.group(1).strip() == "auto":
+                continue
+            for part in found.group(1).split(","):
+                part = part.strip()
+                # The exception itself, and anything scoped to this screen, is the answer
+                # rather than the problem.
+                if 'data-view="orarend"' in part:
+                    continue
+                if part in over or any(part.endswith(" " + o) for o in over):
+                    claimed.append("%s: %s { touch-action: %s }"
+                                   % (name, part, action.group(1).strip()))
+
+    #: The shell's own rule is expected to still be there: it is what the rail swipe needs
+    #: everywhere else, and taking it out would be a different bug. What must exist beside
+    #: it is the exception that puts the gesture back on this one screen.
+    exception = re.search(
+        r'body\[data-view="orarend"\]\s+\.view\s*\{[^}]*touch-action:\s*auto',
+        sheets.get("44-orarend.css", ""))
+    assert exception, (
+        "nothing gives the pinch back on this screen, and these rules take it away: %s"
+        % (claimed or "none, so this test is watching nothing"))
+    assert claimed, (
+        "no rule over the week claims a gesture any more, so the exception in"
+        " 44-orarend.css is answering a question nobody is asking. Take it out.")
+
+    # And the thing the exception is keyed on. Without this line the selector matches
+    # nothing, the rule above is dead text, and the week quietly stops zooming again.
+    router = io.open(os.path.join(ROOT, "web", "js", "80-router.js"),
+                     encoding="utf-8").read()
+    assert "document.body.dataset.view = view" in router, (
+        "nothing writes which screen is up onto the body, so a rule that names one can"
+        " never match")
+
+
 def test_the_rail_gets_out_of_the_way_of_the_week():
     """Five days wide, and a column of album links beside it is width the week does not get.
 

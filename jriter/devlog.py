@@ -22,6 +22,22 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.15.1",
+        "date": "2026-09-22",
+        "name": JRITER,
+        "title": "The timetable really does pinch now",
+        "notes": [
+            "Two fingers on the week zoom the page, as they should have since the "
+            "timetable's own zoom was taken out. The viewport was never the problem: the "
+            "scrolling column asks for vertical panning and nothing else, which is how "
+            "the rail swipe gets a sideways drag to itself, and it switches pinch off as "
+            "well. The timetable takes that rule off again.",
+            "One thing it costs, on that screen only: the rail cannot be pulled out by "
+            "dragging sideways across the page. It is tucked away there anyway and the "
+            "menu button is where it always was.",
+        ],
+    },
+    {
         "version": "3.15.0",
         "date": "2026-09-22",
         "name": JRITER,

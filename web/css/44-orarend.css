@@ -648,3 +648,29 @@
   outline: 2px solid var(--accent-line);
   outline-offset: 2px;
 }
+
+/* ── the one screen that lets the browser have the whole gesture ──────────── */
+
+/* THE PAGE'S OWN ZOOM, BACK.
+ *
+ * The scrolling column carries touch-action: pan-y, which is how the rail swipe gets a
+ * sideways drag to itself: without it a phone claims the whole gesture and cancels the
+ * drag before it has travelled far enough to count. What pan-y also does, and what is
+ * easy to miss, is switch pinch off. It means "vertical panning, nothing else", and
+ * zooming is one of the things it refuses.
+ *
+ * So the week takes that rule off again. The viewport was never the problem: the page has
+ * always said initial-scale=1 with no maximum and no user-scalable=no, and the browser
+ * was doing what the stylesheet asked.
+ *
+ * WHAT IT COSTS, on this screen only: the rail can no longer be pulled out by dragging
+ * sideways across the page. It is the one screen where that is nearly free. The rail is
+ * tucked away here anyway, the hamburger is where it always was, and there is nothing on
+ * this page to navigate to.
+ *
+ * Keyed on the screen rather than on a class the view adds, because the body already
+ * carries which screen is up: the router writes it for the rail, and a second flag
+ * meaning the same thing is a second flag to keep in step. */
+body[data-view="orarend"] .view {
+  touch-action: auto;
+}
