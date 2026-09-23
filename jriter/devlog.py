@@ -22,6 +22,22 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.16.0",
+        "date": "2026-09-23",
+        "name": JRITER,
+        "title": "Update means update",
+        "notes": [
+            "Pressing Update ready in the top bar updates. It used to open Settings, "
+            "where another button pulled the update and a third restarted, and until all "
+            "three were pressed nothing changed. Now one press pulls it, restarts if the "
+            "new version needs it, waits for JR!TER to come back, and reloads the page.",
+            "It also updates itself. Every few hours the server looks for a new version "
+            "and takes it, restarting onto it on the host. Switching automatic updates "
+            "off in Settings stops both the check and this.",
+            "Only the owner sees the button, and only the owner can update or restart.",
+        ],
+    },
+    {
         "version": "3.15.3",
         "date": "2026-09-23",
         "name": JRITER,

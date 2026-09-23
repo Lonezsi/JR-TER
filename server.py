@@ -87,6 +87,11 @@ def main(argv=None):
         print("Something is already serving it. Stop that first, or use --port.")
         return 1
     where = "http://%s:%d" % (args.host, args.port)
+    # The server keeps itself current. Here and not at module load, so importing the
+    # updater (every test does) never starts a thread that pulls from GitHub.
+    if registry.has("updater"):
+        from jriter.modules import updater
+        updater.start_auto()
 
     print("JR!TER %s" % __import__("jriter").__version__)
     print("  library   %s" % where)

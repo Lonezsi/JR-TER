@@ -193,3 +193,119 @@ def test_only_the_owner_can_restart(stopped):
             break
         time.sleep(0.02)
     assert stopped == [0]
+
+
+# ── one press, and on its own ────────────────────────────────────────────────
+def _pulled(py=True):
+    return {"updated": True, "before": "a" * 40, "after": "b" * 40,
+            "files": ["jriter/x.py" if py else "web/js/x.js"],
+            "restart_required": py, "message": "Updated."}
+
+
+def _wait(stopped):
+    for _ in range(100):
+        if stopped:
+            break
+        time.sleep(0.02)
+
+
+def test_update_now_pulls_and_restarts_onto_new_python(stopped, monkeypatch):
+    """The top bar button. It was a link to Settings, which had a second button to pull
+    and a third to restart, and until all three were pressed nothing looked different."""
+    monkeypatch.setattr(updater, "_pull", lambda: _pulled(py=True))
+    answer = updater.update_now(Ask())
+    assert answer["updated"] and answer["restarting"]
+    _wait(stopped)
+    assert stopped == [0], "Python changed and the server never restarted onto it"
+
+
+def test_update_now_does_not_restart_for_a_page_only_change(stopped, monkeypatch):
+    """The page is read from disk on every request, so a reload is enough."""
+    monkeypatch.setattr(updater, "_pull", lambda: _pulled(py=False))
+    answer = updater.update_now(Ask())
+    assert answer["updated"] and not answer["restarting"]
+    time.sleep(0.05)
+    assert stopped == []
+
+
+def test_only_the_owner_can_update(stopped, monkeypatch):
+    """apply() used to have no check at all, so any account could make the server pull."""
+    pulls = []
+    monkeypatch.setattr(updater, "_pull", lambda: pulls.append(1) or _pulled())
+    accounts.create("owner", "one", account_id=accounts.OWNER)
+    friend = accounts.create("jozsef", "two")
+    with who.acting_as(friend["id"]):
+        for route in (updater.update_now, updater.apply):
+            with pytest.raises(Error) as refused:
+                route(Ask())
+            assert refused.value.status == 403
+    assert pulls == [], "a friend made the server pull"
+
+
+def test_the_page_button_updates_rather_than_navigating():
+    boot = open(os.path.join(HERE, "web", "js", "90-boot.js"), encoding="utf-8").read()
+    wired = boot[boot.index('const updateButton = J.$("#updateReady")'):]
+    wired = wired[:wired.index("\n  }\n")]
+    assert "e.preventDefault()" in wired, "pressing it still just opens Settings"
+    assert '"/api/update/now"' in wired
+    assert "J.backAgain()" in wired and "location.reload()" in wired, (
+        "it does not wait for the restart and reload onto the new version")
+
+
+class _Auto:
+    """What _auto_once can see: a checkout, a branch, a remote that is ahead."""
+
+    def __init__(self, monkeypatch, branch="main", ahead=True, clean=True):
+        self.pulls = []
+        monkeypatch.setattr(updater, "_is_repo", lambda: True)
+        monkeypatch.setattr(updater, "_git", lambda *a: (branch, "")
+                            if a[:2] == ("rev-parse", "--abbrev-ref") else ("", ""))
+        monkeypatch.setattr(updater, "check", lambda req: {
+            "checked": True, "update_available": ahead, "can_update": ahead and clean,
+            "why": "" if clean else "There are uncommitted changes here."})
+        monkeypatch.setattr(updater, "_pull",
+                            lambda: self.pulls.append(1) or _pulled(py=True))
+        monkeypatch.setattr(updater.config, "BRANCH", "main")
+
+
+def test_the_server_updates_itself(stopped, monkeypatch):
+    auto = _Auto(monkeypatch)
+    monkeypatch.setenv("JRITER_WATCHDOG", "1")
+    said = updater._auto_once()
+    assert auto.pulls == [1], "an update was waiting and was not taken: %s" % said
+    _wait(stopped)
+    assert stopped == [0], "it pulled new Python and kept running the old"
+
+
+def test_it_only_restarts_where_something_starts_it_again(stopped, monkeypatch):
+    """A developer running the server by hand would find it simply gone."""
+    auto = _Auto(monkeypatch)
+    monkeypatch.delenv("JRITER_WATCHDOG", raising=False)
+    updater._auto_once()
+    assert auto.pulls == [1]
+    time.sleep(0.05)
+    assert stopped == [], "it stopped a server nothing was going to start again"
+
+
+def test_it_leaves_alone_what_it_should(stopped, monkeypatch):
+    for kwargs, why in (({"branch": "feature"}, "on a branch"),
+                        ({"clean": False}, "with changes in the tree"),
+                        ({"ahead": False}, "when there is nothing new")):
+        auto = _Auto(monkeypatch, **kwargs)
+        updater._auto_once()
+        assert auto.pulls == [], "it pulled %s" % why
+
+
+def test_switching_auto_update_off_is_honoured(stopped, monkeypatch):
+    auto = _Auto(monkeypatch)
+    monkeypatch.setattr(updater.config, "settings", lambda: {"auto_update": False})
+    assert updater._auto_once() == "switched off"
+    assert auto.pulls == []
+
+
+def test_importing_the_updater_starts_nothing():
+    """Only server.py starts the loop, so no test ever pulls from GitHub."""
+    import threading
+    assert not [t for t in threading.enumerate() if t.name == "auto-update"]
+    server = open(os.path.join(HERE, "server.py"), encoding="utf-8").read()
+    assert "updater.start_auto()" in server

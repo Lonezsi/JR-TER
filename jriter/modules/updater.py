@@ -5,6 +5,7 @@ fast forward pull and nothing else: no reset, no force, no stash. If the working
 been edited by hand, the update refuses and says so rather than throwing that work away.
 """
 import os
+import sys
 import json
 import time
 import threading
@@ -112,7 +113,26 @@ def check(req):
     }
 
 
+def _owner_only():
+    """Pulling new code and stopping the server are the machine owner's to do.
+
+    restart() always said so. apply() did not, so any account on the server could make it
+    fetch and fast forward; harmless only as long as the branch on GitHub is.
+    """
+    if accounts.count() and who.now() != accounts.OWNER:
+        raise Error("Only the owner of this library can update it.", 403)
+
+
 def apply(req):
+    _owner_only()
+    return _pull()
+
+
+#: One update at a time: the button and the background check must never pull at once.
+_BUSY = threading.Lock()
+
+
+def _pull():
     global _COMMIT
     _COMMIT = None      # the pull moves HEAD; read it again next time
     if not _is_repo():
@@ -213,9 +233,100 @@ def restart(req):
                     "within a few minutes."}
 
 
+def update_now(req):
+    """The Update button: pull, and if Python files changed, restart onto them.
+
+    WHY ONE ROUTE. The button in the top bar used to be a link to Settings, where there
+    was a second button, and after that a third to restart, and until all three were
+    pressed the site looked exactly as it had. "It does not update" was the accurate
+    report. So a press here does the whole thing, and the page waits for the server to
+    come back and reloads itself onto the new version.
+    """
+    _owner_only()
+    if not _BUSY.acquire(blocking=False):
+        raise Error("An update is already under way.", 409)
+    try:
+        result = _pull()
+    finally:
+        _BUSY.release()
+    result["restarting"] = bool(result["restart_required"])
+    if result["restarting"]:
+        _stop_soon()
+    return result
+
+
+def _stop_soon():
+    def bye():
+        time.sleep(STOP_AFTER)
+        try:
+            db.shut_down()
+        except Exception:
+            pass
+        _STOP(0)
+    threading.Thread(target=bye, name="restart", daemon=True).start()
+
+
+# ── on its own ───────────────────────────────────────────────────────────────
+
+#: How often the server looks for an update by itself, and how long after starting.
+EVERY = 3 * 3600
+FIRST_AFTER = 120
+
+
+def _auto_once():
+    """One look, and one update if there is one. Returns what happened, for the log.
+
+    ONLY WHERE SOMETHING WILL START IT AGAIN. Pulling is always safe here: it is a fast
+    forward that refuses a tree with changes in it. Stopping is not, anywhere nothing
+    brings the server back, so the restart only happens when the host launcher says it
+    watches (JRITER_WATCHDOG). Anywhere else the new code waits on disk for the next start,
+    which is what a developer running it by hand would want.
+    """
+    if not _is_repo():
+        return "not a checkout"
+    with who.acting_as(accounts.OWNER):
+        if config.settings().get("auto_update") is False:
+            return "switched off"
+    branch, _ = _git("rev-parse", "--abbrev-ref", "HEAD")
+    if branch and branch.strip() != config.BRANCH:
+        return "on %s, not %s" % (branch.strip(), config.BRANCH)
+    if not _BUSY.acquire(blocking=False):
+        return "busy"
+    try:
+        info = check(None)
+        if not info.get("update_available"):
+            return "up to date" if info.get("checked") else info.get("why", "")
+        if not info.get("can_update"):
+            return info.get("why") or "cannot update"
+        result = _pull()
+    except Error as e:
+        return str(e)
+    finally:
+        _BUSY.release()
+    if result["restart_required"] and os.environ.get("JRITER_WATCHDOG") == "1":
+        _stop_soon()
+        return "updated to %s, restarting" % result["after"][:7]
+    return "updated to %s" % result["after"][:7]
+
+
+def start_auto():
+    """Started by server.py, and by nothing else, so a test never pulls anything."""
+    def loop():
+        time.sleep(FIRST_AFTER)
+        while True:
+            try:
+                said = _auto_once()
+            except Exception as e:           # never let the loop die
+                said = "%s: %s" % (type(e).__name__, e)
+            sys.stderr.write("  update    %s\n" % said)
+            time.sleep(EVERY)
+    threading.Thread(target=loop, name="auto-update", daemon=True).start()
+
+
 def ROUTES():
     return {
         ("GET", "/api/update/check"): check,
         ("POST", "/api/update/apply"): apply,
+        ("POST", "/api/update/now"): update_now,
         ("POST", "/api/update/restart"): restart,
     }

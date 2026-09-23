@@ -261,6 +261,29 @@ J.ownsTheMachine = (state) => {
   return !auth || auth.is_owner !== false;
 };
 
+/* Wait for the server to go away and come back, after it was asked to restart.
+ *
+ * Down first, then up: asking only "is it up" answers yes straight away, from the process
+ * that is about to stop, and the page reloads onto the old code. Gives up after five
+ * minutes, which is longer than the host's watchdog ever takes. */
+J.backAgain = async () => {
+  const alive = () => fetch("/api/health", { cache: "no-store" })
+    .then((r) => r.ok).catch(() => false);
+  const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+  const started = Date.now();
+  let wentAway = false;
+  while (Date.now() - started < 5 * 60 * 1000) {
+    const up = await alive();
+    if (!up) wentAway = true;
+    if (up && wentAway) return true;
+    // A restart that finished between two looks never shows as down; after twenty seconds
+    // of never seeing it go, take up as up.
+    if (up && Date.now() - started > 20000) return true;
+    await nap(wentAway ? 2000 : 500);
+  }
+  return false;
+};
+
 async function buildRail(state) {
   const nav = J.$("#nav");
   const items = [["library", "Library"]];
@@ -1144,9 +1167,34 @@ async function boot() {
   // and says nothing at all.
   J.devlog.check(state);
 
+  /* Pressing "Update ready" updates. It used to be a link to Settings, where a second
+   * button pulled and a third restarted, and until all three were pressed the site looked
+   * exactly as before. Now one press pulls, restarts if the new code needs it, waits for
+   * the server to answer again, and reloads onto the new version. The server also does
+   * this by itself every few hours; this is for not waiting. */
+  const updateButton = J.$("#updateReady");
+  if (updateButton) {
+    updateButton.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (updateButton.dataset.busy) return;
+      updateButton.dataset.busy = "1";
+      J.toast("Updating...");
+      const done = await J.try(() => J.post("/api/update/now"));
+      if (!done) { delete updateButton.dataset.busy; return; }
+      if (!done.updated) { J.toast("Already up to date."); updateButton.hidden = true; return; }
+      if (done.restarting) {
+        J.toast("Updated. Restarting, this takes a moment...");
+        await J.backAgain();
+      }
+      location.reload();
+    });
+  }
+
   // A quiet check on startup. Nothing interrupts: it puts a small "Update ready" in the
-  // top bar, which is a link to the screen the button is on, and says nothing otherwise.
-  if (J.state.modules.includes("updater") && state.settings.auto_update !== false) {
+  // top bar, and says nothing otherwise. Only for the owner, who is the one person the
+  // server lets press it.
+  if (J.state.modules.includes("updater") && state.settings.auto_update !== false
+      && J.ownsTheMachine(state)) {
     setTimeout(async () => {
       try {
         const info = await J.get("/api/update/check");

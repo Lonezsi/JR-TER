@@ -105,6 +105,9 @@ if ($stale) {
 }
 
 $env:JRITER_HOST = '0.0.0.0'
+# This task starts the server again whenever it stops, so the server may restart
+# itself onto an update it pulled. See updater._auto_once.
+$env:JRITER_WATCHDOG = '1'
 $env:JRITER_PORT = "$Port"
 
 Say ("starting with {0}" -f $py)
