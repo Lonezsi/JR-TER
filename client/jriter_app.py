@@ -154,9 +154,13 @@ def window_command(url, exe, profile):
     which browser window happened to be open, does not inherit an extension that rewrites
     pages, and remembers its own size.
     """
+    # --no-first-run and --no-default-browser-check because the profile is new the first
+    # time, and a new Edge profile greets you with its welcome, sign-in and import pages
+    # and asks to be the default browser: windows nobody asked for, arriving with the app.
     return [exe, "--app=" + url,
             "--user-data-dir=" + profile,
-            "--window-size=1180,860"]
+            "--window-size=1180,860",
+            "--no-first-run", "--no-default-browser-check"]
 
 
 def open_window(url, exe=None):
@@ -179,6 +183,35 @@ def open_window(url, exe=None):
         return None
 
 
+#: Held for the life of the process. The name is per session ("Local\\"), so two people
+#: logged on to one machine each get their own watcher.
+_MUTEX_NAME = "Local\\JRITER-watcher"
+_held = []
+
+
+def first_instance():
+    """Whether this is the only copy of the app running for this person.
+
+    There was nothing stopping a second. Logon starts one from the Run key, and every
+    click on the Start menu shortcut started another next to it: a second watcher doing
+    the same survey on the same folders on the same five minute clock, racing the first
+    to upload the same file. A named mutex is the ordinary Windows answer and needs
+    nothing but ctypes; anywhere else this says yes and changes nothing.
+    """
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.restype = ctypes.c_void_p
+        handle = kernel32.CreateMutexW(None, False, _MUTEX_NAME)
+        already = ctypes.get_last_error() == 183          # ERROR_ALREADY_EXISTS
+    except (OSError, AttributeError):
+        return True                 # cannot tell, so behave as before rather than refuse
+    _held.append(handle)
+    return not already
+
+
 def main(argv=None):
     """Start the watcher, and unless told not to, open the library.
 
@@ -189,6 +222,14 @@ def main(argv=None):
     """
     argv = sys.argv[1:] if argv is None else argv
     url = (agent.load_config().get("server") or "").strip()
+
+    # One watcher. A second launch is somebody wanting the window, so it gets the window
+    # and leaves the watching to the copy that is already doing it. A second --minimised
+    # launch (logon run twice) has nothing to add at all.
+    if not first_instance():
+        if "--minimised" not in argv and url:
+            open_window(url)
+        return 0
 
     def say(kind, text):
         """Where the log panel used to be.

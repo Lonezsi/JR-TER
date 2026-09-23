@@ -161,3 +161,39 @@ def test_the_scrubber_is_never_handed_something_impossible(played):
     and a throw here would take the rest of the redraw with it."""
     assert played["system"]["positionsLookSane"], \
         "a position outside its own duration was sent to the system"
+
+
+# ── the lock screen's own controls ───────────────────────────────────────────
+
+def test_the_lock_screen_scrubber_lands_where_it_was_dragged(played):
+    """It speaks seconds, and the player's seek takes a fraction of the song.
+
+    They were handed straight across, so dragging the lock screen scrubber to 0:30 asked
+    for thirty times the length of the song, which clamps to the end: the track finished
+    and autoplay moved on to the next one. The deck's own position is checked too, because
+    the player's idea of where it is and where the audio actually is are two numbers.
+    """
+    got = played.get("lockScreenSeek")
+    assert got, "the lock screen has no scrubber handler, so this watched nothing"
+    assert got["duration"] > 60, "the song is too short for this to mean anything: %s" % got
+    assert got["afterSeekTo"] == 30, (
+        "dragging the lock screen scrubber to 0:30 went to %s of a %ss song"
+        % (got["afterSeekTo"], got["duration"]))
+    assert got["deckAt"] == 30, "the audio itself is at %s" % got["deckAt"]
+
+
+def test_the_ten_second_buttons_move_ten_seconds(played):
+    got = played["lockScreenSeek"]
+    assert got["afterBack"] == 20, "back ten seconds from 0:30 went to %s" % got["afterBack"]
+    assert got["afterForward"] == 30, (
+        "forward ten seconds from 0:20 went to %s" % got["afterForward"])
+
+
+def test_play_and_pause_each_mean_one_thing(played):
+    """Both toggled. A play arriving while already playing, from a headset, a car or a
+    second device, paused the song, and a second pause started it again."""
+    got = played.get("lockScreenPlayPause")
+    assert got, "the lock screen's play and pause were never pressed"
+    assert got["stillPlaying"], "pressing play while playing paused the song"
+    assert got["pausedOnce"], "pause did not pause"
+    assert got["stillPaused"], "pressing pause while paused started the song again"

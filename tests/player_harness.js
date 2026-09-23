@@ -254,6 +254,37 @@ async function main() {
                                wentBackTo: was };
   }
 
+  /* The lock screen's scrubber and its ten second buttons.
+   *
+   * They speak seconds. The player's seek takes a fraction, and they were handed straight
+   * to it, so every one of them from one second up clamped to 1.0: the song jumped to its
+   * end and autoplay moved on. Read off the deck the player actually moved, not off its own
+   * idea of where it is. */
+  if (system.handlers.seekto) {
+    await J.playSong(LIBRARY[1], [LIBRARY[1]]); await settle();
+    const deck = () => (player.state.slot ? decks[player.state.slot] : decks.A).element;
+    const at = () => Math.round(player.state.position * 10) / 10;
+    const duration = player.state.duration;
+    system.handlers.seekto({ seekTime: 30 });
+    const afterSeekTo = at();
+    system.handlers.seekbackward({ seekOffset: 10 });
+    const afterBack = at();
+    system.handlers.seekforward({});
+    const afterForward = at();
+    out.lockScreenSeek = { duration, afterSeekTo, afterBack, afterForward,
+                           deckAt: Math.round(deck().currentTime * 10) / 10 };
+
+    // Play means play and pause means pause, whatever state they arrive in.
+    if (!player.state.playing) { await player.toggle(); await settle(); }
+    system.handlers.play(); await settle();
+    const stillPlaying = player.state.playing;
+    system.handlers.pause(); await settle();
+    const pausedOnce = !player.state.playing;
+    system.handlers.pause(); await settle();
+    const stillPaused = !player.state.playing;
+    out.lockScreenPlayPause = { stillPlaying, pausedOnce, stillPaused };
+  }
+
   process.stdout.write(JSON.stringify(out, null, 2));
 }
 

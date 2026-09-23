@@ -57,6 +57,53 @@ import flrender                                                    # noqa: E402
 
 AUDIO_EXT = (".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus")
 CHUNK = 1024 * 1024
+
+#: Where this agent says what it did, beside its config. The desktop app writes the same
+#: file; the update task writes here too, because it runs under pythonw and pythonw
+#: throws stdout away.
+LOG_PATH = os.path.join(os.path.dirname(CONFIG_PATH), "watch.log")
+
+
+# -- nothing this starts opens a window ----------------------------------------
+
+#: 0 anywhere that is not Windows, where there are no console windows to suppress.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def quiet(args, **kw):
+    """Run a console program with no window and no way to ask a question.
+
+    WHY EVERY CALL GOES THROUGH HERE. Windows gives a console program a console of its
+    own when the thing that started it has none. The update task and the logon watcher
+    both run windowless, so every git, schtasks and powershell they started used to open a
+    window for as long as it ran: five of them for one update, plus ssh for the pull. That
+    is the reason the obvious fix on its own (run the task under pythonw) would have made
+    the popups worse rather than better.
+
+    No questions, either. With no console there is nobody to answer a git credential
+    prompt or an ssh host key question, and a prompt with nobody to answer it is a
+    process that waits for the task's time limit, which is three days. So git is told
+    not to ask, ssh is told to fail rather than prompt, and stdin is closed: a problem
+    becomes a line in the log instead of a hang.
+    """
+    env = dict(os.environ)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+    kw.setdefault("capture_output", True)
+    kw.setdefault("text", True)
+    return subprocess.run(args, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW,
+                          env=env, **kw)
+
+
+def log(line):
+    """One line in the watch log, with the time on it. Never raises."""
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write("%s - %s\n" % (stamp, line))
+    except OSError:
+        pass
 DEFAULTS = {"server": "http://127.0.0.1:7900", "folders": [], "interval_minutes": 5,
             "auto_new_songs": False}
 
@@ -577,31 +624,42 @@ def cmd_login(cfg, server, args):
 
 
 def cmd_update(cfg, server, args):
-    """Pull a newer JR!TER. Fast forward only, and never over local edits."""
+    """Pull a newer JR!TER. Fast forward only, and never over local edits.
+
+    Said twice, on stdout and in the watch log. The daily task runs this under pythonw,
+    which discards stdout, so until now its answer went nowhere: it had been failing
+    quietly with exit code 1, a tree with changes or a pull that did not go, and nothing
+    on the machine said which.
+    """
     def git(*parts):
-        done = subprocess.run(("git",) + parts, cwd=ROOT, capture_output=True, text=True)
+        done = quiet(("git",) + parts, cwd=ROOT)
         return done.returncode, (done.stdout + done.stderr).strip()
+
+    def said(line):
+        print(line)
+        log("update: " + line.splitlines()[0][:200])
 
     code, _ = git("rev-parse", "--is-inside-work-tree")
     if code != 0:
-        print("This copy is not a git checkout, so it cannot update itself.")
+        said("This copy is not a git checkout, so it cannot update itself.")
         return 1
     code, dirty = git("status", "--porcelain")
     if dirty:
-        print("There are uncommitted changes here. Commit or discard them first:")
+        said("There are uncommitted changes here, so it was left alone. "
+             "Commit or discard them first.")
         print(dirty)
         return 1
     before = git("rev-parse", "HEAD")[1]
     code, out = git("pull", "--ff-only")
     if code != 0:
-        print("The pull did not succeed:\n%s" % out)
+        said("The pull did not succeed: %s" % (out.splitlines() or ["no reason given"])[-1])
         return 1
     after = git("rev-parse", "HEAD")[1]
     if before == after:
-        print("Already up to date.")
+        said("Already up to date.")
     else:
-        print("Updated %s to %s.\nRestart JR!TER and this client to run the new code."
-              % (before[:7], after[:7]))
+        said("Updated %s to %s. Restart JR!TER and this client to run the new code."
+             % (before[:7], after[:7]))
     return 0
 
 
@@ -632,9 +690,7 @@ def catch_up(name):
         "$t.Settings.StartWhenAvailable = $true;"
         "Set-ScheduledTask -TaskName '%s' -Settings $t.Settings | Out-Null"
     ) % (name.replace("'", "''"), name.replace("'", "''"))
-    done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive",
-                           "-Command", script],
-                          capture_output=True, text=True)
+    done = quiet(["powershell", "-NoProfile", "-NonInteractive", "-Command", script])
     if done.returncode != 0:
         print("      (left on the default power conditions: a run missed on battery "
               "will not be caught up)")
@@ -693,9 +749,13 @@ def cmd_install(cfg, server, args):
     # pythonw where there is one, so logon does not flash a console up and leave it in the
     # taskbar next to the window it started. The app is the thing that should be there.
     app = os.path.join(HERE, "jriter_app.py")
-    windowless = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-    runner = windowless if os.path.isfile(windowless) else sys.executable
+    runner = windowless_python()
     watcher = '"%s" "%s" --minimised' % (runner, app)
+    # And the update task, which is what actually popped up at random times. It ran the
+    # console python.exe, so every run put a window on the desktop; and it is set to catch
+    # up on a run it missed, so a laptop asleep at five in the morning ran it whenever it
+    # next woke, which is why the window seemed to come from nowhere.
+    updater = '"%s" "%s" update' % (runner, script)
 
     if os.name != "nt":
         print("On this system, add the following to your startup:")
@@ -703,10 +763,8 @@ def cmd_install(cfg, server, args):
         return 0
 
     def task(name, command, schedule):
-        done = subprocess.run(
-            ["schtasks", "/Create", "/TN", name, "/TR", command,
-             "/RL", "LIMITED", "/F"] + schedule,
-            capture_output=True, text=True)
+        done = quiet(["schtasks", "/Create", "/TN", name, "/TR", command,
+                      "/RL", "LIMITED", "/F"] + schedule)
         if done.returncode != 0:
             print("  could not create %s:" % name)
             print("      " + (done.stderr or done.stdout).strip().splitlines()[-1][:160])
@@ -720,8 +778,7 @@ def cmd_install(cfg, server, args):
     # previous pair in place: one more watcher at every logon and one more updater at
     # five in the morning, both running a client script that is not there any more.
     for old in ("J-ong watch", "J-ong update"):
-        subprocess.run(["schtasks", "/Delete", "/TN", old, "/F"],
-                       capture_output=True, text=True)
+        quiet(["schtasks", "/Delete", "/TN", old, "/F"])
 
     print("Starts at logon:")
     # The Run key, not a scheduled task.
@@ -739,10 +796,11 @@ def cmd_install(cfg, server, args):
 
     print("Scheduled tasks:")
     # Daily rather than at every start: an update that needs a restart should land at a
-    # predictable moment, not in the middle of a session. A task rather than the Run key
-    # because this one wants to happen whether or not anybody logs on today.
+    # predictable moment, not in the middle of a session. The task only ever runs while
+    # somebody is logged on (it is registered for this user and nobody else), and it runs
+    # windowless: see updater above. What it did goes into the watch log.
     # JRITER, not JR!TER: a task name is an identifier, and cmd treats ! as its own.
-    task("JRITER update", "%s update" % quoted, ["/SC", "DAILY", "/ST", "05:00"])
+    task("JRITER update", updater, ["/SC", "DAILY", "/ST", "05:00"])
 
     print("Right click menu:")
     try:
@@ -759,6 +817,21 @@ def cmd_install(cfg, server, args):
     print("Remove all of it with:")
     print("  %s uninstall" % quoted)
     return 0
+
+
+def windowless_python():
+    """The interpreter that runs this, but the one without a console.
+
+    pythonw beside python where there is one. sys.executable is the real interpreter
+    whichever launcher started the install, because the py launcher hands over to it and
+    gets out of the way, so this is right even when install ran as "py -3".
+    """
+    here = os.path.dirname(sys.executable)
+    for name in ("pythonw.exe", "pythonw"):
+        candidate = os.path.join(here, name)
+        if os.path.isfile(candidate):
+            return candidate
+    return sys.executable
 
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -805,8 +878,7 @@ def cmd_uninstall(cfg, server, args):
 
     print("Scheduled tasks:")
     for name in ("JRITER watch", "JRITER update", "J-ong watch", "J-ong update"):
-        done = subprocess.run(["schtasks", "/Delete", "/TN", name, "/F"],
-                              capture_output=True, text=True)
+        done = quiet(["schtasks", "/Delete", "/TN", name, "/F"])
         if done.returncode == 0:
             print("  %s removed" % name)
 

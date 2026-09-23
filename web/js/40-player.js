@@ -713,6 +713,18 @@ J.player = (function () {
       J.emit("player:change");
     },
 
+    /* A place in the song, in seconds.
+     *
+     * seek() takes a fraction because the scrub bar hands it one. The phone's lock screen
+     * and notification controls speak seconds, and they were being passed straight to
+     * seek(): anything from one second up clamped to 1.0, so dragging the lock screen
+     * scrubber, or pressing back ten seconds, sent the song to its end and autoplay on to
+     * the next one. One conversion, here, rather than a division at every caller. */
+    seekTo(seconds) {
+      if (!state.duration) return;
+      api.seek(seconds / state.duration);
+    },
+
     seek(fraction) {
       if (!state.duration) return;
       if (arranged()) {
@@ -854,16 +866,20 @@ J.player = (function () {
      */
     if ("mediaSession" in navigator) {
       const acts = {
-        play: () => api.toggle(),
-        pause: () => api.toggle(),
+        // Play and pause each mean one thing. Both used to toggle, so a play that arrived
+        // while already playing (a headset button, a car, a second device) paused.
+        play: () => { if (!state.playing) api.toggle(); },
+        pause: () => { if (state.playing) api.toggle(); },
         stop: () => { if (state.playing) api.toggle(); },
         previoustrack: () => api.step(-1),
         nexttrack: () => api.step(1),
-        seekbackward: (d) => api.seek(Math.max(
+        // Seconds, all three, so through seekTo. See there for what passing them to
+        // seek() did.
+        seekbackward: (d) => api.seekTo(Math.max(
           0, state.position - ((d && d.seekOffset) || 10))),
-        seekforward: (d) => api.seek(Math.min(
+        seekforward: (d) => api.seekTo(Math.min(
           state.duration, state.position + ((d && d.seekOffset) || 10))),
-        seekto: (d) => { if (d && typeof d.seekTime === "number") api.seek(d.seekTime); },
+        seekto: (d) => { if (d && typeof d.seekTime === "number") api.seekTo(d.seekTime); },
       };
       for (const [name, run] of Object.entries(acts)) {
         try { navigator.mediaSession.setActionHandler(name, run); } catch (e) { /* not known here */ }

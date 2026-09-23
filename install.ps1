@@ -211,8 +211,15 @@ $deskDir  = [Environment]::GetFolderPath('Desktop')
 
 # pythonw for the app, so logon does not put a console in the taskbar beside the window.
 $appScript = Join-Path $Dir 'client\jriter_app.py'
-$windowless = Join-Path (Split-Path $py.Exe -Parent) 'pythonw.exe'
-$appRunner = if (Test-Path $windowless) { $windowless } else { $py.Exe }
+# Beside the interpreter the launcher actually picks, not beside the launcher. $py.Exe is
+# usually C:\Windows\py.exe, and there is no pythonw.exe next to that (only pyw.exe), so
+# this used to fall back to py.exe itself: the shortcut opened a console window with the
+# app and killed the app when it was closed. Asking Python where it lives is one line with
+# no double quotes, which PowerShell 5.1 would mangle on the way to a native program.
+$real = "$(& $py.Exe @($py.Args) '-c' 'import sys;print(sys.executable)' 2>$null)".Trim()
+if (-not $real -or -not (Test-Path $real)) { $real = $py.Exe }
+$windowless = Join-Path (Split-Path $real -Parent) 'pythonw.exe'
+$appRunner = if (Test-Path $windowless) { $windowless } else { $real }
 
 foreach ($pair in @(
     @{ Name = 'JR!TER.lnk';        Target = $appRunner; Args = ('"{0}"' -f $appScript) },

@@ -22,6 +22,26 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.15.3",
+        "date": "2026-09-23",
+        "name": JRITER,
+        "title": "No more windows out of nowhere",
+        "notes": [
+            "The console window that appeared at random times was the daily update. It "
+            "ran with the console Python, and it catches up on a run it missed, so a "
+            "laptop asleep at five in the morning got the window whenever it woke. It "
+            "runs without a window now, and so does everything it starts, and what it did "
+            "is written to the watch log.",
+            "The Start menu shortcut opened a console beside the app, and every click "
+            "started one more copy watching your folders. It opens the app alone now, and "
+            "a second click just brings the window up.",
+            "The phone's lock screen scrubber and its ten second buttons sent the song to "
+            "its end. They land where you put them now, and play and pause no longer swap "
+            "places when pressed twice.",
+            "To get the desktop fixes, run the installer once more.",
+        ],
+    },
+    {
         "version": "3.15.2",
         "date": "2026-09-23",
         "name": JRITER,
