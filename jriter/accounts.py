@@ -465,6 +465,33 @@ def revoke_share(share_id):
     _run("UPDATE shares SET revoked_at = ? WHERE id = ?", (time.time(), share_id))
 
 
+def revoke_shares_for(from_account, song_id=None):
+    """Every live share of one song, or of a whole library, taken back.
+
+    WHY THIS EXISTS. A share names its song by id, and a song id is a rowid. SQLite hands
+    out the highest rowid plus one, so deleting the newest song and then making another
+    gives the new one the same number, and erasing a library starts every id again from 1.
+    A share left open across either was a share of whatever song came to hold that number
+    next: somebody's private song, opened by the person a different one had been sent to.
+
+    So the song going takes its shares with it. Marked, like every revoke, rather than
+    deleted: the rows are still what explains a guest's copies in their own library.
+    Returns how many were open, for the caller to report.
+    """
+    now = time.time()
+    if song_id is None:
+        live = _query("SELECT id FROM shares WHERE from_account = ? AND revoked_at = 0",
+                      (from_account,))
+        _run("UPDATE shares SET revoked_at = ? WHERE from_account = ? AND revoked_at = 0",
+             (now, from_account))
+    else:
+        live = _query("SELECT id FROM shares WHERE from_account = ? AND song_id = ? "
+                      "AND revoked_at = 0", (from_account, song_id))
+        _run("UPDATE shares SET revoked_at = ? WHERE from_account = ? AND song_id = ? "
+             "AND revoked_at = 0", (now, from_account, song_id))
+    return len(live)
+
+
 # ── machine credentials ──────────────────────────────────────────────────────
 def add_token(account_id, name, digest, scope):
     _run("INSERT INTO tokens (account_id, name, digest, scope, created_at) "

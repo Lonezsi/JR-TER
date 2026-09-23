@@ -115,11 +115,24 @@ def _song_in(share):
     hand the thread straight back afterwards.
     """
     with who.acting_as(_theirs(share)):
-        row = db.one("SELECT id, title, current_version_id FROM songs WHERE id = ?",
-                     (share["song_id"],))
+        row = db.one("SELECT id, title, current_version_id, created_at FROM songs "
+                     "WHERE id = ?", (share["song_id"],))
     if not row:
         # The song was deleted after the share was made. Not an error on the recipient's
         # part, and not something to leave them guessing about.
+        raise Error("The song behind this share is gone.", 410)
+    # AND IT IS THE SAME SONG. A share names its song by id, and SQLite gives the next
+    # song the highest id plus one, so deleting the newest song and making another hands
+    # the new one the old number. Reproduced: share song 2, delete it, make a private
+    # song, and the guest's share opened "A brand new private song".
+    #
+    # A song's created_at is set once and never moved, and a share can only be made of a
+    # song that already exists. So a song made after its share is a different song
+    # wearing the shared one's number. Nothing new is stored for this, which is why it
+    # also protects every share that was already open before the check existed.
+    # Deleting a song now takes its shares with it too; this is what still holds if a
+    # song ever leaves by some other path.
+    if row["created_at"] > share["created_at"]:
         raise Error("The song behind this share is gone.", 410)
     return row
 
@@ -203,6 +216,10 @@ def _artwork_in(share):
     """
     if not registry.has("artwork"):
         return []
+    # Through the same check as everything else. This was the one read that went straight
+    # to the song's id, so a share whose song had been replaced served the new song's
+    # pictures even once every other route refused it.
+    _song_in(share)
     with who.acting_as(_theirs(share)):
         if not db.table_exists("artwork"):
             return []
@@ -323,6 +340,9 @@ def save_preset(req):
     share = _share(req.params["id"])
     if share["to_account"] != _me():
         raise Error("Only the person a song was shared with can save into it.", 403)
+    # The song has to still be the one that was shared before anything is read from it:
+    # the preset named in `from` below is looked up by the share's song id.
+    _song_in(share)
     if not registry.has("sound"):
         raise Error("This library has no equaliser.", 404)
 
@@ -368,6 +388,7 @@ def save_sheet(req):
     share = _share(req.params["id"])
     if share["to_account"] != _me():
         raise Error("Only the person a song was shared with can save into it.", 403)
+    _song_in(share)                     # same reason as save_preset
     if not registry.has("lyrics"):
         raise Error("This library has no lyrics.", 404)
 

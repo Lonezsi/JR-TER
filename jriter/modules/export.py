@@ -31,7 +31,7 @@ import shutil
 import zipfile
 import tempfile
 
-from .. import db, config, blobs
+from .. import accounts, db, config, blobs, who
 from ..wire import Error, Response, need
 
 NAME = "export"
@@ -213,6 +213,12 @@ def erase(req):
     # VACUUM afterwards is what actually returns the pages rather than leaving the words
     # readable in a file that merely says it is empty.
     gone = []
+    # Every share this library has handed out, before any row goes. An erased library
+    # numbers its songs from 1 again, so each open share would come to mean whatever new
+    # song took its old id: private songs, opened by people a different song was sent to.
+    taken_back = accounts.revoke_shares_for(who.must())
+    if taken_back:
+        gone.append("%d open share%s" % (taken_back, "" if taken_back == 1 else "s"))
     conn = db.connect()
     tables = [row["name"] for row in db.query(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]

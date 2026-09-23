@@ -250,11 +250,24 @@ const NAV_ICONS = {
   settings: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 
+/* Whether this session is the machine's owner.
+ *
+ * Watched folders are folders on the host and the server refuses them to anybody else, so
+ * the page asks the same question the server does rather than showing a friend a screen
+ * that answers every press with a refusal. With the door switched off there is only one
+ * person, and they own everything, which is why a missing auth summary means yes. */
+J.ownsTheMachine = (state) => {
+  const auth = state && state.summary && state.summary.auth;
+  return !auth || auth.is_owner !== false;
+};
+
 async function buildRail(state) {
   const nav = J.$("#nav");
   const items = [["library", "Library"]];
   if (state.modules.includes("renders")) items.push(["renders", "Renders"]);
-  if (state.modules.includes("sync")) items.push(["sync", "Folders"]);
+  if (state.modules.includes("sync") && J.ownsTheMachine(state)) {
+    items.push(["sync", "Folders"]);
+  }
   /* Always, when the module is on.
    *
    * It used to appear only once somebody had actually shared something, on the reasoning

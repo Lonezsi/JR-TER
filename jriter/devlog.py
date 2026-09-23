@@ -22,6 +22,24 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.15.2",
+        "date": "2026-09-23",
+        "name": JRITER,
+        "title": "Two holes closed",
+        "notes": [
+            "A share could open the wrong song. Songs are numbered, and deleting your "
+            "newest song and then making another gives the new one the old number, so a "
+            "share of the deleted song became a share of the new private one, words, "
+            "sound and pictures included. Every shared route now checks the song is the "
+            "one that was shared, and deleting a song or erasing the library takes its "
+            "shares back.",
+            "Watched folders are folders on the machine JR!TER runs on, and any account "
+            "could add one, scan it, and upload files into it with the server's own "
+            "permissions. They are the machine owner's alone now, and the Folders screen "
+            "tells anyone else where their renders come in instead.",
+        ],
+    },
+    {
         "version": "3.15.1",
         "date": "2026-09-22",
         "name": JRITER,

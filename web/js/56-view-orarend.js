@@ -450,7 +450,7 @@ J.views.orarend = {
      * as a stripe down the side of the day. That answers "when are we both free" at a
      * glance, without four people's lectures fighting over one column.
      *
-     * It is the wrong shape for the other question, which is "when is Zita free on
+     * It is the wrong shape for the other question, which is "when is my friend free on
      * Wednesday": her hours are a five pixel stripe with nothing written on them. So one
      * person can be picked instead, and then it is their week, drawn the way mine is,
      * with everybody else out of the way.

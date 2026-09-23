@@ -23,7 +23,7 @@ import os
 import time
 import urllib.parse
 
-from .. import db, blobs, config, audio_meta, registry
+from .. import accounts, db, blobs, config, audio_meta, registry, who
 from ..wire import Error, need
 from . import songs
 
@@ -69,11 +69,33 @@ def MIGRATE():
                              "TEXT NOT NULL DEFAULT '%s'" % COLLECTOR)
 
 
+def _host_only():
+    """Refuse anybody but the account that owns the machine.
+
+    EVERY FOLDER HERE IS A PATH ON THE HOST, and the server reads and writes it with the
+    server's own permissions, which on the host are the whole machine's. That was fine
+    while there was one account. Since friends could have accounts of their own, any of
+    them could add the whole C: drive as a render collector, scan it, import whatever audio it found,
+    take stock of any folder's contents, and upload files into any directory the server
+    can write to: another account's library, the server's own code.
+
+    Per account data does not make this safe, because the folders are not the account's
+    data. They are the machine's. So the whole module belongs to the machine's owner, the
+    same rule invites follow, and a friend's library gets its renders through uploads,
+    which land in their own storage and nowhere else.
+    """
+    if who.must() != accounts.OWNER:
+        raise Error("Watched folders are folders on the machine JR!TER runs on, so only "
+                    "its owner can use them.", 403)
+
+
 def list_folders(req):
+    _host_only()
     return {"folders": db.query("SELECT * FROM sync_folders ORDER BY path")}
 
 
 def add_folder(req):
+    _host_only()
     data = req.json()
     path = need(data, "path")
     path = os.path.abspath(os.path.expanduser(path))
@@ -93,6 +115,7 @@ def add_folder(req):
 
 
 def update_folder(req):
+    _host_only()
     folder = db.one("SELECT * FROM sync_folders WHERE id = ?", (req.params["id"],))
     if not folder:
         raise Error("no folder with id %s" % req.params["id"], 404)
@@ -103,6 +126,7 @@ def update_folder(req):
 
 
 def remove_folder(req):
+    _host_only()
     db.run("DELETE FROM sync_folders WHERE id = ?", (req.params["id"],))
     return {"removed": req.params["id"]}
 
@@ -161,6 +185,7 @@ def _walk(root, skip=()):
 
 def scan(req):
     """Look at every watched folder and report what is not in the library yet."""
+    _host_only()
     if not registry.has("versions"):
         raise Error("the versions module is switched off, so nothing can be imported", 409)
     # Collectors only. This is the whole point of the kind: a sample library is not a
@@ -210,6 +235,7 @@ def take_stock(req):
     hashing tens of thousands of samples to answer "how big is this" would take minutes
     and answer a question nobody asked.
     """
+    _host_only()
     folders = db.query("SELECT * FROM sync_folders WHERE enabled = 1 AND kind = ?",
                        (SYNC,))
     out, errors = [], []
@@ -253,6 +279,7 @@ def _suggest(name):
 
 def import_file(req):
     """Take one scanned file into the library, as a new version or a brand new song."""
+    _host_only()
     if not registry.has("versions"):
         raise Error("the versions module is switched off, so nothing can be imported", 409)
     data = req.json()
@@ -301,6 +328,8 @@ def import_file(req):
 
 
 def SUMMARY():
+    if who.now() != accounts.OWNER:
+        return {}                       # not theirs to know about; see _host_only
     folders = db.one("SELECT COUNT(*) AS n FROM sync_folders WHERE enabled = 1")
     return {"folders": folders["n"] if folders else 0}
 
@@ -332,6 +361,7 @@ def upload_into(req):
     The one place anything writes into a watched folder, which is why this is the longest
     handler in the file for the least work. Everything else here reads.
     """
+    _host_only()
     folder = db.one("SELECT * FROM sync_folders WHERE id = ?", (req.params["id"],))
     if not folder:
         raise Error("no watched folder with that id", 404)

@@ -8,6 +8,18 @@
 J.views.sync = {
   title: "Folders",
   async render(root) {
+    if (!J.ownsTheMachine(J.state)) {
+      root.innerHTML = `
+        <div class="section"><div class="empty">
+          <h3>Folders are the host's</h3>
+          <p>Watched folders are folders on the machine JR!TER runs on, so only its owner
+             can use them. Your renders come in through uploads: drop audio files anywhere
+             on this page, or use Upload on the Renders screen.</p>
+          <a class="btn primary" href="#/renders" data-link style="margin-top:var(--s4)">
+            Go to Renders</a>
+        </div></div>`;
+      return;
+    }
     let folders = [];
     let candidates = [];
     let scanning = false;

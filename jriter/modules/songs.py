@@ -8,7 +8,7 @@ import time
 import random
 import difflib
 
-from .. import db, finding, registry
+from .. import accounts, db, finding, registry, who
 from ..wire import Error, need, as_int
 
 NAME = "songs"
@@ -251,10 +251,14 @@ def update_song(req):
 
 def delete_song(req):
     song = get(req.params["id"])
+    # Its shares first. The id this song leaves behind is the id the next song gets, so a
+    # share left open across the delete is a share of that next one. See
+    # accounts.revoke_shares_for for how that was reached in practice.
+    taken_back = accounts.revoke_shares_for(who.must(), song["id"])
     # Blobs are left alone: another song may point at the same bytes, and a personal
     # library would rather keep an orphaned file than lose one that was still in use.
     db.run("DELETE FROM songs WHERE id = ?", (song["id"],))
-    return {"deleted": song["id"]}
+    return {"deleted": song["id"], "shares_taken_back": taken_back}
 
 
 def match(req):

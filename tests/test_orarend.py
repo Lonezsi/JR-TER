@@ -923,7 +923,7 @@ def test_the_week_can_be_somebody_else_s():
     """Two questions, two shapes.
 
     The whole week answers "when are we both free": my classes as cards, everybody else's
-    as a stripe down the side. It cannot answer "when is Zita free on Wednesday", because
+    as a stripe down the side. It cannot answer "when is my friend free on Wednesday", because
     her hours there are a five pixel stripe with nothing written on them.
 
     So picking a person draws their week the way mine is drawn. Cards, with the room and
