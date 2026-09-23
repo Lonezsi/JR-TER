@@ -139,6 +139,11 @@ J.views.share = {
           </div>
         </div>` : ""}`;
 
+    // What everybody else this song is shared with has made on it.
+    J.guestWork.mount({ where: root, corner: J.$(".share-view .section-head", root),
+                        url: `/api/shared/${params.id}/guests`,
+                        heading: "What the others made" });
+
     root.addEventListener("click", async (e) => {
       const act = e.target.closest("[data-act]");
       if (!act) return;

@@ -319,6 +319,130 @@ def _my_copies(share):
     return {"song": row["id"], "presets": presets, "sheets": sheets}
 
 
+# -- what everybody on a song has made ---------------------------------------
+#
+# A guest's work lives in their own library, on a copy of the song made the first time they
+# saved: their words, their sound, and anything they did to that copy on its own song page,
+# pictures and uploaded mixes included. Nothing used to read it back out, so the owner saw
+# none of it and neither did anybody else the song was shared with, which is the opposite
+# of why a song gets shared. These read it, for exactly the people who share the song and
+# nobody else, one crossing at a time, the same as everything else in this file.
+
+def _people_on(owner, song_id):
+    """Every live, claimed share of one song. A link nobody has opened yet is nobody."""
+    return [r for r in accounts.shares_from(owner, song_id) if r["to_account"]]
+
+
+def _may_see(share, me):
+    """Whether `me` may look at what the person behind `share` made.
+
+    The owner of the song, or anybody who holds a live share of the same song from the same
+    owner. Their own work included: seeing yourself in the list is not a leak.
+    """
+    if me == share["from_account"]:
+        return True
+    return any(r["to_account"] == me
+               for r in _people_on(share["from_account"], share["song_id"]))
+
+
+def _their_copy(share):
+    """The song in the guest's library that holds their work on this share, or None.
+
+    Read inside the guest's library. Only the one row that names this share, so a guest's
+    other songs, and everything else of theirs, stay out of reach.
+    """
+    with who.acting_as(share["to_account"]):
+        return db.one("SELECT id, title, updated_at FROM songs WHERE shared_from = ?",
+                      ("share:%d" % share["id"],))
+
+
+def _work_of(share):
+    """Everything the person behind one share has made on it, for showing."""
+    copy = _their_copy(share)
+    person = accounts.public(accounts.by_id(share["to_account"])) or {}
+    out = {"share": share["id"], "name": person.get("name") or share["as_name"] or "",
+           "handle": person.get("handle", ""), "since": share["created_at"],
+           "updated_at": None, "sheets": [], "presets": [], "artwork": [], "versions": []}
+    if not copy:
+        return out
+    out["updated_at"] = copy["updated_at"]
+    with who.acting_as(share["to_account"]):
+        if registry.has("lyrics") and db.table_exists("lyric_sheets"):
+            out["sheets"] = [_sheet_out(r) for r in db.query(
+                "SELECT id, name, position, is_current, created_at FROM lyric_sheets "
+                "WHERE song_id = ? ORDER BY position, id", (copy["id"],))]
+            out["sheets"] = [x for x in out["sheets"] if x["text"].strip()]
+        if registry.has("sound") and db.table_exists("sound_presets"):
+            out["presets"] = [_preset_out(r) for r in db.query(
+                "SELECT id, name, is_current, data, created_at FROM sound_presets "
+                "WHERE song_id = ? ORDER BY id", (copy["id"],))]
+        if registry.has("artwork") and db.table_exists("artwork"):
+            out["artwork"] = [dict(r) for r in db.query(
+                "SELECT id, caption, position FROM artwork WHERE song_id = ? "
+                "ORDER BY position, id", (copy["id"],))]
+        if registry.has("versions") and db.table_exists("versions"):
+            out["versions"] = [dict(r) for r in db.query(
+                "SELECT id, n, filename, duration, created_at FROM versions "
+                "WHERE song_id = ? ORDER BY n DESC", (copy["id"],))]
+    out["made_anything"] = bool(out["sheets"] or out["presets"] or out["artwork"]
+                                or out["versions"])
+    return out
+
+
+def song_guests(req):
+    """For the owner's song page: everybody the song is shared with, and what they made."""
+    me = _me()
+    song = as_int(req.params["id"], "id")
+    if not db.one("SELECT id FROM songs WHERE id = ?", (song,)):
+        raise Error("No such song.", 404)
+    return {"people": [_work_of(r) for r in _people_on(me, song)]}
+
+
+def shared_guests(req):
+    """For somebody a song is shared with: what everybody else on it made."""
+    share = _share(req.params["id"])
+    _song_in(share)
+    me = _me()
+    others = [r for r in _people_on(share["from_account"], share["song_id"])
+              if r["to_account"] != me]
+    return {"people": [_work_of(r) for r in others]}
+
+
+def _guest_share(req):
+    """The share named in a guest-work URL, checked against whoever is asking."""
+    share = accounts.share(as_int(req.params["share"], "share"))
+    if not share or share["revoked_at"] or not share["to_account"] \
+            or not _may_see(share, _me()):
+        raise Error("That is not open to you.", 404)
+    return share
+
+
+def guest_artwork(req):
+    """One picture off a guest's copy. The id is checked against that copy, not trusted."""
+    share = _guest_share(req)
+    copy = _their_copy(share)
+    want = as_int(req.params["image"], "image")
+    from . import artwork
+    with who.acting_as(share["to_account"]):
+        if not copy or not db.one("SELECT id FROM artwork WHERE id = ? AND song_id = ?",
+                                  (want, copy["id"])):
+            raise Error("That picture is not part of this share.", 404)
+        return artwork.image(_AsRequest({"id": want}, req.headers))
+
+
+def guest_audio(req):
+    """One of a guest's own mixes, the same way."""
+    share = _guest_share(req)
+    copy = _their_copy(share)
+    want = as_int(req.params["version"], "version")
+    from . import versions
+    with who.acting_as(share["to_account"]):
+        if not copy or not db.one("SELECT id FROM versions WHERE id = ? AND song_id = ?",
+                                  (want, copy["id"])):
+            raise Error("That mix is not part of this share.", 404)
+        return versions.audio(_AsRequest({"id": want}, req.headers))
+
+
 def _named(share, original):
     """What to call a copy of something the sharer made.
 
@@ -602,6 +726,10 @@ def ROUTES():
         ("GET", "/api/shared/<id>/artwork/<image>"): shared_artwork,
         ("POST", "/api/shared/<id>/preset"): save_preset,
         ("POST", "/api/shared/<id>/sheet"): save_sheet,
+        ("GET", "/api/shared/<id>/guests"): shared_guests,
+        ("GET", "/api/songs/<id>/guests"): song_guests,
+        ("GET", "/api/guestwork/<share>/artwork/<image>"): guest_artwork,
+        ("GET", "/api/guestwork/<share>/audio/<version>"): guest_audio,
         ("GET", "/api/shares"): list_shares,
         ("POST", "/api/shares"): make_share,
         ("GET", "/api/shares/invitation/<token>"): invitation,

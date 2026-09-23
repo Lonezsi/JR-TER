@@ -266,6 +266,13 @@ J.views.song = {
     if (has("artwork")) await J.blockArtwork(J.$("#artworkBlock", root), ctx);
     if (has("playlists")) await J.blockSongPlaylists(J.$("#songPlaylistsBlock", root), ctx);
     if (has("youtube")) await J.blockYouTube(J.$("#youtubeBlock", root), ctx);
+    // Everybody this song is shared with, in the top right corner, and what they made on
+    // it at the bottom of the page. Nothing at all when it is shared with nobody.
+    if (has("sharing")) {
+      await J.guestWork.mount({ where: root, corner: J.$(".hero", root),
+                                url: `/api/songs/${songId}/guests`,
+                                heading: "What they made" });
+    }
   },
 };
 

@@ -22,6 +22,20 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.17.0",
+        "date": "2026-09-23",
+        "name": JRITER,
+        "title": "See what everybody made",
+        "notes": [
+            "When a song is shared, what the others made on it now shows on it: their "
+            "words, their sound settings, their pictures and their own mixes, which you "
+            "can play. You see it on your song page, and everybody the song is shared with "
+            "sees everybody else's on theirs.",
+            "Their initials sit in the top right corner of the song. Press one to jump to "
+            "what that person made. Work they did before this release shows up too.",
+        ],
+    },
+    {
         "version": "3.16.0",
         "date": "2026-09-23",
         "name": JRITER,

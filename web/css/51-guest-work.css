@@ -1,0 +1,49 @@
+/* Who else is on a song, and what they made. See web/js/63-guest-work.js. */
+
+/* The editors, in the song's top right corner: the hero's 56px top padding is always empty
+   there, on a phone as well as a desktop. */
+.hero .hero-people {
+  position: absolute;
+  top: var(--s3);
+  right: var(--s5);
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+}
+.section-head .hero-people { display: flex; gap: 4px; margin-left: var(--s2); }
+@media (max-width: 520px) {
+  .hero .hero-people { right: var(--s4); }
+}
+
+.who-chip {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--glass-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.who-chip.made { border-color: var(--accent-line); color: var(--text); }
+.who-chip:hover { background: var(--elevated); }
+
+.guest-person { padding: var(--s4); margin-bottom: var(--s3); }
+.guest-who { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.guest-art { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
+.guest-art img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--r-sm); }
+.guest-mixes audio { height: 32px; max-width: 220px; }
+.guest-words { margin: var(--s2) 0; }
+.guest-words summary { cursor: pointer; font-weight: 600; color: var(--text-2); }
+.guest-words pre {
+  white-space: pre-wrap;
+  font: inherit;
+  line-height: 1.6;
+  margin: var(--s2) 0 0;
+  color: var(--text);
+}
+.guest-sound, .guest-mixes { margin-top: var(--s2); }
