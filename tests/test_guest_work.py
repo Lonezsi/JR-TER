@@ -164,3 +164,20 @@ def test_the_initials_switch_the_song_to_that_persons_version():
         assert part in see, "their version does not show %s" % part
     assert "J.post(" not in see and "J.put(" not in see and "J.del(" not in see, (
         "looking at somebody's version writes something")
+
+
+def test_anybodys_mix_and_sound_can_go_on_either_deck():
+    """The A/B menu offers every person's mixes and sounds beside your own. A mix plays
+    through the guest-work route, never by a version id in your library, and a sound goes
+    on the deck without being saved anywhere."""
+    import os
+    web = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "js")
+    song = io.open(os.path.join(web, "60-view-song.js"), encoding="utf-8").read()
+    menu = song[song.index("function openSlotMenu("):song.index("function place(menu")]
+    assert "guestRows(ctx, held, heldPreset)" in menu, "the A/B menu lists only your own"
+    pick = song[song.index("function guestPick(row)"):song.index("function place(menu")]
+    assert "url: `/api/guestwork/${share}/audio/${v.id}`" in pick
+    handler = menu[menu.index("const guestRow = "):menu.index("const row = e.target")]
+    assert "J.player.set(slot, { version: g.version })" in handler
+    assert "J.deckSetPreset(ctx, slot, g.preset)" in handler
+    assert "J.put(" not in handler and "J.post(" not in handler, "trying a sound saved it"

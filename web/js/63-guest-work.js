@@ -18,6 +18,8 @@ J.guestWork = {
     let data;
     try { data = await J.get(url); } catch (e) { return; }
     const people = (data && data.people) || [];
+    // Kept for the A/B menu, which offers everybody's mixes and sounds next to yours.
+    J.guestWork.latest = { url, people };
     if (!people.length || !where) return;
 
     const initials = (p) => (p.name || p.handle || "?").trim().split(/\s+/)

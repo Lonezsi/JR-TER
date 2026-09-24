@@ -22,6 +22,17 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.19.0",
+        "date": "2026-09-24",
+        "name": JRITER,
+        "title": "A/B against anybody",
+        "notes": [
+            "The A/B menu on a shared song lists everybody's mixes and sound settings "
+            "under their name, next to yours. Put a friend's mix on B and yours on A, or "
+            "their sound on your mix, and swap. Trying a sound on a deck saves nothing.",
+        ],
+    },
+    {
         "version": "3.18.2",
         "date": "2026-09-24",
         "name": JRITER,

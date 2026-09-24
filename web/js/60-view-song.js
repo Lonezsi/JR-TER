@@ -412,7 +412,8 @@ function wireAB(root, ctx) {
       const shown = held.version || (slot === "A" ? ctx.currentVersion() : null);
       const preset = J.deckPreset(ctx, slot);
       const label = shown
-        ? `v${shown.n}${preset ? " &middot; " + J.esc(preset.name) : ""}`
+        ? `${shown.abLabel ? J.esc(shown.abLabel) : "v" + shown.n}${
+            preset ? " &middot; " + J.esc(preset.name) : ""}`
         : "not set";
       J.$(".v", chip).innerHTML = label;
       /* Two marks, because they are two facts that are usually the same one. The selected
@@ -632,7 +633,8 @@ function openSlotMenu(anchor, slot, ctx, done) {
                 data-preset="${p.id}">
           <span class="tagline">${(p.data.bands || []).length || "flat"}</span>
           <span class="grow truncate">${J.esc(p.name)}</span>
-        </button>`).join("")}` : ""}`;
+        </button>`).join("")}` : ""}
+    ${guestRows(ctx, held, heldPreset)}`;
 
   document.body.appendChild(menu);
   place(menu, anchor);
@@ -669,6 +671,25 @@ function openSlotMenu(anchor, slot, ctx, done) {
       if (made) J.router.reload();
       return;
     }
+    /* Somebody else's mix or sound, from their own copy of the song. A mix plays from the
+     * guest-work route, which checks you may hear it; a sound goes on the deck like any
+     * other and saves nothing anywhere. */
+    const guestRow = e.target.closest("[data-gversion], [data-gpreset]");
+    if (guestRow) {
+      const g = guestPick(guestRow);
+      if (g && g.version) {
+        if (!playing) await J.playSong(ctx.song);
+        await J.player.set(slot, { version: g.version });
+      } else if (g && g.preset) {
+        await J.deckSetPreset(ctx, slot, g.preset);
+      }
+      if (slot === "B" && J.player.state.active !== "B" && J.player.state.slots.B.version) {
+        await J.player.switchTo("B");
+      }
+      close();
+      if (done) done();
+      return;
+    }
     const row = e.target.closest("[data-version], [data-preset]");
     if (!row) return;
     if (row.dataset.version) {
@@ -693,6 +714,46 @@ function openSlotMenu(anchor, slot, ctx, done) {
     close();
     if (done) done();
   });
+}
+
+/* Everybody else's mixes and sounds on this song, for either deck. */
+function guestPeople(ctx) {
+  const got = J.guestWork.latest;
+  return got && got.url.indexOf(`/${ctx.songId}/guests`) !== -1 ? got.people : [];
+}
+
+function guestRows(ctx, held, heldPreset) {
+  return guestPeople(ctx).filter((p) => p.versions.length || p.presets.length).map((p) => `
+    <div class="menu-group">${J.esc(p.name || p.handle)}</div>
+    ${p.versions.map((v) => `
+      <div class="menu-row ${held.version && held.version.id === `g${p.share}:${v.id}` ? "on" : ""}"
+           data-gversion="${p.share}:${v.id}" role="button" tabindex="0">
+        <span class="tagline">mix</span>
+        <span class="grow truncate">${J.esc(v.filename || "v" + v.n)}</span>
+        <span class="when">${v.duration ? J.time(v.duration) : ""}</span>
+      </div>`).join("")}
+    ${p.presets.map((s) => `
+      <button class="menu-row ${heldPreset && heldPreset.id === `g${p.share}:${s.id}` ? "on" : ""}"
+              data-gpreset="${p.share}:${s.id}">
+        <span class="tagline">${((s.data && s.data.bands) || []).length || "flat"}</span>
+        <span class="grow truncate">${J.esc(s.name)}</span>
+      </button>`).join("")}`).join("");
+}
+
+function guestPick(row) {
+  const [share, id] = (row.dataset.gversion || row.dataset.gpreset).split(":");
+  const person = (J.guestWork.latest.people || []).find((p) => String(p.share) === share);
+  if (!person) return null;
+  const who = person.name || person.handle;
+  if (row.dataset.gversion) {
+    const v = person.versions.find((x) => String(x.id) === id);
+    return v && { version: Object.assign({}, v, {
+      id: `g${share}:${v.id}`, kind: "guest", abLabel: who,
+      url: `/api/guestwork/${share}/audio/${v.id}` }) };
+  }
+  const s = person.presets.find((x) => String(x.id) === id);
+  return s && { preset: Object.assign({}, s, { id: `g${share}:${s.id}`,
+                                               name: `${s.name} (${who})` }) };
 }
 
 /* Put a menu under its chip and inside the window.
