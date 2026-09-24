@@ -32,6 +32,10 @@ J.router = (function () {
     if (parts[0] === "playlist") return { view: "playlist", params: Object.assign({ id: parts[1] }, query) };
     // One shared song. Its own path rather than a tab of #/song, because it is not a song
     // of yours and almost nothing on that screen applies to it.
+    // The owner's own song page, used by somebody it is shared with.
+    if (parts[0] === "shared" && parts[1] && parts[2] === "edit" && parts[3]) {
+      return { view: "song", params: Object.assign({ id: parts[3], share: parts[1] }, query) };
+    }
     if (parts[0] === "shared" && parts[1]) {
       return { view: "share", params: Object.assign({ id: parts[1] }, query) };
     }
@@ -166,6 +170,9 @@ J.router = (function () {
     /* Which screen this is, said out loud, so the shell can lay itself out for it. The
      * rail listens: the timetable wants the whole width. */
     document.body.dataset.view = view;
+    // Guest mode is for exactly one screen, and ends the moment it is left.
+    J.sharedAs = params && params.share ? { share: params.share, song: params.id } : null;
+    document.body.classList.toggle("guesting", !!J.sharedAs);
     if (J.railForView) J.railForView(view);
 
     const screen = J.views[view];

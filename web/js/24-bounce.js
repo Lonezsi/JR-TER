@@ -106,7 +106,7 @@ J.bounce = (function () {
    * that passed a truthiness check and then had no duration. A file this is about to
    * upload is worth reading twice. */
   async function sourceBuffer(ctx, version) {
-    const response = await fetch(`/api/versions/${version.id}/audio`);
+    const response = await fetch(J.u(`/api/versions/${version.id}/audio`));
     if (!response.ok) throw new Error("That render could not be read back.");
     const bytes = await response.arrayBuffer();
     const audioCtx = J.audio.context() || new (window.AudioContext || window.webkitAudioContext)();

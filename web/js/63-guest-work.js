@@ -30,7 +30,8 @@ J.guestWork = {
       chips.innerHTML = people.map((p) => `
         <button class="who-chip${p.made_anything ? " made" : ""}" type="button"
                 data-guest="${p.share}"
-                title="${J.esc(p.name || p.handle)}${p.made_anything ? "" : ", nothing yet"}">
+                title="${J.esc(p.name || p.handle)}${p.changes ? ", " + p.changes + " change"
+                  + (p.changes === 1 ? "" : "s") : p.made_anything ? "" : ", nothing yet"}">
           ${J.esc(initials(p))}</button>`).join("");
       corner.appendChild(chips);
       chips.addEventListener("click", (e) => {
@@ -54,6 +55,8 @@ J.guestWork = {
             ${p.updated_at ? `<span class="faint">${J.esc(when(p.updated_at))}</span>` : ""}
           </div>
           ${!p.made_anything ? `<p class="faint">Nothing made on this song yet.</p>` : ""}
+          ${p.changes ? `<p class="faint">${p.changes} change${p.changes === 1 ? "" : "s"}
+            to the song itself, listed under Changes by others.</p>` : ""}
           ${p.artwork.length ? `
             <div class="guest-art">${p.artwork.map((a) => `
               <img src="/api/guestwork/${p.share}/artwork/${a.id}" alt="${J.esc(a.caption)}"
@@ -79,5 +82,46 @@ J.guestWork = {
               </div>`).join("")}</div>` : ""}
         </div>`).join("")}`;
     where.appendChild(section);
+  },
+
+  /* What the people the song is shared with changed on it, with a way to put each back.
+   *
+   * Putting one back returns the song to how it was just before that change, so anything
+   * changed after it on the same thing goes too. That is said on the button rather than
+   * discovered. */
+  async changes(where, songId) {
+    let data;
+    try { data = await J.get(`/api/songs/${songId}/edits`); } catch (e) { return; }
+    const edits = (data && data.edits) || [];
+    if (!edits.length) return;
+    const when = (t) => new Date(t * 1000).toLocaleString();
+    const section = document.createElement("div");
+    section.className = "section guest-changes";
+    section.innerHTML = `
+      <div class="section-head"><h2>Changes by others</h2></div>
+      <div class="pane">${edits.map((e) => `
+        <div class="list-row${e.undone_at ? " undone" : ""}">
+          <span class="who-chip made">${J.esc(((e.name || e.handle || "?")[0] || "?")
+            .toUpperCase())}</span>
+          <span class="grow truncate"><b>${J.esc(e.name || e.handle)}</b>
+            ${J.esc(e.what)}</span>
+          <span class="faint">${J.esc(when(e.updated_at))}</span>
+          ${e.undone_at ? `<span class="tag">put back</span>` : `
+            <button class="btn sm ghost" data-undo="${e.id}"
+                    title="Back to how it was before this, with anything changed after it">
+              Undo</button>`}
+        </div>`).join("")}</div>`;
+    where.appendChild(section);
+    section.addEventListener("click", async (ev) => {
+      const b = ev.target.closest("[data-undo]");
+      if (!b) return;
+      const sure = await J.confirm("Undo this change?",
+        "The song goes back to how it was just before it. Anything changed after it on the "
+        + "same thing goes back too.", "Undo it");
+      if (!sure) return;
+      const done = await J.try(() => J.post(`/api/guest-edits/${b.dataset.undo}/undo`),
+                               "Put back");
+      if (done) J.router.reload();
+    });
   },
 };

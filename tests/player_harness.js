@@ -98,6 +98,7 @@ const J = {
   $: (sel) => nodes[sel] || null,
   $$: () => [],
   clamp: (n, low, high) => Math.min(high, Math.max(low, n)),
+  u: (path) => path,                           // no share in play here
   esc: (s) => String(s),
   hue: () => 0,
   cover: () => "",

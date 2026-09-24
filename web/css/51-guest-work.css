@@ -47,3 +47,14 @@
   color: var(--text);
 }
 .guest-sound, .guest-mixes { margin-top: var(--s2); }
+
+/* Somebody else's song, being worked on. */
+.guest-note {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+  padding: var(--s3) var(--s4); margin-bottom: var(--s3);
+}
+/* The server refuses every delete from a guest; these just are not offered. */
+body.guesting [data-act="delete"],
+body.guesting .row-drop { display: none; }
+.guest-changes .list-row { gap: var(--s2); }
+.guest-changes .undone { opacity: 0.55; }

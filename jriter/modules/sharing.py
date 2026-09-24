@@ -28,9 +28,28 @@ from ..wire import Error, need, as_int, Response
 
 NAME = "sharing"
 
-#: No tables here. A share is a row in accounts.db, because it names two accounts and a song
-#: in one of their libraries, and no single library is the right place for that.
-SCHEMA = []
+#: A share itself is a row in accounts.db, because it names two accounts and a song in one
+#: of their libraries. What lives here, in the owner's own library, is the record of what the
+#: people a song is shared with changed on it, and how to put each change back.
+SCHEMA = [
+    """
+    CREATE TABLE IF NOT EXISTS guest_edits (
+      id         INTEGER PRIMARY KEY,
+      song_id    INTEGER NOT NULL,
+      account    INTEGER NOT NULL,
+      share_id   INTEGER NOT NULL,
+      what       TEXT NOT NULL,
+      route      TEXT NOT NULL,
+      -- The song as it was before this change: every row of it in every table a guest can
+      -- touch, as JSON. Putting the change back is writing these back.
+      before     TEXT NOT NULL,
+      created_at REAL NOT NULL,
+      updated_at REAL NOT NULL,
+      undone_at  REAL NOT NULL DEFAULT 0
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS guest_edits_song ON guest_edits(song_id, id DESC)",
+]
 
 
 def _me():
@@ -192,7 +211,7 @@ def open_share(req):
     from_who = accounts.public(accounts.by_id(share["from_account"]))
     return {
         "share": share["id"],
-        "song": {"title": song["title"]},
+        "song": {"title": song["title"], "id": song["id"]},
         # Everything hanging on the song. Shown because it was shared on purpose: a share
         # is one song handed to one person, and holding back the artwork made it look like
         # a title and a waveform.
@@ -362,7 +381,8 @@ def _work_of(share):
     person = accounts.public(accounts.by_id(share["to_account"])) or {}
     out = {"share": share["id"], "name": person.get("name") or share["as_name"] or "",
            "handle": person.get("handle", ""), "since": share["created_at"],
-           "updated_at": None, "sheets": [], "presets": [], "artwork": [], "versions": []}
+           "updated_at": None, "sheets": [], "presets": [], "artwork": [], "versions": [],
+           "made_anything": False}
     if not copy:
         return out
     out["updated_at"] = copy["updated_at"]
@@ -395,7 +415,13 @@ def song_guests(req):
     song = as_int(req.params["id"], "id")
     if not db.one("SELECT id FROM songs WHERE id = ?", (song,)):
         raise Error("No such song.", 404)
-    return {"people": [_work_of(r) for r in _people_on(me, song)]}
+    people = [_work_of(r) for r in _people_on(me, song)]
+    for person in people:
+        row = db.one("SELECT COUNT(*) AS n FROM guest_edits WHERE share_id = ? "
+                     "AND song_id = ? AND undone_at = 0", (person["share"], song))
+        person["changes"] = row["n"] if row else 0
+        person["made_anything"] = person["made_anything"] or bool(person["changes"])
+    return {"people": people}
 
 
 def shared_guests(req):
@@ -441,6 +467,255 @@ def guest_audio(req):
                                   (want, copy["id"])):
             raise Error("That mix is not part of this share.", 404)
         return versions.audio(_AsRequest({"id": want}, req.headers))
+
+
+# -- working on the owner's song itself ----------------------------------------
+#
+# A guest can do on a shared song what the owner can, through the owner's own routes, with
+# three limits that are the whole of the design:
+#
+#   1. Only the routes below, and each one only on this song. Every id in the path is
+#      checked to belong to the shared song before anything runs.
+#   2. Nothing that deletes. Not a picture, not a set of words, not a mix. A guest can add
+#      a picture and make it the cover; the old one is still there.
+#   3. Every change is recorded with the song as it was before it, so the owner can put it
+#      back. Words and titles kept their history already; sound and arrangement did not,
+#      and this is what gives them one.
+
+#: (method, route) -> what the ids in it are, and what the change is called.
+GUEST_MAY = {
+    ("GET", "/api/songs/<id>"): ("song", None),
+    ("GET", "/api/songs/<id>/titles"): ("song", None),
+    ("PATCH", "/api/songs/<id>"): ("song", "renamed the song"),
+    ("GET", "/api/songs/<id>/artwork"): ("song", None),
+    ("POST", "/api/songs/<id>/artwork"): ("song", "added a picture"),
+    ("POST", "/api/songs/<id>/artwork/order"): ("song", "changed the cover"),
+    ("GET", "/api/artwork/<id>/image"): ("artwork", None),
+    ("GET", "/api/songs/<id>/lyrics"): ("song", None),
+    ("POST", "/api/songs/<id>/lyrics"): ("song", "added words"),
+    ("PUT", "/api/lyrics/<id>/text"): ("sheet", "edited the words"),
+    ("PATCH", "/api/lyrics/<id>"): ("sheet", "renamed the words"),
+    ("POST", "/api/lyrics/<id>/current"): ("sheet", "chose which words"),
+    ("GET", "/api/lyrics/<id>/history"): ("sheet", None),
+    ("POST", "/api/lyrics/<id>/restore"): ("sheet", "brought back older words"),
+    ("GET", "/api/lyric-revisions/<id>"): ("revision", None),
+    ("GET", "/api/songs/<id>/sound"): ("song", None),
+    ("POST", "/api/songs/<id>/sound"): ("song", "added a sound"),
+    ("PUT", "/api/sound/<id>"): ("preset", "changed the sound"),
+    ("PATCH", "/api/sound/<id>"): ("preset", "renamed a sound"),
+    ("POST", "/api/sound/<id>/current"): ("preset", "chose which sound"),
+    ("GET", "/api/songs/<id>/versions"): ("song", None),
+    ("POST", "/api/songs/<id>/versions"): ("song", "uploaded a mix"),
+    ("PATCH", "/api/versions/<id>"): ("version", "renamed a mix"),
+    ("POST", "/api/versions/<id>/current"): ("version", "chose which mix"),
+    ("GET", "/api/versions/<id>/audio"): ("version", None),
+    ("GET", "/api/versions/<id>/download"): ("version", None),
+    ("GET", "/api/songs/<id>/arrangement"): ("song", None),
+    ("PUT", "/api/songs/<id>/arrangement"): ("song", "changed the arrangement"),
+    ("POST", "/api/songs/<id>/arrangement/enabled"): ("song", "switched the arrangement"),
+    ("GET", "/api/arrangements/shapes"): (None, None),
+}
+
+#: What a song is, for putting a change back: table, and how its rows belong to the song.
+_SONG_TABLES = (
+    ("songs", "id = ?"),
+    ("lyric_sheets", "song_id = ?"),
+    ("sound_presets", "song_id = ?"),
+    ("artwork", "song_id = ?"),
+    ("versions", "song_id = ?"),
+    ("arrangements", "song_id = ?"),
+)
+
+#: Saves in a row from one person, closer together than this, are one change. The equaliser
+#: saves every 600ms while a band is dragged; a history of every one of those is noise.
+SITTING = 120
+
+
+def _snapshot(song_id):
+    out = {}
+    for table, where in _SONG_TABLES:
+        if db.table_exists(table):
+            out[table] = [dict(r) for r in db.query(
+                "SELECT * FROM %s WHERE %s" % (table, where), (song_id,))]
+    if db.table_exists("lyric_revisions"):
+        top = db.one("SELECT MAX(r.id) AS m FROM lyric_revisions r JOIN lyric_sheets s "
+                     "ON s.id = r.sheet_id WHERE s.song_id = ?", (song_id,))
+        out["lyric_revisions_max"] = (top and top["m"]) or 0
+    return out
+
+
+def _belongs(kind, ident, song_id):
+    """Whether the id in a guest's path is part of the shared song."""
+    if kind == "song":
+        return ident == song_id
+    one = lambda sql: db.one(sql, (ident,))       # noqa: E731
+    if kind == "artwork":
+        row = one("SELECT song_id FROM artwork WHERE id = ?")
+    elif kind == "sheet":
+        row = one("SELECT song_id FROM lyric_sheets WHERE id = ?")
+    elif kind == "preset":
+        row = one("SELECT song_id FROM sound_presets WHERE id = ?")
+    elif kind == "version":
+        row = one("SELECT song_id FROM versions WHERE id = ?")
+    elif kind == "revision":
+        row = one("SELECT s.song_id FROM lyric_revisions r JOIN lyric_sheets s "
+                  "ON s.id = r.sheet_id WHERE r.id = ?")
+    else:
+        return False
+    return bool(row) and row["song_id"] == song_id
+
+
+def _find_guest_route(method, path):
+    from .. import http
+    for (m, pattern), meaning in GUEST_MAY.items():
+        if m != method:
+            continue
+        params = http._match(pattern, path)
+        if params is not None:
+            return pattern, params, meaning
+    return None, None, None
+
+
+def proxy(req, share_id, rest):
+    """A guest's request, run on the owner's song through the owner's own routes."""
+    from .. import http
+    from ..wire import Request
+    me = _me()
+    share = accounts.share(as_int(share_id, "share"))
+    if not share or share["revoked_at"] or share["to_account"] != me:
+        raise Error("That share is not open to you.", 404)
+    _song_in(share)
+    pattern, params, meaning = _find_guest_route(req.method, rest)
+    if not pattern:
+        raise Error("That is not something a guest can do on a shared song.", 403)
+    kind, what = meaning
+    handler, _ = http.resolve(req.method, rest)
+    if not handler:
+        raise Error("no such endpoint", 404)
+    song_id = share["song_id"]
+    with who.acting_as(_theirs(share)):
+        if kind and not _belongs(kind, as_int(params.get("id"), "id"), song_id):
+            raise Error("That is not part of this share.", 404)
+        inner = Request(req.method, rest, req.query, req.headers, req.rfile, params)
+        inner.client = getattr(req, "client", "local")
+        if not what:
+            return handler(inner)
+        # A rename is a title and nothing else: the song's notes are the owner's own.
+        if pattern == "/api/songs/<id>":
+            body = inner.json() or {}
+            if set(body) - {"title"}:
+                raise Error("A guest can change the title and nothing else there.", 403)
+        before = _snapshot(song_id)
+        result = handler(inner)
+        touched = _difference(before, _snapshot(song_id))
+        if not (touched["rows"] or touched["made"] or touched["revisions"]):
+            return result                   # a save that changed nothing is not a change
+        now = time.time()
+        last = db.one("SELECT * FROM guest_edits WHERE song_id = ? ORDER BY id DESC LIMIT 1",
+                      (song_id,))
+        if (last and last["account"] == me and last["route"] == req.method + " " + pattern
+                and not last["undone_at"] and now - last["updated_at"] < SITTING):
+            merged = _merge(json.loads(last["before"]), touched)
+            db.run("UPDATE guest_edits SET updated_at = ?, before = ? WHERE id = ?",
+                   (now, json.dumps(merged), last["id"]))
+        else:
+            db.insert("guest_edits", {
+                "song_id": song_id, "account": me, "share_id": share["id"], "what": what,
+                "route": req.method + " " + pattern, "before": json.dumps(touched),
+                "created_at": now, "updated_at": now})
+        return result
+
+
+def _key(table):
+    return "song_id" if table == "arrangements" else "id"
+
+
+def _difference(before, after):
+    """Exactly what one change touched, and what each touched row was before it.
+
+    Only that. Undoing a change puts back the rows it changed, takes away the rows it made
+    and the words it wrote, and leaves everything else alone: undoing a rename does not
+    take the words written after it with it.
+    """
+    out = {"rows": {}, "made": {}, "revisions": []}
+    for table, _ in _SONG_TABLES:
+        if table not in after:
+            continue
+        key = _key(table)
+        was = {r[key]: r for r in before.get(table, [])}
+        for row in after[table]:
+            old = was.get(row[key])
+            if old is None:
+                out["made"].setdefault(table, []).append(row[key])
+            elif old != row:
+                out["rows"].setdefault(table, []).append(old)
+    lo, hi = before.get("lyric_revisions_max", 0), after.get("lyric_revisions_max", 0)
+    if hi > lo:
+        out["revisions"] = [lo, hi]
+    return out
+
+
+def _merge(first, then):
+    """One sitting's worth of saves as one change: the earliest before, everything made."""
+    for table, rows in then["rows"].items():
+        have = {r[_key(table)] for r in first["rows"].get(table, [])}
+        made = set(first["made"].get(table, []))
+        for row in rows:
+            if row[_key(table)] not in have and row[_key(table)] not in made:
+                first["rows"].setdefault(table, []).append(row)
+    for table, keys in then["made"].items():
+        first["made"].setdefault(table, [])
+        first["made"][table] += [k for k in keys if k not in first["made"][table]]
+    if then["revisions"]:
+        if first["revisions"]:
+            first["revisions"] = [first["revisions"][0], then["revisions"][1]]
+        else:
+            first["revisions"] = then["revisions"]
+    return first
+
+
+def _put_back(song_id, change):
+    """Undo one change: its rows back as they were, its new rows and words taken away."""
+    for table, rows in change.get("rows", {}).items():
+        if not db.table_exists(table):
+            continue
+        key = _key(table)
+        for row in rows:
+            cols = [c for c in row if c != key]
+            if cols and db.one("SELECT 1 FROM %s WHERE %s = ?" % (table, key), (row[key],)):
+                db.run("UPDATE %s SET %s WHERE %s = ?" % (
+                    table, ", ".join("%s = ?" % c for c in cols), key),
+                    [row[c] for c in cols] + [row[key]])
+    for table, keys in change.get("made", {}).items():
+        if db.table_exists(table):
+            for k in keys:
+                db.run("DELETE FROM %s WHERE %s = ?" % (table, _key(table)), (k,))
+    span = change.get("revisions") or []
+    if span and db.table_exists("lyric_revisions"):
+        db.run("DELETE FROM lyric_revisions WHERE id > ? AND id <= ? AND sheet_id IN "
+               "(SELECT id FROM lyric_sheets WHERE song_id = ?)", (span[0], span[1], song_id))
+
+
+def song_edits(req):
+    """For the owner: what the people the song is shared with changed, newest first."""
+    song = as_int(req.params["id"], "id")
+    rows = db.query("SELECT id, account, what, created_at, updated_at, undone_at "
+                    "FROM guest_edits WHERE song_id = ? ORDER BY id DESC LIMIT 200", (song,))
+    out = []
+    for r in rows:
+        person = accounts.public(accounts.by_id(r["account"])) or {}
+        out.append(dict(r, name=person.get("name") or "", handle=person.get("handle", "")))
+    return {"edits": out}
+
+
+def undo_edit(req):
+    """Put a song back to how it was before one change. The owner's own library only."""
+    edit = db.one("SELECT * FROM guest_edits WHERE id = ?", (as_int(req.params["id"], "id"),))
+    if not edit:
+        raise Error("No such change.", 404)
+    _put_back(edit["song_id"], json.loads(edit["before"]))
+    db.run("UPDATE guest_edits SET undone_at = ? WHERE id = ?", (time.time(), edit["id"]))
+    return {"undone": edit["id"]}
 
 
 def _named(share, original):
@@ -730,6 +1005,8 @@ def ROUTES():
         ("GET", "/api/songs/<id>/guests"): song_guests,
         ("GET", "/api/guestwork/<share>/artwork/<image>"): guest_artwork,
         ("GET", "/api/guestwork/<share>/audio/<version>"): guest_audio,
+        ("GET", "/api/songs/<id>/edits"): song_edits,
+        ("POST", "/api/guest-edits/<id>/undo"): undo_edit,
         ("GET", "/api/shares"): list_shares,
         ("POST", "/api/shares"): make_share,
         ("GET", "/api/shares/invitation/<token>"): invitation,

@@ -58,6 +58,8 @@ J.views.share = {
         <div class="section-head">
           <h2>${J.esc(data.song.title)}</h2><span class="grow"></span>
           <span class="tag">from ${J.esc(data.from)}</span>
+          <a class="btn primary sm" href="#/shared/${data.share}/edit/${data.song.id}"
+             data-link>Work on this song</a>
         </div>
 
         <!-- The cover, which a guest could not see at all before. It was shared on

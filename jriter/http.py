@@ -7,6 +7,7 @@ being served, which is the browser side of the same swappability the module regi
 gives the server.
 """
 import io
+import re
 import os
 import sys
 import socket
@@ -164,6 +165,9 @@ def _match(pattern, path):
         elif w != g:
             return None
     return params
+
+
+SHARED_ON = re.compile(r"^/api/shared/(\d+)/on/(.+)$")
 
 
 def resolve(method, path):
@@ -576,7 +580,16 @@ class Handler(BaseHTTPRequestHandler):
         return self._static(path)
 
     def _api(self, method, path, query):
-        handler, params = resolve(method, path)
+        # A guest working on a shared song: /api/shared/<share>/on/<the owner's route>.
+        # sharing.proxy decides whether that route may run, on which song, and records it.
+        doorway = SHARED_ON.match(path)
+        if doorway and registry.has("sharing"):
+            from .modules import sharing
+            rest = "/api/" + doorway.group(2)
+            handler = lambda req: sharing.proxy(req, doorway.group(1), rest)  # noqa: E731
+            params = {}
+        else:
+            handler, params = resolve(method, path)
         if not handler:
             return self._json({"error": "no such endpoint", "path": path}, 404)
         request = Request(method, path, query, self.headers,

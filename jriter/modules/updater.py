@@ -269,7 +269,10 @@ def _stop_soon():
 # ── on its own ───────────────────────────────────────────────────────────────
 
 #: How often the server looks for an update by itself, and how long after starting.
-EVERY = 3 * 3600
+# Fifteen minutes. It was three hours, which is long enough that a release looked like it
+# had not been applied at all. One unauthenticated GitHub call per look, four an hour,
+# is far inside the sixty an hour GitHub allows.
+EVERY = 15 * 60
 FIRST_AFTER = 120
 
 

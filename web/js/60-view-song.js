@@ -13,7 +13,11 @@ J.views.song = {
   title: "Song",
   async render(root, params) {
     const songId = params.id;
-    const has = (name) => J.state.modules.includes(name);
+    // As a guest, the parts of a song page that are about the owner's library and not
+    // about this song are left out: albums, playlists, YouTube and sharing it onwards.
+    const NOT_FOR_GUESTS = ["albums", "playlists", "youtube", "sharing"];
+    const has = (name) => J.state.modules.includes(name)
+      && !(J.sharedAs && NOT_FOR_GUESTS.indexOf(name) !== -1);
 
     const [songData, versionData, albumData, artData, titleData, soundData, arrangeData] =
       await Promise.all([
@@ -37,7 +41,7 @@ J.views.song = {
     const previous = titleData.previous || [];
     const presets = soundData.presets || [];
     const current = versions.find((v) => v.id === song.current_version_id) || versions[0];
-    const cover = artwork.length ? `/api/artwork/${artwork[0].id}/image` : null;
+    const cover = artwork.length ? J.u(`/api/artwork/${artwork[0].id}/image`) : null;
 
     const ctx = {
       song, songId, versions, current, artwork, presets, has,
@@ -272,6 +276,16 @@ J.views.song = {
       await J.guestWork.mount({ where: root, corner: J.$(".hero", root),
                                 url: `/api/songs/${songId}/guests`,
                                 heading: "What they made" });
+      await J.guestWork.changes(root, songId);
+    }
+    if (J.sharedAs) {
+      const note = document.createElement("div");
+      note.className = "pane guest-note";
+      note.innerHTML = `<b>You are working on somebody else's song.</b>
+        <span class="faint">Everything you change lands on their song, and they can
+        put any of it back. Nothing here can be deleted.</span>
+        <a class="btn sm ghost" href="#/shared/${J.sharedAs.share}" data-link>Back</a>`;
+      root.insertBefore(note, root.firstChild);
     }
   },
 };
@@ -1057,7 +1071,7 @@ J.blockArtwork = async function (block, ctx) {
              data-image="${image.id}" tabindex="0" role="button"
              title="${image.id === coverId() ? "The cover" : "Make this the cover"}">
           <span class="art-frame">
-            <img src="/api/artwork/${image.id}/image" alt="" loading="lazy">
+            <img src="${J.u(`/api/artwork/${image.id}/image`)}" alt="" loading="lazy">
             <span class="art-badge">Cover</span>
           </span>
           <button class="art-drop" data-act="remove" aria-label="Remove this artwork"
@@ -1103,7 +1117,7 @@ J.blockArtwork = async function (block, ctx) {
      * behind everything, so choosing a cover threw away where you were reading. */
     // Looked up from the document: this block is handed its own element, not the view,
     // so the hero is somewhere else on the page rather than inside it.
-    const url = `/api/artwork/${id}/image`;
+    const url = J.u(`/api/artwork/${id}/image`);
     const art = J.$("#heroArt");
     if (art) { art.style.backgroundImage = `url('${url}')`; art.classList.remove("flat"); }
     const cover = J.$("#coverEdit .cover") || J.$(".cover-edit .cover");
@@ -1137,7 +1151,7 @@ J.blockArtwork = async function (block, ctx) {
       isCover ? { label: "This is the cover", icon: "star", disabled: true, run: () => {} }
               : { label: "Make this the cover", icon: "star", run: () => makeCover(id) },
       { label: "Open the picture", icon: "open",
-        run: () => window.open(`/api/artwork/${id}/image`, "_blank", "noopener") },
+        run: () => window.open(J.u(`/api/artwork/${id}/image`), "_blank", "noopener") },
       { divider: true },
       { label: "Remove this artwork", icon: "drop", danger: true, run: () => removeArt(id) },
     ];

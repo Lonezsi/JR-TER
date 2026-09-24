@@ -22,6 +22,25 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.18.0",
+        "date": "2026-09-24",
+        "name": JRITER,
+        "title": "Working on a song together",
+        "notes": [
+            "The people a song is shared with can now work on the song itself. On the "
+            "shared song, Work on this song opens the ordinary song page: they can rename "
+            "it, add a picture and make it the cover, change the words, the sound and the "
+            "arrangement, and upload mixes.",
+            "They cannot delete anything, not even a picture.",
+            "Every change they make is listed on the song under Changes by others, with "
+            "who and when, and each one has Undo. Undo puts back only that change and "
+            "leaves the rest of what they did alone.",
+            "The initials in the top right corner count these changes now too.",
+            "The server looks for updates every fifteen minutes instead of every three "
+            "hours.",
+        ],
+    },
+    {
         "version": "3.17.0",
         "date": "2026-09-23",
         "name": JRITER,

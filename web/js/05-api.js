@@ -6,7 +6,20 @@
  */
 "use strict";
 
+/* Where a request goes, when the song on screen is somebody else's.
+ *
+ * A guest working on a shared song uses the owner's song page as it is. Every request it
+ * makes about the song is sent through /api/shared/<share>/on/..., where the server checks
+ * that the route is one a guest may use and that every id in it is part of the shared
+ * song, runs it on the owner's library, and records it so the owner can put it back.
+ * Anything else, a guest's own library included, goes where it always went. */
+J.sharedAs = null;
+const SHARED_PATHS = /^\/api\/(songs\/\d+|artwork|lyrics|lyric-revisions|sound|versions|arrangements)(\/|$)/;
+J.u = (path) => (J.sharedAs && SHARED_PATHS.test(path)
+  ? "/api/shared/" + J.sharedAs.share + "/on/" + path.slice(5) : path);
+
 J.api = async function (path, options) {
+  path = J.u(path);
   const opts = Object.assign({ headers: {} }, options || {});
   if (opts.json !== undefined) {
     opts.method = opts.method || "POST";

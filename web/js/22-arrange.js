@@ -263,7 +263,7 @@ J.arrange = (function () {
       const job = (async () => {
         const ctx = await J.audio.resume();
         if (!ctx) return null;
-        const response = await fetch(`/api/versions/${version.id}/audio`);
+        const response = await fetch(J.u(`/api/versions/${version.id}/audio`));
         if (!response.ok) throw new Error("That render would not load.");
 
         const total = Number(response.headers.get("Content-Length")) || version.size || 0;

@@ -113,7 +113,7 @@ J.player = (function () {
   const coverOf = (song) => {
     if (!song) return null;
     if (song.art) return song.art;
-    return song.artwork_id ? `/api/artwork/${song.artwork_id}/image` : null;
+    return song.artwork_id ? J.u(`/api/artwork/${song.artwork_id}/image`) : null;
   };
   const audioOf = (slot) => J.audio.deck(slot).element;
 
@@ -150,7 +150,7 @@ J.player = (function () {
   const srcFor = (item) => (item.url ? item.url
     : item.kind === "render"
       ? `/api/renders/${item.id}/audio`
-      : `/api/versions/${item.id}/audio`);
+      : J.u(`/api/versions/${item.id}/audio`));
   //: A render id and a version id are both small integers, so the deck remembers which.
   const keyFor = (item) => `${item.kind || "version"}:${item.id}`;
 
@@ -904,7 +904,7 @@ J.player = (function () {
           icon: "down",
           run: () => window.open(version.kind === "render"
             ? `/api/renders/${version.id}/audio`
-            : `/api/versions/${version.id}/download`, "_blank") } : null,
+            : J.u(`/api/versions/${version.id}/download`), "_blank") } : null,
         { divider: true },
         { label: "Stop and clear the player", icon: "drop",
           run: () => {

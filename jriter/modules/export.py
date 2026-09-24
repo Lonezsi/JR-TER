@@ -73,6 +73,10 @@ TAKEN = {
     # The name and the scope of each machine token, so you can see what has been let in.
     # Never `digest`: that column is what the token is checked against.
     "auth_tokens": ("id", "name", "scope", "created_at", "last_used"),
+    # Who changed what on your shared songs. Not `before`: that is the song as it was, row
+    # for row, and every one of those rows is already in this export in its own table.
+    "guest_edits": ("id", "song_id", "account", "share_id", "what", "route", "created_at",
+                    "updated_at", "undone_at"),
 }
 
 #: Left out on purpose, and why. Anything that is in neither list is a table nobody has
