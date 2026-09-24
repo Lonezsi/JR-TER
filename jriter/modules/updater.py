@@ -321,7 +321,10 @@ def start_auto():
                 said = _auto_once()
             except Exception as e:           # never let the loop die
                 said = "%s: %s" % (type(e).__name__, e)
-            sys.stderr.write("  update    %s\n" % said)
+            # stdout, not stderr. The host's PowerShell launcher turns every line of a
+            # native program's stderr into an error record; under a Stop preference that
+            # is fatal, which is how a launcher once killed this server over one line.
+            print("  update    %s" % said, flush=True)
             time.sleep(EVERY)
     threading.Thread(target=loop, name="auto-update", daemon=True).start()
 

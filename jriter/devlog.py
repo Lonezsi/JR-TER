@@ -22,6 +22,17 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.18.2",
+        "date": "2026-09-24",
+        "name": JRITER,
+        "title": "Quieter updates",
+        "notes": [
+            "The server's own update check no longer writes to its error log every "
+            "fifteen minutes. Nothing you would see, and one less thing that could trip "
+            "the host up.",
+        ],
+    },
+    {
         "version": "3.18.1",
         "date": "2026-09-24",
         "name": JRITER,
