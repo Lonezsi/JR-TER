@@ -11,3 +11,37 @@
 .vox-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
 .vox-live { color: var(--bad); font-weight: 700; font-size: 12.5px; }
 .vox-tip { font-size: 12px; margin: var(--s2) 0 0; }
+
+/* The vocal edit. See web/js/65-vocal-fx.js. */
+.fx-top { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); font-size: 13px; }
+.fx-chain { display: flex; flex-direction: column; gap: var(--s2); }
+.fx-card {
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: var(--s3); background: var(--hover);
+}
+.fx-card.off .fx-knobs { opacity: 0.45; }
+.fx-card.dragging { opacity: 0.5; }
+.fx-card.drop-here { border-color: var(--accent); }
+.fx-head { display: flex; align-items: center; gap: var(--s2); }
+.fx-grip { cursor: grab; color: var(--text-3); font-size: 18px; line-height: 1; padding: 0 2px; user-select: none; }
+.fx-knobs {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--s3); margin-top: var(--s3);
+}
+.fx-pick { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-2); }
+.fx-add { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.fx-empty { font-size: 12.5px; margin: 0; }
+
+/* A take's row: the name over who and when, so a narrow column does not cut it to "Sh…". */
+.vox-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.vox-name .faint { font-size: 12px; }
+/* The edit's button and its switch, held together so they read as one control and not as
+   a second copy of the take's own switch. */
+.vox-fx {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  padding: 2px 6px 2px 2px; border: 1px solid var(--line); border-radius: var(--r-pill);
+}
+.vox-fx .switch { width: 32px; height: 18px; }
+.vox-fx .switch::after { top: 2px; left: 2px; width: 14px; height: 14px; }
+.vox-fx .switch.on::after { transform: translateX(14px); }
+.vox-fx.off .btn { color: var(--text-3); }

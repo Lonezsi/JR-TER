@@ -5,8 +5,12 @@
  * take with no gap and no fade.
  *
  *   deck A ─ filters… ─ limiter ─ makeup ─ gain A ─┐
- *                                                  ├─ master ─ analyser ─ out
- *   deck B ─ filters… ─ limiter ─ makeup ─ gain B ─┘
+ *                                                  ├─ bed ─ master ─ analyser ─ out
+ *   deck B ─ filters… ─ limiter ─ makeup ─ gain B ─┘       │
+ *                                          vocal layers ───┘
+ *
+ * The bed is the render and nothing else, so a voice can duck it (a sidechain in the
+ * vocal edit) without ducking itself. Most of the time it is one plain wire.
  *
  * The chains are separate rather than shared because a slot carries a preset as well as
  * a version. Comparing the same mix through two different equalisers is as much the
@@ -19,6 +23,7 @@
 J.audio = (function () {
   let ctx = null;
   let master = null;
+  let bed = null;
 
   /* One meter per deck, and it is fed before the deck's own gain.
    *
@@ -51,6 +56,8 @@ J.audio = (function () {
 
     master = ctx.createGain();
     master.connect(ctx.destination);
+    bed = ctx.createGain();
+    bed.connect(master);
     return ctx;
   }
 
@@ -88,7 +95,7 @@ J.audio = (function () {
     entry.source.connect(entry.input);
     entry.makeup.connect(entry.gain);
     entry.meter = meterFor(entry, audioCtx);
-    entry.gain.connect(master);
+    entry.gain.connect(bed);
     rebuild(slot);
     return entry;
   }
@@ -192,6 +199,13 @@ J.audio = (function () {
     output() {
       context();
       return master;
+    },
+
+    /* Where the render leaves the decks, before the voices join it. Whoever splices
+     * something in here puts the plain wire back when they are done. */
+    bed() {
+      context();
+      return { from: bed, to: master };
     },
 
     /* The head of one deck's chain.

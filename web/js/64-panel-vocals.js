@@ -10,37 +10,51 @@
  *
  * PLAYING the layers is a small engine of its own, below, that follows the player. It does
  * nothing at all unless this song is the one playing: no timer, no decoding, no CPU.
+ *
+ * THE VOCAL EDIT on each take (EQ, limiter, autotune, sidechain) is 65-vocal-fx.js. It
+ * renders in the background and hands this engine a finished buffer to play.
  */
 "use strict";
 
 J.vocals = (function () {
-  const buffers = new Map();       // take id -> decoded AudioBuffer
-  const loading = new Map();       // take id -> Promise, so one take decodes once
+  /* Keyed by the take and its bytes, never the id alone. An id comes back: delete the
+   * newest take and record another, and SQLite hands out the same number. The browser
+   * keeps a file for a day, so the address carries the digest as well. */
+  const buffers = new Map();       // id:digest -> decoded AudioBuffer
+  const loading = new Map();       // id:digest -> Promise, so one take decodes once
+  const keyOf = (take) => `${take.id}:${take.digest || ""}`;
   let takes = [];                  // what the page last said this song has
   let songId = null;
+  let version = null;              // the render the voices sit on, for the sidechain
   let sources = [];
   let bus = null;
   let watching = 0;
   let anchor = null;               // { ctxTime, songPos } when the layers were started
 
   async function decode(take) {
-    if (buffers.has(take.id)) return buffers.get(take.id);
-    if (!loading.has(take.id)) {
-      loading.set(take.id, (async () => {
+    const key = keyOf(take);
+    if (buffers.has(key)) return buffers.get(key);
+    if (!loading.has(key)) {
+      loading.set(key, (async () => {
         const ctx = J.audio.context();
-        const bytes = await fetch(J.u(`/api/vocals/${take.id}/audio`)).then((r) => r.arrayBuffer());
+        const bytes = await fetch(J.vocalUrl(take)).then((r) => r.arrayBuffer());
         const buffer = await ctx.decodeAudioData(bytes);
-        buffers.set(take.id, buffer);
+        buffers.set(key, buffer);
         return buffer;
-      })().catch(() => null));
+      })().catch(() => { loading.delete(key); return null; }));
     }
-    return loading.get(take.id);
+    return loading.get(key);
   }
 
-  function stopAll() {
+  function stopSources() {
     sources.forEach((s) => { try { s.stop(); } catch (e) { /* already stopped */ } });
     sources = [];
     anchor = null;
+  }
+
+  function stopAll() {
+    stopSources();
+    J.vocalFx.ducker.off();
   }
 
   function here() {
@@ -50,8 +64,8 @@ J.vocals = (function () {
 
   /* Start every switched-on take from where the song is now. */
   async function start() {
-    stopAll();
-    if (!here()) return;
+    stopSources();
+    if (!here()) { J.vocalFx.ducker.off(); return; }
     const ctx = J.audio.context();
     if (!bus) { bus = ctx.createGain(); bus.connect(J.audio.output()); }
     const on = takes.filter((t) => t.enabled);
@@ -61,7 +75,7 @@ J.vocals = (function () {
     const pos = J.player.now() + lead;
     const when = ctx.currentTime + lead;
     for (const take of on) {
-      const buffer = buffers.get(take.id);
+      const buffer = J.vocalFx.bufferFor(take, buffers.get(keyOf(take)));
       if (!buffer) continue;
       const into = pos - take.offset;
       if (into >= buffer.duration) continue;
@@ -75,6 +89,14 @@ J.vocals = (function () {
       sources.push(src);
     }
     anchor = { ctxTime: when, songPos: pos };
+    // Voices that duck the render: their curves, from here on.
+    const ducks = J.vocalFx.ducks(on);
+    if (ducks.length) {
+      const end = Math.max(...ducks.map((d) => d.offset + d.curves[0].length / J.vocalFx.RATE));
+      J.vocalFx.ducker.play(J.vocalFx.combine(ducks, end), pos, when);
+    } else {
+      J.vocalFx.ducker.off();
+    }
   }
 
   /* While this song plays, check the layers are where the song is, a few times a second.
@@ -94,22 +116,31 @@ J.vocals = (function () {
   }
 
   J.on("player:change", () => { if (songId != null) watch(); });
+  // A vocal edit finished rendering: play the new one from where the song is.
+  J.on("vocals:rendered", () => { if (songId != null && here()) start(); });
 
   return {
     /* The page says which song and which takes. Changing either restarts the layers. */
-    use(id, list) {
+    use(id, list, versionId) {
       songId = id;
       takes = list || [];
+      version = versionId || null;
+      J.vocalFx.want(takes, version);
       if (here()) start(); else stopAll();
       watch();
     },
     leave() { songId = null; takes = []; stopAll(); clearInterval(watching); watching = 0; },
+    /* A take's edit changed: queue it for rendering. Playing carries on as it was. */
+    refresh() { J.vocalFx.want(takes, version); },
     /* How many layers are sounding right now, and whether anything is keeping watch. */
     get live() { return { layers: sources.length, watching: !!watching }; },
     decode,
     buffers,
   };
 })();
+
+/* Where a take's bytes are. See the note on the buffers above for why the digest. */
+J.vocalUrl = (take) => J.u(`/api/vocals/${take.id}/audio`) + "?v=" + encodeURIComponent(take.digest || "");
 
 J.blockVocals = async function (block, ctx) {
   const OPEN_KEY = "jriter.vocals.open";
@@ -121,11 +152,16 @@ J.blockVocals = async function (block, ctx) {
   async function load() {
     const data = await J.try(() => J.get(`/api/songs/${ctx.songId}/vocals`));
     takes = (data && data.takes) || [];
-    J.vocals.use(ctx.song.id, takes);
+    J.vocals.use(ctx.song.id, takes, bedVersion());
     draw();
   }
 
   const mayChange = (t) => t.yours || !J.sharedAs;
+  const bedVersion = () => {
+    const st = J.player.state;
+    const v = (st.song && st.song.id === ctx.song.id && st.slots.A.version) || ctx.currentVersion();
+    return v ? v.id : null;
+  };
 
   function draw() {
     const cur = J.player.state.song && J.player.state.song.id === ctx.song.id
@@ -159,10 +195,18 @@ J.blockVocals = async function (block, ctx) {
             <div class="list-row vox-take" data-take="${t.id}">
               <button class="switch ${t.enabled ? "on" : ""}" data-act="toggle"
                       ${mayChange(t) ? "" : "disabled"} aria-label="Play this take"></button>
-              <span class="grow truncate"><b>${J.esc(t.name || "Take")}</b>
-                <span class="faint">${J.esc(t.by || "")} &middot; from ${J.time(t.offset)}
+              <span class="grow vox-name"><b class="truncate">${J.esc(t.name || "Take")}</b>
+                <span class="faint truncate">${J.esc(t.by || "")} &middot; from ${J.time(t.offset)}
                   ${t.duration ? "&middot; " + J.time(t.duration) : ""}</span></span>
-              <a class="icon-btn" href="${J.u(`/api/vocals/${t.id}/audio`)}?download=1"
+              <span class="vox-fx${t.fx !== 0 ? "" : " off"}">
+                <button class="btn sm ghost" data-act="fx"
+                        title="${mayChange(t) ? "EQ, limiter, autotune, sidechain" : "See the vocal edit"}">Edit${
+                  (t.chain || []).length ? ` <span class="faint">${t.chain.length}</span>` : ""}</button>
+                <button class="switch${t.fx !== 0 ? " on" : ""}" data-act="fxon" aria-pressed="${t.fx !== 0}"
+                        ${mayChange(t) ? "" : "disabled"} aria-label="Use the vocal edit"
+                        title="The vocal edit, on or off"></button>
+              </span>
+              <a class="icon-btn" href="${J.vocalUrl(t)}&download=1"
                  title="Download this voice" aria-label="Download">&darr;</a>
               ${mayChange(t) ? `<button class="icon-btn" data-act="drop" title="Delete this take"
                  aria-label="Delete">&times;</button>` : ""}
@@ -264,12 +308,14 @@ J.blockVocals = async function (block, ctx) {
     if (!on.length) { J.toast("Switch on at least one take."); return; }
     J.toast("Putting it together...");
     const rate = 44100;
-    const voices = (await Promise.all(on.map(J.vocals.decode))).filter(Boolean);
+    await J.vocalFx.settle();
+    const voices = await Promise.all(on.map(async (t) => J.vocalFx.bufferFor(t, await J.vocals.decode(t))));
     let bed = null;
     const version = ctx.currentVersion();
     if (withRender && version) {
       const bytes = await fetch(J.u(`/api/versions/${version.id}/audio`)).then((r) => r.arrayBuffer());
       bed = await J.audio.context().decodeAudioData(bytes);
+      bed = await J.vocalFx.duckBed(bed, J.vocalFx.ducks(on));
     }
     const end = Math.max(bed ? bed.duration : 0,
       ...on.map((t, i) => (voices[i] ? t.offset + voices[i].duration : 0)));
@@ -299,6 +345,7 @@ J.blockVocals = async function (block, ctx) {
       const version = ctx.versions.find((v) => String(v.id) === bed.value);
       if (!J.player.state.song || J.player.state.song.id !== ctx.song.id) await J.playSong(ctx.song);
       if (version) await J.player.set("A", { version });
+      J.vocals.use(ctx.song.id, takes, bedVersion());
     } else if (bed && bed.dataset.bed === "preset") {
       const preset = ctx.presets.find((p) => String(p.id) === bed.value) || null;
       await J.deckSetPreset(ctx, "A", preset);
@@ -329,6 +376,15 @@ J.blockVocals = async function (block, ctx) {
       ], { anchor: act });
     } else if (what === "stop") {
       stop();
+    } else if (what === "fx" && take) {
+      await J.editVocal(take, { mayChange: mayChange(take), changed: () => J.vocals.refresh() });
+      draw();
+    } else if (what === "fxon" && take) {
+      take.fx = take.fx === 0 ? 1 : 0;
+      draw();
+      J.vocals.refresh();
+      await J.try(() => J.patch(`/api/vocals/${take.id}`, { fx: take.fx }));
+      if (J.player.state.playing) J.emit("vocals:rendered", { id: take.id });
     } else if (what === "toggle" && take) {
       await J.try(() => J.patch(`/api/vocals/${take.id}`, { enabled: !take.enabled }));
       await load();

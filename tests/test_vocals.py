@@ -97,6 +97,73 @@ def test_a_guest_cannot_reach_takes_on_another_song(library):
     assert _record(library, friend, on("songs/%d/vocals" % other["song"]["id"]))[0] == 404
 
 
+def _record_bytes(client, who, song, body):
+    request = urllib.request.Request(client.base + "/api/songs/%d/vocals" % song, data=body,
+                                     method="POST", headers={
+        "Cookie": who.cookie, "Content-Type": "application/octet-stream", "X-Filename": "t.ogg"})
+    import json
+    with urllib.request.urlopen(request, timeout=20) as answer:
+        return json.loads(answer.read())["take"]
+
+
+def _fetch(client, who, path, etag=None):
+    headers = {"Cookie": who.cookie}
+    if etag:
+        headers["If-None-Match"] = etag
+    try:
+        with urllib.request.urlopen(urllib.request.Request(client.base + path, headers=headers),
+                                    timeout=20) as answer:
+            return answer.status, answer.read(), answer.headers
+    except urllib.error.HTTPError as e:
+        return e.code, b"", e.headers
+
+
+def test_a_reused_id_is_never_answered_from_the_cache(library):
+    """SQLite hands out the newest row's id again once it is deleted. The audio used to be
+    held for a day under its id, so the take recorded after deleting the last one played
+    the deleted one. Measured in the browser: the old recording, at the old length."""
+    owner, friend, song, on = _setup(library)
+    first = _record_bytes(library, owner, song, b"OggS" + b"" * 300)
+    status, body, headers = _fetch(library, owner, "/api/vocals/%d/audio" % first["id"])
+    assert "max-age" not in headers.get("Cache-Control", ""), headers.get("Cache-Control")
+    held = headers.get("ETag")
+    owner.call("DELETE", "/api/vocals/%d" % first["id"])
+    second = _record_bytes(library, owner, song, b"OggS" + b"" * 300)
+    assert second["id"] == first["id"], "the id was not reused, so this proves nothing"
+    status, body, headers = _fetch(library, owner, "/api/vocals/%d/audio" % second["id"], held)
+    assert status == 200 and body[4:5] == b"", "the deleted take came back"
+    status, _, _ = _fetch(library, owner, "/api/vocals/%d/audio" % second["id"], headers.get("ETag"))
+    assert status == 304, "an unchanged file is fetched in full every time"
+
+
+def test_the_page_asks_for_a_take_by_its_bytes_too():
+    vox = _src("64-panel-vocals.js")
+    assert '"?v=" + encodeURIComponent(take.digest' in vox
+    assert "fetch(J.vocalUrl(take))" in vox
+
+
+def test_the_vocal_edit_only_renders_once_left_alone():
+    fx = _src("65-vocal-fx.js")
+    assert "QUIET_MS = 800" in fx and "if (performance.now() < quietUntil) { kick(); return; }" in fx
+    # Autotune and the envelopes run in a worker, not on the page.
+    assert "new Worker(url)" in fx and 'work("autotune"' in fx
+    # The ducker is taken out when nothing needs it.
+    assert "nodes.from.connect(nodes.to);" in fx
+
+
+def test_an_edit_holds_only_effects_the_page_knows(library):
+    owner, friend, song, on = _setup(library)
+    status, made = _record(library, owner, "/api/songs/%d/vocals" % song)
+    take = made["take"]["id"]
+    ok = owner.call("PATCH", "/api/vocals/%d" % take, {"chain": [
+        {"type": "eq", "on": True}, {"type": "autotune", "on": True, "key": 9}], "fx": False})
+    assert ok[0] == 200 and [e["type"] for e in ok[1]["take"]["chain"]] == ["eq", "autotune"]
+    assert ok[1]["take"]["fx"] == 0
+    assert owner.call("PATCH", "/api/vocals/%d" % take, {"chain": [{"type": "reverb"}]})[0] == 400
+    # A guest cannot change the edit on somebody else's take either.
+    assert friend.call("PATCH", on("vocals/%d" % take), {"chain": []})[0] == 403
+
+
 # ── the page ─────────────────────────────────────────────────────────────────
 import io
 import os

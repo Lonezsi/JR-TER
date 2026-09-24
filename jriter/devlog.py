@@ -22,6 +22,22 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.21.0",
+        "date": "2026-09-24",
+        "name": JRITER,
+        "title": "Vocal edit",
+        "notes": [
+            "Every voice has an Edit button with its own switch. Inside: EQ, limiter, "
+            "autotune and a multiband sidechain, added one at a time and put in any order.",
+            "The sidechain goes either way: the render ducks the voice, or the voice ducks "
+            "the render.",
+            "Nothing is worked out while you play. An edit renders in the background once "
+            "you stop touching it, and the combined download includes it.",
+            "Fixed: after deleting the newest mix or voice, the next one could play the "
+            "deleted one's audio for a day.",
+        ],
+    },
+    {
         "version": "3.20.0",
         "date": "2026-09-24",
         "name": JRITER,

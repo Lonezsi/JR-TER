@@ -14,7 +14,8 @@ may change or delete only the takes they recorded themselves. Their takes are cr
 them, not to the owner whose library the rows live in.
 
 `chain` is the vocal edit: an ordered list of effects, applied in the browser and rendered
-in the background. The server only keeps it.
+in the background. The server only keeps it, and `fx` is the switch beside it: the edit
+kept but not heard, to compare against the take as it was sung.
 """
 import json
 import os
@@ -49,6 +50,15 @@ SCHEMA = [
     """,
     "CREATE INDEX IF NOT EXISTS vocal_takes_song ON vocal_takes(song_id, id)",
 ]
+
+#: The effects a vocal edit can hold. See web/js/65-vocal-fx.js for what each one does.
+EFFECTS = ("eq", "limiter", "autotune", "sidechain")
+
+
+def MIGRATE():
+    """The vocal edit's own switch, which came a release after the takes."""
+    db.add_column_if_missing("vocal_takes", "fx", "INTEGER NOT NULL DEFAULT 1")
+
 
 #: What a browser records into, and what somebody may bring as an existing recording.
 EXT = (".webm", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".mp3", ".wav", ".flac")
@@ -149,10 +159,16 @@ def change_take(req):
         fields["gain"] = min(4.0, max(0.0, float(body["gain"])))
     if "offset" in body:
         fields["offset"] = max(0.0, float(body["offset"]))
+    if "fx" in body:
+        fields["fx"] = 1 if body["fx"] else 0
     if "chain" in body:
-        if not isinstance(body["chain"], list) or len(body["chain"]) > 16:
+        chain = body["chain"]
+        if not isinstance(chain, list) or len(chain) > 16:
             raise Error("chain is a list of at most sixteen effects")
-        fields["chain"] = json.dumps(body["chain"])
+        for effect in chain:
+            if not isinstance(effect, dict) or effect.get("type") not in EFFECTS:
+                raise Error("an effect is one of: " + ", ".join(EFFECTS))
+        fields["chain"] = json.dumps(chain)
     if not fields:
         return {"take": _out(take)}
     fields["updated_at"] = time.time()

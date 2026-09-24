@@ -9,6 +9,7 @@ gives the server.
 import io
 import re
 import os
+import zlib
 import sys
 import socket
 import json
@@ -352,18 +353,23 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, body, ctype,
                               {"ETag": etag, "Cache-Control": "no-cache"})
 
-        # A page revalidates; audio and artwork are reached through an id that can never
-        # come to mean different bytes, so those may be held.
+        # Everything revalidates. Audio and artwork used to be held for a day on the
+        # grounds that an id can never come to mean different bytes, and it can: SQLite
+        # hands the newest row's id out again once that row is deleted, so deleting the
+        # latest mix and uploading another played the old one out of the cache. The ETag
+        # is the stored file's own, so asking again costs a 304 and nothing more.
         is_document = os.path.splitext(path)[1].lower() in (".html", ".htm")
-        etag = '"%x-%x"' % (int(stat.st_mtime), size)
-        if is_document and self._etag_hit(etag):
+        # The path as well: a blob's path is its digest, so two takes of the same length
+        # stored in the same second still have different tags.
+        etag = '"%x-%x-%x"' % (int(stat.st_mtime), size, zlib.crc32(path.encode("utf-8", "replace")))
+        if not once and self._etag_hit(etag):
             return
         # `once` is a file built for this one reply, which is never the same file twice and
         # is gone straight afterwards. Holding it would be wrong in both directions: the
         # export was served immutable for a day, so a second Take a copy after adding a
         # song handed back the older zip out of the browser's cache without a request ever
         # reaching the server, and the file the cache entry pointed at no longer existed.
-        keep = ("no-cache" if is_document else "private, max-age=86400, immutable")
+        keep = "no-cache" if is_document else "private, no-cache"
         extra = {
             "Accept-Ranges": "bytes",
             "ETag": etag,
