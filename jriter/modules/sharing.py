@@ -514,7 +514,26 @@ GUEST_MAY = {
     ("PUT", "/api/songs/<id>/arrangement"): ("song", "changed the arrangement"),
     ("POST", "/api/songs/<id>/arrangement/enabled"): ("song", "switched the arrangement"),
     ("GET", "/api/arrangements/shapes"): (None, None),
+    # Voices. Not in the history below: a take is added whole and a guest can only change
+    # or delete their own, which the vocals module decides, so there is nothing of the
+    # owner's for a guest's take to overwrite.
+    ("GET", "/api/songs/<id>/vocals"): ("song", None),
+    ("POST", "/api/songs/<id>/vocals"): ("song", None),
+    ("PATCH", "/api/vocals/<id>"): ("vocal", None),
+    ("DELETE", "/api/vocals/<id>"): ("vocal", None),
+    ("GET", "/api/vocals/<id>/audio"): ("vocal", None),
 }
+
+#: Who the guest is, while their request runs in the owner's library. who.must() answers
+#: the owner in there, which is what makes the owner's routes work at all; anything that
+#: needs to credit or limit the guest asks this instead.
+import contextvars                                            # noqa: E402
+_GUEST = contextvars.ContextVar("jriter_guest", default=0)
+
+
+def guest_now():
+    """The account a shared request is for, or 0 when it is nobody's but the caller's."""
+    return _GUEST.get()
 
 #: What a song is, for putting a change back: table, and how its rows belong to the song.
 _SONG_TABLES = (
@@ -557,6 +576,9 @@ def _belongs(kind, ident, song_id):
         row = one("SELECT song_id FROM sound_presets WHERE id = ?")
     elif kind == "version":
         row = one("SELECT song_id FROM versions WHERE id = ?")
+    elif kind == "vocal":
+        row = one("SELECT song_id FROM vocal_takes WHERE id = ?") \
+            if db.table_exists("vocal_takes") else None
     elif kind == "revision":
         row = one("SELECT s.song_id FROM lyric_revisions r JOIN lyric_sheets s "
                   "ON s.id = r.sheet_id WHERE r.id = ?")
@@ -598,32 +620,41 @@ def proxy(req, share_id, rest):
             raise Error("That is not part of this share.", 404)
         inner = Request(req.method, rest, req.query, req.headers, req.rfile, params)
         inner.client = getattr(req, "client", "local")
-        if not what:
-            return handler(inner)
-        # A rename is a title and nothing else: the song's notes are the owner's own.
-        if pattern == "/api/songs/<id>":
-            body = inner.json() or {}
-            if set(body) - {"title"}:
-                raise Error("A guest can change the title and nothing else there.", 403)
-        before = _snapshot(song_id)
-        result = handler(inner)
-        touched = _difference(before, _snapshot(song_id))
-        if not (touched["rows"] or touched["made"] or touched["revisions"]):
-            return result                   # a save that changed nothing is not a change
-        now = time.time()
-        last = db.one("SELECT * FROM guest_edits WHERE song_id = ? ORDER BY id DESC LIMIT 1",
-                      (song_id,))
-        if (last and last["account"] == me and last["route"] == req.method + " " + pattern
-                and not last["undone_at"] and now - last["updated_at"] < SITTING):
-            merged = _merge(json.loads(last["before"]), touched)
-            db.run("UPDATE guest_edits SET updated_at = ?, before = ? WHERE id = ?",
-                   (now, json.dumps(merged), last["id"]))
-        else:
-            db.insert("guest_edits", {
-                "song_id": song_id, "account": me, "share_id": share["id"], "what": what,
-                "route": req.method + " " + pattern, "before": json.dumps(touched),
-                "created_at": now, "updated_at": now})
-        return result
+        marker = _GUEST.set(me)
+        try:
+            return _run_as_guest(handler, inner, what, pattern, song_id, me, share, req)
+        finally:
+            _GUEST.reset(marker)
+
+
+def _run_as_guest(handler, inner, what, pattern, song_id, me, share, req):
+    """The guest's request itself, and its record in the history."""
+    if not what:
+        return handler(inner)
+    # A rename is a title and nothing else: the song's notes are the owner's own.
+    if pattern == "/api/songs/<id>":
+        body = inner.json() or {}
+        if set(body) - {"title"}:
+            raise Error("A guest can change the title and nothing else there.", 403)
+    before = _snapshot(song_id)
+    result = handler(inner)
+    touched = _difference(before, _snapshot(song_id))
+    if not (touched["rows"] or touched["made"] or touched["revisions"]):
+        return result                   # a save that changed nothing is not a change
+    now = time.time()
+    last = db.one("SELECT * FROM guest_edits WHERE song_id = ? ORDER BY id DESC LIMIT 1",
+                  (song_id,))
+    if (last and last["account"] == me and last["route"] == req.method + " " + pattern
+            and not last["undone_at"] and now - last["updated_at"] < SITTING):
+        merged = _merge(json.loads(last["before"]), touched)
+        db.run("UPDATE guest_edits SET updated_at = ?, before = ? WHERE id = ?",
+               (now, json.dumps(merged), last["id"]))
+    else:
+        db.insert("guest_edits", {
+            "song_id": song_id, "account": me, "share_id": share["id"], "what": what,
+            "route": req.method + " " + pattern, "before": json.dumps(touched),
+            "created_at": now, "updated_at": now})
+    return result
 
 
 def _key(table):

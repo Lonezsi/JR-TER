@@ -720,6 +720,18 @@ J.player = (function () {
      * seek(): anything from one second up clamped to 1.0, so dragging the lock screen
      * scrubber, or pressing back ten seconds, sent the song to its end and autoplay on to
      * the next one. One conversion, here, rather than a division at every caller. */
+    /* Where the song really is, read off the audio itself.
+     *
+     * state.position is kept by the paint loop, which runs on animation frames, and a tab
+     * that is not being drawn (a phone with the screen off, a background tab) gets none:
+     * the number stops while the song goes on. Anything that has to follow the music
+     * rather than the screen, the vocal layers and the recorder, asks this. */
+    now() {
+      if (arranged()) return J.arrange.position || 0;
+      const audio = activeAudio();
+      return (audio && audio.currentTime) || 0;
+    },
+
     seekTo(seconds) {
       if (!state.duration) return;
       api.seek(seconds / state.duration);

@@ -186,6 +186,14 @@ J.audio = (function () {
     deck,
     wire,
 
+    /* Where anything else that plays with the song joins it: after both decks, before the
+     * speakers, so the volume knob turns it down with everything else. The vocal layers
+     * connect here. */
+    output() {
+      context();
+      return master;
+    },
+
     /* The head of one deck's chain.
      *
      * The compositor connects its scheduled clips here rather than to the destination,

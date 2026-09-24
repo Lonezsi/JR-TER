@@ -223,6 +223,7 @@ J.views.song = {
            words do. Under a thousand pixels they stack in the same order. -->
       <div class="song-grid">
         <div class="song-main">
+          ${has("vocals") ? '<div class="block" id="vocalsBlock"></div>' : ""}
           ${has("lyrics") ? '<div class="block" id="lyricsBlock"></div>' : ""}
           ${has("sound") ? '<div class="block" id="soundBlock"></div>' : ""}
         </div>
@@ -265,6 +266,7 @@ J.views.song = {
     // Whatever this page is about is the thing most likely to be played next.
     J.player.prime(ctx.currentVersion());
 
+    if (has("vocals")) await J.blockVocals(J.$("#vocalsBlock", root), ctx);
     if (has("lyrics")) await J.blockLyrics(J.$("#lyricsBlock", root), ctx);
     if (has("sound")) await J.blockSound(J.$("#soundBlock", root), ctx);
     if (has("artwork")) await J.blockArtwork(J.$("#artworkBlock", root), ctx);

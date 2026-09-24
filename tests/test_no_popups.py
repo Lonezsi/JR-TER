@@ -119,9 +119,12 @@ def test_only_one_watcher_runs(monkeypatch):
 
 @pytest.mark.skipif(os.name != "nt", reason="the mutex is a Windows thing")
 def test_the_mutex_really_refuses_a_second_copy():
+    # Its own name: the real app is usually running on the machine the tests run on, and
+    # it holds the real one.
     code = ("import sys; sys.path.insert(0, %r); import jriter_app as a;"
+            "a._MUTEX_NAME += '-test-%d';"
             "print(a.first_instance(), a.first_instance())"
-            % os.path.join(ROOT, "client"))
+            % (os.path.join(ROOT, "client"), os.getpid()))
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert out.stdout.split() == ["True", "False"], out.stdout + out.stderr
 

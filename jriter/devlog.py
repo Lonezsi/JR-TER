@@ -22,6 +22,21 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.20.0",
+        "date": "2026-09-24",
+        "name": JRITER,
+        "title": "Voices",
+        "notes": [
+            "Above the lyrics there is a Voices section. Record over the song from where "
+            "the player is, or add a recording you already have. Any number of voices, "
+            "from anybody the song is shared with, all playing over the render.",
+            "While you record, the song loops, and every pass round is its own take. "
+            "Each voice can be switched off and downloaded on its own, or all of them "
+            "together, with or without the render.",
+            "On a shared song you can delete only the voices you recorded.",
+        ],
+    },
+    {
         "version": "3.19.0",
         "date": "2026-09-24",
         "name": JRITER,

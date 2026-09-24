@@ -14,7 +14,7 @@
  * song, runs it on the owner's library, and records it so the owner can put it back.
  * Anything else, a guest's own library included, goes where it always went. */
 J.sharedAs = null;
-const SHARED_PATHS = /^\/api\/(songs\/\d+|artwork|lyrics|lyric-revisions|sound|versions|arrangements)(\/|$)/;
+const SHARED_PATHS = /^\/api\/(songs\/\d+|artwork|lyrics|lyric-revisions|sound|versions|arrangements|vocals)(\/|$)/;
 J.u = (path) => (J.sharedAs && SHARED_PATHS.test(path)
   ? "/api/shared/" + J.sharedAs.share + "/on/" + path.slice(5) : path);
 

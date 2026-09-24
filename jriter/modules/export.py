@@ -77,6 +77,9 @@ TAKEN = {
     # for row, and every one of those rows is already in this export in its own table.
     "guest_edits": ("id", "song_id", "account", "share_id", "what", "route", "created_at",
                     "updated_at", "undone_at"),
+    # Voices on a song. The recordings themselves are blobs, like renders.
+    "vocal_takes": ("id", "song_id", "author", "name", "digest", "ext", "size", "duration",
+                    "offset", "enabled", "gain", "chain", "created_at", "updated_at"),
 }
 
 #: Left out on purpose, and why. Anything that is in neither list is a table nobody has
