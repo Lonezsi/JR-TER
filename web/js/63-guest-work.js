@@ -27,16 +27,32 @@ J.guestWork = {
     if (corner) {
       const chips = document.createElement("div");
       chips.className = "hero-people";
-      chips.innerHTML = people.map((p) => `
+      // Yours first, on your own song page: the way back from somebody else's version.
+      const own = corner.classList.contains("hero") && !J.sharedAs;
+      chips.innerHTML = (own ? `
+        <button class="who-chip made on" type="button" data-guest="me"
+                title="Your version">Te</button>` : "")
+        + people.map((p) => `
         <button class="who-chip${p.made_anything ? " made" : ""}" type="button"
                 data-guest="${p.share}"
                 title="${J.esc(p.name || p.handle)}${p.changes ? ", " + p.changes + " change"
                   + (p.changes === 1 ? "" : "s") : p.made_anything ? "" : ", nothing yet"}">
           ${J.esc(initials(p))}</button>`).join("");
       corner.appendChild(chips);
+      /* A person's initials switch the song to their perspective: their picture on the
+       * cover, their words, their sound, their mixes. Yours puts it all back. On a guest's
+       * shared page there is no song of theirs to swap into, so it scrolls to their work. */
       chips.addEventListener("click", (e) => {
         const chip = e.target.closest("[data-guest]");
-        const target = chip && where.querySelector(`[data-person="${chip.dataset.guest}"]`);
+        if (!chip) return;
+        if (chip.dataset.guest === "me") { J.router.reload(); return; }
+        const person = people.find((p) => String(p.share) === chip.dataset.guest);
+        if (own && person) {
+          chips.querySelectorAll(".who-chip").forEach((c) => c.classList.toggle("on", c === chip));
+          J.guestWork.see(where, person);
+          return;
+        }
+        const target = where.querySelector(`[data-person="${chip.dataset.guest}"]`);
         if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
@@ -82,6 +98,52 @@ J.guestWork = {
               </div>`).join("")}</div>` : ""}
         </div>`).join("")}`;
     where.appendChild(section);
+  },
+
+  /* The song, as one person made it. Only what is drawn changes: nothing is written, and
+   * "Back to mine" (or your own initials) redraws the page from your library. */
+  see(root, p) {
+    const art = p.artwork.length ? `/api/guestwork/${p.share}/artwork/${p.artwork[0].id}` : null;
+    const heroArt = J.$("#heroArt", root);
+    const cover = root.querySelector(".hero-row .cover");
+    if (art) {
+      if (heroArt) { heroArt.classList.remove("flat"); heroArt.style.backgroundImage = `url('${art}')`; }
+      if (cover) { cover.style.backgroundImage = `url('${art}')`; const l = cover.querySelector(".letter"); if (l) l.remove(); }
+    }
+    const lyrics = J.$("#lyricsBlock", root);
+    if (lyrics) {
+      lyrics.innerHTML = `<div class="block-head"><h3>${J.esc(p.name || p.handle)}'s words</h3></div>
+        ${p.sheets.length ? p.sheets.map((s) => `
+          <div class="pane guest-words-card"><b>${J.esc(s.name || "Words")}</b>
+            <pre>${J.esc(s.text)}</pre></div>`).join("")
+          : `<p class="faint">No words of their own. Anything they changed on yours is
+             already on your song.</p>`}`;
+    }
+    const sound = J.$("#soundBlock", root);
+    if (sound) {
+      sound.innerHTML = `<div class="block-head"><h3>${J.esc(p.name || p.handle)}'s sound</h3></div>
+        ${p.presets.length ? p.presets.map((s) => `<div class="list-row"><span class="tag">sound</span>
+          <span class="grow truncate">${J.esc(s.name)}</span>
+          <span class="faint">${((s.data && s.data.bands) || []).length} bands</span></div>`).join("")
+          : `<p class="faint">No sound settings of their own.</p>`}`;
+    }
+    let strip = J.$(".perspective", root);
+    if (!strip) {
+      strip = document.createElement("div");
+      strip.className = "pane perspective";
+      root.insertBefore(strip, root.firstChild);
+    }
+    strip.innerHTML = `
+      <b>${J.esc(p.name || p.handle)}'s version</b>
+      ${p.changes ? `<span class="faint">and ${p.changes} change${p.changes === 1 ? "" : "s"}
+        on yours</span>` : ""}
+      <span class="grow"></span>
+      ${p.versions.map((v) => `<span class="perspective-mix">${J.esc(v.filename || ("v" + v.n))}
+        <audio controls preload="none" src="/api/guestwork/${p.share}/audio/${v.id}"></audio>
+        </span>`).join("")}
+      <button class="btn sm ghost" type="button" data-back>Back to mine</button>`;
+    strip.querySelector("[data-back]").onclick = () => J.router.reload();
+    strip.scrollIntoView({ behavior: "smooth", block: "start" });
   },
 
   /* What the people the song is shared with changed on it, with a way to put each back.

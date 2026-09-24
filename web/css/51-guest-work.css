@@ -58,3 +58,14 @@ body.guesting [data-act="delete"],
 body.guesting .row-drop { display: none; }
 .guest-changes .list-row { gap: var(--s2); }
 .guest-changes .undone { opacity: 0.55; }
+
+/* Which perspective the song is showing. */
+.who-chip.on { background: var(--accent); color: var(--bg-deep, #000); border-color: var(--accent); }
+.perspective {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+  padding: var(--s3) var(--s4); margin-bottom: var(--s3);
+}
+.perspective-mix { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.perspective-mix audio { height: 30px; max-width: 200px; }
+.guest-words-card { padding: var(--s3); margin-bottom: var(--s2); }
+.guest-words-card pre { white-space: pre-wrap; font: inherit; line-height: 1.6; margin: var(--s2) 0 0; }

@@ -22,6 +22,18 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.18.1",
+        "date": "2026-09-24",
+        "name": JRITER,
+        "title": "Their version, one press away",
+        "notes": [
+            "The initials in the top right of a shared song now switch the song to that "
+            "person's version: their picture on the cover, their words, their sound, and "
+            "their mixes to play. Your own initials, or Back to mine, bring yours back. "
+            "Looking changes nothing.",
+        ],
+    },
+    {
         "version": "3.18.0",
         "date": "2026-09-24",
         "name": JRITER,

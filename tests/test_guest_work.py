@@ -147,3 +147,20 @@ def test_the_owners_list_is_only_for_the_owners_songs(three):
         except Error:
             people = []
     assert people == []
+
+
+def test_the_initials_switch_the_song_to_that_persons_version():
+    """Pressing someone's initials shows their picture, words and sound on the song, and
+    your own chip (or Back to mine) redraws yours. Nothing is written by either."""
+    import os
+    src = io.open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "web", "js", "63-guest-work.js"), encoding="utf-8").read()
+    click = src[src.index('chips.addEventListener("click"'):]
+    click = click[:click.index("\n      });")]
+    assert "J.guestWork.see(where, person)" in click, "the initials only scroll"
+    assert 'data-guest="me"' in src and "J.router.reload()" in click
+    see = src[src.index("  see(root, p) {"):src.index("  /* What the people the song")]
+    for part in ("#heroArt", "#lyricsBlock", "#soundBlock", "Back to mine"):
+        assert part in see, "their version does not show %s" % part
+    assert "J.post(" not in see and "J.put(" not in see and "J.del(" not in see, (
+        "looking at somebody's version writes something")
