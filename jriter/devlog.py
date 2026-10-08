@@ -22,6 +22,17 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.21.1",
+        "date": "2026-10-08",
+        "name": JRITER,
+        "title": "One timetable for everyone",
+        "notes": [
+            "Everybody signed in now sees the owner's timetable, not an empty one of "
+            "their own. Only the owner can add, change or delete classes.",
+            "Notes and absences are still your own.",
+        ],
+    },
+    {
         "version": "3.21.0",
         "date": "2026-09-24",
         "name": JRITER,

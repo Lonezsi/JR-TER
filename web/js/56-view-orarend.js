@@ -43,6 +43,11 @@ J.views.orarend = {
     const TO = data.to;
     const HOUR = data.hour;
     const CLASSES = data.classes || [];
+    /* Everybody signed in reads the owner's week; only the owner changes it. For anybody
+     * else the editing is not offered at all (the server refuses it as well), and "Saját"
+     * would be a lie, so the owner's classes carry the owner's name. */
+    const READONLY = !!data.readonly;
+    const MINE = READONLY ? (data.owner || "Tulajdonos") : "Saját";
 
     /* Minutes past midnight. The one place a written time becomes a number, so a wrong
      * one is wrong here and nowhere else. */
@@ -286,17 +291,18 @@ J.views.orarend = {
             <div class="tt-fact"><span>Kinek</span><b class="${
               entry.whose === "me" ? "" : "tt-friend-name"}" data-who="${
               entry.whose === "me" ? "" : whoIndex(entry.whose)}">${
-              J.esc(entry.whose === "me" ? "Saját" : entry.whose)}</b></div>
+              J.esc(entry.whose === "me" ? MINE : entry.whose)}</b></div>
           </div>
           ${entry.skip ? `<p class="tt-sheet-note">Erre az előadásra nem járok, ezért csak
             egy csík jelöli. Az idősáv így nem látszik szabadnak.</p>` : ""}
-          <div class="tt-sheet-tools">
+          ${READONLY ? "" : `<div class="tt-sheet-tools">
             <button class="btn ghost" data-edit type="button">Szerkesztés</button>
             <button class="btn ghost danger" data-drop type="button">Törlés</button>
-          </div>
+          </div>`}
           <div class="tt-notes" data-notes></div>`,
         onMount(sheet) {
           notebook(sheet, entry);
+          if (READONLY) return;
           sheet.querySelector("[data-edit]").addEventListener("click", () => {
             // Shut first. Two sheets at once is two dialogs arguing about Escape.
             sheet.querySelector('[data-act="cancel"]').click();
@@ -419,7 +425,7 @@ J.views.orarend = {
           <div class="section-head">
             <h2>Órarend</h2>
             <div class="head-tools">
-              <button class="btn primary" id="ttNew" type="button">Új óra</button>
+              ${READONLY ? "" : '<button class="btn primary" id="ttNew" type="button">Új óra</button>'}
             </div>
           </div>
           <div class="empty">
@@ -427,6 +433,7 @@ J.views.orarend = {
                               : "Nincs még órarend"}</h3>
             <p>${data.broken
               ? `A fájl ott van, de nem értelmezhető: ${J.esc(data.broken)}`
+              : READONLY ? `${J.esc(MINE)} még nem vett fel órát.`
               : `Vedd fel az első órát az Új óra gombbal. A hét a könyvtárad <code>${
                   J.esc(data.where || "orarend.json")}</code> fájljában marad, úgyhogy
                  kézzel is szerkesztheted.`}</p>
@@ -502,7 +509,7 @@ J.views.orarend = {
      * radios needs, so it is the row of radios now rather than a second list of the same
      * people under it. */
     const said = (who) => (who === "all" ? "Mind"
-      : who === "me" ? "Saját" : who);
+      : who === "me" ? MINE : who);
 
     const chooser = CAN_SEE.map((who, i) => `
       <label class="tt-who${who === seeing ? " on" : ""}">
@@ -521,11 +528,12 @@ J.views.orarend = {
         <div class="section-head">
           <h2>Órarend</h2>
           <div class="head-tools">
-            <button class="btn primary" id="ttNew" type="button">Új óra</button>
+            ${READONLY ? "" : '<button class="btn primary" id="ttNew" type="button">Új óra</button>'}
           </div>
         </div>
         <p class="faint" style="margin-top:0">
-          A hét, ahogy van. Kattints bármelyikre a részletekért.
+          ${READONLY ? `${J.esc(MINE)} hete. Kattints bármelyikre a részletekért.`
+                     : "A hét, ahogy van. Kattints bármelyikre a részletekért."}
         </p>
 
       <!-- Whose week. Above the table rather than under it: it decides what the table

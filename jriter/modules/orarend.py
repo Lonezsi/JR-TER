@@ -14,10 +14,14 @@ this repository is public. So the timetable is a file in the account's own direc
 beside its database, which is in data/ and is not committed. The code is public and the
 week is not.
 
-PER ACCOUNT, like everything else here. home() resolves through who.must(), which raises
-rather than picking a library, so a second person signing in gets their own empty week and
-not a view of somebody else's. That is the same reason the databases are separate files:
-a mistake cannot quietly read across.
+ONE WEEK, THE OWNER'S, READ BY EVERYBODY SIGNED IN. It used to be per account like
+everything else, so a friend signing in got their own empty week and could not see the one
+they had been sent to look at. Now every account reads the owner's file (accounts.OWNER),
+and only the owner can change it: the class routes refuse anybody else. The path is named
+explicitly rather than left to who.must(), so it is never "whoever happens to be bound".
+
+Notes and absences are still each account's own, in its own database. They are what a
+person keeps about a class, not the class.
 
 NO SCHEMA. It is a list somebody edits in a file, not something the app writes, so a table
 to hold it would be a table with an import step in front of it. Read at request time, so
@@ -29,7 +33,7 @@ import os
 
 import time
 
-from .. import config, db
+from .. import accounts, config, db, who
 from ..wire import Error, need, as_int
 
 NAME = "orarend"
@@ -85,8 +89,25 @@ HOUR = 60
 
 
 def path(account=None):
-    """Where one account's week is kept."""
-    return os.path.join(config.home(account), "orarend.json")
+    """Where the week is kept: the owner's directory, whoever is asking."""
+    return os.path.join(config.home(accounts.OWNER if account is None else account),
+                        "orarend.json")
+
+
+def _mine():
+    """Whether the caller is the one whose week it is."""
+    return who.must() == accounts.OWNER
+
+
+def _owner_name():
+    found = accounts.by_id(accounts.OWNER)
+    return (found and (found["name"] or found["handle"])) or ""
+
+
+def _only_the_owner():
+    if not _mine():
+        raise Error("Ezt az órarendet csak %s szerkesztheti." % (_owner_name() or "a tulajdonosa"),
+                    403)
 
 
 def read(account=None):
@@ -117,18 +138,21 @@ def week(req):
     says how to make one, the other says which line will not parse.
     """
     found = read()
+    # Whose week this is, and whether the caller may change it. The page hides the
+    # editing for anybody else; the class routes refuse them regardless.
+    whose = {"readonly": not _mine(), "owner": _owner_name()}
     if found is None:
-        return {"classes": [], "missing": True, "where": "orarend.json",
-                "from": FROM, "to": TO, "hour": HOUR}
+        return dict(whose, classes=[], missing=True, where="orarend.json",
+                    **{"from": FROM, "to": TO, "hour": HOUR})
     if found.get("broken"):
-        return {"classes": [], "broken": found["broken"], "where": "orarend.json",
-                "from": FROM, "to": TO, "hour": HOUR}
-    return {
+        return dict(whose, classes=[], broken=found["broken"], where="orarend.json",
+                    **{"from": FROM, "to": TO, "hour": HOUR})
+    return dict(whose, **{
         "classes": [_keyed(e, at) for at, e in enumerate(found.get("classes") or [])],
         "from": found.get("from", FROM),
         "to": found.get("to", TO),
         "hour": found.get("hour", HOUR),
-    }
+    })
 
 
 def _keyed(entry, at):
@@ -276,6 +300,7 @@ def _find(found, said):
 
 def add_class(req):
     """A class the page has just made up."""
+    _only_the_owner()
     sent = req.json() or {}
     need(sent, "name", "at", "to")       # complained about by name rather than in general
     found = _week_now()
@@ -291,6 +316,7 @@ def add_class(req):
 
 def save_class(req):
     """A class as it now is. Only what was sent changes."""
+    _only_the_owner()
     found = _week_now()
     at, entry = _find(found, req.params["id"])
     made = _entry(req.json() or {}, onto=entry)
@@ -302,6 +328,7 @@ def save_class(req):
 
 
 def drop_class(req):
+    _only_the_owner()
     found = _week_now()
     at, _ = _find(found, req.params["id"])
     found["classes"].pop(at)
