@@ -100,9 +100,16 @@ def test_the_refraction_is_only_asked_for_behind_the_engine_gate():
         assert "url(" not in token(chain), \
             "%s asks for a reference outside the gate" % chain
     assert "url(#glass" not in base, "the fallback half must not name an SVG filter"
-    # And inside it, all three chains are the real thing again.
-    for ref in ("url(#glass)", "url(#glass-thin)", "url(#glass-ca)"):
-        assert ref in gated, "%s is missing from the gated block" % ref
+    # Inside it there is no reference either, any more. Blink drew the SVG filter inside a
+    # backdrop-filter in raster tiles, and the tile seams showed as blurred lines that
+    # popped in and out wherever something repainted, on every page of both sites. They
+    # were never in a screenshot, which re-renders the page in one pass. The bend went and
+    # the gate stayed: it still decides who gets the lighter tints below, and the
+    # chromatic dial still asks it before writing #glass-ca by hand.
+    block = gated.split("\n}\n", 1)[0]
+    for chain in ("--glass-filter:", "--glass-filter-thin:", "--glass-filter-edge:"):
+        line = next(l for l in block.splitlines() if l.strip().startswith(chain))
+        assert "url(" not in line, "%s refracts again: %s" % (chain, line.strip())
     # Along with the light tints, which are what glass actually looks like.
     assert "rgba(255, 255, 255, 0.055)" in gated
     assert "rgba(255, 255, 255, 0.085)" in gated

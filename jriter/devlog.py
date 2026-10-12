@@ -22,6 +22,16 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.21.2",
+        "date": "2026-10-12",
+        "name": JRITER,
+        "title": "No more flickering lines",
+        "notes": [
+            "The thin blurry lines that popped in and out on the glass panels are gone. "
+            "The glass is still frosted, it just no longer bends what is behind it.",
+        ],
+    },
+    {
         "version": "3.21.1",
         "date": "2026-10-08",
         "name": JRITER,
