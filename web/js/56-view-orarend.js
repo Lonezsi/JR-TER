@@ -23,6 +23,21 @@
  */
 "use strict";
 
+/* Whether the page is pinched in. See the touch-action note at the end of 44-orarend.css:
+ * at normal size a sideways drag pulls the rail, zoomed in it pans the page. Once, at
+ * load, and on the body, so it costs nothing on the other screens and the stylesheet
+ * only acts on it here. */
+(function () {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const mark = () => {
+    if (vv.scale > 1.01) document.body.dataset.zoomed = "";
+    else delete document.body.dataset.zoomed;
+  };
+  vv.addEventListener("resize", mark);
+  mark();
+})();
+
 J.views.orarend = {
   title: "Órarend",
 

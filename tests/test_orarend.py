@@ -873,7 +873,7 @@ def test_nothing_over_the_week_claims_the_pinch():
     #: everywhere else, and taking it out would be a different bug. What must exist beside
     #: it is the exception that puts the gesture back on this one screen.
     exception = re.search(
-        r'body\[data-view="orarend"\]\s+\.view\s*\{[^}]*touch-action:\s*auto',
+        r'body\[data-view="orarend"\]\s+\.view\s*\{[^}]*touch-action:\s*pan-y pinch-zoom',
         sheets.get("44-orarend.css", ""))
     assert exception, (
         "nothing gives the pinch back on this screen, and these rules take it away: %s"
@@ -1191,3 +1191,17 @@ def test_the_week_never_leaves_this_repository(tmp_path, monkeypatch):
     assert not [f for f in tracked if f.endswith("orarend.json")], (
         "a week is committed to this repository: %s"
         % [f for f in tracked if f.endswith("orarend.json")])
+
+
+def test_the_week_can_be_swiped_like_every_other_screen():
+    """It took touch-action away entirely (auto) to get the pinch back, which also gave the
+    sideways drag to the browser: the one screen on the site where the rail could not be
+    swiped out. pan-y pinch-zoom keeps both, and only a pinched page (where sideways is
+    how you look along it) hands the whole gesture back."""
+    sheet = io.open(os.path.join(ROOT, "web", "css", "44-orarend.css"), encoding="utf-8").read()
+    assert re.search(r'body\[data-view="orarend"\]\s+\.view\s*\{\s*touch-action:\s*pan-y pinch-zoom;',
+                     sheet), "the week does not leave sideways drags to the rail"
+    assert re.search(r'body\[data-view="orarend"\]\[data-zoomed\]\s+\.view\s*\{\s*touch-action:\s*auto;',
+                     sheet), "a pinched week cannot be panned sideways"
+    view = io.open(VIEW, encoding="utf-8").read()
+    assert "vv.scale > 1.01" in view and 'vv.addEventListener("resize", mark)' in view

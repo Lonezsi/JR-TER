@@ -651,26 +651,29 @@
 
 /* ── the one screen that lets the browser have the whole gesture ──────────── */
 
-/* THE PAGE'S OWN ZOOM, BACK.
+/* THE BROWSER'S ZOOM AND THE RAIL SWIPE, BOTH.
  *
  * The scrolling column carries touch-action: pan-y, which is how the rail swipe gets a
  * sideways drag to itself: without it a phone claims the whole gesture and cancels the
- * drag before it has travelled far enough to count. What pan-y also does, and what is
- * easy to miss, is switch pinch off. It means "vertical panning, nothing else", and
- * zooming is one of the things it refuses.
+ * drag before it has travelled far enough to count. pan-y on its own also switches pinch
+ * off, so this screen used to take the rule away entirely (auto), which gave the pinch
+ * back and took the swipe away with it: the one page on the site you could not swipe on.
  *
- * So the week takes that rule off again. The viewport was never the problem: the page has
- * always said initial-scale=1 with no maximum and no user-scalable=no, and the browser
- * was doing what the stylesheet asked.
+ * pinch-zoom is the missing word. "pan-y pinch-zoom" is vertical scrolling and zooming for
+ * the browser and sideways for the rail, so at normal size both work. The week is scaled
+ * to fit the width, so at normal size there is nothing to pan sideways anyway.
  *
- * WHAT IT COSTS, on this screen only: the rail can no longer be pulled out by dragging
- * sideways across the page. It is the one screen where that is nearly free. The rail is
- * tucked away here anyway, the hamburger is where it always was, and there is nothing on
- * this page to navigate to.
+ * Zoomed in, there is: the page is wider than the screen and a sideways drag is how you
+ * look along it. So while the page is pinched (the view writes data-zoomed on the body
+ * from visualViewport) the gesture goes back to the browser whole, and the swipe waits
+ * until you zoom back out.
  *
  * Keyed on the screen rather than on a class the view adds, because the body already
  * carries which screen is up: the router writes it for the rail, and a second flag
  * meaning the same thing is a second flag to keep in step. */
 body[data-view="orarend"] .view {
+  touch-action: pan-y pinch-zoom;
+}
+body[data-view="orarend"][data-zoomed] .view {
   touch-action: auto;
 }

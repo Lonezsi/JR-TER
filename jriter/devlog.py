@@ -22,6 +22,17 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "3.21.3",
+        "date": "2026-10-19",
+        "name": JRITER,
+        "title": "Swipe on the timetable",
+        "notes": [
+            "On a phone, swiping sideways on the timetable pulls the menu out again, like "
+            "everywhere else. Pinch to zoom still works, and while you are zoomed in a "
+            "sideways drag moves around the week instead.",
+        ],
+    },
+    {
         "version": "3.21.2",
         "date": "2026-10-12",
         "name": JRITER,
