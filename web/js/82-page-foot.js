@@ -25,8 +25,13 @@ J.pageFoot = (function () {
      * are on with a song playing, and the player is part of this document: following it
      * in this tab would stop the music to show you a page about cookies. It carries its
      * own way back to the library anyway, for whoever arrives at it from the door. */
+    /* The second link is the one privacy page for everything on this machine, which sits
+     * with Foyer so that no project has to keep its own. */
     foot.innerHTML =
-      '<a href="/legal" target="_blank" rel="noopener">Terms and privacy</a>';
+      '<a href="/legal" target="_blank" rel="noopener">Terms and privacy</a>' +
+      ' &middot; ' +
+      '<a href="' + (J.foyer ? J.foyer() : "/foyer") + '/privacy" target="_blank" rel="noopener">' +
+      'Privacy for this machine</a>';
     return foot;
   }
 
