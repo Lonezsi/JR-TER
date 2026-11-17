@@ -22,6 +22,19 @@ is not.
 Signing up needs an invite. This server answers on a public address, and an open signup form
 is an offer to every crawler that finds it to make an account and store files on somebody's
 home machine.
+
+FOYER. Foyer is the machine's front door (../foyer), and it signs people in for every site
+here: its cookie is on Path=/ of the same hostname, so it arrives with every request. This
+never checks it; it asks Foyer over the loopback who it belongs to (foyer()). A Foyer
+account opens the library it is tied to, so somebody who came in through Foyer never signs
+in here. They get tied three ways:
+
+  - Foyer's owner (proved on Foyer with the key on this machine) is this library's owner;
+  - signing in here with a password while signed in on Foyer ties the two, once;
+  - a friend of the owner on Foyer can have a library made for them (foyer_new), which is
+    the invite, given by being the owner's friend rather than by a code.
+
+A Foyer account that is none of those is nobody here, and sees the sign in page.
 """
 import os
 import json
@@ -31,6 +44,7 @@ import base64
 import hashlib
 import secrets
 import threading
+import urllib.request
 
 from .. import config, db, who, accounts
 from ..wire import Error, Response, need
@@ -418,7 +432,10 @@ def token_allows(headers, method, path):
 
 
 def account_for(headers):
-    """Which account this request's cookie belongs to, or None."""
+    """Which account this request's cookie belongs to, or None.
+
+    This library's own cookie first; then Foyer's, for whoever came in through the front
+    door and is tied to a library here."""
     raw = headers.get("Cookie") or ""
     for part in raw.split(";"):
         name, _, value = part.strip().partition("=")
@@ -426,7 +443,94 @@ def account_for(headers):
             found = whose(value)
             if found:
                 return found
+    return foyer_library(foyer(headers))
+
+
+# -- Foyer, the front door -----------------------------------------------------
+#: Where Foyer answers on this machine. Empty turns it off (the tests do).
+FOYER = os.environ.get("JRITER_FOYER", "http://127.0.0.1:7000")
+FOYER_COOKIE = "foyer"
+FOYER_KEEP = 30           # seconds an answer is kept, so a page load asks once
+_foyer_seen = {}
+
+
+def foyer(headers):
+    """Who Foyer says this request is: {id, handle, name, owner, ownerFriend}, or None.
+
+    Only Foyer's own cookie is sent on, never this library's. Foyer being down is nobody
+    signed in, never an error."""
+    token = None
+    for part in (headers.get("Cookie") or "").split(";"):
+        name, _, value = part.strip().partition("=")
+        if name == FOYER_COOKIE and value:
+            token = value
+    if not token or not FOYER or len(token) > 400 \
+            or not all(c.isalnum() or c in "-_." for c in token):
+        return None
+    now = time.time()
+    seen = _foyer_seen.get(token)
+    if seen and now - seen[1] < FOYER_KEEP:
+        return seen[0]
+    account = None
+    try:
+        req = urllib.request.Request(FOYER.rstrip("/") + "/api/account",
+                                     headers={"Cookie": FOYER_COOKIE + "=" + token})
+        with urllib.request.urlopen(req, timeout=2) as res:
+            account = json.loads(res.read().decode("utf-8")).get("account") or None
+    except Exception:
+        account = None
+    if account is not None and not isinstance(account.get("id"), str):
+        account = None
+    if len(_foyer_seen) > 1000:
+        _foyer_seen.clear()
+    _foyer_seen[token] = (account, now)
+    return account
+
+
+def foyer_library(f):
+    """The library a Foyer account opens, tying Foyer's owner to this one's on the way."""
+    if not f:
+        return None
+    here = accounts.foyer_account(f["id"])
+    if here and accounts.by_id(here):
+        return here
+    if f.get("owner") and accounts.by_id(accounts.OWNER) and not accounts.foyer_of(accounts.OWNER):
+        accounts.link_foyer(f["id"], accounts.OWNER)
+        return accounts.OWNER
     return None
+
+
+def foyer_state(req):
+    """For Foyer's account page: whether this library is open to them, and if not, whether
+    they may have one made."""
+    f = foyer(req.headers)
+    if not f:
+        return {"foyer": None}
+    here = foyer_library(f)
+    return {"foyer": {"handle": f.get("handle"), "linked": here is not None,
+                      "handle_here": (accounts.by_id(here) or {}).get("handle") if here else None,
+                      "can_make": here is None and bool(f.get("ownerFriend"))}}
+
+
+def foyer_new(req):
+    """A library for a friend of the owner, made from their Foyer account and tied to it.
+
+    The password is random and never shown: they come in through Foyer. Signing in here
+    with a password is still possible once they set one in their settings."""
+    f = foyer(req.headers)
+    if not f:
+        raise Error("Sign in on Foyer first.", 401)
+    if foyer_library(f):
+        raise Error("Your Foyer account already opens a library here.", 409)
+    if not f.get("ownerFriend"):
+        raise Error("A library here is for friends of whoever runs this machine. Ask them "
+                    "to add you on Foyer.", 403)
+    if not accounts.count():
+        raise Error("This library has no owner yet.", 409)
+    made = accounts.create(accounts.free_handle(f.get("handle")), secrets.token_urlsafe(24),
+                           name=(f.get("name") or "").strip())
+    accounts.link_foyer(f["id"], made["id"])
+    return {"ok": True, "handle": made["handle"]}
 
 
 def signed_in(headers):
@@ -525,6 +629,9 @@ def state(req):
         "can_sign_up": accounts.count() > 0,
         "locked_for": _wait_for(_who(req)),
         "custom_font": False,
+        # Foyer's account page asks this too: whether this library opens for them, and if
+        # not, whether they may have one made.
+        "foyer": foyer_state(req)["foyer"],
     }
     # The door wears the same face as the library, and this is the only call it is
     # allowed to make before signing in. Asking the font endpoint directly meant a 404
@@ -579,6 +686,8 @@ def sign_up(req):
         raise Error("This library has no owner yet.", 409)
 
     data = req.json()
+    if data.get("foyer") is True:
+        return foyer_new(req)
     invite = accounts.invite_for((data.get("code") or "").strip())
     if not invite:
         _note_failure(ip)
@@ -643,6 +752,11 @@ def login(req):
 
     _clear(ip)
     accounts.seen(account["id"])
+    # Signed in on Foyer as well: the password just proved this library is theirs, so from
+    # now on the front door opens it.
+    f = foyer(req.headers)
+    if f:
+        accounts.link_foyer(f["id"], account["id"])
     return Response(status=200, body=b'{"ok":true}', content_type="application/json",
                     headers={"Set-Cookie": _cookie_header(req, issue(account["id"]),
                                                           SESSION_DAYS)})
