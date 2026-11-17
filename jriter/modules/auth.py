@@ -512,6 +512,27 @@ def foyer_state(req):
                       "can_make": here is None and bool(f.get("ownerFriend"))}}
 
 
+def foyer_connect(req):
+    """Settings' Connect to Foyer: the account signed in here, tied to whoever is signed in
+    on Foyer in this browser. Being signed in to both is the proof."""
+    here = account_for(req.headers)
+    if not here:
+        raise Error("Sign in first.", 401)
+    f = foyer(req.headers)
+    if not f:
+        raise Error("Sign in on Foyer first, then press this again.", 409)
+    accounts.link_foyer(f["id"], here)
+    return {"ok": True, "foyer": f.get("handle")}
+
+
+def foyer_disconnect(req):
+    here = account_for(req.headers)
+    if not here:
+        raise Error("Sign in first.", 401)
+    accounts.unlink_foyer(here)
+    return {"ok": True}
+
+
 def foyer_new(req):
     """A library for a friend of the owner, made from their Foyer account and tied to it.
 
@@ -632,6 +653,8 @@ def state(req):
         # Foyer's account page asks this too: whether this library opens for them, and if
         # not, whether they may have one made.
         "foyer": foyer_state(req)["foyer"],
+        # whether the account signed in here opens through Foyer at all (settings asks)
+        "foyer_tied": bool(here and accounts.foyer_of(here)),
     }
     # The door wears the same face as the library, and this is the only call it is
     # allowed to make before signing in. Asking the font endpoint directly meant a 404
@@ -900,4 +923,6 @@ def ROUTES():
         ("DELETE", "/api/auth/tokens/<id>"): revoke_token,
         ("POST", "/api/auth/logout"): logout,
         ("POST", "/api/auth/password"): change,
+        ("POST", "/api/auth/foyer/connect"): foyer_connect,
+        ("POST", "/api/auth/foyer/disconnect"): foyer_disconnect,
     }

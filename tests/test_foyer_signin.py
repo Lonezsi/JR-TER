@@ -112,3 +112,21 @@ def test_a_stranger_on_foyer_gets_no_library(foyer):
         auth.sign_up(Req(None, {"foyer": True}))
     assert nobody.value.status == 401
     assert accounts.count() == 1
+
+
+def test_settings_connects_and_disconnects(foyer):
+    accounts.create("owner", "pw", account_id=accounts.OWNER)
+    anna = accounts.create("anna", "her password")
+    cookie = "jriter_session=" + auth.issue(anna["id"])
+    req = Req("stra.nger.cookie")
+    req.headers["Cookie"] = cookie + "; foyer=stra.nger.cookie"
+    assert auth.foyer_connect(req)["foyer"] == "who"
+    assert auth.account_for(headers("stra.nger.cookie")) == anna["id"]
+    auth.foyer_disconnect(req)
+    assert auth.account_for(headers("stra.nger.cookie")) is None
+    # signed in here but not on Foyer: nothing to connect to
+    alone = Req()
+    alone.headers["Cookie"] = cookie
+    with pytest.raises(Error) as e:
+        auth.foyer_connect(alone)
+    assert e.value.status == 409
