@@ -144,3 +144,30 @@ def test_the_page_agrees_with_the_server_about_who_owns_the_machine():
     owns = owns[:owns.index("\n};")]
     assert "!auth ||" in owns, (
         "with the door off there is no auth summary, and the only person is the owner")
+
+
+def test_a_friend_cannot_take_in_a_file_from_the_host_by_its_path(library, tmp_path):
+    """Condom finding 1 (2026-11-18). /api/renders/ingest took any path on the host from any
+    account and stored the file as a render, so a friend could read the owner's auth.json
+    back through /api/renders/<id>/audio. Now only the owner, and only audio."""
+    owner, friend = _owner_and_friend(library)
+    # a file only the server should read, standing in for the session secret
+    secret = str(tmp_path / "secret.json")
+    with open(secret, "w") as f:
+        f.write('{"secret": "do not read me"}')
+    status, said = friend.call("POST", "/api/renders/ingest", {"path": secret})
+    assert status == 403, (status, said)
+    assert "owner" in str(said).lower(), said
+    # nor a folder, nor a path that isn't there (which used to tell you what exists)
+    for path in (str(tmp_path), str(tmp_path / "nothing-here")):
+        assert friend.call("POST", "/api/renders/ingest", {"path": path})[0] == 403
+    # nothing landed in the friend's library
+    status, listed = friend.call("GET", "/api/renders")
+    assert status == 200 and not (listed.get("renders") or []), listed
+
+    # the owner can still take in a render from disk, but never a file that isn't audio
+    wav = _wav(tmp_path / "bounce.wav")
+    status, got = owner.call("POST", "/api/renders/ingest", {"path": str(wav)})
+    assert status == 200 and got["count"] == 1, got
+    status, said = owner.call("POST", "/api/renders/ingest", {"path": secret})
+    assert status == 400 and "audio" in str(said), (status, said)

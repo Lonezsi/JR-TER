@@ -13,7 +13,7 @@ version simply points at the same digest.
 import os
 import time
 
-from .. import audio_meta, blobs, config, db, finding
+from .. import accounts, audio_meta, blobs, config, db, finding, who
 from ..wire import Error, Response, as_int, need
 from . import songs, versions
 
@@ -242,10 +242,22 @@ def ingest(req):
     This is the other end of a batch render: FL writes a folder full of wavs, and this
     reads them where they lie rather than posting several gigabytes to a server running
     on the same disk.
+
+    A PATH HERE IS A PATH ON THE HOST, read with the server's own permissions, so it is the
+    machine owner's alone, the same rule as watched folders (sync._host_only). Without it
+    any account, a friend or whoever opened a share link, could copy any file the server
+    can read into their library and play it back: the session secret, other libraries,
+    Foyer's accounts. A friend's renders come in through uploads instead. And only audio is
+    taken in, whether named one file at a time or found by walking a folder.
     """
+    if who.must() != accounts.OWNER:
+        raise Error("Importing from a path reads files on the machine JR!TER runs on, so only "
+                    "its owner can do it. Upload the file instead.", 403)
     data = req.json()
     path = os.path.abspath(os.path.expanduser(need(data, "path")))
     if os.path.isfile(path):
+        if os.path.splitext(path)[1].lower() not in config.AUDIO_EXT:
+            raise Error("only audio files can be taken in (%s)" % ", ".join(sorted(config.AUDIO_EXT)))
         found = [path]
     elif os.path.isdir(path):
         found = []
