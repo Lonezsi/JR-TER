@@ -13,6 +13,8 @@
 #     $env:JRITER_BRANCH    which branch to take   (default: main)
 #     $env:JRITER_PORT      which port to serve on (default: 7900)
 #     $env:JRITER_NOSTART   set to 1 to install without starting it
+#     $env:JRITER_HOST      0.0.0.0 to open it to your home network without asking
+#     $env:JRITER_TAILSCALE 1 to set up Tailscale without asking, 0 to never ask
 #
 # Nothing here chooses a password, and nothing here needs administrator. The server prints
 # a one time setup code the first time it runs and the first person to present that code
@@ -246,6 +248,33 @@ try {
   Warn ('autostart and the right click menu could not be set up: ' + $_.Exception.Message)
 } finally { Pop-Location }
 
+# ── reaching it from elsewhere (optional) ───────────────────────────────────
+# The same two questions as install.sh, asked only when somebody is at the keyboard, and
+# answered without asking by JRITER_HOST (0.0.0.0 for the home network) and
+# JRITER_TAILSCALE (1 yes, 0 never ask). Neither is needed: JR!TER works on this machine
+# either way.
+function Ask ($q) {
+  if (-not [Environment]::UserInteractive) { return $false }
+  try { $a = Read-Host ("  {0} [y/N]" -f $q) } catch { return $false }
+  return $a -match '^[yY]'
+}
+if (-not $env:JRITER_HOST -and (Ask 'Open it to the other devices on your home network too?')) {
+  [Environment]::SetEnvironmentVariable('JRITER_HOST', '0.0.0.0', 'User')
+  $env:JRITER_HOST = '0.0.0.0'
+  Say 'listening on your network as well (Windows may ask to allow it through the firewall: say yes for private networks)'
+}
+if ($env:JRITER_TAILSCALE -eq '1' -or (-not $env:JRITER_TAILSCALE -and (Ask 'Reach it from anywhere with Tailscale (optional, free)?'))) {
+  $ts = Get-Command tailscale -ErrorAction SilentlyContinue
+  if ($ts) {
+    # Only your own devices (your tailnet) can open this address; nothing is public.
+    & $ts.Source serve --bg $Port *> $null
+    if ($LASTEXITCODE -eq 0) { Say ("Tailscale: open it from your devices at https://{0}/" -f $env:COMPUTERNAME.ToLower()) }
+    else { Warn ("Tailscale is installed but 'tailscale serve' didn't work. Sign in to Tailscale first, then run: tailscale serve --bg {0}" -f $Port) }
+  } else {
+    Warn ("Tailscale isn't installed. Get it at https://tailscale.com/download, sign in, then run: tailscale serve --bg {0}" -f $Port)
+  }
+}
+
 # ── go ───────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host 'Installed.' -ForegroundColor Green
@@ -257,7 +286,8 @@ Say 'From now on: the JR!TER shortcut on your desktop. It watches your render fo
 Say 'starts by itself when you log on. JR!TER Server is the library itself, for whichever'
 Say 'machine is meant to be holding it.'
 Say 'To update:   run this same line again.'
-Say 'To keep it running with nobody logged in, so you can reach it from your phone:'
+Say "It's your own JR!TER, with its own accounts: invite people from Settings, People."
+Say 'To keep it running with nobody logged in (and a public address through Tailscale Funnel):'
 Say ("  powershell -ExecutionPolicy Bypass -File `"{0}\hostsetup\Install-JriterHost.ps1`"" -f $Dir)
 
 if ($env:JRITER_NOSTART -eq '1') { return }

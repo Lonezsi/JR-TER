@@ -1,0 +1,14 @@
+The word lists in this folder are built by tools/build_lexicon.py from Hunspell
+dictionaries, keeping only plain lower-case words. They are what the rhyme tools on the
+Words tab search; they never leave the browser that loaded them.
+
+hu.txt, hu-nouns.txt  Magyarispell, the Hungarian Hunspell dictionary (hu-nouns.txt keeps
+        the stems it tags as nouns and adjectives).
+        Copyright (C) Németh László and the Magyarispell contributors.
+        Tri-licensed: GPL 2+, LGPL 2.1+ or MPL 1.1. Used here under the MPL 1.1.
+        https://github.com/laszlonemeth/magyarispell
+
+en.txt  The en_US Hunspell dictionary, built from SCOWL (Spell Checker Oriented Word
+        Lists). Copyright 2000-2019 Kevin Atkinson and others. Permission to use, copy,
+        modify, distribute and sell these word lists is granted, provided the copyright
+        notice appears in all copies. http://wordlist.aspell.net/

@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOKENS = os.path.join(os.path.dirname(HERE), "foyer", "shared", "glass.css")
 CONFIG = os.path.join(HERE, "jriter", "config.py")
 FAVICON = os.path.join(HERE, "web", "img", "make-favicon.py")
-UTIL = os.path.join(HERE, "web", "js", "00-util.js")
+UTIL = os.path.join(HERE, "ui", "src", "lib", "color.ts")
 
 #: The AA threshold for body text. Nothing here should come near it; the number is here so
 #: that an edit which does gets stopped.
@@ -102,12 +102,12 @@ def test_the_default_accent_is_the_same_colour_in_every_file_that_holds_it():
 
 
 def _band():
-    """The three numbers the JS solver is built on, read out of it."""
+    """The four numbers the TypeScript solver (ui/src/lib/color.ts) is built on, read out of it."""
     util = _read(UTIL)
-    return (int(re.search(r"J\.NEON_SAT\s*=\s*(\d+)", util).group(1)),
-            float(re.search(r"J\.NEON_FLOOR\s*=\s*([\d.]+)", util).group(1)),
-            int(re.search(r"J\.NEON_LIGHT_MIN\s*=\s*(\d+)", util).group(1)),
-            int(re.search(r"J\.NEON_LIGHT_MAX\s*=\s*(\d+)", util).group(1)))
+    return (int(re.search(r"NEON_SAT\s*=\s*(\d+)", util).group(1)),
+            float(re.search(r"NEON_FLOOR\s*=\s*([\d.]+)", util).group(1)),
+            int(re.search(r"NEON_LIGHT_MIN\s*=\s*(\d+)", util).group(1)),
+            int(re.search(r"NEON_LIGHT_MAX\s*=\s*(\d+)", util).group(1)))
 
 
 def _neon(hue):

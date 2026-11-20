@@ -112,5 +112,7 @@ def test_the_page_does_not_send_you_to_the_library_any_other_way():
         "login.html sets location.href to a literal in %d place(s): %s. Every way out of"
         " this page has to carry the destination, or the one that does not is the one"
         " somebody arrives through." % (len(stray), stray))
-    assert source.count("location.href = onwards()") == 2, (
-        "the two ways out of the login page are no longer both going through onwards()")
+    # Three ways out: already signed in, a sign in (with a password here or a Foyer
+    # account), and making a library from a Foyer account. Every one goes through onwards().
+    assert source.count("location.href = onwards()") == 3, (
+        "the three ways out of the login page are no longer all going through onwards()")

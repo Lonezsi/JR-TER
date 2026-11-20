@@ -108,22 +108,22 @@ def test_the_route_each_one_opens_is_a_screen_that_exists():
     Read off the view files rather than a list here, so adding a pretty path for a screen
     that was never built fails instead of shipping.
     """
-    views = set()
-    js = os.path.join(HERE, "web", "js")
-    for name in sorted(os.listdir(js)):
-        if not name.endswith(".js"):
-            continue
-        source = io.open(os.path.join(js, name), encoding="utf-8").read()
-        views |= set(re.findall(r"J\.views\.(\w+)\s*=", source))
-        views |= set(re.findall(r"J\.views\[[\"'](\w+)[\"']\]\s*=", source))
+    router = io.open(os.path.join(HERE, "ui", "src", "lib", "router.svelte.ts"),
+                     encoding="utf-8").read()
+    union = router[router.index("export type View ="):router.index(";", router.index("export type View ="))]
+    views = set(re.findall(r'"(\w+)"', union)) - {"missing"}
     assert views, "no views were found at all, so this test cannot say anything"
+    app = io.open(os.path.join(HERE, "ui", "src", "shell", "Shell.svelte"), encoding="utf-8").read()
 
     for path, target in sorted(http.PRETTY.items()):
         view = target.split("#/")[-1].split("/")[0].split("?")[0]
         assert view in views, (
-            "%s opens #/%s and no file registers a view called that, so the link lands on"
+            "%s opens #/%s and the router has no view called that, so the link lands on"
             " the missing screen. Views found: %s"
             % (path, view, ", ".join(sorted(views))))
+        assert 'route("%s"' % view in router, "the router never produces the %s view" % view
+        assert "views/%s.svelte" % view.capitalize() in app, (
+            "Shell.svelte never imports a screen for the %s view" % view)
 
 
 def test_a_pretty_path_is_not_also_a_file(secured):

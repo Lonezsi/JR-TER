@@ -89,11 +89,11 @@ def test_a_version_it_cannot_read_is_answered_with_nothing(server):
 
 
 def test_a_first_visit_is_shown_nothing():
-    """The page decides this, so it is checked in the page. Someone opening JR!TER for
-    the first time has missed nothing, and a wall of releases is the whole thing this
+    """The page decides this, so it is checked in the page's source. Someone opening JR!TER
+    for the first time has missed nothing, and a wall of releases is the whole thing this
     feature is meant to avoid being."""
-    path = os.path.join(config.WEB, "js", "16-devlog.js")
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "ui", "src", "lib", "devlog.ts")
     with open(path, encoding="utf-8") as f:
         source = f.read()
-    assert "if (!last) { remember(now); return; }" in source, \
-        "a first visit no longer stores the version silently"
+    assert "if (!last) { store.setRaw(KEY, version); return; }" in source,         "a first visit no longer stores the version silently"

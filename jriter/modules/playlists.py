@@ -77,9 +77,13 @@ def _items(playlist_id):
     songs = {}
     if song_ids:
         marks = ",".join("?" * len(song_ids))
-        for s in db.query(
+        found = db.query(
                 "SELECT s.*, (SELECT COUNT(*) FROM versions v WHERE v.song_id = s.id) "
-                "AS version_count FROM songs s WHERE s.id IN (%s)" % marks, song_ids):
+                "AS version_count FROM songs s WHERE s.id IN (%s)" % marks, song_ids)
+        # The same row a song is everywhere else (its render, length and cover), so a song
+        # in a playlist looks exactly like it does in the library and on an album.
+        from . import songs as song_rows
+        for s in song_rows.decorate(found):
             songs[s["id"]] = s
 
     renders = {}
@@ -133,8 +137,24 @@ def list_playlists(req):
                          (row["id"],))
         item = dict(row)
         item["count"] = counted["n"] if counted else 0
+        item["behind"] = _behind(row["id"])
         out.append(item)
     return {"playlists": out}
+
+
+def _behind(playlist_id):
+    """The first three songs in a playlist, as their covers fan out behind its own: a
+    playlist looks like the songs in it. Title and artwork id, so a song with no picture
+    still draws its letter tile."""
+    rows = db.query(
+        "SELECT s.id, s.title, (SELECT a.id FROM artwork a WHERE a.song_id = s.id "
+        "ORDER BY a.position LIMIT 1) AS artwork_id FROM playlist_items i JOIN songs s "
+        "ON s.id = i.song_id WHERE i.playlist_id = ? ORDER BY i.position, i.id LIMIT 3",
+        (playlist_id,)) if db.table_exists("artwork") else db.query(
+        "SELECT s.id, s.title, NULL AS artwork_id FROM playlist_items i JOIN songs s "
+        "ON s.id = i.song_id WHERE i.playlist_id = ? ORDER BY i.position, i.id LIMIT 3",
+        (playlist_id,))
+    return [{"title": r["title"], "artwork_id": r["artwork_id"]} for r in rows]
 
 
 def read(req):
@@ -160,6 +180,7 @@ def remove(req):
     playlist = get(req.params["id"])
     if playlist["album_id"]:
         raise Error("that playlist belongs to an album. Delete the album instead.")
+    _to_grave("bury_playlist", playlist["id"])
     db.run("DELETE FROM playlists WHERE id = ?", (playlist["id"],))
     return {"deleted": playlist["id"]}
 
@@ -373,3 +394,11 @@ def ROUTES():
         ("DELETE", "/api/playlists/<id>/items/<item_id>"): drop_item,
         ("PUT", "/api/playlists/<id>/order"): reorder,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

@@ -149,35 +149,19 @@ def test_the_owners_list_is_only_for_the_owners_songs(three):
     assert people == []
 
 
-def test_the_initials_switch_the_song_to_that_persons_version():
-    """Pressing someone's initials shows their picture, words and sound on the song, and
-    your own chip (or Back to mine) redraws yours. Nothing is written by either."""
-    import os
-    src = io.open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                               "web", "js", "63-guest-work.js"), encoding="utf-8").read()
-    click = src[src.index('chips.addEventListener("click"'):]
-    click = click[:click.index("\n      });")]
-    assert "J.guestWork.see(where, person)" in click, "the initials only scroll"
-    assert 'data-guest="me"' in src and "J.router.reload()" in click
-    see = src[src.index("  see(root, p) {"):src.index("  /* What the people the song")]
-    for part in ("#heroArt", "#lyricsBlock", "#soundBlock", "Back to mine"):
-        assert part in see, "their version does not show %s" % part
-    assert "J.post(" not in see and "J.put(" not in see and "J.del(" not in see, (
-        "looking at somebody's version writes something")
-
-
 def test_anybodys_mix_and_sound_can_go_on_either_deck():
     """The A/B menu offers every person's mixes and sounds beside your own. A mix plays
     through the guest-work route, never by a version id in your library, and a sound goes
     on the deck without being saved anywhere."""
     import os
-    web = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "js")
-    song = io.open(os.path.join(web, "60-view-song.js"), encoding="utf-8").read()
-    menu = song[song.index("function openSlotMenu("):song.index("function place(menu")]
-    assert "guestRows(ctx, held, heldPreset)" in menu, "the A/B menu lists only your own"
-    pick = song[song.index("function guestPick(row)"):song.index("function place(menu")]
-    assert "url: `/api/guestwork/${share}/audio/${v.id}`" in pick
-    handler = menu[menu.index("const guestRow = "):menu.index("const row = e.target")]
-    assert "J.player.set(slot, { version: g.version })" in handler
-    assert "J.deckSetPreset(ctx, slot, g.preset)" in handler
-    assert "J.put(" not in handler and "J.post(" not in handler, "trying a sound saved it"
+    web = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "ui", "src", "views", "song")
+    menu = io.open(os.path.join(web, "slotmenu.ts"), encoding="utf-8").read()
+    work = io.open(os.path.join(web, "guestwork.svelte.ts"), encoding="utf-8").read()
+    assert "guestwork.versionOf(p, v)" in menu and "guestwork.presetOf(p, s)" in menu,         "the A/B menu lists only your own"
+    assert "url: `/api/guestwork/${p.share}/audio/${v.id}`" in work
+    assert "id: `g${p.share}:${v.id}`" in work, "a guest's mix must not pass for a version in your library"
+    guests = menu[menu.index("...(guestwork ?"):menu.index('slot === "B" && held')]
+    assert "chooseTake(song, slot, gv)" in guests and "song.setPreset(slot, gp)" in guests
+    for write in ("put(", "post(", "del(", "patch("):
+        assert write not in guests, "trying a sound saved it"

@@ -135,9 +135,12 @@ def test_a_module_that_is_off_is_not_searched_and_not_claimed(server, monkeypatc
 def test_the_search_screen_is_reachable_from_the_hash():
     """#/?q= is the search URL, so every link anybody already has keeps working and the
     box that writes that hash did not have to change."""
-    import os
     import pathlib
-    from jriter import config
-    router = pathlib.Path(config.WEB, "js", "80-router.js").read_text(encoding="utf-8")
-    assert 'view: query.q ? "search" : "library"' in router
-    assert os.path.exists(os.path.join(config.WEB, "js", "52-view-search.js"))
+    root = pathlib.Path(__file__).resolve().parent.parent / "ui" / "src"
+    router = (root / "lib" / "router.svelte.ts").read_text(encoding="utf-8")
+    assert "search: (q: string) => (q ? `#/?q=${encodeURIComponent(q)}` : \"#/\")" in router
+    # The query is kept as a parameter of whichever route the hash names, and the library
+    # screen, which is where "#/" lands, reads it.
+    assert "params[key] = value" in router
+    library = (root / "views" / "Library.svelte").read_text(encoding="utf-8")
+    assert "params.q" in library

@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JR!TER</title>
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex, nofollow">
+<!-- No webfont on the door, deliberately.
+     This page is in front of the password, so everyone who reaches the address sees it,
+     including people who do not have the password and people who arrived by accident.
+     Asking fonts.googleapis.com for a stylesheet here meant every one of them made a
+     request to a third party carrying their address and their browser, before JR!TER had
+     decided whether to let them in at all, and there is nothing they could do about it.
+     The app behind the door still uses the faces: that is one person, their own copy,
+     after they have signed in. The door uses what the machine already has. -->
+<link rel="stylesheet" href="/jriter.css">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<style>
+/* The door. It borrows the app's tokens and adds nothing of its own but a layout. */
+body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4); }
+.door {
+  width: min(380px, 100%);
+  background: var(--grad-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  padding: var(--s7) var(--s6) var(--s6);
+  box-shadow: var(--shadow-3), var(--edge-top);
+  /* The one screen with nothing else on it, so it may arrive rather than appear. */
+  animation: door-in 420ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+@keyframes door-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+}
+@media (prefers-reduced-motion: reduce) { .door { animation: none; } }
+.door h1 {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--display); font-weight: 800; font-size: 34px;
+  letter-spacing: -0.03em; margin: 0 0 var(--s2);
+}
+/* The rest carries the accent, where a green dot after the name used to. */
+.door h1 .rest { flex: none; color: var(--accent); }
+/* Quieter and smaller than the blurb under it, so it reads as a line about what this
+   is rather than as another instruction. Its own element, because the blurb is
+   rewritten on load and swaps between the setup and sign in wordings. */
+.slogan {
+  margin: 0 0 var(--s4);
+  font-size: 11.5px; letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+.door p { color: var(--text-2); margin: 0 0 var(--s6); font-size: 14px; line-height: 1.6; }
+.door label {
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 12.5px; font-weight: 600; color: var(--text-2);
+  margin-bottom: var(--s4);
+}
+.door .btn { width: 100%; height: 44px; }
+.note {
+  margin: var(--s5) 0 0; font-size: 12.5px; color: var(--text-3); line-height: 1.6;
+}
+.note.legal { margin-top: var(--s3); font-size: 12px; }
+.note.legal a { color: var(--accent); }
+.problem {
+  margin: 0 0 var(--s4); padding: 10px var(--s4);
+  border-radius: var(--r-md);
+  background: rgba(212, 104, 94, 0.12);
+  color: var(--bad-hi); font-size: 13px; font-weight: 600;
+}
+/* Same reason as the app: an author rule setting display beats the browser's own
+   [hidden] rule, and .door label sets display: flex. */
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- GLASS-DEFS -->
+<!-- The filters used to be written out here as well as in index.html, and this copy had
+     fallen behind: it carried #glass and #glass-thin and never got #glass-ca.
+
+     What that cost, measured rather than assumed: nothing, on this page. The door is a
+     gradient with a border and a shadow and there is no backdrop-filter anywhere on it, so
+     it references no filter and was not missing an effect. It was a second definition
+     drifting from the first with nothing watching, which is the argument against keeping
+     two copies of anything even when neither one is currently wrong.
+
+     They are in foyer/shared/glass-defs.html now and the server drops all three in here.
+     Kept on this page although the door does not use one: this page wears the whole
+     application stylesheet, so anything added to it can be glass without also having to
+     know that this particular page cannot. -->
+
+
+<form class="door" id="door" autocomplete="on">
+  <h1><svg class="rest" viewBox="0 0 12 30" width="13" height="32"
+             aria-hidden="true" focusable="false">
+          <path d="M8.5 2 L3.5 9.5 L8.5 15 L3.5 21" fill="none" stroke="currentColor"
+                stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3.5 21c3.2.6 4.9 2.4 4.9 4.6 0 1.6-1 2.6-2.4 2.6" fill="none"
+                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>JR!TER</h1>
+  <p class="slogan">please post for the world to see</p>
+  <p id="blurb">Signing in.</p>
+  <div class="problem" id="problem" hidden></div>
+
+  <label id="codeField" hidden>
+    <span id="codeLabel">Setup code</span>
+    <input class="field" id="code" name="code" autocomplete="off" spellcheck="false"
+           placeholder="printed where the server is running">
+  </label>
+
+  <!-- Optional on the way in, required on the way up.
+       Somebody who has only ever typed a password here is the owner of this library, and
+       an empty handle means exactly that, so their habit is unchanged. -->
+  <label id="handleField" hidden>
+    <span id="handleLabel">Handle</span>
+    <input class="field" id="handle" name="username" autocomplete="username"
+           spellcheck="false" autocapitalize="none" placeholder="what your friend calls you">
+  </label>
+
+  <label>
+    <span id="passwordLabel">Password</span>
+    <input class="field" id="password" name="password" type="password"
+           autocomplete="current-password" autofocus>
+  </label>
+
+  <button class="btn primary" id="go" type="submit">Sign in</button>
+
+  <!-- Only when there is somebody to have been invited by. A fresh library shows the
+       setup form instead, and a link offering to sign up to a library that has no owner
+       yet would be an invitation to take it. -->
+  <p class="note" id="swap" hidden>
+    <a href="#" id="swapLink">I have an invite</a>
+  </p>
+
+  <p class="note" id="note">
+    Guessing is limited to a few tries before this address has to wait.
+  </p>
+
+  <!-- Its own paragraph, outside #note on purpose: decideMode() rewrites that one's
+       textContent for the setup and sign in wordings, and a link inside it would be
+       thrown away the moment the page worked out which door it was. -->
+  <p class="note legal">
+    <a href="/legal">Terms and privacy</a>. Nothing here is tracked, and there is nothing
+    to agree to. The <a href="/foyer/privacy">privacy page for everything on this
+    machine</a> covers the rest.
+  </p>
+</form>
+
+<script>
+  /* Where to go once the door opens.
+   *
+   * The server sends an unauthenticated caller to /login and keeps the fragment, so the
+   * destination arrives here as /login#/orarend. This page used to finish with
+   * location.href = "/" and throw it away, so every deep link into the app landed on the
+   * library: a shared song, a timetable, an album somebody sent you.
+   *
+   * ONLY THE FRAGMENT, and only when it looks like one of this app's routes. Taking a
+   * redirect target out of the address bar is how open redirects are built; a fragment
+   * cannot leave this origin, and requiring it to start with #/ means nothing but a route
+   * can be carried through.
+   */
+  function onwards() {
+    const hash = location.hash || "";
+    // No "//" anywhere, which is what makes "#//evil.example.com" a route and not an
+    // address. It could not have left this origin as a fragment either; the point is that
+    // the pattern refuses it on its own, without depending on that.
+    const route = /^#\/[\w\-/?=&.%]*$/.test(hash) && hash.indexOf("//") === -1;
+    return "/" + (route ? hash : "");
+  }
+
+"use strict";
+const $ = (id) => document.getElementById(id);
+let mode = "login";
+//: Whether this library has an owner yet, and therefore whether an invite could exist.
+let canSignUp = false;
+
+async function api(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  let data = {};
+  try { data = JSON.parse(text || "{}"); } catch (e) { data = { error: text.slice(0, 200) }; }
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+}
+
+function problem(message) {
+  const box = $("problem");
+  box.textContent = message || "";
+  box.hidden = !message;
+}
+
+async function decideMode() {
+  try {
+    const state = await (await fetch("/api/auth/state")).json();
+    if (state.custom_font) {
+      // The same face the library wears, so the door is part of the same product.
+      const face = document.createElement("style");
+      face.textContent = '@font-face{font-family:"Jriter Display";'
+        + 'src:url("/api/appearance/font");font-display:swap}';
+      document.head.appendChild(face);
+    }
+    if (state.signed_in) { location.href = onwards(); return; }
+    mode = state.has_password ? "login" : "setup";
+    canSignUp = !!state.can_sign_up;
+  } catch (e) {
+    problem("JR!TER is not answering.");
+    return;
+  }
+
+  draw();
+}
+
+/* Which of the three doors this is, drawn from `mode`.
+ *
+ * Its own function now, because there are three and you can move between two of them
+ * without asking the server anything: deciding used to be the same code as drawing, which
+ * was fine while the only way to change your mind was to reload. */
+function draw() {
+  const setup = mode === "setup";
+  const joining = mode === "signup";
+  const fresh = setup || joining;
+
+  // The code field does two jobs, and they are not the same job. Setting up a library
+  // needs the code printed where the server runs; joining one needs a code the owner sent
+  // you. Same input, different question, so the label says which.
+  $("codeField").hidden = !fresh;
+  $("codeLabel").textContent = setup ? "Setup code" : "Invite code";
+  $("code").placeholder = setup ? "printed where the server is running"
+                                : "the code you were sent";
+
+  // A handle is asked for when joining, offered when signing in, and never when setting
+  // up: the owner's handle is fixed, and an empty one means them.
+  $("handleField").hidden = setup;
+  $("handleLabel").textContent = joining ? "Choose a handle" : "Handle";
+  $("handle").placeholder = joining ? "letters, digits, - _ ."
+                                    : "leave empty if this library is yours";
+
+  $("blurb").textContent = setup
+    ? "Nobody has set a password on this library yet. Choose one now."
+    : joining
+      ? "Somebody gave you a code. This makes you an account with a library of your own."
+      : "Sign in to your library.";
+  $("passwordLabel").textContent = fresh ? "Choose a password" : "Password";
+  $("password").setAttribute("autocomplete", fresh ? "new-password" : "current-password");
+  $("go").textContent = setup ? "Set it and open the library"
+    : joining ? "Make my account" : "Sign in";
+  $("note").textContent = fresh
+    ? "Anything at all, as long as it is not empty. There are no rules about length or "
+      + "characters, because guessing is rate limited instead."
+    /* Not "any password is accepted" on the sign in screen.
+     *
+     * It was written to mean "any password may be chosen", which is true and useful
+     * while setting one, and the setup branch above says exactly that. Read on a door,
+     * with a password field and a Sign in button under it, the same sentence says
+     * something else entirely: that anything typed will get you in. */
+    : "Guessing is limited to a few tries before this address has to wait.";
+
+  $("swap").hidden = setup || !canSignUp;
+  $("swapLink").textContent = joining ? "I already have an account" : "I have an invite";
+  (fresh ? $("code") : $("password")).focus();
+}
+
+$("swapLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  mode = mode === "signup" ? "login" : "signup";
+  problem("");
+  draw();
+});
+
+$("door").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  problem("");
+  const password = $("password").value;
+  const button = $("go");
+  button.disabled = true;
+  try {
+    if (mode === "setup") {
+      await api("/api/auth/setup", { code: $("code").value.trim(), password });
+    } else if (mode === "signup") {
+      await api("/api/auth/signup", { code: $("code").value.trim(), password,
+                                      handle: $("handle").value.trim() });
+    } else {
+      await api("/api/auth/login", { password, handle: $("handle").value.trim() });
+    }
+    location.href = onwards();
+  } catch (err) {
+    problem(err.message);
+    button.disabled = false;
+    $("password").select();
+  }
+});
+
+decideMode();
+</script>
+</body>
+</html>

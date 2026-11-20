@@ -1,0 +1,92 @@
+/* JR!TER's own furniture.
+ *
+ * THE MATERIAL IS NOT IN THIS REPO. The ground, the surfaces, the lines, the type colours,
+ * the accent and everything derived from it, the three tiers of glass, the field that
+ * bends them, the radii, the spacing, the shadows and the timings all live in one file
+ * that every site on this machine reads off the same disk:
+ *
+ *     foyer/shared/glass.css
+ *
+ * It is served in front of this file, so everything below may refer to it and may override
+ * it. If it goes missing the stylesheet says so at the top and the page wears a red band,
+ * because an app with no colours, no radii and no spacing presents as a hundred unrelated
+ * bugs rather than as one missing file.
+ *
+ * WHY IT IS SHARED RATHER THAN COPIED. Two bugs in one week had the same cause: a design
+ * that existed twice. Ten rules wrote the accent out by hand and stayed green when it
+ * became pink, and the desktop app kept its own palette and stayed green for the same
+ * reason. A look with two definitions is one look until the first time somebody changes
+ * one of them.
+ *
+ * WHAT IS LEFT HERE. The things that are JR!TER rather than things that are glass: the
+ * wash behind the library, the knocked out discs on a render row, the two panel tints, the
+ * warning colours, the flattened gradient names, the faces, and the two measurements this
+ * layout is built on.
+ *
+ * One colour in the room, and it belongs to whatever is playing: a song's artwork or a
+ * render's own waveform colour, neonised, and the colour you chose when nothing is on.
+ * That decision is in web/js/42-accent.js; the scaffolding it writes to is in the shared
+ * file.
+ */
+
+:root {
+  /* One soft blob on the black, and the reason it is worth having is the glass.
+     The main panel is a pane, and on the library screens there is nothing behind it to
+     bend: a flat black backdrop through a displacement map is still flat black. This gives
+     it something. Barely there on purpose, and in the accent rather than a neutral so it
+     reads as part of the room rather than as a smudge on the screen. */
+  --bg-dot: radial-gradient(58% 44% at 26% 12%,
+                            rgba(var(--accent-rgb), 0.07), transparent 72%);
+
+  /* The knocked out buttons on a render row. Not pure white: a solid #FFF disc on a dark
+     glass row is the hardest edge in the app and it read as stamped on rather than set
+     into the surface. At 78 per cent the colour behind comes through it a little, which
+     is what puts it in the same material as everything else. */
+  --cut: rgba(255, 255, 255, 0.78);
+
+  /* Kept because rules across this app still ask for it by name. Black, like the ground:
+     this app has no raised plane that is a different colour, only ones that are glass. */
+  --bg-high: #000000;
+
+  /* The main panel's own tint. Darker than the chrome's white veil rather than lighter:
+     the rail and the player float over the library and read as brighter than it, while
+     this is the room those float in and has to stay the darker of the two or the hierarchy
+     inverts. Thinner with artwork open, so more of it comes through.
+     Not shared: a main panel is a thing this app has and the front door does not. */
+  --pane:      rgba(11, 11, 12, 0.78);
+  --pane-thin: rgba(11, 11, 12, 0.55);
+
+  /* Something is wrong, and something is wrong enough to be red. Not shared, because
+     "warn" and "bad" are states an application has and a page of links has no use for. */
+  --warn:   #D9A441;
+  --bad:    #D4685E;
+  --bad-hi: #F0A79E;
+
+  /* ── gradients, off ─────────────────────────────────────────────────────────
+   *
+   * These names are spent all over the stylesheets. Rather than chase every one, they are
+   * flat values, so "the gradients are off" is true at the single place that decides it
+   * and cannot quietly come back on somewhere else. */
+  --grad-app:       none;
+  --grad-surface:   var(--surface);
+  --grad-raised:    var(--elevated);
+  --grad-raised-hi: #232327;
+  --grad-sunken:    #08080A;
+  --grad-player:    var(--surface);
+  --grad-accent:    var(--accent);
+  --grad-accent-hi: var(--accent-hi);
+
+  --font: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* "Jriter Display" is whatever font has been uploaded in Settings, registered at
+     runtime. Orbitron is the openly licensed stand in until one is. Not shared: an
+     uploaded display face belongs to the library it was uploaded to. */
+  --display: "Jriter Display", "Orbitron", "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  /* The two measurements this app's layout is built on. */
+  --rail-w: 244px;
+  --player-h: 84px;
+
+  /* The accent, as a ring and a bloom. Built out of the shared tokens, but the shape of it
+     belongs here: it is what a focused control in this app looks like. */
+  --glow: 0 0 0 1px var(--accent-line), 0 8px 30px rgba(var(--accent-rgb), 0.2);
+}

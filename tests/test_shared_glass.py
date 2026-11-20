@@ -23,9 +23,10 @@ sys.path.insert(0, HERE)
 
 from jriter import config, http as jhttp   # noqa: E402
 
-CSS = os.path.join(HERE, "web", "css")
+CSS = os.path.join(HERE, "web", "css")   # old front end, still bundled by jhttp.bundle
 JS = os.path.join(HERE, "web", "js")
 WEB = os.path.join(HERE, "web")
+UISRC = os.path.join(HERE, "ui", "src")
 
 
 def read(path):
@@ -44,6 +45,17 @@ def declared(source):
 def our_css():
     return {n: read(os.path.join(CSS, n))
             for n in sorted(os.listdir(CSS)) if n.endswith(".css")}
+
+
+def ui_sources():
+    """Every stylesheet and component of the Svelte interface: {relative path: text}."""
+    found = {}
+    for here, _dirs, names in os.walk(UISRC):
+        for n in sorted(names):
+            if n.endswith((".css", ".svelte", ".ts")):
+                p = os.path.join(here, n)
+                found[os.path.relpath(p, UISRC).replace(os.sep, "/")] = read(p)
+    return found
 
 
 def pages():
@@ -104,9 +116,9 @@ def test_the_app_agrees_with_foyer_about_where_foyer_is():
         import pytest
         pytest.skip("foyer is not checked out beside this repo")
 
-    boot = read(os.path.join(JS, "90-boot.js"))
-    ours = re.search(r'J\.FOYER_PATH\s*=\s*"([^"]+)"', boot)
-    assert ours, "90-boot.js no longer says where Foyer is"
+    ours = re.search(r'export const FOYER\s*=\s*"([^"]+)"',
+                     read(os.path.join(UISRC, "lib", "app.svelte.ts")))
+    assert ours, "ui/src/lib/app.svelte.ts no longer says where Foyer is"
     theirs = re.search(r'^MOUNT\s*=\s*"([^"]+)"', read(sibling), flags=re.M)
     assert theirs, "foyer/server.py no longer says what it is mounted at"
     assert ours.group(1) == theirs.group(1), (
@@ -121,9 +133,10 @@ def test_the_way_out_does_not_name_a_host_or_a_port():
     A path on this origin works wherever the library itself worked: through the tunnel, over
     the tailnet, on localhost. A hostname written down here works in exactly one of those.
     """
-    boot = read(os.path.join(JS, "90-boot.js"))
-    where = boot[boot.index("J.FOYER_PATH"):]
-    where = where[:where.index("\n\n")]
+    line = [l for l in read(os.path.join(UISRC, "lib", "app.svelte.ts")).splitlines()
+            if "export const FOYER" in l]
+    assert line, "ui/src/lib/app.svelte.ts no longer says where Foyer is"
+    where = line[0]
     assert "://" not in where and "hostname" not in where and ":7000" not in where, (
         "the way out names a host or a port again: %s" % where.strip())
 
@@ -186,19 +199,21 @@ def test_every_token_this_app_uses_is_defined_by_one_of_the_two():
     Which reads as a colour that is absent rather than wrong. The two files together are
     what a browser gets, so both count.
     """
+    sources = ui_sources()
     known = declared(material())
-    for source in our_css().values():
+    for source in sources.values():
         known |= declared(source)
-    for name in sorted(os.listdir(JS)):
-        if name.endswith(".js"):
-            source = read(os.path.join(JS, name))
-            known |= set(re.findall(r"(--[a-z0-9-]+)\s*:", source))
-            known |= set(re.findall(r'setProperty\(\s*"(--[a-z0-9-]+)"', source))
-
-    for name, source in our_css().items():
+        known |= set(re.findall(r"(--[a-z0-9-]+)\s*:", source))      # inline style="--x: ..."
+        known |= set(re.findall(r"\bstyle:(--[a-z0-9-]+)\s*=", source))  # svelte style:--x={..}
+        known |= set(re.findall(r"style:(--[a-z0-9-]+)\s*=", source))  # svelte style:--x={..}
+        known |= set(re.findall(r"""setProperty\(\s*["'](--[a-z0-9-]+)""", source))
+    for name, source in sources.items():
+        if not name.endswith((".css", ".svelte")):
+            continue
+        source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
         for used in sorted(set(re.findall(r"var\((--[a-z0-9-]+)", source))):
             assert used in known, (
-                "web/css/%s uses %s and neither the material nor this repo defines it, so"
+                "ui/src/%s uses %s and neither the shared glass.css nor ui/src defines it, so"
                 " that declaration is dropped" % (name, used))
 
 
@@ -265,70 +280,26 @@ def test_no_page_carries_its_own_copy_of_the_filter():
             " short." % (name, jhttp.Handler.DEFS_MARK.decode()))
 
 
-def glass_classes():
-    """Every class this app draws with an SVG filter, read off the stylesheets.
-
-    Listed nowhere, because a list is a thing to keep in step. A rule that sets
-    var(--glass-filter...) is a rule whose selector needs the filter to exist, so the
-    selectors answer the question.
-    """
-    found = set()
-    for source in our_css().values():
-        source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
-        for rule in re.finditer(r"([^{}]+)\{([^{}]*)\}", source):
-            if "var(--glass-filter" in rule.group(2):
-                found |= set(re.findall(r"\.([a-zA-Z][\w-]*)", rule.group(1)))
-    return found
-
-
-def test_the_stylesheets_draw_something_with_a_filter_at_all():
-    """The premise of the two tests below, which are vacuous without it."""
-    assert len(glass_classes()) > 5, (
-        "only %s are drawn with a glass filter, so either the refraction is gone or the"
-        " rules that use it have moved somewhere this cannot see"
-        % sorted(glass_classes()))
-
-
-def test_every_page_that_can_show_glass_says_where_the_filter_goes():
-    """A page that draws glass with no filter in it looks flat and reports as nothing.
-
-    Flat is a supported way for this app to look, on an engine that cannot bend light, so
-    there is no error and nothing about the page says it was a mistake. That is the whole
-    reason it needs a test.
-
-    Two ways a page can show glass: its own markup uses one of the classes, or it loads the
-    app, which draws panes, sheets and menus into it afterwards.
-    """
-    mark = jhttp.Handler.DEFS_MARK.decode()
-    glassy = glass_classes()
-    for name, source in pages().items():
-        classes = set()
-        for attr in re.findall(r'class="([^"]*)"', source):
-            classes |= set(attr.split())
-        mine = sorted(classes & glassy)
-        runs_the_app = "/jriter.js" in source
-        if not mine and not runs_the_app:
-            continue
-        assert mark in source, (
-            "web/%s does not carry %s and it can show glass (%s), so it is served with no"
-            " filter and every refraction on it silently does nothing."
-            % (name, mark, "it loads the app" if runs_the_app
-               else "it uses " + ", ".join("." + c for c in mine)))
-
+# Deleted with the old front end: glass_classes(), the "draws something with a SVG filter at
+# all" test (false by design now: the material is blur only, no SVG filters), and the "every
+# page that can show glass carries the filter marker" test (the marker is kept below, but
+# nothing in the new CSS needs the filter fragment).
 
 def test_the_marker_is_only_on_pages_that_wear_the_stylesheet():
-    """A filter injected into a page with no material is three definitions nothing uses.
+    """A filter injected into a page with no material is definitions nothing uses.
 
-    Not a fault, and it is the residue of one: a page that has the marker and not the
-    stylesheet is a page somebody detached from the app's design without finishing.
+    The Svelte shell (ui/index.html) links the shared sheet at /glass.css; login.html and
+    legal.html are not rebuilt and still link /jriter.css.
     """
     mark = jhttp.Handler.DEFS_MARK.decode()
+    index = read(os.path.join(HERE, "ui", "index.html"))
+    assert mark in index, "ui/index.html lost the %s marker the server injects at" % mark
+    assert 'href="/glass.css"' in index, "ui/index.html does not link the shared stylesheet"
     for name, source in pages().items():
         if mark not in source:
             continue
-        assert "/jriter.css" in source, (
-            "web/%s asks for the glass filter and does not link the stylesheet that"
-            " references it, so nothing on the page can use what is injected" % name)
+        assert "/jriter.css" in source or 'href="/glass.css"' in source or "/assets/" in source, (
+            "web/%s asks for the glass filter and links no stylesheet at all" % name)
 
 
 def test_the_fragment_defines_every_filter_the_material_asks_for():

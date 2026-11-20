@@ -21,7 +21,8 @@ from jriter.wire import Error
 from jriter.modules import updater
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SETTINGS = os.path.join(HERE, "web", "js", "74-view-sync.js")
+UI = os.path.join(HERE, "ui", "src")
+SETTINGS = os.path.join(UI, "views", "settings", "Updates.svelte")
 
 
 class Ask:
@@ -40,43 +41,40 @@ class Ask:
 def test_settings_asks_about_updates_on_the_way_in():
     """The bug itself.
 
-    The top bar's "Update ready" is a link to this screen and nothing more, so if this
-    screen does not check on arrival there is no way to reach the button that applies one
-    except by knowing to press a second Check first.
+    The top bar's "Update ready" starts the update and Settings shows the details, so if
+    this screen does not check on arrival, it opens on "not checked yet" with nothing to
+    press until somebody knows to press Check first.
     """
     source = open(SETTINGS, encoding="utf-8").read()
 
-    # Not "before the handlers". This screen draws first and then fills in whatever it had
-    # to go and ask for, so the arrival fetch sits further down the file than the button's
-    # does. What matters is that there are two of them and that one is not the button's.
     asks = [i for i in range(len(source)) if source.startswith("/api/update/check", i)]
     assert asks, "Settings never checks for updates at all"
 
-    pressed = source.index('act.dataset.act === "check"')
-    handler_end = source.index("}", source.index("draw();", pressed))
-    outside = [i for i in asks if not (pressed < i < handler_end)]
-
-    assert outside, (
+    # The arrival check is the resource made when the screen is built. The button only
+    # reloads it, so it must not be the only thing that ever asks.
+    arrival = re.search(r"const check = control \? resource\(\(\) => get<[^>]*>\(\"/api/update/check\"\)\)", source)
+    assert arrival, (
         "Settings only checks for updates when the button is pressed, so arriving from "
         "the banner shows a screen with nothing on it to press")
+    assert "onclick={recheck}" in source, "and the button asks again"
 
 
 def test_the_banner_still_points_somewhere_that_can_act():
-    """The link and the screen have to agree about where the button is."""
-    index = open(os.path.join(HERE, "web", "index.html"), encoding="utf-8").read()
-    banner = re.search(r'id="updateReady"[^>]*href="([^"]+)"', index)
-    assert banner, "the update banner is gone"
-    assert banner.group(1) == "#/settings"
+    """The banner and the screen have to agree about what happens. The banner now applies
+    the update itself, and Settings offers the same button, so neither is a dead end."""
+    shell = open(os.path.join(UI, "shell", "Shell.svelte"), encoding="utf-8").read()
+    banner = re.search(r"\{#if shell\.updateReady\}\s*<button[^>]*onclick=\{update\}", shell)
+    assert banner, "the update banner is gone, or no longer does anything when pressed"
 
     source = open(SETTINGS, encoding="utf-8").read()
-    assert 'data-act="apply"' in source, "the screen the banner points at cannot apply one"
+    assert "Update now" in source and "onclick={update}" in source,         "the screen cannot apply one"
 
 
 def test_restarting_is_offered_rather_than_described():
     """It used to say "stop the server and start it again", which is no help at all on a
     machine in another room with nobody logged into it."""
     source = open(SETTINGS, encoding="utf-8").read()
-    assert 'data-act="restart"' in source
+    assert "onclick={restart}" in source
     assert "/api/update/restart" in source
 
 
@@ -89,7 +87,7 @@ def test_a_reason_for_no_button_is_shown_next_to_the_release():
     release it was ready for, offered nothing to press, and gave no reason at all.
     """
     source = open(SETTINGS, encoding="utf-8").read()
-    assert "update.why && update.message" in source, (
+    assert "c.why && c.message" in source, (
         "the reason an update cannot be applied is still only shown when there is no "
         "release message to show instead, which is never")
 
@@ -198,7 +196,7 @@ def test_only_the_owner_can_restart(stopped):
 # ── one press, and on its own ────────────────────────────────────────────────
 def _pulled(py=True):
     return {"updated": True, "before": "a" * 40, "after": "b" * 40,
-            "files": ["jriter/x.py" if py else "web/js/x.js"],
+            "files": ["jriter/x.py" if py else "web/x.js"],
             "restart_required": py, "message": "Updated."}
 
 
@@ -243,13 +241,14 @@ def test_only_the_owner_can_update(stopped, monkeypatch):
 
 
 def test_the_page_button_updates_rather_than_navigating():
-    boot = open(os.path.join(HERE, "web", "js", "90-boot.js"), encoding="utf-8").read()
-    wired = boot[boot.index('const updateButton = J.$("#updateReady")'):]
-    wired = wired[:wired.index("\n  }\n")]
-    assert "e.preventDefault()" in wired, "pressing it still just opens Settings"
-    assert '"/api/update/now"' in wired
-    assert "J.backAgain()" in wired and "location.reload()" in wired, (
+    actions = open(os.path.join(UI, "lib", "actions.ts"), encoding="utf-8").read()
+    body = actions[actions.index("export async function updateNow"):]
+    body = body[:body.index("\n}\n")]
+    assert '"/api/update/now"' in body
+    assert "backAgain()" in body and "location.reload()" in body, (
         "it does not wait for the restart and reload onto the new version")
+    shell = open(os.path.join(UI, "shell", "Shell.svelte"), encoding="utf-8").read()
+    assert "await updateNow()" in shell, "the banner's button does not run the update"
 
 
 class _Auto:

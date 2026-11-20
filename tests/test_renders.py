@@ -113,6 +113,10 @@ def test_throwing_a_waiting_render_away_takes_its_bytes(server, wav):
 
     status, _ = server.delete("/api/renders/%d" % arrived["render"]["id"])
     assert status == 200
+    # It waits in the grave first (modules/grave.py), and the audio waits with it...
+    assert blobs.exists(digest), "the grave can't bring back a render without its audio"
+    # ...until it leaves the grave for good, and then nothing is left behind.
+    server.delete("/api/grave")
     assert not blobs.exists(digest), "the audio was left behind with nothing pointing at it"
 
 

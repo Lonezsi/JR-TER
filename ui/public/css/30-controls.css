@@ -1,0 +1,277 @@
+/* Controls: round, and pills where a pill says "one of these".
+
+   Three shapes only. A filled green pill for the action a screen is actually for, a
+   quiet pill for everything else, and a circle for transport. */
+
+.btn {
+  box-shadow: var(--edge-top), var(--shadow-1);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+  height: 38px;
+  padding: 0 var(--s5);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--grad-raised);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--fast), transform var(--fast), opacity var(--fast);
+}
+.btn:hover { background: var(--grad-raised-hi); }
+.btn:active { transform: scale(0.97); }
+.btn[disabled] { opacity: 0.45; cursor: default; transform: none; }
+
+.btn.primary {
+  background: var(--grad-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--edge-top), 0 2px 10px rgba(var(--accent-rgb), 0.25);
+}
+.btn.primary:hover { background: var(--grad-accent-hi); }
+.btn.ghost { background: transparent; color: var(--text-2); box-shadow: none; }
+.btn.ghost:hover { background: var(--hover); color: var(--text); }
+.btn.danger { background: transparent; color: var(--bad); }
+.btn.danger:hover { background: rgba(212, 104, 94, 0.12); }
+.btn.sm { height: 30px; padding: 0 var(--s4); font-size: 12.5px; }
+.btn.lg { height: 46px; padding: 0 var(--s6); font-size: 15px; }
+
+/* Round transport and icon buttons. */
+.icon-btn {
+  display: grid; place-items: center;
+  width: 36px; height: 36px;
+  border: 0; border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast), transform var(--fast);
+}
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.icon-btn:active { transform: scale(0.94); }
+.icon-btn.on { color: var(--accent-hi); }
+.icon-btn[disabled] { opacity: 0.35; cursor: default; }
+
+.play-btn {
+  display: grid; place-items: center;
+  width: 52px; height: 52px;
+  border: 0; border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--fast), background var(--fast);
+}
+.play-btn:hover { background: var(--accent-hi); transform: scale(1.05); }
+.play-btn:active { transform: scale(0.97); }
+.play-btn.sm { width: 38px; height: 38px; box-shadow: none; }
+
+/* Pills: a row where exactly one is chosen. */
+.pills { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 var(--s4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast), border-color var(--fast);
+}
+.pill:hover { background: var(--hover); color: var(--text); }
+.pill.on {
+  background: var(--accent); border-color: var(--accent); color: var(--text-on-accent);
+}
+.pill.quiet { border-color: transparent; background: var(--surface-2); }
+.pill.quiet.on { background: var(--accent); }
+
+/* A read only tag, not a control. */
+.tag {
+  white-space: nowrap;        /* "43 waiting" is one thing, never two lines */
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11.5px; font-weight: 600;
+}
+.tag.accent { background: var(--accent-soft); color: var(--accent-hi); }
+.tag.warn { background: rgba(217, 164, 65, 0.14); color: var(--warn); }
+
+.field {
+  width: 100%;
+  background: var(--grad-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px var(--s4);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--fast), background var(--fast);
+}
+.field:hover { border-color: var(--line-2); }
+.field:focus { border-color: var(--accent-line); background: var(--bg-deep); }
+textarea.field { min-height: 120px; resize: vertical; line-height: 1.7; }
+
+.switch {
+  position: relative; width: 44px; height: 26px; flex: none;
+  border-radius: var(--r-pill); border: 0;
+  background: var(--grad-sunken);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: background var(--fast);
+}
+.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--text-2);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--med), background var(--fast);
+}
+.switch.on { background: var(--grad-accent); }
+/* 44 wide, 20 of knob, 3 of gap either side: the travel is what is left. */
+.switch.on::after { transform: translateX(18px); background: var(--text-on-accent); }
+
+/* Slider used by the limiter and the volume control. */
+.range {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 20px; background: none; cursor: pointer;
+}
+.range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: var(--r-pill);
+  background: linear-gradient(var(--accent), var(--accent)) 0 / var(--fill, 0%) 100% no-repeat,
+              var(--elevated);
+}
+.range::-moz-range-track { height: 4px; border-radius: var(--r-pill); background: var(--elevated); }
+.range::-moz-range-progress { height: 4px; border-radius: var(--r-pill); background: var(--accent); }
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: -5px;
+  border-radius: 50%; background: var(--text); border: 0;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--fast);
+}
+.range::-moz-range-thumb {
+  width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--text);
+}
+.range:hover::-webkit-slider-thumb { transform: scale(1.18); }
+
+/* A plain row in a settings or folder list. Generic, so it lives with the controls
+   rather than inside one screen's stylesheet, which is where it used to be until that
+   screen was rewritten out from under it. */
+.list-row {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  margin-bottom: var(--s2);
+}
+.list-row .grow { min-width: 0; flex: 1; }
+
+/* Clear of the player when there is one, and near the bottom when there is not. Without
+   the second case a message floats with eighty four pixels of nothing under it, holding
+   room for a bar that is not on screen. */
+.toast-stack {
+  position: fixed; left: 50%; bottom: var(--s5);
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: var(--s2);
+  z-index: 90; pointer-events: none;
+  transition: bottom var(--med);
+}
+.shell:has(.player:not([hidden])) ~ .toast-stack {
+  bottom: calc(var(--player-h) + var(--s5));
+}
+.toast {
+  background: var(--grad-raised);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  padding: 10px var(--s5);
+  font-size: 13.5px; font-weight: 600;
+  box-shadow: var(--shadow-2), var(--edge-top);
+  /* Blurred behind, so a message that lands over the equaliser is still readable
+     without having to be opaque enough to hide it. */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: toast-in 260ms var(--ease);
+}
+.toast.bad {
+  border-color: rgba(212, 104, 94, 0.5);
+  color: var(--bad-hi);
+  box-shadow: var(--shadow-2), var(--edge-top), 0 0 24px rgba(212, 104, 94, 0.15);
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } }
+
+/* ── choosing a colour ────────────────────────────────────────────────────
+
+   A bare <input type="color"> is a full width block of flat colour with the operating
+   system's own border on it, which is the one thing on the settings page that looked
+   like nobody had touched it. The input is still there, and still opens the system
+   picker, but it is invisible and the swatch in front of it is what you see. */
+
+.swatch {
+  position: relative;
+  display: inline-flex; align-items: center; gap: var(--s3);
+  /* Its parent is a stretching column, so without this the pill runs the full width of
+     the form for no reason: it is a swatch, it should be the size of a swatch. */
+  align-self: flex-start;
+  height: 42px; padding: 0 var(--s4) 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--grad-sunken);
+  cursor: pointer;
+  transition: border-color var(--fast);
+}
+/* Save, and the way back. Two buttons on one line, and the second is quieter because
+   putting the look back is not the thing you came here to do. */
+.settings-foot { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+
+.swatch:hover { border-color: var(--line-2); }
+.swatch:focus-within { border-color: var(--accent-line); }
+
+.swatch input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  border: 0; padding: 0;
+  cursor: pointer;
+}
+.swatch-dot {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 50%;
+  background: var(--picked, var(--accent));
+  box-shadow: var(--edge-top), 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.swatch-hex {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+
+/* The sort control.
+ *
+ * A button that says what the list is in order by, not what pressing it will do, because
+ * a list's order is a state you read at a glance far more often than you change it. The
+ * arrow is the direction, and it is absent entirely for an order that cannot be
+ * reversed: a running order somebody chose has a right way round and no other. */
+.sort-pick { gap: 6px; }
+.sort-pick .sort-mark { flex: none; color: var(--text-3); transition: transform var(--fast); }
+.sort-pick:hover .sort-mark { color: var(--accent-hi); }
+.sort-pick .sort-mark.down { transform: scaleY(-1); }
+.sort-pick span { white-space: nowrap; }
+
+/* On a phone the label goes and the icon stays: the menu says the rest. */
+@media (max-width: 560px) {
+  .sort-pick span { display: none; }
+}
+
+/* A slider with its number beside it, for the two settings that are taste rather than
+   function. The number is tabular so it does not shuffle the track sideways as it counts
+   past ten and a hundred, which is what makes a dial feel loose. */
+.dial { display: flex; align-items: center; gap: var(--s3); }
+.dial .range { flex: 1; }
+.dial b {
+  flex: none; min-width: 34px; text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px; color: var(--text-2);
+}
+.dial-note { display: block; margin-top: 4px; font-size: 11.5px; }

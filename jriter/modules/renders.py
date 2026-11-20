@@ -332,6 +332,7 @@ def rename(req):
 def dismiss(req):
     """Throw one away. The bytes go too, unless a version is still made of them."""
     render = get(req.params["id"])
+    _to_grave("bury_render", render["id"])
     db.run("DELETE FROM renders WHERE id = ?", (render["id"],))
     still = db.one("SELECT id FROM versions WHERE digest = ? LIMIT 1", (render["digest"],))
     if not still:
@@ -433,3 +434,11 @@ def ROUTES():
         ("PATCH", "/api/renders/<id>"): rename,
         ("DELETE", "/api/renders/<id>"): dismiss,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

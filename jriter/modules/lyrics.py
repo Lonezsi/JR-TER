@@ -202,6 +202,7 @@ def restore(req):
 
 def delete_sheet(req):
     sheet = get_sheet(req.params["id"])
+    _to_grave("bury_sheet", sheet["id"])
     db.run("DELETE FROM lyric_revisions WHERE sheet_id = ?", (sheet["id"],))
     db.run("DELETE FROM lyric_sheets WHERE id = ?", (sheet["id"],))
     if sheet["is_current"]:
@@ -277,3 +278,11 @@ def ROUTES():
         ("DELETE", "/api/lyrics/<id>"): delete_sheet,
         ("GET", "/api/lyric-revisions/<id>"): revision,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

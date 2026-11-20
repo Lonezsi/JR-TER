@@ -17,17 +17,51 @@
 <link rel="stylesheet" href="/jriter.css">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <style>
-/* The door. It borrows the app's tokens and adds nothing of its own but a layout. */
+/* The door. It borrows the app's tokens, and wears the rebuilt app's glass
+   (ui/src/styles/base.css): a light film, lighter at the top where the light is, an inner
+   edge, and a rim that runs along the border, cool where the light lands and warm at the
+   far corner. Written out here because this page loads before any of the app's own styles;
+   the values are that file's, so change them there and here together. */
+:root {
+  --door-film: rgb(255 255 255 / 0.07);
+  --door-edge:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 1px 0 0 rgb(150 200 255 / 0.10),
+    inset -1px 0 0 rgb(255 190 150 / 0.09),
+    inset 0 -1px 0 rgb(255 255 255 / 0.05);
+  --door-rim: linear-gradient(135deg,
+    rgb(200 235 255 / 0.70) 0%, rgb(255 255 255 / 0.20) 14%,
+    rgb(255 255 255 / 0.04) 36%, rgb(255 255 255 / 0.04) 64%,
+    rgb(255 205 170 / 0.26) 86%, rgb(255 175 135 / 0.50) 100%);
+}
 body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4); }
+/* Something behind the glass: glass over a flat colour is just a grey card. */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(55% 45% at 28% 22%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 78% 82%, rgb(120 150 255 / 0.16), transparent 70%);
+}
 .door {
+  position: relative;
   width: min(380px, 100%);
-  background: var(--grad-raised);
-  border: 1px solid var(--line);
+  background: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0)), var(--door-film);
+  border: 0;
   border-radius: var(--r-xl);
   padding: var(--s7) var(--s6) var(--s6);
-  box-shadow: var(--shadow-3), var(--edge-top);
+  box-shadow: var(--door-edge), var(--shadow-3);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
   /* The one screen with nothing else on it, so it may arrive rather than appear. */
   animation: door-in 420ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+/* the rim: a masked layer, because border-image ignores the radius */
+.door::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  background: var(--door-rim); pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 @keyframes door-in {
   from { opacity: 0; transform: translateY(12px) scale(0.985); }
@@ -69,6 +103,13 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
 /* Same reason as the app: an author rule setting display beats the browser's own
    [hidden] rule, and .door label sets display: flex. */
 [hidden] { display: none !important; }
+/* Foyer, the machine's one sign-in: a quiet line above the form, never a wall */
+.foyer-line { margin: 0 0 var(--s4); font-size: 13px; color: var(--text-2); }
+.foyer-line a, .foyer-line button {
+  color: var(--accent); font: inherit; font-weight: 600;
+  background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none;
+}
+.foyer-line a:hover, .foyer-line button:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>
 </head>
 <body>
@@ -100,6 +141,9 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
   <p class="slogan">please post for the world to see</p>
   <p id="blurb">Signing in.</p>
   <div class="problem" id="problem" hidden></div>
+  <!-- Foyer is the front door of this machine and one sign-in for all of it. What this
+       says depends on who Foyer says you are (the state's "foyer"). -->
+  <p class="foyer-line" id="foyerLine" hidden></p>
 
   <label id="codeField" hidden>
     <span id="codeLabel">Setup code</span>
@@ -129,6 +173,11 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
        yet would be an invitation to take it. -->
   <p class="note" id="swap" hidden>
     <a href="#" id="swapLink">I have an invite</a>
+  </p>
+
+  <!-- Signed out, the library opens anyway, as a guest library kept in this browser. -->
+  <p class="note">
+    <a href="/">Keep going without an account</a>
   </p>
 
   <p class="note" id="note">
@@ -182,7 +231,7 @@ async function api(path, body) {
   const text = await response.text();
   let data = {};
   try { data = JSON.parse(text || "{}"); } catch (e) { data = { error: text.slice(0, 200) }; }
-  if (!response.ok) throw new Error(data.error || response.statusText);
+  if (!response.ok) { const e = new Error(data.error || response.statusText); e.status = response.status; throw e; }
   return data;
 }
 
@@ -205,6 +254,10 @@ async function decideMode() {
     if (state.signed_in) { location.href = onwards(); return; }
     mode = state.has_password ? "login" : "setup";
     canSignUp = !!state.can_sign_up;
+    // "Make an account", from a guest library: the invite form straight away when there
+    // could be an invite, and the Foyer line below otherwise.
+    if (mode === "login" && canSignUp && /(^|[?&])new(=|&|$)/.test(location.search)) mode = "signup";
+    if (state.has_password) foyerLine(state.foyer);
   } catch (e) {
     problem("JR!TER is not answering.");
     return;
@@ -263,6 +316,33 @@ function draw() {
   (fresh ? $("code") : $("password")).focus();
 }
 
+/* The Foyer line. Not signed in there: a way to. Signed in there and this library opens
+ * for nobody yet: signing in below once connects the two, and a friend of the owner can
+ * have a library made instead. */
+function foyerLine(f) {
+  const line = $("foyerLine");
+  line.textContent = "";
+  if (!f) {
+    const a = document.createElement("a");
+    a.href = "/foyer/account?next=/";
+    a.textContent = "on Foyer";
+    line.append("A Foyer account works here too: its handle and password below. No account yet? Make one ", a, ".");
+  } else if (f.can_make) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = "make me a library";
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await api("/api/auth/signup", { foyer: true }); location.href = onwards(); }
+      catch (err) { problem(err.message); b.disabled = false; }
+    };
+    line.append("Signed in on Foyer as @" + f.handle + ". Already have a library here? Sign in below once to connect it. If not, ", b, ".");
+  } else {
+    line.append("Signed in on Foyer as @" + f.handle + ". Sign in below once, and Foyer opens this library from then on.");
+  }
+  line.hidden = false;
+}
+
 $("swapLink").addEventListener("click", (e) => {
   e.preventDefault();
   mode = mode === "signup" ? "login" : "signup";
@@ -283,7 +363,16 @@ $("door").addEventListener("submit", async (e) => {
       await api("/api/auth/signup", { code: $("code").value.trim(), password,
                                       handle: $("handle").value.trim() });
     } else {
-      await api("/api/auth/login", { password, handle: $("handle").value.trim() });
+      // One form for both: a JR!TER account here, or a Foyer account (the machine's one
+      // sign in). If the handle isn't one of this library's, Foyer gets to check it.
+      const handle = $("handle").value.trim();
+      try {
+        await api("/api/auth/login", { password, handle });
+      } catch (err) {
+        if (!handle || err.status === 429) throw err;
+        try { await api("/api/auth/foyer-login", { handle, password }); }
+        catch (viaFoyer) { throw viaFoyer.status === 404 ? err : viaFoyer; }
+      }
     }
     location.href = onwards();
   } catch (err) {

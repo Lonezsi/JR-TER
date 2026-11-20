@@ -51,7 +51,7 @@ TAKEN = {
                 "rendered_at", "peak_db", "trouble", "song_id", "version_id"),
     "lyric_sheets": ("id", "song_id", "name", "position", "is_current", "created_at"),
     "lyric_revisions": ("id", "sheet_id", "text", "created_at"),
-    "albums": ("id", "title", "year", "notes", "cover_digest", "cover_ext",
+    "albums": ("id", "title", "year", "notes", "cover_digest", "cover_ext", "stickers",
                "created_at", "updated_at", "opened"),
     "album_songs": ("album_id", "song_id", "position"),
     "playlists": ("id", "title", "album_id", "created_at", "updated_at"),
@@ -87,22 +87,32 @@ TAKEN = {
 SKIPPED = {
     "migrations": "bookkeeping: which schema steps have run",
     "sync_seen": "a cache of every file ever scanned, rebuilt by the next scan",
+    "grave": "deleted things kept for a while; bring them back first to have them in a copy",
 }
 
 #: The peaks columns are deliberately absent from TAKEN. They are a hundred and twenty
 #: numbers per row describing a waveform the export draws nothing with, and they would be
 #: most of the file.
 
-INSIDE = """This is everything JR!TER holds about your library that is text.
+INSIDE = """This is a JR!TER library: everything it holds about your songs, as text.
 
-  library.json   every row it keeps, table by table
-  settings.json  your settings
-  README.txt     this file
+  library.json            every row it keeps, table by table (format "jriter-library",
+                          version 2). This is the part JR!TER reads back in.
+  settings.json           your settings
+  songs/<title>/words.md  each song's current words, as you typed them
+  songs/<title>/song.txt  the song in plain words: renders, arrangement, sound
+  audio/<digest>.<ext>    the audio and pictures, if this copy was taken with audio
+  README.txt              this file
+
+To bring it back, into this library or any other: Settings, Library, Bring a library in.
+That adds what is in here; it never replaces or deletes anything. The format is written
+down in docs/library-format.md in JR!TER's source.
 
 WHAT IS NOT IN HERE
 
-The audio and the artwork. Every render and version in library.json names the SHA-256 of
-its bytes under "digest". The file itself is in your data directory at
+Unless this copy was taken with audio: the audio and the artwork. Every render and version
+in library.json names the SHA-256 of its bytes under "digest". The file itself is in your
+data directory at
 
     data/blobs/<first two characters>/<next two>/<the whole digest>
 
@@ -135,6 +145,84 @@ def _rows():
     return out
 
 
+FORMAT = "jriter-library"
+VERSION = 2
+ABOUT = ("Every row this library keeps, table by table. Ids are this library's own; every "
+         "*_id column points at a row in another table here. Audio and pictures are named by "
+         "the SHA-256 of their bytes (digest) and, when included, sit in audio/<digest>.<ext>. "
+         "Import adds these rows to a library with new ids; it never deletes anything.")
+
+#: Which columns name a file in the blob store, per table.
+BLOB_COLUMNS = {"versions": ("digest", "ext"), "renders": ("digest", "ext"),
+                "artwork": ("digest", "ext"), "vocal_takes": ("digest", "ext"),
+                "albums": ("cover_digest", "cover_ext")}
+
+
+def _slug(title, n):
+    keep = "".join(c if c.isalnum() or c in " -_()'" else " " for c in (title or "untitled"))
+    return ("%03d %s" % (n, " ".join(keep.split())))[:80].strip()
+
+
+def _clock(t):
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(t)) if t else "?"
+
+
+def _song_files(tables):
+    """songs/<title>/words.md and song.txt: the library for people, written from the rows."""
+    out = {}
+    by = lambda name: tables.get(name) or []
+    for n, song in enumerate(sorted(by("songs"), key=lambda r: r.get("id") or 0), 1):
+        sid = song.get("id")
+        folder = "songs/%s/" % _slug(song.get("title"), n)
+        sheets = [s for s in by("lyric_sheets") if s.get("song_id") == sid]
+        current = next((s for s in sheets if s.get("is_current")), sheets[0] if sheets else None)
+        if current:
+            revs = [r for r in by("lyric_revisions") if r.get("sheet_id") == current.get("id")]
+            if revs:
+                latest = max(revs, key=lambda r: (r.get("created_at") or 0, r.get("id") or 0))
+                out[folder + "words.md"] = latest.get("text") or ""
+        lines = ["%s" % (song.get("title") or "untitled"), ""]
+        if (song.get("notes") or "").strip():
+            lines += [song["notes"].strip(), ""]
+        lines.append("Started %s, last touched %s." % (_clock(song.get("created_at")), _clock(song.get("updated_at"))))
+        versions = sorted([v for v in by("versions") if v.get("song_id") == sid], key=lambda v: v.get("n") or 0)
+        if versions:
+            lines += ["", "Renders"]
+            for v in versions:
+                mark = " (current)" if v.get("id") == song.get("current_version_id") else ""
+                secs = v.get("duration") or 0
+                lines.append("  v%s  %s  %d:%02d  %s.%s%s" % (
+                    v.get("n"), v.get("label") or v.get("filename") or "", secs // 60, secs % 60,
+                    v.get("digest"), v.get("ext"), mark))
+        arr = next((a for a in by("arrangements") if a.get("song_id") == sid), None)
+        if arr:
+            lines += ["", "Arrangement", "  %s bpm, beat one at %ss, %s beats a bar, %s" % (
+                arr.get("bpm"), arr.get("offset"), arr.get("per_bar"), "on" if arr.get("enabled") else "off")]
+            try:
+                data = json.loads(arr.get("data") or "{}")
+                for clip in data.get("clips") or []:
+                    lines.append("  %s beats from beat %s" % (clip.get("beats"), clip.get("from")))
+            except (ValueError, AttributeError):
+                pass
+        presets = [p for p in by("sound_presets") if p.get("song_id") == sid]
+        if presets:
+            lines += ["", "Sound presets"]
+            for p in presets:
+                lines.append("  %s%s" % (p.get("name"), " (current)" if p.get("is_current") else ""))
+                lines.append("    " + (p.get("data") or "{}"))
+        out[folder + "song.txt"] = "\n".join(lines) + "\n"
+    return out
+
+
+def _blobs_in(tables):
+    seen = {}
+    for table, (dcol, ecol) in BLOB_COLUMNS.items():
+        for row in tables.get(table) or []:
+            if row.get(dcol):
+                seen[row[dcol]] = row.get(ecol) or "bin"
+    return seen
+
+
 def take(req):
     """The whole library as text, in a zip.
 
@@ -143,6 +231,9 @@ def take(req):
     """
     when = time.strftime("%Y-%m-%d %H:%M")
     body = {
+        "format": FORMAT,
+        "version": VERSION,
+        "about": ABOUT,
         "taken_at": time.time(),
         "library": config.settings().get("library_name", "JR!TER"),
         "tables": _rows(),
@@ -155,6 +246,15 @@ def take(req):
         z.writestr("settings.json", json.dumps(config.settings(), indent=1,
                                                ensure_ascii=False))
         z.writestr("README.txt", INSIDE % (when, body["library"]))
+        for name, text in _song_files(body["tables"]).items():
+            z.writestr(name, text)
+        # With audio when asked: Settings has the two buttons, since a real library is
+        # gigabytes and most copies are for the words.
+        if req is not None and req.q("audio") in ("1", "true", "yes"):
+            for digest, ext in _blobs_in(body["tables"]).items():
+                if blobs.exists(digest):
+                    z.write(blobs.path_for(digest), "audio/%s.%s" % (digest, ext),
+                            compress_type=zipfile.ZIP_STORED)
     name = "jriter-%s.zip" % time.strftime("%Y-%m-%d")
     # "download", not a Content-Disposition of our own: the HTTP layer builds that header
     # itself in _file, and a raw one set here is dropped on the floor. It was, and the zip
@@ -270,6 +370,134 @@ def erase(req):
     }
 
 
+# ── bringing a library in ──────────────────────────────────────────────────────────────
+
+#: What an import reads, in the order rows can be made (everything a row points at first).
+#: The rest of TAKEN belongs to the machine or account that made it and never comes in.
+IMPORTED = ["songs", "song_titles", "albums", "album_songs", "versions", "renders",
+            "lyric_sheets", "lyric_revisions", "artwork", "sound_presets", "arrangements",
+            "playlists", "playlist_items", "vocal_takes"]
+#: column -> the table whose new ids it must be rewritten to.
+POINTS_AT = {"song_id": "songs", "album_id": "albums", "sheet_id": "lyric_sheets",
+             "playlist_id": "playlists", "render_id": "renders", "version_id": "versions",
+             "current_version_id": "versions"}
+#: The most a library file may be: a guest library with its audio, or a copy taken with it.
+MAX_IMPORT = 4 * 1024 ** 3
+
+
+def bring_in(req):
+    """Add the songs, albums, playlists and everything about them from a library file.
+
+    Adds, never replaces: every row gets a new id, and every reference is rewritten to the
+    new ids. A row naming audio that is neither in the file nor already here is skipped and
+    counted, rather than leaving a render that cannot play.
+    """
+    length = int(req.headers.get("Content-Length") or 0)
+    if length <= 0:
+        raise Error("That upload had no file in it.")
+    if length > MAX_IMPORT:
+        raise Error("That file is bigger than a library file can be.", 413)
+    handle, path = tempfile.mkstemp(prefix="jriter-import-", suffix=".zip")
+    try:
+        with os.fdopen(handle, "wb") as f:
+            left = length
+            while left > 0:
+                chunk = req.rfile.read(min(1 << 20, left))
+                if not chunk:
+                    break
+                f.write(chunk)
+                left -= len(chunk)
+        try:
+            z = zipfile.ZipFile(path)
+        except zipfile.BadZipFile:
+            raise Error("That isn't a JR!TER library file (it isn't a zip).")
+        with z:
+            try:
+                body = json.loads(z.read("library.json").decode("utf-8"))
+            except KeyError:
+                raise Error("That zip has no library.json, so it isn't a JR!TER library file.")
+            except ValueError:
+                raise Error("The library.json in that file is damaged.")
+            if body.get("format", FORMAT) != FORMAT or int(body.get("version", 1)) > VERSION:
+                raise Error("That library file is from a newer JR!TER than this one. Update first.")
+            names = set(z.namelist())
+            return _bring_in_tables(body.get("tables") or {}, z, names)
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def _bring_in_tables(tables, z, names):
+    new_ids = {t: {} for t in IMPORTED}
+    counts = {"songs": 0, "albums": 0, "playlists": 0, "renders": 0, "lyrics": 0, "missing_audio": 0}
+    later = []          # (table, new id, column, old value): references to rows made after
+
+    def have_blob(digest, ext):
+        if not digest:
+            return True
+        if blobs.exists(digest):
+            return True
+        inside = "audio/%s.%s" % (digest, ext or "bin")
+        if inside not in names:
+            return False
+        stored, _ = blobs.put_bytes(z.read(inside))
+        return stored == digest
+
+    for table in IMPORTED:
+        if not db.table_exists(table) or table not in tables:
+            continue
+        have = set(db.columns(table))
+        for row in tables[table]:
+            if not isinstance(row, dict):
+                continue
+            blob = BLOB_COLUMNS.get(table)
+            if blob and not have_blob(row.get(blob[0]), row.get(blob[1])):
+                if table == "albums":
+                    row = dict(row, **{blob[0]: None, blob[1]: None})
+                else:
+                    counts["missing_audio"] += 1
+                    continue
+            values = {}
+            skip = False
+            for col, value in row.items():
+                if col == "id" or col not in have:
+                    continue
+                target = POINTS_AT.get(col)
+                if target and value is not None:
+                    mapped = new_ids.get(target, {}).get(value)
+                    if mapped is None:
+                        if target == "versions" and table == "songs":
+                            later.append((table, None, col, value))
+                            continue
+                        if col in ("song_id", "sheet_id", "playlist_id") or (col == "album_id" and table == "album_songs"):
+                            skip = True          # its owner didn't come in
+                            break
+                        value = None             # an optional link to something that didn't
+                    else:
+                        value = mapped
+                values[col] = value
+            if skip:
+                continue
+            new_id = db.insert(table, values)
+            if "id" in row:
+                new_ids[table][row["id"]] = new_id
+            for i, (t, nid, c, v) in enumerate(later):
+                if t == table and nid is None:
+                    later[i] = (t, new_id, c, v)
+            counts_key = {"songs": "songs", "albums": "albums", "playlists": "playlists",
+                          "versions": "renders", "renders": "renders", "lyric_sheets": "lyrics"}.get(table)
+            if counts_key:
+                counts[counts_key] += 1
+    # A song's current render points at a render made after the song.
+    for table, nid, col, old in later:
+        mapped = new_ids["versions"].get(old)
+        if nid and mapped:
+            db.update(table, nid, {col: mapped})
+    return counts
+
+
 def SUMMARY():
     return {"tables": len(TAKEN)}
 
@@ -279,4 +507,5 @@ def ROUTES():
         ("GET", "/api/export"): take,
         ("GET", "/api/export/erase"): what_erase_takes,
         ("POST", "/api/export/erase"): erase,
+        ("POST", "/api/import"): bring_in,
     }

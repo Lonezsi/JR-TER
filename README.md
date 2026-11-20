@@ -9,7 +9,9 @@ album membership, and its own playback settings. The website is where you browse
 compare mixes and organise. The desktop agent watches the folder your exports land in and
 puts new renders where they belong.
 
-Standard library Python and plain browser JavaScript. No dependencies, no build step.
+The server is standard library Python with no dependencies. The interface is Svelte 5 and
+TypeScript in `ui/`, built once into `web/` (`cd ui && npm run ship`); the server only ever
+serves the built files, so running JR!TER needs Python and nothing else.
 
 ## Install it
 
@@ -42,6 +44,13 @@ python server.py --open
 ```
 
 Then open http://127.0.0.1:7900.
+
+On a Mac or Linux, one line too (it asks, optionally, whether to open it to your home
+network and whether to set up Tailscale; neither is needed):
+
+```
+curl -fsSL https://raw.githubusercontent.com/Lonezsi/JR-TER/main/install.sh | bash
+```
 
 ### Right click menu
 
@@ -105,92 +114,96 @@ Features are easy to list and harder to place. This is the job each one does, wr
 the moment you are actually in when you want it.
 
 **You just bounced a mix and want to know if it is better than the last one.**
-Drop it on the song. It becomes v14 and v13 stays exactly where it was. Put them in A and
-B and press `X`: both play at once with one silent, so the switch lands on the same bar of
-the other mix with no gap and no fade. That is the one thing this app is built around.
+Drop it on the song. It becomes v14 and v13 stays exactly where it was. On the song's
+**Sound** tab put them in A and B and press `X`: both play at once with one silent, so the
+switch lands on the same bar of the other mix with no gap and no fade. Once B holds
+something, the player says which one you're hearing.
 
 **You bounced forty things and have no idea what half of them are.**
-They go in **Renders** and wait. A render arrives knowing the name of the project it came
-out of and nothing else; which song it belongs to is a question for later, when you are
-looking at the library rather than at a console that is about to close. Play one from the
-list before deciding. Nothing is filed until you file it.
+They go in the **Inbox** and wait. A render arrives knowing the name of the project it
+came out of and nothing else; which song it belongs to is a question for later. Play one
+from the list before deciding. Nothing is filed until you file it.
 
 **The exports folder is where the renders are and you do not want to carry them.**
-Point **Folders** at it. JR!TER notices new bounces arriving, reads that folder and never
-writes to it, and imports nothing until you say so.
+Point **Folders** (in the Inbox) at it. JR!TER notices new bounces arriving, reads that
+folder and never writes to it, and imports nothing until you say so.
 
 **The mix sounds right on headphones and wrong in the car.**
-The **Sound** panel is an equaliser and a limiter that exist only while you listen. Build
-a preset for each place you check mixes, then A and B two equalisers on the same bounce.
-Nothing is ever written into the file, so nothing here can damage a mix.
+**Sound** is a chain of effects you build yourself (EQ, compressor, drive, delay, reverb,
+width, gain, limiter), each with its own presets, and a preset per song for each place you
+check mixes. It exists only while you listen: nothing is ever written into the file.
 
 **The words do not fit the section.**
 Open **Arrange**. JR!TER listens to the render, works out the tempo and splits it into
-sections, and lays it out as it already is. Drag an edge to take four bars out of the
-intro; double click a section to send the chorus round twice. One track, everything on a
-beat. It is not a DAW and does not want to be: it answers the question "what if that part
-were shorter", and the render on disk is never rewritten.
+sections, laid out as it already is. Drag an edge to take four bars out of the intro;
+double click a section to send the chorus round twice. It answers "what if that part were
+shorter", and the render on disk is never rewritten.
 
-**You want to know which words land where.**
-Point a lyric card at a section. When that section plays, the card lights up, whether or
-not the compositor panel is open.
+**You're writing and want the words to land.**
+The **Words** tab marks the vowels of every line, gives each line its rhyme letter, and
+checks each verse against the shape it's closest to (ABAB, AABB and the rest), in
+Hungarian and English, even mixed in one line. Press the rhyme button (or `Alt R`) on a
+line and it works out what that line should rhyme with, lights that word up and lists
+rhymes for it; click another word to rhyme with that one instead. A line ending in `//`
+is left alone: no warnings. Text in `()`, `<>`, `{}` and `[]` is an aside, drawn dimmer
+and left out of the rhyme. All of it runs in the browser, no AI, nothing sent anywhere.
 
 **You are rewriting a verse and do not want to lose the one you have.**
 A song holds several sets of words at once, and each keeps its own history. The first line
-is the title, so there is nothing to name. Looking at an old revision is looking, not
-restoring.
+is the title, so there is nothing to name.
 
 **You have a hundred songs and a shelf of grey rectangles.**
-Give them **artwork**. The library is the only place you will ever scan quickly, and the
-picture is what you scan by.
+Give them **artwork**. The library is the place you scan quickly, and the picture is what
+you scan by. Pin the ones you're working on and they sit at the top of the sidebar.
 
 **The face used for titles is not the one you want.**
-Upload your own in **Settings**. JR!TER ships Orbitron because a licensed or shareware font
+Upload your own in **Settings › Appearance**. JR!TER ships Orbitron because a licensed font
 cannot live in a public repository; yours stays in your own data directory.
 
 ---
 
 ## What it does
 
-**Versions.** Every render of a song is kept and numbered. Upload one and it becomes v14;
-the ones before it stay exactly where they were.
+**Renders.** Every render of a song is kept and numbered. Upload one and it becomes v14;
+the ones before it stay where they were. Storage is content addressed, so the same bytes
+arriving twice are one file, and attaching an inbox render to a song copies nothing.
 
-**A/B comparison.** Put two versions in slots A and B and switch between them. Both decks
-play at once with one of them silent, so the switch is a gain change on the next audio
-block: the same bar of the other mix, no gap and no fade. That is the feature the player
-is built around. Press **X** to swap.
+**A/B.** Two slots on the Sound tab, each a render and a sound. Both decks play at once
+with one silent, so the switch is a gain change on the next audio block. `X` swaps.
 
-**Lyrics with alternatives.** A song has several lyric sheets and one of them is current.
-Arrow keys page between them sideways. Each alternative keeps its own history, so trying a
-different second verse never costs you the first, and restoring an old text is a new
-revision rather than an overwrite.
+**Sound.** A rack of effects per preset, in the order you drag them into. The EQ is a real
+one: double click to add a band, drag it, wheel for Q. The curve is the actual response of
+the filter chain, with a spectrum behind it. Playback only; the file never changes.
 
-**The renders list.** A bounce arrives and waits there, keeping the name of the project it
-came out of, until you say which song it is a version of. The same bytes arriving twice
-from two places are one entry, and attaching one to a song copies nothing: storage is
-content addressed, so a version is a row pointing at bytes that are already there.
+**Words.** Several sets per song, each with history. Rhyme marks, letters, verse shapes and
+warnings, a rhyme finder over shipped Hungarian and English word lists (`ui/public/lexicon`,
+built by `tools/build_lexicon.py`), all local.
 
-**The compositor.** One track, every edge on a beat. JR!TER listens to the render, guesses
-the tempo, splits it into sections and lays it out as it already is, so switching it on
-changes nothing you can hear and the next edit does. Trim, move, duplicate, remove. While
-it is on, A and B compare two equalisers rather than two takes, because one set of
-scheduled clips feeds both decks. The tempo is a guess and says so; halve, double and tap
-are next to the number because no detector settles the octave reliably.
+**Arrange.** One track, every edge on a beat, guessed from the render and then yours.
 
-**A real equaliser.** Not a bank of fixed sliders. Double click the display to add a node,
-drag it to move it in frequency and gain, roll the wheel over it to change Q, right click
-to remove it. Bells, shelves, cuts and notches, up to 24 bands. The curve drawn is the
-actual response of the filter chain, read back from the audio graph, with a spectrum
-analyser behind it. There is a limiter with a gain reduction meter, and per-song presets
-(Current, Car, Headphones, Loud) you can A/B.
+**Vocals.** Record over the song (the mic and the output are picked next to Record), or
+upload takes. Takes are vocals; renders are mixes.
 
-All of that is **playback processing**. Your uploaded render is never modified.
+**Albums and playlists.** An album is a cover, a year and an order; a song can sit on
+several. A playlist can hold songs and loose renders together.
 
-**Albums.** Cover, year, ordered songs. A song can sit on several albums, and its position
-belongs to the album rather than to the song.
+**Release.** Render the song through its sound and arrangement and upload it to YouTube
+(the account is connected once, in Settings), or record a link you posted by hand.
 
-**YouTube.** JR!TER does not upload for you. It records which render went up, so six
-versions later you still know what is actually online.
+**The grave.** Deleting has Undo, and what you delete waits in the Grave for 30 days:
+bring it back whole (a song returns with its renders, words, artwork and its places on
+albums and in playlists), or let it go. Its audio stays until it leaves the grave for good.
+
+**Accounts.** Without one, JR!TER is a guest library kept in your browser, everything
+included. On a machine that also runs Foyer, a Foyer handle and password work on the sign
+in page, and `data/foyer-owner.txt` (one line, a Foyer handle) names which Foyer account
+is the owner.
+
+**Light and dark.** Settings, Appearance, Theme: the glass at night, a soft neumorphic
+look by day.
+
+**Phone.** The sidebar follows your thumb from the edge, Back closes whatever is on top,
+and the player grows out of the mini bar.
 
 ---
 
@@ -364,22 +377,23 @@ To add a feature, write `jriter/modules/yours.py` with `SCHEMA` and `ROUTES()`, 
 ```
 server.py              start it
 jriter/
-  config.py            paths, and the module list
+  config.py            paths, the module list, settings defaults
   db.py                sqlite, one connection per thread
   blobs.py             content addressed storage
-  http.py              routing, static bundling, byte ranges for audio
+  http.py              routing, static files, byte ranges for audio
   registry.py          loads whichever modules are switched on
-  wire.py              what a route handler receives and returns
   devlog.py            the release notes, and the version they name
-  audio_meta.py        duration and bitrate, without a third party library
   modules/             one file per feature
-web/
-  index.html
-  css/                 bundled in filename order
-  js/                  bundled in filename order
-client/
-  jriter_client.py       the desktop agent
-tests/                 111 tests, run with: python -m pytest tests -q
+ui/                    the interface: Svelte 5 + TypeScript, built with Vite
+  src/shell/           sidebar, phone drawer, player, search, Now Playing
+  src/views/           one folder or file per screen
+  src/lib/             player and audio engine, rhyme engine (lib/lyrics), glass
+  src/ui/              shared controls (Dropdown, Segmented, Slider, menus, sheets)
+  public/lexicon/      the word lists the rhyme finder uses
+web/                   what `npm run ship` builds; the server serves this
+client/                the desktop agent
+tools/                 build_lexicon.py and other one-off builders
+tests/                 python -m pytest -q
 data/                  your library. Not in git.
 ```
 
@@ -392,13 +406,23 @@ one directory.
 
 | | |
 |---|---|
+| `Ctrl` `K` | search, or jump to anything (`>` for commands) |
 | `Space` | play or pause |
 | `X` | swap A and B |
-| `/` | search |
-| `←` `→` | page between lyric alternatives |
 | `Shift` `←` `→` | previous or next song |
-| `Backspace` | remove the selected section, in the compositor |
-| `Esc` | close a dialog |
+| `←` `→`, `0`-`9` | move through the song |
+| `Q` | the queue |
+| `R` | repeat |
+| `N` | new song |
+| `G` then `L` `I` `S` `P` | go to Library, Inbox, Settings, the song playing |
+| `Alt` `1`-`6` | song tabs |
+| `Alt` `R` | rhymes for this line (in the words) |
+| `F2` | rename |
+| `[` | show or hide the sidebar |
+| `?` | every shortcut |
+| `Esc` | close the top thing |
+
+None of it shows on a phone.
 
 ---
 

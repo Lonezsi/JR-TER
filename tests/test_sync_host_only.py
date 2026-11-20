@@ -123,24 +123,20 @@ def test_the_page_agrees_with_the_server_about_who_owns_the_machine():
     """
     import io
     here = os.path.dirname(os.path.abspath(__file__))
-    web = os.path.join(os.path.dirname(here), "web", "js")
-    boot = io.open(os.path.join(web, "90-boot.js"), encoding="utf-8").read()
-    view = io.open(os.path.join(web, "74-view-sync.js"), encoding="utf-8").read()
+    src = os.path.join(os.path.dirname(here), "ui", "src")
+    app = io.open(os.path.join(src, "lib", "app.svelte.ts"), encoding="utf-8").read()
+    shell = io.open(os.path.join(src, "shell", "Shell.svelte"), encoding="utf-8").read()
+    inbox = io.open(os.path.join(src, "views", "Inbox.svelte"), encoding="utf-8").read()
 
-    rail = boot[boot.index("async function buildRail("):]
-    rail = rail[:rail.index("\n}")]
-    line = [l for l in rail.splitlines() if '"Folders"' in l or "'Folders'" in l]
-    assert line, "the rail has no Folders item at all"
-    guarded = rail[max(0, rail.index(line[0]) - 200):rail.index(line[0])]
-    assert "J.ownsTheMachine(state)" in guarded, (
-        "the rail offers Folders to every account, and the server refuses all but one")
+    palette = [l for l in shell.splitlines() if "Watched folders" in l]
+    assert palette, "the palette has no Folders item at all"
+    assert "ownsTheMachine()" in palette[0], (
+        "the palette offers Folders to every account, and the server refuses all but one")
 
-    render = view[view.index("J.views.sync = {"):]
-    render = render[:render.index("async function loadFolders")]
-    assert "J.ownsTheMachine(J.state)" in render, (
-        "the Folders screen draws its controls before asking whose machine it is")
+    assert "const sourcesOk = $derived(has(\"sync\") && ownsTheMachine());" in inbox, (
+        "the Inbox draws the watched folders before asking whose machine it is")
 
-    owns = boot[boot.index("J.ownsTheMachine = (state) => {"):]
+    owns = app[app.index("export const ownsTheMachine = () => {"):]
     owns = owns[:owns.index("\n};")]
     assert "!auth ||" in owns, (
         "with the door off there is no auth summary, and the only person is the owner")

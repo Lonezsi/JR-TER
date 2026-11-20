@@ -105,6 +105,9 @@ def test_the_notice_names_every_place_the_code_can_reach(request):
                              "that page that leaves.",
         "www.w3.org": "the SVG namespace, which is an identifier and not an address",
         "example.invalid": "a test double's address, reserved and unroutable",
+        "svelte.dev": "inside the framework's own error messages in the built interface, "
+                      "as text a developer reads in a console when something throws. The "
+                      "page never requests it.",
     }
 
     missing = {host: sorted(where) for host, where in found.items()
@@ -145,92 +148,44 @@ def test_the_notice_does_not_borrow_a_class_the_app_already_uses():
         "silently inherits whatever those rules do: %s" % sorted(clash))
 
 
-def test_there_are_three_ways_to_the_notice_and_none_of_them_is_hidden():
+def _ui(*parts):
+    with open(os.path.join(ROOT, "ui", "src", *parts), encoding="utf-8") as f:
+        return f.read()
+
+
+def test_there_are_ways_to_the_notice_and_none_of_them_is_hidden():
     """A notice nobody can find is the same as no notice.
 
     Three, because each answers a different moment: the door, for somebody deciding
-    whether to hand anything over; the rail, which is on every screen; and the foot of
-    each page, for whoever has read to the end of one and wondered. Removing any of them
-    is silent in a browser, so it is checked here instead.
+    whether to hand anything over; the sidebar, which is on every screen; and Settings,
+    for whoever went looking for it there. Removing any of them is silent in a browser,
+    so it is checked here instead.
     """
     door = _read("login.html")
     assert 'href="/legal"' in door, "the door no longer offers the terms"
 
-    shell = _read("index.html")
-    assert 'class="rail-legal"' in shell and 'href="/legal"' in shell
-    # Icon only, so without this it is a link a screen reader announces as "link".
-    assert 'aria-label="Terms and privacy"' in shell
+    sidebar = _ui("shell", "Sidebar.svelte")
+    assert re.search(r'<a href="/legal"[^>]*>Terms</a>', sidebar), \
+        "the sidebar no longer links to the terms"
+    assert 'title="Terms and privacy"' in sidebar
 
-    foot = ""
-    with open(os.path.join(WEB, "js", "82-page-foot.js"), encoding="utf-8") as f:
-        foot = f.read()
-    assert 'href="/legal"' in foot
-
-    # And the one call that puts it on every screen. Without it the module still loads,
-    # nothing throws, and the foot is simply never on any page.
-    with open(os.path.join(WEB, "js", "80-router.js"), encoding="utf-8") as f:
-        assert "J.pageFoot.attach(" in f.read(), (
-            "the router no longer attaches the page foot, so no screen has one")
+    assert 'href="/legal"' in _ui("views", "settings", "About.svelte"), \
+        "Settings, About no longer links to the terms"
 
 
-def test_the_page_foot_is_owned_in_one_place():
-    """It survives thirty four places writing root.innerHTML because a MutationObserver
-    puts it back, not because each of those remembers to re-emit it.
+def test_a_link_to_the_notice_leaves_the_app_in_a_new_tab():
+    """/legal is a page of its own, not a route: it has to be a real navigation, and in a
+    new tab so that it never costs somebody the song or the unsaved words they were on.
 
-    If a view ever hand writes its own, that view's copy stops being the one this module
-    manages: two would show after an in place refresh, and only on that screen.
+    That is also why the old lyric editor's history.back() trick, which cancelled a link
+    that left the document, has no counterpart: nothing here pushes a history entry.
     """
-    folder = os.path.join(WEB, "js")
-    guilty = []
-    for name in sorted(os.listdir(folder)):
-        if name == "82-page-foot.js":
-            continue
-        with open(os.path.join(folder, name), encoding="utf-8") as f:
-            if "page-foot" in f.read():
-                guilty.append(name)
-    assert not guilty, (
-        "these write their own page foot instead of leaving it to 82-page-foot.js, which "
-        "means two of them after an in place refresh: %s" % guilty)
-
-
-def test_a_link_out_of_the_app_is_not_cancelled_by_the_lyric_editor():
-    """The one real fault the three new links exposed.
-
-    Every link in this app used to be a hash: the router handles it, no document unloads.
-    A link to /legal is the first that actually leaves, and leaving is what broke it.
-
-    Focus goes the moment a press goes down, so the lyric editor's blur starts saving
-    while the button is still held, and the link does not begin navigating until it comes
-    up. The history.back() that the save fires to give back its Back stop is queued rather
-    than immediate, and the queued traversal lands after the navigation has begun and
-    cancels it. Measured in a browser: with a stop entry pushed and back() queued on a
-    zero timeout, a navigation started immediately after simply does not happen.
-
-    So the editor asks first whether the press that started all this was on a link out of
-    here. Checked statically because there is no JS runtime in this suite, and the
-    alternative is that somebody deletes the guard and the only symptom is a link that
-    quietly does nothing, but only while you happen to be writing words.
-    """
-    folder = os.path.join(WEB, "js")
-    with open(os.path.join(folder, "00-util.js"), encoding="utf-8") as f:
-        util = f.read()
-    assert "J.pressIsLeaving" in util and "pointerdown" in util, (
-        "00-util.js no longer tracks whether the press in progress leaves the document")
-    # Set on the way down. On the way up is too late: the blur, and everything it starts,
-    # has already happened by then.
-    assert 'addEventListener("pointerdown"' in util
-
-    with open(os.path.join(folder, "62-panel-lyrics.js"), encoding="utf-8") as f:
-        lyrics = f.read()
-    assert "J.pressIsLeaving()" in lyrics, (
-        "the lyric editor no longer asks whether the press was on a link out of the "
-        "document, so its history.back() will cancel that link's navigation and the "
-        "terms link will silently do nothing while you are writing words")
-    guard = lyrics.index("J.pressIsLeaving()")
-    back = lyrics.index("window.history.back()")
-    assert guard < back, (
-        "the lyric editor calls history.back() without first asking whether the press "
-        "was on a link out of the document, which cancels that link's navigation")
+    for where in (("shell", "Sidebar.svelte"), ("views", "settings", "About.svelte"),
+                  ("views", "settings", "Library.svelte")):
+        for link in re.findall(r'<a [^>]*href="/legal"[^>]*>', _ui(*where)):
+            assert 'target="_blank"' in link and "noopener" in link, (
+                "%s opens the notice in the app's own tab, or without noopener: %s"
+                % ("/".join(where), link))
 
 
 def test_no_stylesheet_reaches_for_a_token_that_does_not_exist():
@@ -239,38 +194,38 @@ def test_no_stylesheet_reaches_for_a_token_that_does_not_exist():
     The rule does not error, does not warn, and does not apply: the property keeps
     whatever it inherited, so the page looks almost right and nobody looks twice. This
     happened. --text-1 was invented by pattern from --text-2 and --text-3, which do
-    exist, and shipped in four rules across two files. The terms page's sub-headings, its
-    bold text and its code all quietly stayed body colour, and the rail icon's hover did
-    nothing at all.
+    exist, and shipped in four rules across two files.
 
-    The JavaScript counts as a definition. Several properties are only ever set as an
-    inline style on the element that needs them, which is the right way to hand a number
-    from a layout to a stylesheet, and a check that only read the CSS would call every
-    one of those a fault.
+    The TypeScript and the components count as definitions. Several properties are only
+    ever set as an inline style (style:--hue, setProperty) on the element that needs them,
+    which is the right way to hand a number from a layout to a stylesheet, and a check
+    that only read the CSS would call every one of those a fault.
     """
-    def read_all(folder, *exts):
-        # The material first, when a stylesheet is being asked for: it defines most of the
-        # tokens now and a var() naming one of them is not a fault. Without this the check
-        # would report the whole shared palette as undefined.
+    def collect(folder, exts):
         out = ""
-        if ".css" in exts:
-            material = os.path.join(os.path.dirname(ROOT), "foyer", "shared", "glass.css")
-            if os.path.isfile(material):
-                with open(material, encoding="utf-8") as f:
-                    out += f.read()
-        for name in sorted(os.listdir(folder)):
-            if os.path.splitext(name)[1] in exts:
-                with open(os.path.join(folder, name), encoding="utf-8") as f:
-                    out += f.read()
+        for here, dirs, names in os.walk(folder):
+            dirs[:] = [d for d in dirs if d != "node_modules"]
+            for name in sorted(names):
+                if os.path.splitext(name)[1] in exts:
+                    with open(os.path.join(here, name), encoding="utf-8") as f:
+                        out += f.read()
         return out
 
-    css = read_all(os.path.join(WEB, "css"), ".css")
-    js = read_all(os.path.join(WEB, "js"), ".js")
-    pages = "".join(_read(n) for n in ("legal.html", "login.html", "index.html"))
-    everything = css + js + pages
+    everything = collect(os.path.join(ROOT, "ui", "src"), (".css", ".svelte", ".ts"))
+    everything += collect(os.path.join(WEB, "css"), (".css",))
+    everything += "".join(_read(n) for n in ("legal.html", "login.html", "index.html"))
+    # The material first: it defines most of the tokens now and a var() naming one of
+    # them is not a fault. Without this the check would report the whole shared palette
+    # as undefined.
+    material = os.path.join(os.path.dirname(ROOT), "foyer", "shared", "glass.css")
+    if os.path.isfile(material):
+        with open(material, encoding="utf-8") as f:
+            everything += f.read()
 
     defined = set(re.findall(r"(--[\w-]+)\s*:", everything))
     defined |= set(re.findall(r"""setProperty\(\s*["'](--[\w-]+)""", everything))
+    # style:--name={...} and style="--name: ..." in markup.
+    defined |= set(re.findall(r"style:(--[\w-]+)", everything))
     used = set(re.findall(r"var\(\s*(--[\w-]+)", everything))
     # A var() carrying its own fallback is not relying on the name being there.
     with_fallback = set(re.findall(r"var\(\s*(--[\w-]+)\s*,", everything))

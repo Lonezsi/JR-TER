@@ -179,6 +179,7 @@ def change_take(req):
 def drop_take(req):
     take = _take(req.params["id"])
     _mine_or_refuse(take)
+    _to_grave("bury_take", take["id"])
     db.run("DELETE FROM vocal_takes WHERE id = ?", (take["id"],))
     return {"deleted": take["id"]}
 
@@ -209,3 +210,11 @@ def ROUTES():
         ("DELETE", "/api/vocals/<id>"): drop_take,
         ("GET", "/api/vocals/<id>/audio"): audio,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

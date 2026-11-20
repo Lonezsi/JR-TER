@@ -44,7 +44,14 @@ def test_the_page_offers_no_editing_to_a_reader():
     import io
     import os
     view = io.open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                "web", "js", "56-view-orarend.js"), encoding="utf-8").read()
-    assert "const READONLY = !!data.readonly;" in view
-    assert view.count('${READONLY ? "" : \'<button class="btn primary" id="ttNew"') == 2
-    assert '${READONLY ? "" : `<div class="tt-sheet-tools">' in view
+                                "ui", "src", "views", "Orarend.svelte"), encoding="utf-8").read()
+    assert "const readonly = $derived(!!week?.readonly);" in view
+    # Every way in to a write is behind it: the button, the keys, the context menu and the
+    # functions themselves, so a reader who reaches one some other way still changes nothing.
+    assert "{#if week && !readonly}" in view, "the New button"
+    assert "...(readonly ? [] : [" in view, "the edit, copy and delete menu items"
+    for header in ("async function drop(entry: Entry) {", "async function create(day?: number) {",
+                   "async function edit(entry: Entry) {"):
+        at = view.index(header)
+        assert "if (readonly" in view[at:at + len(header) + 40],             "%s can be reached by a reader" % header.split("(")[0]
+    assert view.count("&& !readonly") >= 3, "the keyboard shortcuts"

@@ -136,21 +136,6 @@ def test_a_reused_id_is_never_answered_from_the_cache(library):
     assert status == 304, "an unchanged file is fetched in full every time"
 
 
-def test_the_page_asks_for_a_take_by_its_bytes_too():
-    vox = _src("64-panel-vocals.js")
-    assert '"?v=" + encodeURIComponent(take.digest' in vox
-    assert "fetch(J.vocalUrl(take))" in vox
-
-
-def test_the_vocal_edit_only_renders_once_left_alone():
-    fx = _src("65-vocal-fx.js")
-    assert "QUIET_MS = 800" in fx and "if (performance.now() < quietUntil) { kick(); return; }" in fx
-    # Autotune and the envelopes run in a worker, not on the page.
-    assert "new Worker(url)" in fx and 'work("autotune"' in fx
-    # The ducker is taken out when nothing needs it.
-    assert "nodes.from.connect(nodes.to);" in fx
-
-
 def test_an_edit_holds_only_effects_the_page_knows(library):
     owner, friend, song, on = _setup(library)
     status, made = _record(library, owner, "/api/songs/%d/vocals" % song)
@@ -168,42 +153,60 @@ def test_an_edit_holds_only_effects_the_page_knows(library):
 import io
 import os
 
-WEB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "js")
+WEB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                   "ui", "src", "lib", "audio")
 
 
 def _src(name):
     return io.open(os.path.join(WEB, name), encoding="utf-8").read()
 
 
+def test_the_page_asks_for_a_take_by_its_bytes_too():
+    vox = _src("vocals.svelte.ts")
+    assert '+ "?v=" + encodeURIComponent(take.digest || "")' in vox
+    assert "fetch(vocalUrl(take))" in vox
+
+
+def test_the_vocal_edit_only_renders_once_left_alone():
+    fx = _src("vocals.svelte.ts")
+    assert "QUIET_MS = 800" in fx and "if (performance.now() < quietUntil) { kick(); return; }" in fx
+    # Autotune and the envelopes run in a worker, not on the page.
+    assert "new Worker(new URL(" in fx and 'work<Float32Array[]>("autotune"' in fx
+    # The ducker is taken out when nothing needs it.
+    assert "from.disconnect();" in fx and "try { nodes.from.disconnect(); }" in fx
+
+
 def test_the_layers_follow_the_audio_and_not_the_screen():
     """The player's own position is kept by the paint loop, which stops in a tab that is
     not being drawn: a phone with the screen off. Measured: it sat at 0:00.9 while the song
     looped three times. Everything that follows the music reads the audio's clock."""
-    vox = _src("64-panel-vocals.js")
-    assert "J.player.state.position" not in vox, "the layers follow the paint loop again"
-    assert vox.count("J.player.now()") >= 3
-    assert "now() {" in _src("40-player.js")
+    vox = _src("vocals.svelte.ts")
+    assert "player.position" not in vox, "the layers follow the paint loop again"
+    assert vox.count("now()") >= 3
+    assert "export function now" in io.open(os.path.join(WEB, "..", "player.svelte.ts"),
+                                            encoding="utf-8").read()
 
 
 def test_nothing_runs_while_the_song_is_not_playing():
     """No timer, no decoding, no CPU unless this song is the one playing."""
-    vox = _src("64-panel-vocals.js")
-    watch = vox[vox.index("function watch() {"):vox.index("J.on(\"player:change\"")]
+    vox = _src("vocals.svelte.ts")
+    watch = vox[vox.index("function watch() {"):vox.index("setInterval(() => {", vox.index("function watch() {"))]
     assert "if (!here()) { stopAll(); return; }" in watch, "the watcher runs with nothing playing"
 
 
 def test_each_pass_round_the_loop_is_its_own_take():
-    vox = _src("64-panel-vocals.js")
-    loop = vox[vox.index("rec.loop = setInterval("):vox.index("draw();\n  }\n\n  function stop()")]
+    vox = _src("vocals.svelte.ts")
+    at = vox.index("state.loop = setInterval(")
+    loop = vox[at:vox.index("}, 100);", at)]
     assert "rec.recorder.stop();" in loop and "rec.recorder = segment();" in loop
-    assert 'J.player.state.repeat = "one"' in vox, "the song does not loop while recording"
+    assert 'player.repeat = "one"' in vox, "the song does not loop while recording"
 
 
 def test_a_take_is_placed_earlier_by_the_latency_it_was_recorded_through():
-    vox = _src("64-panel-vocals.js")
-    assert "outputLatency" in vox and "Math.max(0, J.player.now() - lag)" in vox
+    vox = _src("vocals.svelte.ts")
+    assert "outputLatency" in vox and "Math.max(0, now() - lag)" in vox
 
 
 def test_guests_are_offered_deleting_only_their_own():
-    vox = _src("64-panel-vocals.js")
-    assert "const mayChange = (t) => t.yours || !J.sharedAs;" in vox
+    vox = _src("vocals.svelte.ts")
+    assert "export const mayChange = (take: VocalTake) => !!take.yours || !guest.current;" in vox
