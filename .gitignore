@@ -31,3 +31,5 @@ JR-TER.cmd
 # Written by web/img/make-favicon.py --preview, to look at the icon at three sizes at once.
 # Regenerable with one command, and it would otherwise be served as part of the app.
 web/img/favicon-preview.png
+
+server/target/

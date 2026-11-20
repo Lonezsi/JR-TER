@@ -69,3 +69,15 @@ Windows credential store.
 5. `desktop/` replaces `client/` (task 10).
 6. Switch the host: the "JRITER Server" task starts the jar on 7900; `server.py` kept as the
    way back until it hasn't been needed for a month (task 13).
+
+## Progress
+
+Task 9 (the Spring server), slice by slice. Each slice is done when `tools/parity_door.py`-style
+checks and the matching Python tests agree.
+
+- [x] 9a: skeleton, static serving, `/api/health`, the door: accounts, sessions, invites,
+  machine tokens, the guess limit, the Foyer sign-in (`server/`, `tools/parity_door.py`)
+- [ ] 9b: songs, versions, blobs, renders
+- [ ] 9c: lyrics, arrange, artwork, vocals, albums, playlists
+- [ ] 9d: sharing, search, the grave, the timetable
+- [ ] 9e: export, sync, appearance, devlog, updater, youtube
