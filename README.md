@@ -196,6 +196,8 @@ versions later you still know what is actually online.
 
 ## The desktop agent
 
+> **New:** the PC side is being replaced by a desktop app with no Python in it, in desktop/\n> (Java 21, built by desktop\build.ps1 into JRITER.exe for the tray and jriter-cli.exe for the\n> commands, which have the same names as below: jriter-cli server/login/add/scan/push/watch/render/shell).\n> It reads the same client.json. See desktop/README.md. The Python client below stays as the way\n> back until the app has had real use.
+
 ```
 cd client
 python jriter_client.py install --server http://127.0.0.1:7900 --folder "C:\Users\you\Music\Renders"

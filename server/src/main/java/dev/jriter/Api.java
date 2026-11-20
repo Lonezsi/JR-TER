@@ -51,6 +51,13 @@ final class Api {
 
     /** Header as a trimmed string, "" when absent. */
     static String header(HttpServletRequest req, String name) {
+        // The desktop app (Java) cannot put non-ASCII bytes in a header value, so it also sends
+        // "<name>-Enc" with the value percent-encoded as UTF-8. Python clients just send the raw value.
+        String enc = req.getHeader(name + "-Enc");
+        if (enc != null) {
+            try { return java.net.URLDecoder.decode(enc.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8).strip(); }
+            catch (IllegalArgumentException ignored) { /* fall through to the plain header */ }
+        }
         String v = req.getHeader(name);
         return v == null ? "" : v.strip();
     }

@@ -33,3 +33,5 @@ JR-TER.cmd
 web/img/favicon-preview.png
 
 server/target/
+
+desktop/target/

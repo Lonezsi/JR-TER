@@ -11,7 +11,7 @@ One server and one desktop app, with nothing in Python:
 |-----------|--------------------------------------|------------------------------------------------|
 | server    | Python stdlib, `server.py`, `jriter/` | Spring Boot 3, Java 21, one jar, `server/`     |
 | interface | vanilla JS in `web/js`, Svelte 5 in `ui/` on the owner's PC | the Svelte 5 + TypeScript rebuild, `ui/` |
-| PC side   | `client/*.py` (watcher, FL renders, agent token) | a Tauri 2 desktop app, `desktop/`, same Svelte UI |
+| PC side   | `client/*.py` (watcher, FL renders, agent token) | a Java 21 desktop app, `desktop/`, packaged with jpackage |
 | data      | SQLite per account + blobs on disk   | the **same files**, unchanged                  |
 
 ### Server: Spring Boot, but not JQZZ's database
@@ -50,7 +50,16 @@ undo, j/k, search language, light mode and guest library all come along; nothing
 First step, before anything else: the rebuild is only on the owner's PC. It gets committed
 to this repo as `ui/` so the rest of the rework can see it.
 
-### Desktop app: Tauri
+### Desktop app: Java (changed from Tauri, 2026-11-21)
+
+The plan said Tauri. The build machine has no Rust or MSVC and little free disk, and the Spring server
+already needs JDK 21 and Maven, so the app is plain Java 21 with a tray, packaged by jpackage (desktop/,
+built by desktop\build.ps1). The window is still the library in a Chromium --app window; the
+Svelte UI shows there once it is served. The token stays in client.json for now.
+
+(Original text, kept for the record:)
+
+#### Tauri
 
 A real PC app replaces `client/jriter_client.py`, `jriter_app.py`, `jriter_shell.py` and
 `flrender.py`: a tray app that watches the song folders, picks up FL Studio renders and
@@ -81,3 +90,4 @@ checks and the matching Python tests agree.
 - [ ] 9c: lyrics, arrange, artwork, vocals, albums, playlists
 - [ ] 9d: sharing, search, the grave, the timetable
 - [ ] 9e: export, sync, appearance, devlog, updater, youtube
+- [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
