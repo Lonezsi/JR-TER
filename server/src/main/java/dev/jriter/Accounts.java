@@ -126,6 +126,23 @@ public class Accounts {
         return keys.getKey().longValue();
     }
 
+    /**
+     * Every live share of one song (or, with null, of a whole library) taken back, marked
+     * revoked rather than deleted. A share names its song by rowid, and a deleted song's
+     * number is reused, so a share left open would become a share of the next song.
+     */
+    public int revokeSharesFor(long from, Long songId) {
+        double now = now();
+        if (songId == null) {
+            int n = query("SELECT id FROM shares WHERE from_account = ? AND revoked_at = 0", from).size();
+            run("UPDATE shares SET revoked_at = ? WHERE from_account = ? AND revoked_at = 0", now, from);
+            return n;
+        }
+        int n = query("SELECT id FROM shares WHERE from_account = ? AND song_id = ? AND revoked_at = 0", from, songId).size();
+        run("UPDATE shares SET revoked_at = ? WHERE from_account = ? AND song_id = ? AND revoked_at = 0", now, from, songId);
+        return n;
+    }
+
     // -- passwords ---------------------------------------------------------------
     /** scrypt N=2^14 r=8 p=1 dkLen=32, base64: the same as hashlib.scrypt in Python. */
     public static String hash(String password, byte[] salt) {

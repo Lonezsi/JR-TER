@@ -135,7 +135,7 @@ try:
 
     # 4. tokens
     status, body, _, _ = call("GET", "/api/songs", headers={"X-Jriter-Token": token})
-    check("an upload token gets past the door", status == 404 and "no such endpoint" in body["error"], body)
+    check("an upload token gets past the door", status == 200 and "songs" in body, body)
     status, _, _, _ = call("DELETE", "/api/songs/1", headers={"X-Jriter-Token": token})
     check("an upload token cannot delete", status == 401, status)
     status, _, _, _ = call("GET", "/api/songs", headers={"X-Jriter-Token": "jt_wrong"})

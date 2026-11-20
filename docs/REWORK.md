@@ -77,7 +77,7 @@ checks and the matching Python tests agree.
 
 - [x] 9a: skeleton, static serving, `/api/health`, the door: accounts, sessions, invites,
   machine tokens, the guess limit, the Foyer sign-in (`server/`, `tools/parity_door.py`)
-- [ ] 9b: songs, versions, blobs, renders
+- [x] 9b: songs, versions, blobs, renders (`Library`, `Blobs`, `AudioMeta`, three controllers; `tools/parity_library.py`)
 - [ ] 9c: lyrics, arrange, artwork, vocals, albums, playlists
 - [ ] 9d: sharing, search, the grave, the timetable
 - [ ] 9e: export, sync, appearance, devlog, updater, youtube
