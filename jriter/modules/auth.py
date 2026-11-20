@@ -571,12 +571,18 @@ def sign_out_everywhere():
 
 # ── guessing limits ──────────────────────────────────────────────────────────
 def _who(req):
-    # Behind Tailscale Funnel the real caller is in a forwarded header. Falling back to
-    # the socket address keeps this working when it is reached directly.
-    forwarded = req.headers.get("X-Forwarded-For") or ""
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return req.headers.get("X-Real-IP") or getattr(req, "client", "") or "local"
+    """The caller's address, for counting wrong guesses.
+
+    Behind Tailscale Funnel every request comes from the loopback, and the address the
+    tunnel saw is the LAST one in X-Forwarded-For; anything before it is whatever the
+    visitor chose to send, so reading the first one let a guesser pick a new address for
+    every try (Condom finding 2, same fix as Foyer). The header only counts when the
+    request came from this machine, which is where the tunnel is."""
+    peer = getattr(req, "client", "") or "local"
+    if peer not in ("127.0.0.1", "::1", "local"):
+        return peer
+    forwarded = (req.headers.get("X-Forwarded-For") or "").split(",")[-1].strip()
+    return forwarded or peer
 
 
 def _wait_for(ip):

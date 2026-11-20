@@ -236,6 +236,23 @@ def test_one_address_being_locked_does_not_lock_another(secured):
     assert auth._wait_for("198.51.100.4") == 0
 
 
+def test_the_address_counted_is_the_one_the_tunnel_saw(secured):
+    """Condom finding 2: the first X-Forwarded-For address is the visitor's own words; the
+    tunnel appends the real one at the end, so changing the first must not reset the count."""
+    code = auth.setup_code()
+    secured.post("/api/auth/setup", {"code": code, "password": "a"})
+    auth._attempts.clear()
+    statuses = []
+    for i in range(auth.FREE_TRIES + 2):
+        status, _ = secured.request("POST", "/api/auth/login", {"password": "wrong"},
+                                    headers={"X-Forwarded-For": "10.0.0.%d, 9.9.9.9" % i})
+        statuses.append(status)
+        if status == 429:
+            break
+    assert 429 in statuses, "a new fake address each try dodged the limit"
+    assert "9.9.9.9" in auth._attempts
+
+
 def test_a_damaged_auth_file_shuts_the_door_and_is_left_alone(secured):
     """"There is no password yet" and "the password is unreadable" are opposite states,
     and they used to be the same empty dict.
