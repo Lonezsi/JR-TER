@@ -215,10 +215,17 @@ public class VersionsController {
         }
         if (song != null) SongsController.touch(db, song.get("id"));
         Object digest = version.get("digest");
-        boolean still = db.one("SELECT id FROM versions WHERE digest = ? LIMIT 1", digest) != null
-                || db.one("SELECT id FROM renders WHERE digest = ? LIMIT 1", digest) != null;
-        if (!still) blobs.delete(acct, (String) digest);
+        if (!stillUsed(db, digest)) blobs.delete(acct, (String) digest);
         return Map.of("deleted", version.get("id"));
+    }
+
+    /** Does any row still point at this blob? (versions, renders, artwork, voice takes, album covers) */
+    static boolean stillUsed(Library.Db db, Object digest) {
+        return db.one("SELECT id FROM versions WHERE digest = ? LIMIT 1", digest) != null
+                || db.one("SELECT id FROM renders WHERE digest = ? LIMIT 1", digest) != null
+                || db.one("SELECT id FROM artwork WHERE digest = ? LIMIT 1", digest) != null
+                || db.one("SELECT id FROM vocal_takes WHERE digest = ? LIMIT 1", digest) != null
+                || db.one("SELECT id FROM albums WHERE cover_digest = ? LIMIT 1", digest) != null;
     }
 
     /** The stored file as a response: Spring answers Range requests itself. */

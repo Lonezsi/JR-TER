@@ -52,6 +52,58 @@ public class Library {
             + " rendered_at REAL NOT NULL DEFAULT 0, peaks TEXT NOT NULL DEFAULT '',"
             + " peak_db REAL, trouble TEXT NOT NULL DEFAULT '', song_id INTEGER, version_id INTEGER)",
         "CREATE INDEX IF NOT EXISTS renders_waiting ON renders(used_at, created_at DESC)",
+        // lyrics
+        "CREATE TABLE IF NOT EXISTS lyric_sheets (id INTEGER PRIMARY KEY,"
+            + " song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,"
+            + " name TEXT NOT NULL DEFAULT 'Alternative', position INTEGER NOT NULL DEFAULT 0,"
+            + " is_current INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS lyric_revisions (id INTEGER PRIMARY KEY,"
+            + " sheet_id INTEGER NOT NULL REFERENCES lyric_sheets(id) ON DELETE CASCADE,"
+            + " text TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS sheets_song ON lyric_sheets(song_id, position)",
+        "CREATE INDEX IF NOT EXISTS revisions_sheet ON lyric_revisions(sheet_id, id DESC)",
+        // arrange
+        "CREATE TABLE IF NOT EXISTS arrangements (song_id INTEGER PRIMARY KEY"
+            + " REFERENCES songs(id) ON DELETE CASCADE, version_id INTEGER,"
+            + " bpm REAL NOT NULL DEFAULT 120, offset REAL NOT NULL DEFAULT 0,"
+            + " per_bar INTEGER NOT NULL DEFAULT 4, enabled INTEGER NOT NULL DEFAULT 0,"
+            + " data TEXT NOT NULL DEFAULT '{}', updated_at REAL NOT NULL)",
+        // artwork
+        "CREATE TABLE IF NOT EXISTS artwork (id INTEGER PRIMARY KEY,"
+            + " song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,"
+            + " digest TEXT NOT NULL, ext TEXT NOT NULL DEFAULT '.jpg',"
+            + " position INTEGER NOT NULL DEFAULT 0, caption TEXT NOT NULL DEFAULT '',"
+            + " created_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS artwork_song ON artwork(song_id, position)",
+        // vocals
+        "CREATE TABLE IF NOT EXISTS vocal_takes (id INTEGER PRIMARY KEY,"
+            + " song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,"
+            + " author INTEGER NOT NULL, name TEXT NOT NULL DEFAULT '', digest TEXT NOT NULL,"
+            + " ext TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, duration REAL NOT NULL DEFAULT 0,"
+            + " offset REAL NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1,"
+            + " gain REAL NOT NULL DEFAULT 1, chain TEXT NOT NULL DEFAULT '[]',"
+            + " created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS vocal_takes_song ON vocal_takes(song_id, id)",
+        // albums
+        "CREATE TABLE IF NOT EXISTS albums (id INTEGER PRIMARY KEY, title TEXT NOT NULL,"
+            + " year INTEGER, notes TEXT NOT NULL DEFAULT '', cover_digest TEXT NOT NULL DEFAULT '',"
+            + " cover_ext TEXT NOT NULL DEFAULT '', created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS album_songs (album_id INTEGER NOT NULL"
+            + " REFERENCES albums(id) ON DELETE CASCADE, song_id INTEGER NOT NULL"
+            + " REFERENCES songs(id) ON DELETE CASCADE, position INTEGER NOT NULL DEFAULT 0,"
+            + " PRIMARY KEY (album_id, song_id))",
+        "CREATE INDEX IF NOT EXISTS album_songs_order ON album_songs(album_id, position)",
+        // playlists
+        "CREATE TABLE IF NOT EXISTS playlists (id INTEGER PRIMARY KEY, title TEXT NOT NULL,"
+            + " album_id INTEGER REFERENCES albums(id) ON DELETE CASCADE,"
+            + " created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS playlist_items (id INTEGER PRIMARY KEY,"
+            + " playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,"
+            + " position REAL NOT NULL, song_id INTEGER REFERENCES songs(id) ON DELETE CASCADE,"
+            + " render_id INTEGER REFERENCES renders(id) ON DELETE CASCADE, added_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS playlist_items_order ON playlist_items(playlist_id, position)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS playlists_album ON playlists(album_id)"
+            + " WHERE album_id IS NOT NULL",
     };
 
     /** Columns older libraries may lack: table, name, declaration (as the Python migrations). */
@@ -67,6 +119,9 @@ public class Library {
         {"renders", "peaks", "TEXT NOT NULL DEFAULT ''"},
         {"renders", "peak_db", "REAL"},
         {"renders", "trouble", "TEXT NOT NULL DEFAULT ''"},
+        {"vocal_takes", "fx", "INTEGER NOT NULL DEFAULT 1"},
+        {"albums", "opened", "INTEGER NOT NULL DEFAULT 0"},
+        {"albums", "stickers", "TEXT NOT NULL DEFAULT ''"},
     };
 
     private final Config config;

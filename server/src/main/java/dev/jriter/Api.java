@@ -40,6 +40,33 @@ final class Api {
         return AUDIO_TYPES.getOrDefault(ext == null ? "" : ext.toLowerCase(Locale.ROOT), "application/octet-stream");
     }
 
+    static final Map<String, String> IMAGE_TYPES = Map.of(
+            ".jpg", "image/jpeg", ".jpeg", "image/jpeg", ".png", "image/png", ".webp", "image/webp",
+            ".gif", "image/gif", ".avif", "image/avif");
+
+    /** A stored file as a response (Spring answers Range itself); 410 with the given words if gone. */
+    static org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> serve(
+            java.nio.file.Path path, String type, String downloadName, String missing) {
+        if (!java.nio.file.Files.isRegularFile(path)) throw new ApiError(missing, 410);
+        org.springframework.http.ResponseEntity.BodyBuilder b = org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(type));
+        if (downloadName != null)
+            b.header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + downloadName + "\"");
+        return b.body(new org.springframework.core.io.FileSystemResource(path));
+    }
+
+    /** Python's "%s" of a list of ints, e.g. [5, 9]. */
+    static String listRepr(java.util.List<?> items) {
+        StringBuilder s = new StringBuilder("[");
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) s.append(", ");
+            Object o = items.get(i);
+            s.append(o instanceof String ? "'" + o + "'" : o == null ? "None" : String.valueOf(o));
+        }
+        return s.append("]").toString();
+    }
+
     /** The extension of a file name, lower case, with the dot ("" if none). */
     static String extOf(String name) {
         int dot = name.lastIndexOf('.');

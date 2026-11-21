@@ -18,14 +18,27 @@ class LibraryTest {
         assertEquals("A", db.one("SELECT title FROM songs WHERE id = ?", id).get("title"));
         assertEquals(0, ((Number) db.one("SELECT opened FROM songs WHERE id = ?", id).get("opened")).intValue());
         assertTrue(db.tableExists("versions"));
-        assertFalse(db.tableExists("artwork"));
+        for (String t : new String[] {"artwork", "lyric_sheets", "lyric_revisions", "arrangements", "vocal_takes",
+                "albums", "album_songs", "playlists", "playlist_items"})
+            assertTrue(db.tableExists(t), t);
         // a second Library over the same folder runs the schema again and keeps the row
         Library.Db again = new Library(config).of(1);
         assertEquals(1, again.query("SELECT * FROM songs").size());
-        // foreign keys cascade
+        // foreign keys cascade, through every table that hangs off a song
         db.run("INSERT INTO song_titles (song_id, title, changed_at) VALUES (?, 'old', 1)", id);
+        db.run("INSERT INTO lyric_sheets (song_id, created_at) VALUES (?, 1)", id);
+        db.run("INSERT INTO lyric_revisions (sheet_id, created_at) VALUES (1, 1)");
+        db.run("INSERT INTO artwork (song_id, digest, created_at) VALUES (?, 'x', 1)", id);
+        db.run("INSERT INTO arrangements (song_id, updated_at) VALUES (?, 1)", id);
+        db.run("INSERT INTO albums (title, created_at, updated_at) VALUES ('Al', 1, 1)");
+        db.run("INSERT INTO album_songs (album_id, song_id) VALUES (1, ?)", id);
+        db.run("INSERT INTO playlists (title, album_id, created_at, updated_at) VALUES ('Al', 1, 1, 1)");
+        db.run("INSERT INTO playlist_items (playlist_id, position, song_id, added_at) VALUES (1, 1, ?, 1)", id);
         db.run("DELETE FROM songs WHERE id = ?", id);
-        assertEquals(0, db.query("SELECT * FROM song_titles").size());
+        for (String t : new String[] {"song_titles", "lyric_sheets", "lyric_revisions", "artwork", "arrangements",
+                "album_songs", "playlist_items"})
+            assertEquals(0, db.query("SELECT * FROM " + t).size(), t);
+        assertEquals(1, db.query("SELECT * FROM albums").size());
     }
 
     @Test

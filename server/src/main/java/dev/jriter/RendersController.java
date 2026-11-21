@@ -298,7 +298,7 @@ public class RendersController {
         Library.Db db = library.of(acct);
         Map<String, Object> render = getRender(db, id);
         db.run("DELETE FROM renders WHERE id = ?", render.get("id"));
-        if (db.one("SELECT id FROM versions WHERE digest = ? LIMIT 1", render.get("digest")) == null)
+        if (!VersionsController.stillUsed(db, render.get("digest")))
             blobs.delete(acct, (String) render.get("digest"));
         return Map.of("dismissed", render.get("id"));
     }

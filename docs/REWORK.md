@@ -87,7 +87,7 @@ checks and the matching Python tests agree.
 - [x] 9a: skeleton, static serving, `/api/health`, the door: accounts, sessions, invites,
   machine tokens, the guess limit, the Foyer sign-in (`server/`, `tools/parity_door.py`)
 - [x] 9b: songs, versions, blobs, renders (`Library`, `Blobs`, `AudioMeta`, three controllers; `tools/parity_library.py`)
-- [ ] 9c: lyrics, arrange, artwork, vocals, albums, playlists
+- [x] 9c: lyrics, arrange, artwork, vocals, albums, playlists (six controllers, `tools/parity_media.py`; grave, guest and search hooks wait for 9d)
 - [ ] 9d: sharing, search, the grave, the timetable
 - [ ] 9e: export, sync, appearance, devlog, updater, youtube
 - [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
