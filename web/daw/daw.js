@@ -1,19 +1,21 @@
 // daw.js: the DAW page. Tracks on the left, a piano roll on the right, a bar on top.
 // The song is plain data (see midi.js); everything here edits that object and redraws.
 import { parseMidi, writeMidi, songToText, textToSong, midiToSong } from "./midi.js";
+import { classify } from "./gestures.js";
 import { createSynth, instrumentFor, INSTRUMENTS } from "./synth.js";
 
 const $ = (id) => document.getElementById(id);
 const KEY = "jriter-daw";
 const SNAP = 0.25; // a 16th note, in beats
-const ROW = 14, GUTTER = 44;
+let ROW = 14;
+const GUTTER = 44;
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 let song = loadSaved() || defaultSong();
 let sel = 0, selNote = null, lastLen = 0.25;
 let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
-let looping = true, playing = false;
+let looping = true, playing = false, tool = "draw", wakeLock = null;
 let ctx = null, synth = null, master = null, gains = [];
 let t0 = 0, scheduled = 0, timer = 0, raf = 0;
 
@@ -73,19 +75,26 @@ function renderBar() {
     $("play").setAttribute("aria-label", playing ? "Stop" : "Play");
     $("play").dataset.tip = playing ? "Stop (Space)" : "Play (Space)";
     $("loop").setAttribute("aria-pressed", looping);
+    for (const t of ["draw", "erase", "select"]) $("tool-" + t).setAttribute("aria-pressed", tool === t);
     $("bpm").value = song.bpm; $("bars").value = song.bars;
     return;
   }
   bar.dataset.built = "1";
-  bar.innerHTML = `<span class="name">DAW</span>` + btn("home", "⌂", "Back to the library") +
+  bar.innerHTML = `<div class="transport">` + btn("home", "⌂", "Back to the library") +
     btn("play", ICONS.play, "Play (Space)") + btn("loop", ICONS.loop, "Loop (L)", looping) +
     `<span class="sep"></span>` +
+    btn("tool-draw", "✎", "Draw notes (P)", true) + btn("tool-erase", "⌫", "Erase notes (E)", false) +
+    btn("tool-select", "⌖", "Select only (V)", false) +
+    btn("more", "⋯", "More", false) + `</div><div class="more" id="morebox"><span class="name">DAW</span>` +
     `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
     `<label>Bars <input id="bars" type="number" min="1" max="64" step="1"></label>` +
     `<span class="sep"></span>` +
     btn("add", ICONS.add, "New track (N)") + btn("undo", ICONS.undo, "Undo (Ctrl+Z)") +
     `<span class="sep"></span>` +
-    btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") + btn("savejson", ICONS.json, "Save as .json text");
+    btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") +
+    btn("savejson", ICONS.json, "Save as .json text") + `</div>`;
+  for (const t of ["draw", "erase", "select"]) $("tool-" + t).onclick = () => setTool(t);
+  $("more").onclick = () => { bar.classList.toggle("open"); $("more").setAttribute("aria-pressed", bar.classList.contains("open")); };
   $("home").onclick = () => location.assign("/");
   $("play").onclick = () => togglePlay();
   $("loop").onclick = () => { looping = !looping; renderBar(); };
@@ -98,6 +107,7 @@ function renderBar() {
   $("savejson").onclick = () => download("song.json", songToText(song), "application/json");
   renderBar();
 }
+function setTool(t) { tool = t; renderBar(); }
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 function download(name, data, type) {
   const a = document.createElement("a");
@@ -159,6 +169,7 @@ function range() {
 function resize() {
   const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
   W = r.width; H = r.height;
+  ROW = matchMedia("(pointer: coarse)").matches ? 24 : 14; // fingers need taller rows
   cv.width = Math.max(1, Math.round(W * d)); cv.height = Math.max(1, Math.round(H * d));
   g.setTransform(d, 0, 0, d, 0, 0);
   clampScroll(); draw();
@@ -238,27 +249,51 @@ function hit(c) {
   return null;
 }
 let drag = null;
-cv.addEventListener("pointerdown", (e) => {
+function removeNote(n) {
+  edit(() => { const t = song.tracks[sel]; t.notes.splice(t.notes.indexOf(n), 1); if (selNote === n) selNote = null; });
+}
+function addNoteAt(c) {
+  const start = Math.floor(c.beat / SNAP) * SNAP;
+  if (start >= loopLen()) return null;
+  const n = { pitch: c.pitch, start, length: lastLen, velocity: 90 };
+  edit(() => { song.tracks[sel].notes.push(n); });
+  return n;
+}
+const onEdge = (n, c, fat) => n.start + n.length - c.beat < Math.min(0.3, n.length / 2) + (fat ? 16 : 6) / pxBeat();
+const inGutter = (e) => e.clientX - cv.getBoundingClientRect().left < GUTTER;
+function keyPreview(e) {
+  const t = song.tracks[sel];
+  if (t) preview(t, { pitch: cell(e).pitch, velocity: 90 });
+}
+function beginDrag(n, mode, c) {
+  drag = { n, mode, before: snap(), c0: c, start0: n.start };
+  draw();
+}
+
+// Mouse: press to add or grab, drag to move or resize, right-click to delete.
+function mouseDown(e) {
   if (e.button !== 0 || !song.tracks[sel]) return;
-  cv.focus();
-  const r = cv.getBoundingClientRect();
-  if (e.clientX - r.left < GUTTER) return;
-  const c = cell(e), t = song.tracks[sel], before = snap();
-  let n = hit(c), mode = "move";
+  if (inGutter(e)) return keyPreview(e);
+  const c = cell(e), t = song.tracks[sel];
+  let n = hit(c);
+  if (tool === "erase") { if (n) removeNote(n); return; }
   if (!n) {
+    if (tool === "select") { selNote = null; draw(); return; }
     const start = Math.floor(c.beat / SNAP) * SNAP;
     if (start >= loopLen()) return;
+    const before = snap();
     n = { pitch: c.pitch, start, length: lastLen, velocity: 90 };
     t.notes.push(n);
-  } else if (n.start + n.length - c.beat < Math.min(0.3, n.length / 2) + 6 / pxBeat()) mode = "resize";
-  selNote = n;
-  preview(t, n);
-  drag = { n, mode, before, c0: c, start0: n.start, pitch0: n.pitch, len0: n.length };
+    selNote = n; preview(t, n);
+    drag = { n, mode: "move", before, c0: c, start0: n.start };
+  } else {
+    selNote = n; preview(t, n);
+    beginDrag(n, onEdge(n, c, false) ? "resize" : "move", c);
+  }
   cv.setPointerCapture(e.pointerId);
   draw();
-});
-cv.addEventListener("pointermove", (e) => {
-  if (!drag) return;
+}
+function dragTo(e) {
   const c = cell(e), n = drag.n;
   if (drag.mode === "move") {
     const ns = Math.max(0, drag.start0 + Math.round((c.beat - drag.c0.beat) / SNAP) * SNAP);
@@ -269,19 +304,93 @@ cv.addEventListener("pointermove", (e) => {
     lastLen = n.length;
   }
   draw();
-});
+}
 const endDrag = () => {
   if (!drag) return;
   if (drag.mode === "move") lastLen = drag.n.length;
   if (snap() !== drag.before) { pushUndo(drag.before); save(); renderBar(); }
   drag = null; draw();
 };
-cv.addEventListener("pointerup", endDrag);
-cv.addEventListener("pointercancel", endDrag);
+
+// Touch: tap, drag, long press and pinch, told apart by gestures.js.
+// One finger on a note moves or resizes it; on empty space it pans; a long press deletes;
+// two fingers zoom and pan.
+const fingers = new Set();
+let gs = [], touch = null, pinch = null, longTimer = 0;
+const sample = (e, type) => gs.push({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, type });
+function touchEnd() { clearTimeout(longTimer); touch = null; pinch = null; gs = []; }
+function touchDown(e) {
+  if (!song.tracks[sel]) return;
+  if (!fingers.size) gs = [];
+  fingers.add(e.pointerId); sample(e, "down");
+  cv.setPointerCapture(e.pointerId);
+  if (fingers.size >= 2) {
+    clearTimeout(longTimer);
+    if (drag) return; // already dragging a note: leave it be
+    touch = null; pinch = { zoom0: zoom, sx0: scrollX, sy0: scrollY, beat0: null };
+    return;
+  }
+  if (inGutter(e)) { keyPreview(e); touch = null; return; }
+  const c = cell(e);
+  touch = { c, n: hit(c), x0: scrollX, y0: scrollY, started: false, done: false };
+  longTimer = setTimeout(() => {
+    if (!touch || touch.started || !touch.n || classify(gs, performance.now()).kind !== "long") return;
+    touch.done = true;
+    navigator.vibrate?.(12);
+    removeNote(touch.n);
+    toast("Note deleted.", { label: "Undo", run: doUndo });
+  }, 460);
+}
+function touchMove(e) {
+  if (!fingers.has(e.pointerId)) return;
+  sample(e, "move");
+  if (pinch) {
+    const k = classify(gs);
+    if (k.kind !== "pinch") return;
+    const r = cv.getBoundingClientRect();
+    if (pinch.beat0 === null) pinch.beat0 = (k.x - k.dx - r.left - GUTTER + pinch.sx0) / pxBeat();
+    zoom = clamp(pinch.zoom0 * k.scale, 0.25, 4);
+    scrollX = pinch.beat0 * pxBeat() - (k.x - r.left - GUTTER);
+    scrollY = pinch.sy0 - k.dy;
+    draw(); return;
+  }
+  if (!touch || touch.done) return;
+  const k = classify(gs);
+  if (k.kind !== "drag") return;
+  if (!touch.started) {
+    touch.started = true; clearTimeout(longTimer);
+    if (touch.n && tool !== "erase") {
+      selNote = touch.n;
+      beginDrag(touch.n, onEdge(touch.n, touch.c, true) ? "resize" : "move", touch.c);
+    }
+  }
+  if (drag) dragTo(e);
+  else { scrollX = touch.x0 - k.dx; scrollY = touch.y0 - k.dy; draw(); }
+}
+function touchUp(e, cancelled) {
+  if (!fingers.delete(e.pointerId)) return;
+  sample(e, cancelled ? "cancel" : "up");
+  if (pinch) { if (!fingers.size) touchEnd(); return; }
+  const t = touch;
+  endDrag();
+  if (t && !t.done && !t.started && classify(gs).kind === "tap") {
+    const n = t.n, tr = song.tracks[sel];
+    if (tool === "erase") { if (n) removeNote(n); }
+    else if (n) { selNote = n; preview(tr, n); draw(); }
+    else if (tool === "draw") { const m = addNoteAt(t.c); if (m) { selNote = m; preview(tr, m); draw(); } }
+  }
+  touchEnd();
+}
+
+cv.addEventListener("pointerdown", (e) => { cv.focus(); if (e.pointerType === "mouse") mouseDown(e); else touchDown(e); });
+cv.addEventListener("pointermove", (e) => { if (e.pointerType !== "mouse") touchMove(e); else if (drag) dragTo(e); });
+cv.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse") endDrag(); else touchUp(e, false); });
+cv.addEventListener("pointercancel", (e) => { if (e.pointerType === "mouse") endDrag(); else touchUp(e, true); });
 cv.addEventListener("contextmenu", (e) => {
   e.preventDefault();
+  if (e.pointerType && e.pointerType !== "mouse") return; // a long press is handled above
   const n = hit(cell(e));
-  if (n) edit(() => { const t = song.tracks[sel]; t.notes.splice(t.notes.indexOf(n), 1); if (selNote === n) selNote = null; });
+  if (n) removeNote(n);
 });
 cv.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -320,11 +429,13 @@ function play(from) {
   scheduled = from;
   tick(); timer = setInterval(tick, 25);
   frame(); renderBar();
+  navigator.wakeLock?.request("screen").then((l) => { wakeLock = l; }).catch(() => {});
 }
 function stop(quiet) {
   clearInterval(timer); cancelAnimationFrame(raf);
   if (!quiet) {
     playing = false; renderBar(); draw();
+    wakeLock?.release().catch(() => {}); wakeLock = null;
     // Cut hanging tails by rebuilding the track gains.
     for (const gn of gains) gn.disconnect();
     gains = []; if (ctx) syncGains();
@@ -384,6 +495,9 @@ addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   else if (k === " ") { e.preventDefault(); togglePlay(); }
+  else if (k === "p" || k === "P") setTool("draw");
+  else if (k === "e" || k === "E") setTool("erase");
+  else if (k === "v" || k === "V") setTool("select");
   else if (k === "l" || k === "L") { looping = !looping; renderBar(); }
   else if (k === "j" || k === "k") {
     sel = clamp(sel + (k === "j" ? 1 : -1), 0, song.tracks.length - 1); selNote = null; renderTracks(); draw();

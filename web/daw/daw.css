@@ -26,7 +26,9 @@ body {
   background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px);
   -webkit-backdrop-filter: var(--glass-filter-thin, none); backdrop-filter: var(--glass-filter-thin, none);
 }
-.bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--d-s2); padding: var(--d-s2) var(--d-s3); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--d-s2); padding: var(--d-s2) var(--d-s3); position: relative; }
+.transport, .more { display: contents; }
+#more { display: none; }
 .bar .sep { width: 1px; height: 20px; background: var(--d-line); margin: 0 var(--d-s1); }
 .bar label { display: inline-flex; align-items: center; gap: var(--d-s1); color: var(--d-mute); }
 .bar .name { font-weight: 600; margin-right: var(--d-s2); }
@@ -34,10 +36,26 @@ body {
 .tracks { width: 248px; flex: none; overflow: auto; padding: var(--d-s2); display: flex; flex-direction: column; gap: var(--d-s2); }
 .roll { flex: 1; min-width: 0; position: relative; overflow: hidden; }
 canvas { width: 100%; height: 100%; display: block; outline: none; }
-@media (max-width: 640px) {
+canvas { touch-action: none; -webkit-user-select: none; user-select: none; }
+
+/* Phones and tablets: transport at the bottom where the thumb is, tracks as a strip. */
+@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
+  body { padding: var(--d-s2); padding-bottom: calc(var(--d-s2) + env(safe-area-inset-bottom)); }
   .main { flex-direction: column; }
-  .tracks { width: auto; max-height: 38%; }
+  .tracks { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; max-height: none; flex: none; }
+  .track { min-width: 200px; }
+  .bar { order: 3; flex-wrap: nowrap; justify-content: space-between; }
+  .transport { display: flex; align-items: center; gap: var(--d-s2); width: 100%; justify-content: space-between; }
+  #more { display: inline-flex; }
+  .more { display: none; position: absolute; left: 0; right: 0; bottom: calc(100% + var(--d-s2)); flex-wrap: wrap; gap: var(--d-s2); align-items: center;
+    padding: var(--d-s3); background: var(--glass-2, #1c1d22); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); z-index: 10; }
+  .bar.open .more { display: flex; }
+  .bar .sep { display: none; }
+  button, select, input { min-height: 40px; min-width: 40px; }
+  .track .row button { min-width: 40px; }
+  #play { flex: 1; max-width: 96px; }
 }
+@media (hover: none) { [data-tip]::after { display: none !important; } }
 
 button, select, input {
   font: inherit; color: inherit; background: var(--d-key); border: 1px solid var(--d-line);

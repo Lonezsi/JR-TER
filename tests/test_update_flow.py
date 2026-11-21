@@ -316,6 +316,26 @@ def test_a_live_branch_updates_from_itself(stopped, monkeypatch):
     assert ("pull", "--ff-only", "origin", "live-4.3.0") in pulled
 
 
+def test_a_release_note_alone_restarts(monkeypatch):
+    """The version is read from devlog.json at start, so changing it needs a restart."""
+    pulled = []
+
+    def git(*a):
+        if a[:1] == ("rev-parse",):
+            return ("b" if pulled else "a") * 40, None
+        if a[:1] == ("pull",):
+            pulled.append(1)
+            return "", None
+        if a[:1] == ("diff",):
+            return "jriter/devlog.json", None
+        return "", None
+
+    monkeypatch.setattr(updater, "_is_repo", lambda: True)
+    monkeypatch.setattr(updater, "_git", git)
+    monkeypatch.setattr(updater, "_tracked_changes", lambda: "")
+    assert updater._pull()["restart_required"] is True
+
+
 def test_switching_auto_update_off_is_honoured(stopped, monkeypatch):
     auto = _Auto(monkeypatch)
     monkeypatch.setattr(updater.config, "settings", lambda: {"auto_update": False})
