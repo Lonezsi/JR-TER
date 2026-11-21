@@ -257,6 +257,7 @@ def delete_song(req):
     taken_back = accounts.revoke_shares_for(who.must(), song["id"])
     # Blobs are left alone: another song may point at the same bytes, and a personal
     # library would rather keep an orphaned file than lose one that was still in use.
+    _to_grave("bury_song", song["id"])
     db.run("DELETE FROM songs WHERE id = ?", (song["id"],))
     return {"deleted": song["id"], "shares_taken_back": taken_back}
 
@@ -338,3 +339,11 @@ def ROUTES():
         ("PATCH", "/api/songs/<id>"): update_song,
         ("DELETE", "/api/songs/<id>"): delete_song,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

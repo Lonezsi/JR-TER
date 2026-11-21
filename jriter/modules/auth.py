@@ -45,6 +45,7 @@ import hashlib
 import secrets
 import threading
 import urllib.request
+import urllib.error
 
 from .. import config, db, who, accounts
 from ..wire import Error, Response, need
@@ -487,10 +488,29 @@ def foyer(headers):
     return account
 
 
+#: Which Foyer account is this machine's owner, by handle, kept beside the data rather than
+#: in the code (the code is public, the machine is somebody's). One line, e.g. "lonezsi".
+#: When it is set, that Foyer account opens the owner's library, whoever had it before.
+OWNER_FILE = os.path.join(config.DATA, "foyer-owner.txt")
+
+
+def foyer_owner_handle():
+    try:
+        with open(OWNER_FILE, encoding="utf-8") as f:
+            return f.read().strip().lstrip("@").lower()
+    except OSError:
+        return ""
+
+
 def foyer_library(f):
     """The library a Foyer account opens, tying Foyer's owner to this one's on the way."""
     if not f:
         return None
+    named = foyer_owner_handle()
+    if named and (f.get("handle") or "").lstrip("@").lower() == named and accounts.by_id(accounts.OWNER):
+        if accounts.foyer_of(accounts.OWNER) != f["id"]:
+            accounts.link_foyer(f["id"], accounts.OWNER)
+        return accounts.OWNER
     here = accounts.foyer_account(f["id"])
     if here and accounts.by_id(here):
         return here
@@ -531,6 +551,55 @@ def foyer_disconnect(req):
         raise Error("Sign in first.", 401)
     accounts.unlink_foyer(here)
     return {"ok": True}
+
+
+def foyer_login(req):
+    """The sign in page's "Sign in with Foyer": a Foyer handle and password, checked by
+    Foyer itself over the loopback, and Foyer's own cookie handed back to the browser. From
+    then on this library sees that cookie like any Foyer sign in (foyer()), so signing in
+    here is signing in on Foyer too, and the other way round.
+
+    Foyer does its own counting of wrong guesses, by the visitor's address, which is sent
+    on. Friends of the owner with no library yet get one made, as foyer_new does."""
+    if not FOYER:
+        raise Error("There's no Foyer on this machine.", 404)
+    data = req.json() or {}
+    handle = str(data.get("handle") or "").strip().lstrip("@")
+    password = str(data.get("password") or "")
+    if not handle or not password:
+        raise Error("Your Foyer handle and password, both.")
+    where = (req.headers.get("X-Forwarded-For") or "").split(",")[-1].strip() or getattr(req, "client", "") or "local"
+    ask = urllib.request.Request(
+        FOYER + "/api/account/login", method="POST",
+        data=json.dumps({"handle": handle, "password": password}).encode("utf-8"),
+        headers={"Content-Type": "application/json", "X-Forwarded-For": where,
+                 "Host": req.headers.get("Host") or "127.0.0.1"})
+    try:
+        with urllib.request.urlopen(ask, timeout=6) as answer:
+            cookie = answer.headers.get("Set-Cookie") or ""
+    except urllib.error.HTTPError as e:
+        try:
+            said = json.loads(e.read().decode("utf-8") or "{}")
+        except ValueError:
+            said = {}
+        raise Error(said.get("message") or "Foyer said no to that.", e.code if e.code in (401, 409, 429) else 400)
+    except OSError:
+        raise Error("Foyer isn't answering right now. Try again in a moment.", 503)
+    token = cookie.split(";", 1)[0].partition("=")[2]
+    f = foyer({"Cookie": "%s=%s" % (FOYER_COOKIE, token)}) if token else None
+    if not f:
+        raise Error("Foyer signed you in but didn't say who you are. Try again.", 502)
+    here = foyer_library(f)
+    if not here and f.get("ownerFriend") and accounts.count():
+        made = accounts.create(accounts.free_handle(f.get("handle")), secrets.token_urlsafe(24),
+                               name=(f.get("name") or "").strip())
+        accounts.link_foyer(f["id"], made["id"])
+        here = made["id"]
+    if not here:
+        raise Error("That Foyer account doesn't open a library here. Ask whoever runs this one "
+                    "to add you as a friend on Foyer.", 403)
+    return Response(status=200, body=b'{"ok":true}', content_type="application/json",
+                    headers={"Set-Cookie": cookie})
 
 
 def foyer_new(req):
@@ -924,6 +993,7 @@ def ROUTES():
         ("POST", "/api/auth/invites"): create_invite,
         ("DELETE", "/api/auth/invites/<id>"): revoke_invite,
         ("POST", "/api/auth/login"): login,
+        ("POST", "/api/auth/foyer-login"): foyer_login,
         ("GET", "/api/auth/tokens"): list_tokens,
         ("POST", "/api/auth/tokens"): create_token,
         ("DELETE", "/api/auth/tokens/<id>"): revoke_token,

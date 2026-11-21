@@ -10,7 +10,11 @@ import sqlite3
 import json
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB = os.path.join(BASE, "web")
+#: What the browser is served. The built interface: `ui/` is its source and
+#: tools/release.py is what builds one into the other. The variable is for running a
+#: second build beside the shipped one, which is how a new interface is tried against a
+#: real library without replacing the one that works.
+WEB = os.path.abspath(os.environ.get("JRITER_WEB") or os.path.join(BASE, "web"))
 
 #: The glass, which this app does not own.
 #:
@@ -168,6 +172,8 @@ MODULES = [
     # A copy of the library as text, and getting rid of it. Off is a library with no way
     # to take one out, which the privacy notice would then be wrong about.
     "export",
+    # Deleted things, kept for a while where they can be brought back (Library, Grave).
+    "grave",
     "updater",
     # What changed, and the note that appears once after an update. Off is a library that
     # still says which version it is and simply never mentions the rest.
@@ -200,10 +206,21 @@ _DEFAULTS = {
     "library_name": "JR!TER",
     "accent": "#FAA8B8",
     # The accent follows what is playing: a render's own waveform colour, or a song's
-    # artwork neonised. On by default, because a colour that follows the music is the
-    # point rather than an option, and the switch is there for a room where it is not
-    # wanted. The chosen accent above is what it falls back to, always.
+    # artwork neonised. On by default; with nothing playing, the accent chosen above.
     "adaptive": True,
+    # The open song's artwork behind the top of the app: out of focus, darkened, and faded
+    # to black toward the sidebar and toward the bottom, so it is a glow over the song's
+    # hero and never a colour wash over the whole app. On by default.
+    "artwork_ground": True,
+    # Presets for single effects (a compressor's "Vocal", a reverb's "Hall"), by effect
+    # kind: { "comp": [ { "name": ..., "values": { ... } } ] }. Shared by every song.
+    "effect_presets": {},
+    # Sidebar pins: [{"kind": "song" | "album" | "playlist" | "render", "id": n}], in order.
+    "pinned": [],
+    # How the Words tab shows rhymes: vowel marks (as underlines, or as highlights), each
+    # stanza's structure and the warnings about lines that break it (all on to start), and
+    # the browser's spellcheck while editing (off to start).
+    "lyrics_view": {"marks": True, "highlight": False, "structure": True, "warnings": True, "spellcheck": False},
     "auto_update": True,
     "sync_interval_minutes": 5,
     # Two dials, nought to a hundred, for the two things on this page that are taste

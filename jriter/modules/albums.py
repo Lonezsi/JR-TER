@@ -70,6 +70,9 @@ def MIGRATE():
     """How often each album has been opened. Zero for everything already here: see the
     same note in the songs module for why a seeded guess is worse than nothing."""
     db.add_column_if_missing("albums", "opened", "INTEGER NOT NULL DEFAULT 0")
+    # The stickers on its case, as JSON (ui/src/lib/stickers.ts); empty is "the album's own
+    # random ones", worked out from its id the same way everywhere.
+    db.add_column_if_missing("albums", "stickers", "TEXT NOT NULL DEFAULT ''")
 
 
 def most_opened(req):
@@ -144,13 +147,53 @@ def update_album(req):
         patch["year"] = as_int(data["year"], "year") if data["year"] not in (None, "") else None
     if "notes" in data:
         patch["notes"] = data["notes"] or ""
+    if "stickers" in data:
+        patch["stickers"] = _stickers(data["stickers"])
     patch["updated_at"] = time.time()
     db.update("albums", album["id"], patch)
     return {"album": get(album["id"])}
 
 
+STICKER_KINDS = {"warning", "price", "barcode", "sale", "ticket", "tape", "year", "discount"}
+# Where the old six fixed spots were, as x/y on the case (percent), for a sticker that
+# still says "at" instead of where it is.
+STICKER_AT = {"tl": (28, 14), "t": (50, 11), "tr": (76, 13), "bl": (30, 86), "b": (50, 89), "br": (74, 86)}
+STICKER_MAX = 8
+
+
+def _num(value, low, high, default):
+    try:
+        return max(low, min(high, round(float(value), 1)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _stickers(value):
+    """A case's stickers, checked: up to eight, of the kinds the page draws, short texts.
+    Each one is where its middle is on the case (x, y: percent), its size (s, 1 = normal)
+    and its tilt in degrees. None (or an empty list after "back to random") stores empty:
+    the random ones again."""
+    if value in (None, ""):
+        return ""
+    if not isinstance(value, list) or len(value) > STICKER_MAX:
+        raise Error("Up to %d stickers on a case." % STICKER_MAX)
+    out = []
+    for s in value:
+        if not isinstance(s, dict) or s.get("kind") not in STICKER_KINDS:
+            raise Error("That's not a sticker JR!TER knows.")
+        x, y = STICKER_AT.get(s.get("at"), (50, 50))
+        one = {"kind": s["kind"], "x": _num(s.get("x", x), 0, 100, x), "y": _num(s.get("y", y), 0, 100, y),
+               "s": _num(s.get("s", 1), 0.4, 3, 1), "rot": _num(s.get("rot", 0), -180, 180, 0)}
+        if s.get("text"):
+            one["text"] = str(s["text"])[:48]  # the warning label holds three lines
+        out.append(one)
+    import json
+    return json.dumps(out)
+
+
 def delete_album(req):
     album = get(req.params["id"])
+    _to_grave("bury_album", album["id"])
     db.run("DELETE FROM album_songs WHERE album_id = ?", (album["id"],))
     db.run("DELETE FROM albums WHERE id = ?", (album["id"],))
     return {"deleted": album["id"]}
@@ -281,3 +324,11 @@ def ROUTES():
         ("GET", "/api/albums/<id>/cover"): cover,
         ("GET", "/api/songs/<id>/albums"): for_song,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

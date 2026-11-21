@@ -214,6 +214,7 @@ def make_current(req):
 
 def delete_version(req):
     version = get(req.params["id"])
+    _to_grave("bury_version", version["id"])
     db.run("DELETE FROM versions WHERE id = ?", (version["id"],))
     song = db.one("SELECT * FROM songs WHERE id = ?", (version["song_id"],))
     if song and song["current_version_id"] == version["id"]:
@@ -337,3 +338,11 @@ def ROUTES():
         ("GET", "/api/versions/<id>/audio"): audio,
         ("GET", "/api/versions/<id>/download"): download,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

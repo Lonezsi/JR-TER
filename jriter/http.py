@@ -9,6 +9,7 @@ gives the server.
 import io
 import re
 import os
+import gzip
 import zlib
 import sys
 import socket
@@ -47,6 +48,50 @@ CONTENT_TYPES = {
 
 CHUNK = 256 * 1024
 
+#: What is worth compressing: text, which is most of what a page load is.
+#:
+#: The interface is one script and one stylesheet, and over the tunnel from a laptop they
+#: are the difference between a page that opens and a page that arrives. Audio and images
+#: are already compressed and are never touched; neither is anything asked for by range,
+#: because a range is an offset into the bytes on disk and not into a compressed copy.
+SQUEEZE = (".html", ".css", ".js", ".json", ".svg", ".txt")
+
+#: Below this a reply is sent as it is: the gzip header costs more than it saves.
+SQUEEZE_FROM = 1024
+
+#: Compressed static files, by path, with the mtime and size they were made from. A
+#: handful of entries: this is the built interface, not the library.
+_SQUEEZED = {}
+
+
+def squeezed(path, stat):
+    """A static file's gzip, made once per version of the file."""
+    key = (int(stat.st_mtime), stat.st_size)
+    kept = _SQUEEZED.get(path)
+    if kept and kept[0] == key:
+        return kept[1]
+    with open(path, "rb") as f:
+        body = gzip.compress(f.read(), 6)
+    if len(_SQUEEZED) > 64:
+        _SQUEEZED.clear()
+    _SQUEEZED[path] = (key, body)
+    return body
+
+
+def inside(root, path):
+    """Is this path the directory or something under it.
+
+    Not startswith. `web-next` starts with `web`, so a prefix test let a request for
+    /../web-next/anything out of the directory being served and into its neighbour, and
+    any sibling whose name merely begins the same way was readable. A path is inside a
+    directory when the directory is their common ancestor, and that is what this asks.
+    """
+    root = os.path.abspath(root)
+    try:
+        return os.path.commonpath([root, os.path.abspath(path)]) == root
+    except ValueError:
+        return False        # different drives, or a path that is not one
+
 #: Errors that only mean the other end went away.
 #:
 #: A browser cancels a range request every single time the player seeks, and a tab that
@@ -64,7 +109,19 @@ GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
 # no use behind the thing you have to hand it over to first, and somebody deciding whether
 # to sign up to a library a friend has pointed them at is exactly the person it is for. It
 # says nothing about the library itself: no titles, no counts, not even its name.
-OPEN_PAGES = {"/login", "/legal", "/jriter.css", "/favicon.ico"}
+OPEN_PAGES = {"/login", "/legal", "/jriter.css", "/glass.css", "/favicon.ico"}
+
+#: The app itself, open to a signed out visitor, who gets a guest library kept in their own
+#: browser (ui/src/guest). The page, its scripts and styles, the service worker that answers
+#: a guest's /api/* from the browser, and the word lists the rhyme finder reads.
+#:
+#: Only GET, and only the built interface, which is the same for everybody and is in a public
+#: repository anyway: it says nothing about any library, not even its name (the title is
+#: fixed in index.html; the name comes from /api/state, which stays shut). THE API IS NOT
+#: OPENED BY THIS. Every /api/* path not in OPEN_API still answers 401 to a signed out
+#: caller, guest mode or not: a guest's requests never reach this server at all.
+SHELL = {"/", "/index.html", "/sw.js"}
+SHELL_UNDER = ("/assets/", "/lexicon/", "/img/", "/css/")
 
 #: Screens that have an address of their own, and the route each one opens.
 #:
@@ -77,6 +134,9 @@ OPEN_PAGES = {"/login", "/legal", "/jriter.css", "/favicon.ico"}
 #: above the door. A path is lost on the way to /login and a fragment is not.
 PRETTY = {"/orarend": "/#/orarend"}
 OPEN_API = {"/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/health",
+            # Signing in with a Foyer account: Foyer checks the password and counts the
+            # guesses; this only passes them on and hands Foyer's cookie back.
+            "/api/auth/foyer-login",
             # Making an account, which by definition happens before you have one. It needs
             # an invite and it is behind the same guess limiter as a password, so being
             # open here is not being open: a stranger who reaches it still has to hold a
@@ -262,6 +322,23 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass  # the access log is noise for a single user tool
 
+    def end_headers(self):
+        """Every reply says two things about itself, whatever it is.
+
+        nosniff: this server stores what people upload and serves it back under the type
+        its extension names. Without this a browser may decide a file is really a page and
+        run it, and an upload is then a way to put script on this origin.
+
+        The referrer stays on this origin: a share link's token is in the address, and a
+        link out of the app (the terms, Foyer, YouTube) must not carry it along.
+        """
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "same-origin")
+        super().end_headers()
+
+    def _takes_gzip(self):
+        return "gzip" in (self.headers.get("Accept-Encoding") or "").lower()
+
     # ── replies ──────────────────────────────────────────────────────────────
     def _send(self, status, body, content_type, extra=None):
         self.send_response(status)
@@ -294,7 +371,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, data, status=200):
         body = json.dumps(data, default=str).encode("utf-8")
-        self._send(status, body, "application/json", {"Cache-Control": "no-store"})
+        extra = {"Cache-Control": "no-store"}
+        # A list of takes carries a waveform per take, and a library of a few hundred
+        # songs is a few hundred kilobytes of JSON that is nearly all repeated keys.
+        if len(body) >= SQUEEZE_FROM and self._takes_gzip():
+            body = gzip.compress(body, 5)
+            extra["Content-Encoding"] = "gzip"
+            extra["Vary"] = "Accept-Encoding"
+        self._send(status, body, "application/json", extra)
 
     #: The one marker a page uses to say where the shared filter goes.
     DEFS_MARK = b"<!-- GLASS-DEFS -->"
@@ -370,6 +454,13 @@ class Handler(BaseHTTPRequestHandler):
         # song handed back the older zip out of the browser's cache without a request ever
         # reaching the server, and the file the cache entry pointed at no longer existed.
         keep = "no-cache" if is_document else "private, no-cache"
+        # The one exception to "everything revalidates". The build names each of these
+        # after its own contents, so a given address can never come to mean other bytes:
+        # a new build is a new name, and index.html, which does revalidate, is what
+        # points at it. Asking again would be a round trip per file per visit for an
+        # answer that cannot change.
+        if getattr(self, "_hashed_asset", False) and not once:
+            keep = "private, max-age=31536000, immutable"
         extra = {
             "Accept-Ranges": "bytes",
             "ETag": etag,
@@ -378,9 +469,22 @@ class Handler(BaseHTTPRequestHandler):
         if download_name:
             extra["Content-Disposition"] = 'attachment; filename="%s"' % download_name
 
+        header = self.headers.get("Range")
+        if (not header and not once and size >= SQUEEZE_FROM and self._takes_gzip()
+                and os.path.splitext(path)[1].lower() in SQUEEZE):
+            try:
+                packed = squeezed(path, stat)
+            except OSError:
+                packed = None
+            if packed is not None:
+                extra["Content-Encoding"] = "gzip"
+                extra["Vary"] = "Accept-Encoding"
+                # A compressed reply is not seekable by the offsets of the file on disk.
+                extra.pop("Accept-Ranges", None)
+                return self._send(200, packed, ctype, extra)
+
         start, end = 0, size - 1
         status = 200
-        header = self.headers.get("Range")
         if header and header.startswith("bytes="):
             spec = header[6:].split(",")[0].strip()
             first, _, last = spec.partition("-")
@@ -432,6 +536,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = 0
+        self._hashed_asset = False
         self.body = Body(self.rfile, length)
         try:
             self._dispatch(method)
@@ -469,6 +574,10 @@ class Handler(BaseHTTPRequestHandler):
         if not registry.has("auth"):
             return False
         if path in OPEN_PAGES or path in OPEN_API:
+            return False
+        if getattr(self, "_method_now", None) == "GET" and not path.startswith("/api/") and (
+                path in SHELL or any(path.startswith(under) and len(path) > len(under)
+                                     for under in SHELL_UNDER)):
             return False
         if any(path.startswith(under) and len(path) > len(under)
                for under in OPEN_API_UNDER):
@@ -664,16 +773,33 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, body, CONTENT_TYPES[ext],
                               {"Cache-Control": "no-cache", "ETag": etag})
 
+        # The material on its own, for the built interface: it carries its own styles in
+        # its bundle and needs only the glass every site on this machine shares.
+        if path == "/glass.css":
+            body = shared_glass()
+            etag = '"%s"' % hashlib.sha256(body).hexdigest()[:16]
+            if self._etag_hit(etag):
+                return
+            return self._send(200, body, CONTENT_TYPES[".css"],
+                              {"Cache-Control": "no-cache", "ETag": etag})
+
         if path == "/login":
             return self._file(os.path.join(config.WEB, "login.html"))
         if path == "/legal":
             return self._file(os.path.join(config.WEB, "legal.html"))
-        rel = "index.html" if path == "/" else path.lstrip("/")
+        rel = "index.html" if path == "/" else urllib.parse.unquote(path).lstrip("/" + chr(92))
         full = os.path.normpath(os.path.join(config.WEB, rel))
-        if not full.startswith(config.WEB):
+        if chr(0) in rel or not inside(config.WEB, full):
             return self._json({"error": "not found"}, 404)
         if os.path.isfile(full):
+            self._hashed_asset = path.startswith("/assets/")
             return self._file(full)
+        # A missing file under /assets/ is a missing file. Handing back the app there
+        # would answer a request for a script with a page, which the browser refuses with
+        # an error about MIME types that says nothing about what is actually wrong: the
+        # tab is holding an index.html from before an update.
+        if path.startswith("/assets/") or path == "/sw.js":
+            return self._json({"error": "not found"}, 404)
         # Unknown paths are client side routes, so hand back the app and let it decide.
         index = os.path.join(config.WEB, "index.html")
         if os.path.isfile(index):

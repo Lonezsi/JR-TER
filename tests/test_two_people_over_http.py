@@ -254,6 +254,6 @@ def test_the_open_endpoints_are_still_the_only_open_ones(library):
         assert "no account is bound" not in json.dumps(body),             "%s reached a library with nobody signed in: %s" % (path, body)
     assert OPEN_API == {
         "/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/auth/signup",
-        "/api/health", "/api/appearance/font",
+        "/api/health", "/api/appearance/font", "/api/auth/foyer-login",
     }, ("the list of endpoints reachable without signing in has changed; each one is a "
         "thing a stranger on the internet can call, so it is worth a second look")

@@ -136,7 +136,17 @@ def size_of(digest):
 
 
 def delete(digest):
-    """Only ever called once nothing references the blob. Callers check, not this."""
+    """Only ever called once nothing references the blob. Callers check, not this.
+
+    The one reference callers don't know about is the grave (modules/grave.py): a deleted
+    render waiting there still needs its audio, so its file stays until it is brought back
+    or the grave lets it go (and even then it is kept, like any orphaned file)."""
+    try:
+        from .modules import grave
+        if grave.holds(digest):
+            return False
+    except Exception:
+        pass
     try:
         os.remove(path_for(digest))
         _forget_usage()

@@ -59,6 +59,21 @@ def put_settings(req):
     unknown = set(patch) - allowed
     if unknown:
         raise Error("not a setting: " + ", ".join(sorted(unknown)))
+    if "effect_presets" in patch:
+        patch["effect_presets"] = _effect_presets(patch["effect_presets"])
+    if "pinned" in patch:
+        pinned = patch["pinned"]
+        if (not isinstance(pinned, list) or len(pinned) > 100 or not all(
+                isinstance(p, dict) and p.get("kind") in ("song", "album", "playlist", "render")
+                and isinstance(p.get("id"), int) and not isinstance(p.get("id"), bool) for p in pinned)):
+            raise Error("pinned takes up to 100 {kind, id} entries")
+        patch["pinned"] = [{"kind": p["kind"], "id": p["id"]} for p in pinned]
+    if "lyrics_view" in patch:
+        view = patch["lyrics_view"]
+        keys = set(config.defaults()["lyrics_view"])
+        if not isinstance(view, dict) or set(view) - keys or not all(isinstance(v, bool) for v in view.values()):
+            raise Error("lyrics_view takes " + ", ".join(sorted(keys)) + ", each true or false")
+        patch["lyrics_view"] = {**config.defaults()["lyrics_view"], **view}
     saved = config.save_settings(patch)
     if "ffmpeg_path" in patch:
         # The lookup is cached for the same reason updater._COMMIT is, and somebody who
@@ -66,6 +81,49 @@ def put_settings(req):
         from .. import video
         video.forget()
     return saved
+
+
+EFFECT_KINDS = ("eq", "comp", "drive", "delay", "reverb", "width", "gain", "limiter")
+
+
+def _effect_presets(value):
+    """Effect presets as the Sound tab saves them, checked: a known effect kind, at most
+    fifty presets each, a name of at most eighty characters, values that are numbers (or,
+    for an equaliser, a list of at most twenty-four bands of numbers and a filter type).
+    Anything else is refused rather than stored, since this file is read back into the
+    page on every load."""
+    if not isinstance(value, dict):
+        raise Error("effect presets must be an object")
+    out = {}
+    for kind, presets in value.items():
+        if kind not in EFFECT_KINDS or not isinstance(presets, list) or len(presets) > 50:
+            raise Error("effect presets: bad entry for %r" % kind)
+        clean = []
+        for p in presets:
+            name = p.get("name") if isinstance(p, dict) else None
+            values = p.get("values") if isinstance(p, dict) else None
+            if not isinstance(name, str) or not name.strip() or len(name) > 80 or not isinstance(values, dict):
+                raise Error("effect presets: each needs a name and values")
+            if kind == "eq":
+                bands = values.get("bands", [])
+                if not isinstance(bands, list) or len(bands) > 24:
+                    raise Error("effect presets: an equaliser holds up to 24 bands")
+                kept = []
+                for b in bands:
+                    if not isinstance(b, dict) or not isinstance(b.get("type"), str) or len(b["type"]) > 12:
+                        raise Error("effect presets: bad band")
+                    nums = {k: b.get(k) for k in ("freq", "gain", "q")}
+                    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in nums.values()):
+                        raise Error("effect presets: bad band")
+                    kept.append({"type": b["type"], "on": bool(b.get("on", True)), **nums})
+                clean.append({"name": name.strip(), "values": {"bands": kept}})
+            else:
+                if len(values) > 16 or not all(isinstance(k, str) and isinstance(v, (int, float)) and not isinstance(v, bool)
+                                               for k, v in values.items()):
+                    raise Error("effect presets: values must be numbers")
+                clean.append({"name": name.strip(), "values": values})
+        out[kind] = clean
+    return out
 
 
 def _probe():

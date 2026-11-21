@@ -103,7 +103,7 @@ def test_putting_one_back_leaves_the_version_alone(server, wav):
     assert len(listing["versions"]) == 1, "putting it back took the version with it"
 
 
-def test_throwing_a_waiting_render_away_takes_its_bytes(server, wav):
+def test_throwing_a_waiting_render_away_keeps_its_bytes_in_the_grave(server, wav):
     _, arrived = server.upload("/api/renders", wav(), filename="mistake.wav")
     digest = None
     from jriter import db
@@ -113,7 +113,9 @@ def test_throwing_a_waiting_render_away_takes_its_bytes(server, wav):
 
     status, _ = server.delete("/api/renders/%d" % arrived["render"]["id"])
     assert status == 200
-    assert not blobs.exists(digest), "the audio was left behind with nothing pointing at it"
+    # The grave holds the bytes until it is emptied (modules/grave.py), so a thrown-away
+    # render can be brought back with its audio.
+    assert blobs.exists(digest), "the grave lost the audio of a render thrown away"
 
 
 def test_throwing_a_used_render_away_keeps_the_audio_the_song_needs(server, wav):

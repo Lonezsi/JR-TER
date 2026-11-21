@@ -12,7 +12,7 @@ the next, and a page that reshuffles under the cursor is the thing that makes a 
 box feel untrustworthy. Fixed order also means an exact song title is never underneath a
 lyric that happens to contain the word.
 """
-from .. import registry, finding
+from .. import registry, finding, query, db
 from ..wire import as_int
 
 NAME = "search"
@@ -23,15 +23,46 @@ SHOW = 8
 MOST = 50
 
 
+def _song_facts(ids):
+    """What the album: and has: filters need about each song, in three queries."""
+    facts = {i: {"albums": [], "has_words": False, "has_art": False} for i in ids}
+    if not ids:
+        return facts
+    marks = ",".join("?" * len(ids))
+    if db.table_exists("album_songs"):
+        for row in db.query("SELECT s.song_id, a.title FROM album_songs s JOIN albums a ON a.id = s.album_id "
+                            "WHERE s.song_id IN (%s)" % marks, ids):
+            facts[row["song_id"]]["albums"].append(row["title"] or "")
+    if db.table_exists("lyric_sheets"):
+        for row in db.query("SELECT DISTINCT song_id FROM lyric_sheets WHERE song_id IN (%s)" % marks, ids):
+            facts[row["song_id"]]["has_words"] = True
+    if db.table_exists("artwork"):
+        for row in db.query("SELECT DISTINCT song_id FROM artwork WHERE song_id IN (%s)" % marks, ids):
+            facts[row["song_id"]]["has_art"] = True
+    return facts
+
+
 def search(req):
-    term = (req.q("q") or "").strip()[:finding.MAX_TERM]
+    """Plain words, or the search language in jriter/query.py (is:song renders:>3 ...)."""
+    raw = (req.q("q") or "").strip()[:finding.MAX_TERM * 3]
     limit = max(1, min(MOST, as_int(req.q("limit") or SHOW, "limit")))
-    if not term:
+    q = query.parse(raw)
+    term = q.text[:finding.MAX_TERM]
+    if not term and not q.narrowed:
         return {"query": "", "groups": [], "looked_in": []}
-    found = registry.searches(term, limit)
+    # Narrowed: ask for more, since the filters will throw some away.
+    found = registry.searches(term, MOST if q.narrowed else limit)
+    if q.narrowed:
+        for g in found:
+            kind = g.get("kind", g.get("module"))
+            hits = g.get("hits") or []
+            facts = _song_facts([h["id"] for h in hits if "id" in h])                 if query.KIND_ALIASES.get(kind, kind) == "song" and query.song_facts_needed(q) else {}
+            kept = [h for h in hits if q.allows(kind, h, facts.get(h.get("id")))]
+            g["total"] = len(kept) if len(hits) < MOST else g.get("total", len(kept))
+            g["hits"] = kept[:limit]
     found.sort(key=lambda g: (g["order"], g.get("label", "")))
     return {
-        "query": term,
+        "query": raw,
         # Only the ones with something to show, plus any that failed, because a heading
         # with nothing under it is noise on a page whose whole job is a short answer.
         "groups": [g for g in found if g["hits"] or g.get("error")],
