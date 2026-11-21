@@ -216,8 +216,10 @@ try:
     sid_r = body["render"]["id"]
     sdigest = hashlib.sha256(sdata).hexdigest()
     status, body, _, _ = call("DELETE", "/api/renders/%d" % sid_r, cookie=owner)
-    check("dismiss removes an unused blob",
-          not os.path.exists(os.path.join(TMP, "accounts", "1", "blobs", sdigest[:2], sdigest[2:4], sdigest)))
+    sblob = os.path.join(TMP, "accounts", "1", "blobs", sdigest[:2], sdigest[2:4], sdigest)
+    check("dismiss keeps the blob in the grave", os.path.exists(sblob))
+    call("DELETE", "/api/grave", cookie=owner)
+    check("dismiss removes an unused blob once the grave lets go", not os.path.exists(sblob))
     status, body, _, _ = call("GET", "/api/renders/%d/audio" % sid_r, cookie=owner)
     check("a dismissed render is 404", status == 404, status)
 
@@ -256,8 +258,10 @@ try:
     # -- deletes ---------------------------------------------------------------------
     status, body, _, _ = call("DELETE", "/api/versions/%d" % v2["id"], cookie=owner)
     d2 = hashlib.sha256(data2).hexdigest()
-    check("deleting a version removes its unused blob", status == 200 and
-          not os.path.exists(os.path.join(TMP, "accounts", "1", "blobs", d2[:2], d2[2:4], d2)), body)
+    b2 = os.path.join(TMP, "accounts", "1", "blobs", d2[:2], d2[2:4], d2)
+    check("deleting a version keeps its blob in the grave", status == 200 and os.path.exists(b2), body)
+    call("DELETE", "/api/grave", cookie=owner)
+    check("deleting a version removes its unused blob once the grave lets go", not os.path.exists(b2))
     check("the song falls back to the newest version",
           py_rows(1, "SELECT current_version_id FROM songs WHERE id = ?", (sid,))[0]["current_version_id"] == v["id"])
     status, body, _, _ = call("DELETE", "/api/songs/%d" % sid, cookie=owner)

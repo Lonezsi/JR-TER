@@ -239,9 +239,11 @@ try:
     st, b, _, _ = call("GET", "/api/songs/%d" % s1, cookie=owner)
     check("the song's cover is the first image", b["song"]["artwork_id"] == img2["id"], b)
     st, b, _, _ = call("DELETE", "/api/artwork/%d" % img["id"], cookie=owner)
-    check("delete an image and its unused blob", st == 200 and b["deleted"] == img["id"]
-          and not os.path.exists(blobs.path_for(digest) if False else os.path.join(
-              TMP, "accounts", "1", "blobs", digest[:2], digest[2:4], digest)), b)
+    blob_file = os.path.join(TMP, "accounts", "1", "blobs", digest[:2], digest[2:4], digest)
+    check("delete an image: its blob waits in the grave", st == 200 and b["deleted"] == img["id"]
+          and os.path.exists(blob_file), b)
+    call("DELETE", "/api/grave", cookie=owner)
+    check("letting the grave go removes the unused blob", not os.path.exists(blob_file))
     st, b, _, _ = call("GET", "/api/artwork/%d/image" % img["id"], cookie=owner)
     check("deleted image is gone", err(st, b, 404, "no image with id %d" % img["id"]), b)
 
