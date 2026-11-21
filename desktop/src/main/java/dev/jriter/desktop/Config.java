@@ -42,7 +42,27 @@ public final class Config {
         String s = node.path("server").asText("http://127.0.0.1:7900");
         return s.isBlank() ? "http://127.0.0.1:7900" : s;
     }
-    public String token() { return node.path("token").asText(""); }
+    /** The credential's name in Windows Credential Manager: one per settings file. */
+    public String credentialTarget() { return "JRITER:" + path.toAbsolutePath(); }
+
+    /** From Credential Manager; an old token in the file moves there on first use. */
+    public String token() {
+        String target = credentialTarget();
+        var stored = Secrets.get(target);
+        if (stored.isPresent() && !stored.get().isEmpty()) return stored.get();
+        String inFile = node.path("token").asText("");
+        if (!inFile.isEmpty() && Secrets.put(target, inFile)) {
+            node.remove("token");
+            try { save(); } catch (IOException ignored) { }
+        }
+        return inFile;
+    }
+
+    public Config setToken(String t) {
+        if (Secrets.put(credentialTarget(), t)) node.remove("token");
+        else node.put("token", t);
+        return this;
+    }
     public String flPath() { return node.path("fl_path").asText(""); }
     public String renderFormat() { return node.path("render_format").asText("wav"); }
     public String renderOut() { return node.path("render_out").asText(""); }

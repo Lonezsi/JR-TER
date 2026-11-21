@@ -34,6 +34,8 @@ Settings are the same `%APPDATA%\jriter\client.json` the Python client used (or 
     powershell -File desktop\build.ps1      # needs JDK 21 (jpackage) and Maven; JRITER_JDK to point at it
 
 Gives `desktop\target\dist\JRITER\` and `desktop\target\JRITER-0.1.0-win.zip`. Unzip anywhere.
+
+    powershell -File desktop\build.ps1 -Msi   # also builds desktop\target\JRITER-0.1.0.msi
 `python tools/check_desktop.py` drives the built `jriter-cli.exe` against the Spring server on a
 scratch data folder.
 
@@ -43,6 +45,7 @@ scratch data folder.
 - The Java HTTP client cannot put non-ASCII bytes in a header, so a file name like `Józsi dal.wav`
   goes as ASCII plus `X-Filename-Enc` (percent-encoded UTF-8); the Spring server reads that one first.
   The old Python server ignores it and would show `?` for such names.
-- The token still lives in `client.json`; the Windows credential store is a later job.
+- The token lives in Windows Credential Manager (generic credential `JRITER:<path of client.json>`); an old token in `client.json` moves there on first use. Off Windows it stays in `client.json`.
+- The .msi needs WiX 3.14 binaries in `%USERPROFILE%\tools\wix314` (or `JRITER_WIX`). It installs per user (no admin), with a Start menu entry and a desktop shortcut; a fixed upgrade UUID lets newer versions install over it.
 - `update`/`install`/`uninstall` from the Python client are gone: a new build replaces the app.
 - `client/` stays until the app has been used on the owner's PC.

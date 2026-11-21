@@ -91,8 +91,7 @@ try:
     check("wrong password refused", code == 1 and "said no" in out, out)
     code, out = cli("login", "--password", "pw", "--name", "check")
     check("login", code == 0 and "can now reach" in out, out)
-    token = json.load(open(os.path.join(TMP, "client.json")))["token"]
-    check("token stored", len(token) > 10)
+    check("token kept out of client.json", "token" not in json.load(open(os.path.join(TMP, "client.json"))))
     token = owner_cookie()
 
     folder = os.path.join(TMP, "bounces")
@@ -126,6 +125,7 @@ try:
     code, out = cli("help")
     check("help", code == 0 and "jriter-cli" in out)
 finally:
+    subprocess.run(["cmdkey", "/delete:JRITER:" + os.path.abspath(os.path.join(TMP, "client.json"))], capture_output=True)
     if proc:
         proc.kill()
     time.sleep(1)

@@ -184,7 +184,7 @@ public final class Main {
             password = pw == null ? "" : new String(pw);
         }
         if (password.isEmpty()) { out.println("Nothing entered."); return 1; }
-        cfg.set("token", Library.login(cfg.server(), handle, password, name)).save();
+        cfg.setToken(Library.login(cfg.server(), handle, password, name)).save();
         out.println("This machine can now reach " + cfg.server() + " as \"" + name + "\".");
         out.println("It can upload renders and read the library. It cannot delete anything.");
         return 0;

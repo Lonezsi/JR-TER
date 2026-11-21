@@ -58,6 +58,20 @@ class DesktopTest {
         assertEquals(5, Config.load(tmp.resolve("none.json")).intervalMinutes());
     }
 
+    @Test @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void tokenMovesToCredentialManager() throws Exception {
+        Path f = tmp.resolve("client.json");
+        Files.writeString(f, "{\"token\":\"t\",\"server\":\"http://x:1\"}");
+        Config c = Config.load(f);
+        try {
+            assertEquals("t", c.token());
+            assertFalse(Files.readString(f).contains("\"token\""));
+            assertEquals("t", Secrets.get(c.credentialTarget()).orElse(""));
+            c.setToken("u").save();
+            assertEquals("u", Config.load(f).token());
+        } finally { Secrets.delete(c.credentialTarget()); }
+    }
+
     @Test void surveyWalksAudioAndSkipsDotDirs() throws Exception {
         Files.createDirectories(tmp.resolve("a/.hidden"));
         Files.writeString(tmp.resolve("a/one.WAV"), "x");
