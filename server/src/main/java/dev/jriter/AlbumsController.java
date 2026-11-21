@@ -45,7 +45,7 @@ public class AlbumsController {
     }
 
     /** Adds song_count, duration and has_cover to an album row. */
-    private static Map<String, Object> counted(Library.Db db, Map<String, Object> album) {
+    static Map<String, Object> counted(Library.Db db, Map<String, Object> album) {
         Object id = album.get("id");
         album.put("song_count", db.one("SELECT COUNT(*) AS n FROM album_songs WHERE album_id = ?", id).get("n"));
         Object total = db.one("SELECT COALESCE(SUM(v.duration), 0) AS d FROM album_songs a JOIN songs s ON s.id = a.song_id"
