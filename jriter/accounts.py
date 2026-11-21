@@ -107,6 +107,16 @@ SCHEMA = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS tokens_account ON tokens(account_id)",
+    # Which Foyer account opens which library. Foyer is the front door of the machine and
+    # signs people in for every site on it (auth.foyer). One Foyer account, one library,
+    # both ways round.
+    """
+    CREATE TABLE IF NOT EXISTS foyer_links (
+      foyer_id   TEXT PRIMARY KEY,
+      account_id INTEGER NOT NULL UNIQUE,
+      linked_at  REAL NOT NULL
+    )
+    """,
 ]
 
 _local = threading.local()
@@ -516,6 +526,39 @@ def tokens_of(account_id):
 def drop_token(token_id, account_id):
     """Scoped to the account, so an id guessed off another library revokes nothing."""
     _run("DELETE FROM tokens WHERE id = ? AND account_id = ?", (token_id, account_id))
+
+
+# -- Foyer ----------------------------------------------------------------------
+def foyer_account(foyer_id):
+    """The library this Foyer account opens, or None."""
+    row = _one("SELECT account_id FROM foyer_links WHERE foyer_id = ?", (foyer_id,))
+    return row["account_id"] if row else None
+
+
+def foyer_of(account_id):
+    row = _one("SELECT foyer_id FROM foyer_links WHERE account_id = ?", (account_id,))
+    return row["foyer_id"] if row else None
+
+
+def link_foyer(foyer_id, account_id):
+    """Ties them, and unties whatever either one was tied to before."""
+    _run("DELETE FROM foyer_links WHERE foyer_id = ? OR account_id = ?", (foyer_id, account_id))
+    _run("INSERT INTO foyer_links (foyer_id, account_id, linked_at) VALUES (?, ?, ?)",
+         (foyer_id, account_id, time.time()))
+
+
+def unlink_foyer(account_id):
+    _run("DELETE FROM foyer_links WHERE account_id = ?", (account_id,))
+
+
+def free_handle(wanted):
+    """A handle nobody has, as close to the one wanted as it can be."""
+    base = "".join(c for c in (wanted or "").strip().lower() if c in HANDLE_OK)[:HANDLE_MAX - 4] or "friend"
+    handle, n = base, 1
+    while by_handle(handle):
+        n += 1
+        handle = "%s%d" % (base, n)
+    return handle
 
 
 def adopt_old_tokens(rows, account_id):

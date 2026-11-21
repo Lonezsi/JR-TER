@@ -6,6 +6,11 @@ the HTTP layer needs Response, and if either owned it the two would import each 
 import json
 
 
+#: The most JSON a request may carry. Sixteen megabytes is hundreds of times the largest
+#: thing the interface sends and still small enough to hold without thinking about it.
+MAX_JSON = 16 * 1024 * 1024
+
+
 class Error(Exception):
     """Raised by a handler to answer with a status and a message rather than a stack trace."""
 
@@ -65,10 +70,18 @@ class Request:
         """
         if self._parsed is not None:
             return self._parsed
-        length = int(self.headers.get("Content-Length") or 0)
-        if not length:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise Error("that request has no readable length")
+        if length <= 0:
             self._parsed = {}
             return self._parsed
+        # A JSON body is read whole into memory, so it gets a ceiling. Everything this
+        # app sends as JSON is small: words, a title, an arrangement. Files are sent as
+        # the raw body and never come through here.
+        if length > MAX_JSON:
+            raise Error("that request body is too large", 413)
         raw = self.rfile.read(length)
         try:
             value = json.loads(raw.decode("utf-8"))

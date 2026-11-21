@@ -8,179 +8,34 @@
 <meta name="description" content="please post for the world to see">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Orbitron carries the titles: geometric and technical, and the closest openly
-     licensed face to the one this was designed around. Upload your own in Settings and
-     it is registered as "Jriter Display", which the stylesheet asks for first. Manrope
-     does everything else: well used, not everywhere, and it holds its shape at twelve
-     pixels in a dense track list. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/jriter.css">
+<!-- The glass every site on this machine is made of. One copy, in foyer/shared, served
+     by this app at this address; the interface's own styles come after it in the bundle. -->
+<link rel="stylesheet" href="/glass.css">
 <link rel="icon" href="/favicon.ico" sizes="any">
+<script>
+  /* Light or dark: "auto" follows the system, and the choice lives in this browser
+     (Settings, Appearance). Here, before the first paint, so nothing flashes. */
+  (function () {
+    var root = document.documentElement, want = "auto";
+    try { want = localStorage.getItem("jriter.theme") || "auto"; } catch (e) {}
+    var sys = window.matchMedia("(prefers-color-scheme: light)");
+    function apply() {
+      var t = want === "auto" ? (sys.matches ? "light" : "dark") : want;
+      root.setAttribute("data-theme", t);
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute("content", t === "light" ? "#F3F1F2" : "#000000");
+    }
+    apply();
+    sys.addEventListener && sys.addEventListener("change", apply);
+    window.__jriterTheme = function (next) { want = next; try { localStorage.setItem("jriter.theme", next); } catch (e) {} apply(); };
+  })();
+</script>
+  <script type="module" crossorigin src="/assets/index-BLSEJ7bD.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Bnl7413D.css">
 </head>
 <body>
-
-
 <!-- GLASS-DEFS -->
-<!-- The three filters that bend the glass used to be written out here. They are in
-     foyer/shared/glass-defs.html now, read off the same disk as the stylesheet that
-     references them by id, and dropped in at this marker by the server.
-
-     Injected rather than linked because an SVG filter is only referenceable from the
-     document it sits in, so there is no <link> that would do. A page that loses the
-     marker still works and simply has no refraction, which is the same thing as being on
-     an engine that cannot do it, and the stylesheet already covers that case. -->
-
-<div class="nav-bar" id="navBar" hidden><span></span></div>
-
-<!-- The song's own artwork, enormous and far out of focus, behind the entire app.
-     Fixed to the page rather than to the panel, so the rail and the player have
-     something with colour in it to refract, which is what makes them read as glass. -->
-<div class="page-wash" id="pageWash" aria-hidden="true"></div>
-
-<div id="app" class="shell">
-
-  <aside class="rail" id="rail">
-    <div class="rail-top">
-      <a class="wordmark" href="#/home" data-link aria-label="Home">
-        <!-- The quarter rest, drawn rather than typed: nothing in the display
-             stack carries U+1D13D, least of all a face somebody uploaded
-             themselves, so a text glyph is a notdef box on a machine you cannot
-             test. The name beside it is the library's own, which boot.js writes. -->
-        <svg class="rest" viewBox="0 0 12 30" width="9" height="22"
-             aria-hidden="true" focusable="false">
-          <path d="M8.5 2 L3.5 9.5 L8.5 15 L3.5 21" fill="none" stroke="currentColor"
-                stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M3.5 21c3.2.6 4.9 2.4 4.9 4.6 0 1.6-1 2.6-2.4 2.6" fill="none"
-                stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        </svg>
-        <span id="wordmarkName">JR!TER</span>
-      </a>
-      <button class="icon-btn rail-close" id="railClose" aria-label="Close menu">&times;</button>
-    </div>
-
-    <nav class="nav" id="nav"></nav>
-
-    <div class="rail-section" id="railAlbums"></div>
-    <div class="rail-section" id="railPlaylists"></div>
-
-    <!-- Just above the rule that closes the rail, in the smallest type on the screen.
-         The gesture that reaches this page is a phone gesture, so on a machine with a
-         pointer there was no way to it at all. -->
-    <!-- The way out, for a machine with a pointer.
-         The gesture that reaches Foyer is a phone gesture, so without this there is no way
-         to it at all on a desktop. No data-link: this leaves the app rather than navigating
-         inside it, and the href is pointed at whichever host served this page at boot. -->
-    <a class="rail-about" id="railFoyer" href="/" rel="noopener">Foyer</a>
-
-    <div class="rail-foot">
-      <!-- The connected Google account, if there is one. Written by boot.js from what
-           the YouTube module already knows, and absent rather than empty when nothing
-           is connected: a grey circle with no picture in it is a thing to wonder about. -->
-      <a class="rail-account" id="railAccount" href="#/account" data-link>
-        <span class="rail-avatar" id="railAvatar" aria-hidden="true"></span>
-        <span class="rail-who">
-          <span class="rail-account-name truncate" id="railAccountName"></span>
-          <span class="rail-account-sub truncate" id="railAccountSub"></span>
-        </span>
-      </a>
-
-    </div>
-
-    <!-- The small print, on its own line under the account. Two hundred and eighteen
-         pixels of rail cannot hold an avatar, a name, a button, a ?, a version and the
-         terms in one row: the button alone is eighty seven of them. So the row you use
-         is one line and the row you read is the next. -->
-    <div class="rail-meta">
-      <button class="btn sm" id="newSong">New song</button>
-      <span class="grow"></span>
-      <button class="rail-keys" id="railKeys" title="Keyboard shortcuts">?</button>
-      <span class="rail-end">
-        <span class="rail-version" id="railVersion"></span>
-        <!-- A sheet of paper with a folded corner, beside the version because that is
-             the one corner of every screen already given over to what this is and who
-             is answerable for it. The version went back to being text: a number that
-             navigates is a number you click by accident when you meant to read it.
-             A new tab, for the three ways in that are inside the app.
-
-     This is a music player. The player lives in the shell, so a full page navigation
-     ends whatever is playing, and it takes any unsaved Settings field with it. The
-     terms are a thing you glance at and come back from, and none of that is worth a
-     stopped song and a lost accent colour. The door's link is the exception and stays
-     in this tab: nothing is playing there and there is nothing to lose. -->
-        <a class="rail-legal" href="/legal" target="_blank" rel="noopener"
-           title="Terms and privacy" aria-label="Terms and privacy">
-          <svg viewBox="0 0 14 17" width="12" height="15" aria-hidden="true"
-               focusable="false">
-            <path d="M2.6 1.4h5.1l3.7 3.7v10a.5.5 0 0 1-.5.5H2.6a.5.5 0 0 1-.5-.5V1.9a.5.5 0 0 1 .5-.5z"
-                  fill="none" stroke="currentColor" stroke-width="1.15"
-                  stroke-linejoin="round"/>
-            <path d="M7.7 1.4v3.7h3.7" fill="none" stroke="currentColor"
-                  stroke-width="1.15" stroke-linejoin="round"/>
-            <path d="M4.4 8.4h5.2M4.4 10.9h5.2M4.4 13.4h3.1" stroke="currentColor"
-                  stroke-width="1.15" stroke-linecap="round"/>
-          </svg>
-        </a>
-      </span>
-    </div>
-  </aside>
-
-  <div class="rail-scrim" id="railScrim"></div>
-
-  <main class="main">
-    <header class="topbar">
-      <button class="icon-btn rail-open" id="railOpen" aria-label="Open menu">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
-      </button>
-      <div class="search">
-        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <input id="search" type="search" placeholder="Search your songs" aria-label="Search songs" autocomplete="off">
-      </div>
-      <span class="grow"></span>
-      <a class="update-ready" id="updateReady" href="#/settings" title="Update now" hidden>
-        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"
-             focusable="false">
-          <path d="M12 20V5m0 0l-5 5m5-5l5 5" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                transform="rotate(180 12 12)"/>
-        </svg>
-        <span>Update ready</span>
-      </a>
-    </header>
-
-    <div class="view" id="view"></div>
-  </main>
-
-  <footer class="player" id="player" hidden></footer>
-</div>
-
-<!-- Armed by holding the rail past its stop. Never pressed: letting go is what presses
-     it, and by then the thumb is nowhere near this. On the left, beside the rail, because
-     it is a label on the thing in your hand and the two of them leave together. The arrow
-     points the way they both go. -->
-<!-- A button rather than a div, because it is pressed now.
-     It used to be neither pressed nor reachable: letting the rail go was what opened the
-     page, and this only announced that. Which is fine when you already know, and on a
-     phone it reads as an arrow that does not work. -->
-<!-- aria-hidden rather than hidden, and toggled with the class.
-     hidden is display:none, and you cannot transition out of that: the bubble slides in
-     and out, so it has to stay in the layout the whole time and be invisible by opacity.
-     What it must not do is sit in the tab order or get read out while it is not there. -->
-<button class="edge-bubble" id="edgeBubble" type="button" aria-hidden="true" tabindex="-1">
-  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-       stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-       aria-hidden="true" focusable="false">
-    <path d="M19 12H6M13 5l-7 7 7 7"/>
-  </svg>
-  <span>Foyer</span>
-</button>
-
-<!-- Over everything, including the dialogs, because a step in a gradient does not stop
-     being a step when a sheet is open. pointer-events: none, so it is only ever paint. -->
-<div class="grain" id="grain" aria-hidden="true"></div>
-
-<div class="sheet-backdrop" id="modalBackdrop" hidden></div>
-<div class="toast-stack" id="toasts" aria-live="polite"></div>
-
-<script src="/jriter.js"></script>
+<div id="app"></div>
 </body>
 </html>

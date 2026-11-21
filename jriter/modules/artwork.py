@@ -87,6 +87,7 @@ def reorder(req):
 
 def delete_image(req):
     image = get(req.params["id"])
+    _to_grave("bury_image", image["id"])
     db.run("DELETE FROM artwork WHERE id = ?", (image["id"],))
     still = db.one("SELECT id FROM artwork WHERE digest = ? LIMIT 1", (image["digest"],))
     if not still:
@@ -145,3 +146,11 @@ def ROUTES():
         ("DELETE", "/api/artwork/<id>"): delete_image,
         ("GET", "/api/artwork/<id>/image"): image,
     }
+
+
+def _to_grave(what, row_id):
+    """Copy it into the grave first (modules/grave.py), when the grave is switched on."""
+    from .. import registry
+    if registry.has("grave"):
+        from . import grave
+        getattr(grave, what)(row_id)

@@ -22,6 +22,106 @@ JRITER = "JR!TER"
 
 ENTRIES = [
     {
+        "version": "4.3.0",
+        "date": "2026-11-20",
+        "name": JRITER,
+        "title": "The grave",
+        "notes": [
+            "Deleted songs, renders, albums, playlists, words and pictures wait in the Grave for "
+            "30 days. Bring one back and it's whole again, back on its albums and all.",
+            "Undo puts things back on screen the moment you press it, sidebar included, and "
+            "takes you back to the page you deleted from.",
+            "Arrange draws a breathing skeleton waveform while a render's picture is on its "
+            "way, and fills in the real one by itself.",
+            "Sign in with your Foyer account right on the sign in page.",
+            "Running your own: Tailscale is optional now; the installer asks, and each JR!TER "
+            "has its own people.",
+            "Albums are CDs in their case everywhere. Hover one and the case swings open on its "
+            "hinge, showing the rainbow disc inside.",
+            "Every case has two or three stickers: a LISTEN LOUD label and shop stickers picked at "
+            "random. The pen on the album page opens a sticker editor like a story editor: drag "
+            "them anywhere, pinch (or the corner handle) to resize and turn, stick new ones on "
+            "from the tray, drop one on the bin to peel it off. Rewrite the prices, or what the "
+            "LISTEN LOUD label says.",
+            "A playlist is a stack of the covers of the songs in it, stacked up to the right, and "
+            "it fans out to the right when you hover it.",
+            "Opening an album or a playlist glides the whole case into place, not just its picture.",
+            "Light mode went soft: everything is shaped by light and shadow instead of glass, "
+            "and the sidebar's lists sit in a groove.",
+        ],
+    },
+    {
+        "version": "4.2.0",
+        "date": "2026-11-20",
+        "name": JRITER,
+        "title": "Try it without an account",
+        "notes": [
+            "No account? You get a guest library that lives in your browser: songs, renders, "
+            "words, albums, sound and arrange all work. Sign in later and bring it over in one go.",
+            "Run your own: a guide in the sidebar for putting JR!TER on a computer of yours, "
+            "with a one-line installer for Windows, Mac and Linux.",
+            "Your library as a file you can read and bring back: Settings, Library, Take a copy "
+            "(now with each song's words as plain text) and Bring a library in.",
+            "Search speaks a little language: is:song, album:\"name\", has:words, renders:>3, "
+            "length:<3:30, touched:<7d, -not.",
+            "Deleting things has Undo instead of \"are you sure?\". Plus light mode, real "
+            "tooltips, j/k to move through lists and h to go up a level.",
+        ],
+    },
+    {
+        "version": "4.1.0",
+        "date": "2026-11-17",
+        "name": JRITER,
+        "title": "Smarter rhymes, cleaner everything",
+        "notes": [
+            "The rhyme button works out what your line should rhyme with from the verse, "
+            "lights that word up and lists rhymes for it. Click another word while it's open "
+            "to rhyme with that one instead.",
+            "Warnings say what a verse actually is (\"this verse is ABAC, it'd be ABAB "
+            "if...\"). End a line with // and it's left alone.",
+            "Every dropdown is the app's own now, and renders are called renders everywhere "
+            "(the Takes tab is Renders, takes are vocals).",
+            "In the words, each line's syllables, rhyme letter and warning sit right before "
+            "it, like line numbers, and the rhyme tools are one row above the words.",
+            "Song tabs stay pinned while you scroll, the phone search and player feel "
+            "quicker, and a lot of duplicate buttons and long text are gone.",
+        ],
+    },
+    {
+        "version": "4.0.1",
+        "date": "2026-11-16",
+        "name": JRITER,
+        "title": "Phone polish",
+        "notes": [
+            "Sliders and the Arrange timeline keep your drag now, instead of pulling the "
+            "sidebar out halfway through.",
+            "The sidebar follows your finger again, slides back the same way, and knows a "
+            "tap from a swipe. Back on your phone closes the search, the player or a sheet "
+            "before it leaves the page.",
+            "Song tabs fit on a phone, play and the song's buttons share one row, and the "
+            "library, inbox, album, sound and settings screens stopped wrapping and "
+            "cutting things off.",
+            "Pin songs, albums, playlists and renders to the sidebar. Songs get a "
+            "description, and Record lets you pick the mic and the output.",
+        ],
+    },
+    {
+        "version": "4.0.0",
+        "date": "2026-11-16",
+        "name": JRITER,
+        "title": "JR!TER 4: rebuilt from scratch",
+        "notes": [
+            "A whole new app on the same library. New interface, real glass that doesn't "
+            "flicker, smoother everything, and screens that make more sense together.",
+            "Rhymes on the Words tab: vowel marks, rhyme groups, a stanza structure checker "
+            "with fixes, and a rhyme finder that mixes Hungarian and English.",
+            "Sound is now a chain of effects you build yourself (EQ, compressor, reverb, "
+            "delay and more), each with its own presets.",
+            "Arrange is its own tab, the sidebar shows renders, and opening a song grows it "
+            "out of where you tapped.",
+        ],
+    },
+    {
         "version": "3.21.3",
         "date": "2026-10-19",
         "name": JRITER,
