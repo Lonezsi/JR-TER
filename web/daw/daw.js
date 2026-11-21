@@ -77,7 +77,7 @@ function renderBar() {
     return;
   }
   bar.dataset.built = "1";
-  bar.innerHTML = `<span class="name">DAW</span>` +
+  bar.innerHTML = `<span class="name">DAW</span>` + btn("home", "⌂", "Back to the library") +
     btn("play", ICONS.play, "Play (Space)") + btn("loop", ICONS.loop, "Loop (L)", looping) +
     `<span class="sep"></span>` +
     `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
@@ -86,6 +86,7 @@ function renderBar() {
     btn("add", ICONS.add, "New track (N)") + btn("undo", ICONS.undo, "Undo (Ctrl+Z)") +
     `<span class="sep"></span>` +
     btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") + btn("savejson", ICONS.json, "Save as .json text");
+  $("home").onclick = () => location.assign("/");
   $("play").onclick = () => togglePlay();
   $("loop").onclick = () => { looping = !looping; renderBar(); };
   $("bpm").onchange = (e) => { edit(() => { song.bpm = clamp(+e.target.value || 120, 20, 300); }); if (playing) play(curBeat() % loopLen()); };

@@ -62,6 +62,21 @@ def _git(*args):
     return done.stdout.strip(), None
 
 
+def _branch():
+    """The branch updates come from.
+
+    JRITER_BRANCH if it is set. Otherwise the branch this checkout is on, when that is a
+    live-* branch: the host runs live-4.3.0, which carries the built interface that main
+    does not, and following main there would never end. Anything else falls back to the
+    default, and _auto_once then declines a checkout on some other branch.
+    """
+    if os.environ.get("JRITER_BRANCH"):
+        return config.BRANCH
+    here, _ = _git("rev-parse", "--abbrev-ref", "HEAD")
+    here = (here or "").strip()
+    return here if here.startswith("live-") else config.BRANCH
+
+
 def _is_repo():
     out, _ = _git("rev-parse", "--is-inside-work-tree")
     return out == "true"
@@ -69,7 +84,7 @@ def _is_repo():
 
 def _remote_head():
     """The newest commit on the tracked branch, straight from the GitHub API."""
-    url = "https://api.github.com/repos/%s/commits/%s" % (config.REPO, config.BRANCH)
+    url = "https://api.github.com/repos/%s/commits/%s" % (config.REPO, _branch())
     request = urllib.request.Request(url, headers={
         "Accept": "application/vnd.github+json", "User-Agent": "JR!TER"})
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
@@ -109,7 +124,7 @@ def check(req):
         "why": ("There are uncommitted changes here, so the update was not applied."
                 if behind and dirty else ""),
         "repo": config.REPO,
-        "branch": config.BRANCH,
+        "branch": _branch(),
     }
 
 
@@ -142,7 +157,7 @@ def _pull():
         raise Error("There are uncommitted changes to JR!TER's own files here. Commit or "
                     "discard them first, then update.", 409)
     before, _ = _git("rev-parse", "HEAD")
-    out, error = _git("pull", "--ff-only", "origin", config.BRANCH)
+    out, error = _git("pull", "--ff-only", "origin", _branch())
     if error:
         raise Error("The pull did not succeed: " + error, 502)
     after, _ = _git("rev-parse", "HEAD")
@@ -291,8 +306,8 @@ def _auto_once():
         if config.settings().get("auto_update") is False:
             return "switched off"
     branch, _ = _git("rev-parse", "--abbrev-ref", "HEAD")
-    if branch and branch.strip() != config.BRANCH:
-        return "on %s, not %s" % (branch.strip(), config.BRANCH)
+    if branch and branch.strip() != _branch():
+        return "on %s, not %s" % (branch.strip(), _branch())
     if not _BUSY.acquire(blocking=False):
         return "busy"
     try:
