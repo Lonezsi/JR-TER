@@ -99,7 +99,7 @@ checks and the matching Python tests agree.
   old one as `jriter.prev.jar`.
   YouTube done too (9e3): posts, the account file, both Google sign-ins, the mix, the upload job (resumable, with retries) and the pinned ffmpeg fetch (`Video`, `YouTube`, `YouTubeController`; `tools/parity_youtube.py`, `YouTubeUploadTest` against a local stand-in). The checks never reach Google; a real upload through Spring is untested.
 - [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
-- [ ] 12: `tools/check_libraries.py` copies the host's data and compares every real library through Spring and Python
-  (files hashed, answers equal, export v2 row counts). Passes today for what Spring serves (4 libraries, 60 files);
-  done when nothing is left in its "not ported yet" list. Rerun it after each slice.
+- [x] 12: `tools/check_libraries.py` copies the host's data and compares all 4 real libraries through Spring and Python
+  (60 files hashed, every answer equal, both servers' export v2 identical). Nothing left unported (2026-11-21).
+  Rerun it before the switch (task 13).
 - Live 4.3.0 (never committed before) is on `main` (backend) and branch `live-4.3.0` (with the built UI bundle).

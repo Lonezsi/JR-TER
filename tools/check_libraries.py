@@ -300,6 +300,17 @@ try:
         lost = [d[:12] for d in have if not os.path.isfile(blob_path(B, acc, d))]
         check("account %d: every digest the export names is a file" % acc, not lost, lost[:5])
         c.close()
+        # After the switch Spring is what hands the copy out: it must be the same file.
+        st, sraw, _ = call(SPRING_PORT, "/api/export", cookie)
+        if st != 200:
+            check("account %d Spring export" % acc, False, (st, sraw[:200]))
+            continue
+        sz = zipfile.ZipFile(io.BytesIO(sraw))
+        check("account %d: Spring's export has the same files" % acc,
+              sorted(sz.namelist()) == sorted(z.namelist()),
+              sorted(set(sz.namelist()) ^ set(z.namelist()))[:5])
+        d = first_difference(json.loads(sz.read("library.json").decode("utf-8")), lib)
+        check("account %d: Spring's library.json equals Python's" % acc, not d, d)
 finally:
     if proc:
         proc.kill()
