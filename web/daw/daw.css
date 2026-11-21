@@ -1,10 +1,14 @@
-/* DAW page. Spacing scale: 4 / 8 / 12 / 16 / 24. Colours come from /glass.css when present. */
+/* DAW page. Spacing scale: 4 / 8 / 12 / 16 / 24. Colours come from /glass.css when present.
+   Order matters: base rules first, the phone block LAST. Rules of equal weight are decided by
+   position, and a phone rule placed above a base rule silently lost to it (the toasts sat on
+   the buttons, buttons stayed 28px). */
 :root {
   --d-s1: 4px; --d-s2: 8px; --d-s3: 12px; --d-s4: 16px; --d-s5: 24px;
   --d-bg: #0e0f12; --d-fg: #e8e8ec; --d-mute: #8d8f99;
   --d-panel: rgba(255, 255, 255, 0.05); --d-line: rgba(255, 255, 255, 0.13);
   --d-key: rgba(255, 255, 255, 0.04); --d-black: rgba(0, 0, 0, 0.18);
   --d-acc: var(--accent, #FAA8B8); --d-acc-ink: var(--accent-ink, #16080C);
+  --d-sheet: #1c1d22;
   --d-grid: rgba(255, 255, 255, 0.07); --d-bar: rgba(255, 255, 255, 0.2);
 }
 @media (prefers-color-scheme: light) {
@@ -12,14 +16,17 @@
     --d-bg: #f1f1f4; --d-fg: #1b1c21; --d-mute: #6b6d78;
     --d-panel: rgba(255, 255, 255, 0.7); --d-line: rgba(0, 0, 0, 0.14);
     --d-key: rgba(0, 0, 0, 0.03); --d-black: rgba(0, 0, 0, 0.07);
+    --d-sheet: #ffffff;
     --d-grid: rgba(0, 0, 0, 0.08); --d-bar: rgba(0, 0, 0, 0.28);
   }
 }
 * { box-sizing: border-box; }
+/* dvh: the visible height, so the bottom bar is not hidden under a phone's address bar. */
 html, body { height: 100%; margin: 0; }
 body {
+  height: 100vh; height: 100dvh;
   display: flex; flex-direction: column; gap: var(--d-s2); padding: var(--d-s3);
-  background: var(--d-bg); color: var(--d-fg);
+  background: var(--d-bg); color: var(--d-fg); overflow: hidden;
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .bar, .tracks, .roll {
@@ -35,29 +42,9 @@ body {
 .main { flex: 1; min-height: 0; display: flex; gap: var(--d-s2); }
 .tracks { width: 248px; flex: none; overflow: auto; padding: var(--d-s2); display: flex; flex-direction: column; gap: var(--d-s2); }
 .roll { flex: 1; min-width: 0; position: relative; overflow: hidden; }
-canvas { width: 100%; height: 100%; display: block; outline: none; }
-canvas { touch-action: none; -webkit-user-select: none; user-select: none; }
+canvas { width: 100%; height: 100%; display: block; outline: none; touch-action: none; -webkit-user-select: none; user-select: none; }
 
-/* Phones and tablets: transport at the bottom where the thumb is, tracks as a strip. */
-@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
-  body { padding: var(--d-s2); padding-bottom: calc(var(--d-s2) + env(safe-area-inset-bottom)); }
-  .main { flex-direction: column; }
-  .tracks { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; max-height: none; flex: none; }
-  .track { min-width: 200px; }
-  .bar { order: 3; flex-wrap: nowrap; justify-content: space-between; }
-  .transport { display: flex; align-items: center; gap: var(--d-s2); width: 100%; justify-content: space-between; }
-  #more { display: inline-flex; }
-  .more { display: none; position: absolute; left: 0; right: 0; bottom: calc(100% + var(--d-s2)); flex-wrap: wrap; gap: var(--d-s2); align-items: center;
-    padding: var(--d-s3); background: var(--glass-2, #1c1d22); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); z-index: 10; }
-  .bar.open .more { display: flex; }
-  .bar .sep { display: none; }
-  button, select, input { min-height: 40px; min-width: 40px; }
-  .track .row button { min-width: 40px; }
-  #play { flex: 1; max-width: 96px; }
-}
-@media (hover: none) { [data-tip]::after { display: none !important; } }
-
-button, select, input {
+button, select, input, textarea {
   font: inherit; color: inherit; background: var(--d-key); border: 1px solid var(--d-line);
   border-radius: var(--r-sm, 9px); padding: var(--d-s1) var(--d-s2); min-height: 28px;
 }
@@ -65,7 +52,7 @@ button { cursor: pointer; display: inline-flex; align-items: center; justify-con
 button:hover { border-color: var(--d-acc); }
 button[aria-pressed="true"], .track.sel { border-color: var(--d-acc); }
 button[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
-button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--d-acc); outline-offset: 1px; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, canvas:focus-visible { outline: 2px solid var(--d-acc); outline-offset: 1px; }
 input[type="number"] { width: 64px; }
 input[type="range"] { padding: 0; accent-color: var(--d-acc); min-height: 20px; }
 input[type="text"] { min-width: 0; width: 100%; }
@@ -75,16 +62,52 @@ input[type="text"] { min-width: 0; width: 100%; }
 .track .row select { flex: 1; min-width: 0; }
 .track .row input[type="range"] { flex: 1; min-width: 0; }
 
-/* Custom tooltips: text in data-tip, no shortcut hints on touch screens. */
+/* Custom tooltips: text in data-tip. Not on touch screens, where they would stick. */
 [data-tip]:hover::after, [data-tip]:focus-visible::after {
   content: attr(data-tip); position: absolute; top: calc(100% + var(--d-s1)); left: 50%; transform: translateX(-50%);
   white-space: nowrap; z-index: 20; pointer-events: none;
-  background: var(--glass-2, #1c1d22); color: var(--d-fg); border: 1px solid var(--d-line);
+  background: var(--d-sheet); color: var(--d-fg); border: 1px solid var(--d-line);
   border-radius: var(--d-s2); padding: var(--d-s1) var(--d-s2); font-size: 12px;
 }
-.toasts { position: fixed; right: var(--d-s4); bottom: var(--d-s4); display: flex; flex-direction: column; gap: var(--d-s2); z-index: 30; }
-.toast { background: var(--glass-2, #1c1d22); border: 1px solid var(--d-line); border-radius: var(--d-s2); padding: var(--d-s2) var(--d-s3);
+.lb { display: none; }
+
+.help { position: fixed; top: 64px; right: var(--d-s3); width: min(360px, calc(100vw - 24px)); z-index: 25; padding: var(--d-s3);
+  background: var(--d-sheet); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px);
+  display: grid; gap: var(--d-s2); box-shadow: var(--glass-shadow, 0 12px 40px rgba(0,0,0,.4)); animation: hin .18s ease-out; }
+.help[hidden] { display: none; }
+.helphead { display: flex; justify-content: space-between; align-items: center; }
+.helphead small { color: var(--d-mute); margin-left: var(--d-s2); font-weight: 400; }
+.helprow { display: flex; gap: var(--d-s3); align-items: baseline; }
+.helprow .ic { width: 20px; flex: none; text-align: center; color: var(--d-acc); }
+.helprow .desk { color: var(--d-mute); font-size: 11px; }
+@keyframes hin { from { opacity: 0; transform: translateY(12px); } }
+
+.toasts { position: fixed; right: var(--d-s4); bottom: var(--d-s4); display: flex; flex-direction: column; gap: var(--d-s2); z-index: 30; max-width: calc(100vw - 32px); }
+.toast { background: var(--d-sheet); border: 1px solid var(--d-line); border-radius: var(--d-s2); padding: var(--d-s2) var(--d-s3);
   display: flex; gap: var(--d-s3); align-items: center; animation: tin .2s ease-out; }
 @keyframes tin { from { opacity: 0; transform: translateY(8px); } }
 body.drop .roll { border-color: var(--d-acc); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (hover: none) { [data-tip]::after { display: none !important; } .helprow .desk { display: none; } }
+
+/* Phones and small tablets. LAST on purpose. */
+@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
+  body { padding: var(--d-s2); padding-bottom: calc(var(--d-s2) + env(safe-area-inset-bottom)); }
+  .main { flex-direction: column; }
+  .tracks { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; max-height: none; flex: none; }
+  .track { min-width: 200px; }
+  .bar { order: 3; flex-wrap: nowrap; justify-content: space-between; }
+  .bar .sep { display: none; }
+  .transport { display: flex; align-items: center; gap: var(--d-s1); width: 100%; justify-content: space-between; }
+  #more { display: inline-flex; }
+  .more { display: none; position: absolute; left: 0; right: 0; bottom: calc(100% + var(--d-s2)); flex-wrap: wrap; gap: var(--d-s2); align-items: center;
+    padding: var(--d-s3); background: var(--d-sheet); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); z-index: 10; }
+  .bar.open .more { display: flex; }
+  button, select, input, textarea { min-height: 40px; min-width: 40px; }
+  .transport button { flex: 1; flex-direction: column; gap: 2px; padding: var(--d-s1); min-width: 0; min-height: 52px; }
+  .transport button .lb { display: block; font-size: 10px; line-height: 1.1; color: var(--d-mute); }
+  .transport button[aria-pressed="true"] .lb { color: var(--d-acc-ink); }
+  .help { top: auto; left: var(--d-s2); right: var(--d-s2); width: auto; bottom: calc(88px + env(safe-area-inset-bottom)); max-height: 60vh; overflow: auto; }
+  /* Above the bottom bar, never on it. */
+  .toasts { left: var(--d-s2); right: var(--d-s2); bottom: calc(88px + env(safe-area-inset-bottom)); max-width: none; }
+}

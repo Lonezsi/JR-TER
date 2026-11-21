@@ -12,7 +12,8 @@ const GUTTER = 44;
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 let song = loadSaved() || defaultSong();
-let sel = 0, selNote = null, lastLen = 0.25;
+let sel = 0, selNote = null;
+let lastLen = matchMedia("(pointer: coarse)").matches ? 0.5 : 0.25; // a thumb can grab an eighth
 let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
 let looping = true, playing = false, tool = "draw", wakeLock = null;
@@ -59,19 +60,23 @@ function toast(text, action) {
     b.onclick = () => { action.run(); el.remove(); };
     el.append(b);
   }
+  el.addEventListener("click", (e) => { if (e.target === el) el.remove(); }); // tap a message to dismiss it
   $("toasts").append(el);
-  setTimeout(() => el.remove(), action ? 8000 : 4000);
+  while ($("toasts").children.length > 3) $("toasts").firstChild.remove();
+  setTimeout(() => el.remove(), action ? 6000 : 3500);
 }
 
 // ---- the top bar ------------------------------------------------------------------------
 const ICONS = { play: "▶", stop: "■", loop: "↻", open: "↑", mid: "♪", json: "{ }", add: "+", undo: "↶" };
-function btn(id, icon, tip, pressed) {
-  return `<button id="${id}" data-tip="${tip}" aria-label="${tip}"${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}>${icon}</button>`;
+function btn(id, icon, tip, pressed, label) {
+  const inner = label ? `<span class="ic">${icon}</span><span class="lb">${label}</span>` : icon;
+  return `<button id="${id}" data-tip="${tip}" aria-label="${tip}"${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}>${inner}</button>`;
 }
 function renderBar() {
   const bar = $("bar");
   if (bar.dataset.built) {
-    $("play").textContent = playing ? ICONS.stop : ICONS.play;
+    $("play").querySelector(".ic").textContent = playing ? ICONS.stop : ICONS.play;
+    $("play").querySelector(".lb").textContent = playing ? "Stop" : "Play";
     $("play").setAttribute("aria-label", playing ? "Stop" : "Play");
     $("play").dataset.tip = playing ? "Stop (Space)" : "Play (Space)";
     $("loop").setAttribute("aria-pressed", looping);
@@ -80,12 +85,12 @@ function renderBar() {
     return;
   }
   bar.dataset.built = "1";
-  bar.innerHTML = `<div class="transport">` + btn("home", "⌂", "Back to the library") +
-    btn("play", ICONS.play, "Play (Space)") + btn("loop", ICONS.loop, "Loop (L)", looping) +
+  bar.innerHTML = `<div class="transport">` + btn("home", "⌂", "Back to the library", undefined, "Library") +
+    btn("play", ICONS.play, "Play (Space)", undefined, "Play") + btn("loop", ICONS.loop, "Loop (L)", looping, "Loop") +
     `<span class="sep"></span>` +
-    btn("tool-draw", "✎", "Draw notes (P)", true) + btn("tool-erase", "⌫", "Erase notes (E)", false) +
-    btn("tool-select", "⌖", "Select only (V)", false) +
-    btn("more", "⋯", "More", false) + `</div><div class="more" id="morebox"><span class="name">DAW</span>` +
+    btn("tool-draw", "✎", "Draw notes (P)", true, "Draw") + btn("tool-erase", "⌫", "Erase notes (E)", false, "Erase") +
+    btn("tool-select", "⌖", "Select only (V)", false, "Select") +
+    btn("help", "?", "How it works (?)", false, "Help") + btn("more", "⋯", "More", false, "More") + `</div><div class="more" id="morebox"><span class="name">DAW</span>` +
     `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
     `<label>Bars <input id="bars" type="number" min="1" max="64" step="1"></label>` +
     `<span class="sep"></span>` +
@@ -94,7 +99,8 @@ function renderBar() {
     btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") +
     btn("savejson", ICONS.json, "Save as .json text") + `</div>`;
   for (const t of ["draw", "erase", "select"]) $("tool-" + t).onclick = () => setTool(t);
-  $("more").onclick = () => { bar.classList.toggle("open"); $("more").setAttribute("aria-pressed", bar.classList.contains("open")); };
+  $("more").onclick = () => setMore(!bar.classList.contains("open"));
+  $("help").onclick = () => setHelp($("helpbox").hidden);
   $("home").onclick = () => location.assign("/");
   $("play").onclick = () => togglePlay();
   $("loop").onclick = () => { looping = !looping; renderBar(); };
@@ -107,7 +113,48 @@ function renderBar() {
   $("savejson").onclick = () => download("song.json", songToText(song), "application/json");
   renderBar();
 }
-function setTool(t) { tool = t; renderBar(); }
+const toldTool = new Set();
+const TOOL_TIPS = {
+  draw: "Draw: tap a square to add a note.",
+  erase: "Erase: tap a note to delete it.",
+  select: "Select: tap a note to pick it; nothing gets added.",
+};
+function setTool(t) {
+  tool = t; renderBar();
+  if (!toldTool.has(t)) { toldTool.add(t); toast(TOOL_TIPS[t]); }
+}
+function setMore(open) {
+  $("bar").classList.toggle("open", open);
+  $("more").setAttribute("aria-pressed", open);
+  if (open) setHelp(false);
+}
+
+// ---- the help sheet: one list, so the words live in one place ------------------------------
+const HELP = [
+  ["＋", "Tap an empty square to add a note.", "click"],
+  ["↔", "Drag a note to move it. Drag its right end to make it longer.", "drag"],
+  ["⌫", "Hold a note to delete it. Undo brings it back.", "right-click, or Delete"],
+  ["✥", "Drag empty space to scroll. Pinch with two fingers to zoom.", "wheel; Ctrl+wheel; + and -"],
+  ["♪", "Tap a key on the left to hear it.", "click"],
+  ["✎", "Draw adds notes, Erase removes them, Select only picks them.", "P, E, V"],
+  ["▶", "Play runs the loop. Loop turns repeating on and off.", "Space, L"],
+  ["⋯", "More: tempo, bars, new track, open and save .mid or .json.", "N, Ctrl+Z"],
+  ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
+];
+function renderHelp() {
+  const box = $("helpbox");
+  box.innerHTML = `<div class="helphead"><strong>How it works</strong><button id="helpx" aria-label="Close help">×</button></div>` +
+    HELP.map(([ic, text, desk]) => `<div class="helprow"><span class="ic">${ic}</span><span>${text} <span class="desk">(${desk})</span></span></div>`).join("");
+  $("helpx").onclick = () => setHelp(false);
+}
+function setHelp(open) {
+  $("helpbox").hidden = !open;
+  $("help").setAttribute("aria-pressed", open);
+  if (open) setMore(false);
+}
+addEventListener("pointerdown", (e) => {
+  if (!$("helpbox").hidden && !e.target.closest("#helpbox, #help")) setHelp(false);
+});
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 function download(name, data, type) {
   const a = document.createElement("a");
@@ -223,6 +270,12 @@ function draw() {
     const px = x(curBeat() % total);
     g.fillStyle = acc; g.fillRect(Math.round(px), 0, 2, H);
   }
+  const cur = song.tracks[sel];
+  if (cur && !cur.notes.length && !playing) {
+    g.globalAlpha = 0.8; g.fillStyle = mute; g.font = "13px system-ui, sans-serif"; g.textAlign = "center";
+    g.fillText(matchMedia("(pointer: coarse)").matches ? "Tap a square to add a note" : "Click a square to add a note", GUTTER + (W - GUTTER) / 2, H / 2);
+    g.textAlign = "left"; g.globalAlpha = 1; g.font = "10px system-ui, sans-serif";
+  }
   g.clearRect(0, 0, GUTTER, H);
   for (let p = hi; p >= lo; p--) {
     const yy = y(p);
@@ -259,7 +312,10 @@ function addNoteAt(c) {
   edit(() => { song.tracks[sel].notes.push(n); });
   return n;
 }
-const onEdge = (n, c, fat) => n.start + n.length - c.beat < Math.min(0.3, n.length / 2) + (fat ? 16 : 6) / pxBeat();
+// The right end of a note resizes it, the rest moves it. The end is at most the last 40% of the
+// note: a sixteenth is only 16px wide, and a fixed 16px "fat finger" end used to be the whole
+// note, so dragging a note on a phone could only ever resize it.
+const onEdge = (n, c, fat) => (n.start + n.length - c.beat) * pxBeat() < Math.min(fat ? 18 : 6, 0.4 * n.length * pxBeat());
 const inGutter = (e) => e.clientX - cv.getBoundingClientRect().left < GUTTER;
 function keyPreview(e) {
   const t = song.tracks[sel];
@@ -495,6 +551,8 @@ addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   else if (k === " ") { e.preventDefault(); togglePlay(); }
+  else if (k === "?") setHelp($("helpbox").hidden);
+  else if (k === "Escape") { setHelp(false); setMore(false); }
   else if (k === "p" || k === "P") setTool("draw");
   else if (k === "e" || k === "E") setTool("erase");
   else if (k === "v" || k === "V") setTool("select");
@@ -508,9 +566,28 @@ addEventListener("keydown", (e) => {
   else if (k === "-") setZoom(zoom / 1.25);
 });
 
+// ---- errors are shown, and the page can be scripted ----------------------------------------
+// A failure on a phone used to be silence. Now it is a message, and the tests (and anyone
+// with a console) can read and drive the page without clicking: anything you can click you
+// can also call.
+addEventListener("error", (e) => toast("Something went wrong: " + (e.message || "unknown error")));
+addEventListener("unhandledrejection", (e) => toast("Something went wrong: " + ((e.reason && e.reason.message) || e.reason)));
+window.jriterDaw = {
+  song: () => JSON.parse(songToText(song)),
+  load: (text) => { song = textToSong(text); sel = 0; selNote = null; changed(true); },
+  zoom: () => zoom,
+  scroll: () => ({ x: scrollX, y: scrollY }),
+  playing: () => playing,
+  tool: () => tool,
+  selected: () => sel,
+};
+
 // ---- start ------------------------------------------------------------------------------
 new ResizeObserver(resize).observe($("rollbox"));
-renderBar(); renderTracks(); resize();
+renderBar(); renderTracks(); renderHelp(); resize();
+try {
+  if (!localStorage.getItem("jriter-daw-help")) { localStorage.setItem("jriter-daw-help", "1"); setHelp(true); }
+} catch { /* no storage: the ? button still works */ }
 {
   const [lo, hi] = range(), first = song.tracks[0] && song.tracks[0].notes[0];
   if (first) scrollY = Math.max(0, (hi - first.pitch) * ROW - H / 2);
