@@ -214,6 +214,7 @@ and the player grows out of the mini bar.
 > commands, which have the same names as below: jriter-cli server/login/add/scan/push/watch/render/shell).
 > It reads the same client.json. See desktop/README.md. The Python client below stays as the way
 > back until the app has had real use.
+> `jriter-cli plugins X.flp` lists the VSTs a project uses; the plan for the rest is in docs/VST.md.
 
 ```
 cd client

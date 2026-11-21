@@ -18,6 +18,7 @@ jriter-cli add "C:\Users\you\Music\Renders" watch a folder
 jriter-cli scan | push [--yes] | watch [--once]
 jriter-cli push-file FILE | push-folder FOLDER
 jriter-cli render X.flp|FOLDER              FL Studio renders, the audio goes to Renders
+jriter-cli plugins X.flp|FOLDER [--json]    which VSTs and FL plugins a project uses
 jriter-cli flpath "C:\...\FL64.exe"
 jriter-cli shell install|remove             right-click menu (HKCU only)
 jriter-cli autostart on|off                 start the tray at logon
