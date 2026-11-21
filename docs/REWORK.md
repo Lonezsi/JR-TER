@@ -91,3 +91,7 @@ checks and the matching Python tests agree.
 - [ ] 9d: sharing, search, the grave, the timetable
 - [ ] 9e: export, sync, appearance, devlog, updater, youtube
 - [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
+- [ ] 12: `tools/check_libraries.py` copies the host's data and compares every real library through Spring and Python
+  (files hashed, answers equal, export v2 row counts). Passes today for what Spring serves (4 libraries, 60 files);
+  done when nothing is left in its "not ported yet" list. Rerun it after each slice.
+- Live 4.3.0 (never committed before) is on `main` (backend) and branch `live-4.3.0` (with the built UI bundle).
