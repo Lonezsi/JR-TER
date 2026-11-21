@@ -25,11 +25,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class VersionsController {
     private final Library library;
+    private final Grave grave;
     private final Blobs blobs;
 
-    public VersionsController(Library library, Blobs blobs) {
+    public VersionsController(Library library, Blobs blobs, Grave grave) {
         this.library = library;
         this.blobs = blobs;
+        this.grave = grave;
     }
 
     static Map<String, Object> getVersion(Library.Db db, Object id) {
@@ -205,6 +207,7 @@ public class VersionsController {
         long acct = Api.acct(req);
         Library.Db db = library.of(acct);
         Map<String, Object> version = getVersion(db, id);
+        grave.buryVersion(db, acct, version.get("id"));
         db.run("DELETE FROM versions WHERE id = ?", version.get("id"));
         Map<String, Object> song = db.one("SELECT * FROM songs WHERE id = ?", version.get("song_id"));
         if (song != null && version.get("id").equals(song.get("current_version_id"))) {

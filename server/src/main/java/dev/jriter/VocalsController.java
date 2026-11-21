@@ -29,12 +29,14 @@ public class VocalsController {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Library library;
+    private final Grave grave;
     private final Blobs blobs;
     private final Accounts accounts;
 
-    public VocalsController(Library library, Blobs blobs, Accounts accounts) {
+    public VocalsController(Library library, Blobs blobs, Accounts accounts, Grave grave) {
         this.library = library;
         this.blobs = blobs;
+        this.grave = grave;
         this.accounts = accounts;
     }
 
@@ -178,9 +180,10 @@ public class VocalsController {
 
     @DeleteMapping("/api/vocals/{id}")
     public Object drop(HttpServletRequest req, @PathVariable String id) {
-        Library.Db db = library.of(Api.acct(req));
+        long acct = Api.acct(req);
+        Library.Db db = library.of(acct);
         Map<String, Object> take = take(db, id);
-        // shortcut: grave (slice 9d) buries the take before it goes; its file is never deleted, as in Python
+        grave.buryTake(db, acct, take.get("id"));
         db.run("DELETE FROM vocal_takes WHERE id = ?", take.get("id"));
         return Map.of("deleted", take.get("id"));
     }

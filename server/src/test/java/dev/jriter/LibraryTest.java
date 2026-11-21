@@ -54,4 +54,11 @@ class LibraryTest {
         assertFalse(blobs.putStream(1, new java.io.ByteArrayInputStream(bytes), bytes.length).added());
         assertTrue(blobs.delete(1, s.digest()));
     }
+
+    @Test
+    void foldCaseFolds() throws Exception {
+        Path tmp = Files.createTempDirectory("jriter-test");
+        Library.Db db = new Library(new Config(tmp.resolve("data"), tmp.resolve("web"), tmp.resolve("glass.css"), "")).of(1);
+        assertEquals("árvíz strasse", db.one("SELECT fold('ÁRVÍZ Straße') AS f").get("f"));
+    }
 }

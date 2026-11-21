@@ -21,11 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SongsController {
     private final Library library;
+    private final Grave grave;
     private final Accounts accounts;
 
-    public SongsController(Library library, Accounts accounts) {
+    public SongsController(Library library, Accounts accounts, Grave grave) {
         this.library = library;
         this.accounts = accounts;
+        this.grave = grave;
     }
 
     static double now() { return Accounts.now(); }
@@ -263,6 +265,7 @@ public class SongsController {
         // Its shares first: the next song may be given this id (see Accounts.revokeSharesFor).
         int taken = accounts.revokeSharesFor(acct, songId);
         // Blobs are left alone: another song may point at the same bytes.
+        grave.burySong(db, acct, songId);
         db.run("DELETE FROM songs WHERE id = ?", songId);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("deleted", songId);

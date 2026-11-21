@@ -24,12 +24,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class RendersController {
     private final Library library;
+    private final Grave grave;
     private final Blobs blobs;
     private final VersionsController versions;
 
-    public RendersController(Library library, Blobs blobs, VersionsController versions) {
+    public RendersController(Library library, Blobs blobs, VersionsController versions, Grave grave) {
         this.library = library;
         this.blobs = blobs;
+        this.grave = grave;
         this.versions = versions;
     }
 
@@ -297,6 +299,7 @@ public class RendersController {
         long acct = Api.acct(req);
         Library.Db db = library.of(acct);
         Map<String, Object> render = getRender(db, id);
+        grave.buryRender(db, acct, render.get("id"));
         db.run("DELETE FROM renders WHERE id = ?", render.get("id"));
         if (!VersionsController.stillUsed(db, render.get("digest")))
             blobs.delete(acct, (String) render.get("digest"));

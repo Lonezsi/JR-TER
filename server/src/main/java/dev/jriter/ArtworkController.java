@@ -22,11 +22,13 @@ public class ArtworkController {
     static final List<String> IMAGE_EXT = List.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif");
 
     private final Library library;
+    private final Grave grave;
     private final Blobs blobs;
 
-    public ArtworkController(Library library, Blobs blobs) {
+    public ArtworkController(Library library, Blobs blobs, Grave grave) {
         this.library = library;
         this.blobs = blobs;
+        this.grave = grave;
     }
 
     static Map<String, Object> getImage(Library.Db db, Object id) {
@@ -117,7 +119,7 @@ public class ArtworkController {
         long acct = Api.acct(req);
         Library.Db db = library.of(acct);
         Map<String, Object> image = getImage(db, id);
-        // shortcut: grave (slice 9d) buries the image before it goes
+        grave.buryImage(db, acct, image.get("id"));
         db.run("DELETE FROM artwork WHERE id = ?", image.get("id"));
         String digest = (String) image.get("digest");
         if (db.one("SELECT id FROM artwork WHERE digest = ? LIMIT 1", digest) == null

@@ -20,7 +20,13 @@ import org.springframework.stereotype.Component;
 public class Blobs {
     private final Config config;
 
+    private Library library;
+
     public Blobs(Config config) { this.config = config; }
+
+    /** Lets delete() ask the grave (not in the constructor, so Blobs works without a library in tests). */
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setLibrary(Library library) { this.library = library; }
 
     /** What was stored: the digest, the size, and whether the bytes were new. */
     public record Stored(String digest, long size, boolean added) {}
@@ -72,6 +78,8 @@ public class Blobs {
 
     /** Only called once nothing references the blob. */
     public boolean delete(long account, String digest) {
+        // a deleted thing waiting in the grave still needs its file (modules/grave.py holds)
+        if (library != null && Grave.holds(library.of(account), digest)) return false;
         try {
             return Files.deleteIfExists(pathFor(account, digest));
         } catch (IOException e) {

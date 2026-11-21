@@ -1,16 +1,21 @@
 package dev.jriter;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Component;
+import org.sqlite.Function;
 import org.sqlite.SQLiteConfig;
+import org.sqlite.SQLiteConnection;
 import org.sqlite.SQLiteDataSource;
 
 /**
@@ -19,7 +24,8 @@ import org.sqlite.SQLiteDataSource;
  * effect, and every one is IF NOT EXISTS, so opening a library Python made changes nothing.
  * The migrations table is not touched: Python owns that record while it is the way back.
  *
- * shortcut: no "fold" SQL function yet. Only search uses it, and search is slice 9d.
+ * Every connection gets a "fold" SQL function (Python registers str.casefold under that name),
+ * which search matches with.
  */
 @Component
 public class Library {
@@ -104,6 +110,36 @@ public class Library {
         "CREATE INDEX IF NOT EXISTS playlist_items_order ON playlist_items(playlist_id, position)",
         "CREATE UNIQUE INDEX IF NOT EXISTS playlists_album ON playlists(album_id)"
             + " WHERE album_id IS NOT NULL",
+        // sound (sound.py) and youtube (youtube.py): the grave and sharing read them
+        "CREATE TABLE IF NOT EXISTS sound_presets (id INTEGER PRIMARY KEY,"
+            + " song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,"
+            + " name TEXT NOT NULL DEFAULT 'Current', is_current INTEGER NOT NULL DEFAULT 0,"
+            + " data TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS presets_song ON sound_presets(song_id)",
+        "CREATE TABLE IF NOT EXISTS youtube_posts (id INTEGER PRIMARY KEY,"
+            + " song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE, version_id INTEGER,"
+            + " url TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '',"
+            + " status TEXT NOT NULL DEFAULT 'published', note TEXT NOT NULL DEFAULT '',"
+            + " created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS youtube_song ON youtube_posts(song_id)",
+        // grave (grave.py)
+        "CREATE TABLE IF NOT EXISTS grave (id INTEGER PRIMARY KEY, kind TEXT NOT NULL,"
+            + " title TEXT NOT NULL DEFAULT '', deleted_at REAL NOT NULL, tables TEXT NOT NULL,"
+            + " digests TEXT NOT NULL DEFAULT '')",
+        // orarend notes (orarend.py)
+        "CREATE TABLE IF NOT EXISTS orarend_notes (id INTEGER PRIMARY KEY, subject TEXT NOT NULL UNIQUE,"
+            + " absences INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS orarend_pages (id INTEGER PRIMARY KEY,"
+            + " note_id INTEGER NOT NULL REFERENCES orarend_notes(id) ON DELETE CASCADE,"
+            + " position INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL DEFAULT '',"
+            + " created_at REAL NOT NULL, updated_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS orarend_pages_note ON orarend_pages(note_id, position)",
+        // sharing (sharing.py): what guests changed, so the owner can undo it
+        "CREATE TABLE IF NOT EXISTS guest_edits (id INTEGER PRIMARY KEY, song_id INTEGER NOT NULL,"
+            + " account INTEGER NOT NULL, share_id INTEGER NOT NULL, what TEXT NOT NULL,"
+            + " route TEXT NOT NULL, before TEXT NOT NULL, created_at REAL NOT NULL,"
+            + " updated_at REAL NOT NULL, undone_at REAL NOT NULL DEFAULT 0)",
+        "CREATE INDEX IF NOT EXISTS guest_edits_song ON guest_edits(song_id, id DESC)",
     };
 
     /** Columns older libraries may lack: table, name, declaration (as the Python migrations). */
@@ -122,6 +158,7 @@ public class Library {
         {"vocal_takes", "fx", "INTEGER NOT NULL DEFAULT 1"},
         {"albums", "opened", "INTEGER NOT NULL DEFAULT 0"},
         {"albums", "stickers", "TEXT NOT NULL DEFAULT ''"},
+        {"songs", "shared_from", "TEXT DEFAULT ''"},
     };
 
     private final Config config;
@@ -143,11 +180,31 @@ public class Library {
             c.setSynchronous(SQLiteConfig.SynchronousMode.NORMAL);
             c.setBusyTimeout(30000);
             c.enforceForeignKeys(true);
-            SQLiteDataSource ds = new SQLiteDataSource(c);
+            SQLiteDataSource ds = new SQLiteDataSource(c) {
+                @Override
+                public SQLiteConnection getConnection(String user, String pass) throws SQLException {
+                    SQLiteConnection conn = super.getConnection(user, pass);
+                    withFold(conn);
+                    return conn;
+                }
+            };
             ds.setUrl("jdbc:sqlite:" + path);
             t = new JdbcTemplate(ds);
             for (String s : SCHEMA) t.execute(s);
             for (String[] a : ADDED) addColumn(a[0], a[1], a[2]);
+        }
+
+        /** fold(x): the case-folded text, as Python's str.casefold (the name Python registers). */
+        static Connection withFold(Connection conn) throws SQLException {
+            Function.create(conn, "fold", new Function() {
+                @Override
+                protected void xFunc() throws SQLException {
+                    String v = value_text(0);
+                    if (v == null) result();
+                    else result(v.toUpperCase(Locale.ROOT).toLowerCase(Locale.ROOT));
+                }
+            });
+            return conn;
         }
 
         void addColumn(String table, String name, String decl) {
@@ -168,6 +225,13 @@ public class Library {
         }
 
         public int run(String sql, Object... args) { return t.update(sql, args); }
+
+        /** The column names of a table, in order. */
+        public List<String> columns(String table) {
+            List<String> out = new ArrayList<>();
+            for (Map<String, Object> r : t.queryForList("PRAGMA table_info(" + table + ")")) out.add((String) r.get("name"));
+            return out;
+        }
 
         public boolean tableExists(String name) {
             return one("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", name) != null;

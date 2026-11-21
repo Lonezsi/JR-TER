@@ -17,8 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LyricsController {
     private final Library library;
+    private final Grave grave;
 
-    public LyricsController(Library library) { this.library = library; }
+    public LyricsController(Library library, Grave grave) { this.library = library; this.grave = grave; }
 
     static Map<String, Object> getSheet(Library.Db db, Object id) {
         Map<String, Object> row = db.one("SELECT * FROM lyric_sheets WHERE id = ?", id);
@@ -199,9 +200,10 @@ public class LyricsController {
 
     @DeleteMapping("/api/lyrics/{id}")
     public Object delete(HttpServletRequest req, @PathVariable String id) {
-        Library.Db db = library.of(Api.acct(req));
+        long acct = Api.acct(req);
+        Library.Db db = library.of(acct);
         Map<String, Object> sheet = getSheet(db, id);
-        // shortcut: grave (slice 9d) buries the sheet before it goes
+        grave.burySheet(db, acct, sheet.get("id"));
         db.run("DELETE FROM lyric_revisions WHERE sheet_id = ?", sheet.get("id"));
         db.run("DELETE FROM lyric_sheets WHERE id = ?", sheet.get("id"));
         if (Accounts.num(sheet.get("is_current")) != 0) {

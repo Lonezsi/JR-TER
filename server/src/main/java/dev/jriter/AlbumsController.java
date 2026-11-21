@@ -29,11 +29,13 @@ public class AlbumsController {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Library library;
+    private final Grave grave;
     private final Blobs blobs;
 
-    public AlbumsController(Library library, Blobs blobs) {
+    public AlbumsController(Library library, Blobs blobs, Grave grave) {
         this.library = library;
         this.blobs = blobs;
+        this.grave = grave;
     }
 
     static Map<String, Object> getAlbum(Library.Db db, Object id) {
@@ -183,9 +185,10 @@ public class AlbumsController {
 
     @DeleteMapping("/api/albums/{id}")
     public Object delete(HttpServletRequest req, @PathVariable String id) {
-        Library.Db db = library.of(Api.acct(req));
+        long acct = Api.acct(req);
+        Library.Db db = library.of(acct);
         Map<String, Object> album = getAlbum(db, id);
-        // shortcut: grave (slice 9d) buries the album, its links and its playlist before they go
+        grave.buryAlbum(db, acct, album.get("id"));
         db.run("DELETE FROM album_songs WHERE album_id = ?", album.get("id"));
         db.run("DELETE FROM albums WHERE id = ?", album.get("id"));
         return Map.of("deleted", album.get("id"));

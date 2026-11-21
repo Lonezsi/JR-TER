@@ -24,8 +24,9 @@ public class PlaylistsController {
     static final int MAX_ITEMS = 2000;
 
     private final Library library;
+    private final Grave grave;
 
-    public PlaylistsController(Library library) { this.library = library; }
+    public PlaylistsController(Library library, Grave grave) { this.library = library; this.grave = grave; }
 
     static Map<String, Object> getPlaylist(Library.Db db, Object id) {
         Map<String, Object> row = db.one("SELECT * FROM playlists WHERE id = ?", id);
@@ -179,11 +180,12 @@ public class PlaylistsController {
 
     @DeleteMapping("/api/playlists/{id}")
     public Object remove(HttpServletRequest req, @PathVariable String id) {
-        Library.Db db = library.of(Api.acct(req));
+        long acct = Api.acct(req);
+        Library.Db db = library.of(acct);
         Map<String, Object> playlist = getPlaylist(db, id);
         if (playlist.get("album_id") != null && Accounts.num(playlist.get("album_id")) != 0)
             throw new ApiError("that playlist belongs to an album. Delete the album instead.");
-        // shortcut: grave (slice 9d) buries the playlist before it goes
+        grave.buryPlaylist(db, acct, playlist.get("id"));
         db.run("DELETE FROM playlists WHERE id = ?", playlist.get("id"));
         return Map.of("deleted", playlist.get("id"));
     }
