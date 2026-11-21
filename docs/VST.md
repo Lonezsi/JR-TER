@@ -15,6 +15,6 @@ So VST support in JR!TER comes in steps, each useful alone.
    "missing here" (JSON: `installed`), matching by path, file name or plugin name
    (`VstFolders.java`). Showing it in the web UI waits for step 2. Original idea: compare a project's VSTs with the ones installed on this PC (the
    desktop app can look in the usual VST folders) and show "missing here".
-4. **Play in the DAW tab.** The tab from task 23 plays MIDI with browser instruments (Web Audio
+4. **Play in the DAW tab.** The page from task 23 (`/daw.html`, code in `web/daw/`; it becomes a song tab once `ui/` lands) plays MIDI with browser instruments (Web Audio
    Modules are the web's version of plugins). Hosting real VSTs needs a native host inside the
    desktop app. Only worth it if the browser instruments are not enough.

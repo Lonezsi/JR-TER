@@ -202,6 +202,13 @@ is the owner.
 **Light and dark.** Settings, Appearance, Theme: the glass at night, a soft neumorphic
 look by day.
 
+**DAW.** `/daw.html` is a MIDI player and a very simple piano-roll editor: open a `.mid`
+(or drop one on the page), add notes by clicking, drag to move, drag the right edge to
+resize, right-click to delete, and play it with built-in browser instruments (piano, pad,
+bass, pluck, drums). Space plays, `L` loops, `j`/`k` change track, `N` adds one, `Ctrl+Z`
+undoes. Save as `.mid` or as a plain-text `.json` that explains itself. It is plain ES
+modules in `web/daw/` (no build step); it becomes a song tab once the Svelte `ui/` is here.
+
 **Phone.** The sidebar follows your thumb from the edge, Back closes whatever is on top,
 and the player grows out of the mini bar.
 
@@ -400,7 +407,7 @@ ui/                    the interface: Svelte 5 + TypeScript, built with Vite
 web/                   what `npm run ship` builds; the server serves this
 client/                the desktop agent
 tools/                 build_lexicon.py and other one-off builders
-tests/                 python -m pytest -q
+tests/                 python -m pytest -q; node --test tests/daw/*.test.mjs
 data/                  your library. Not in git.
 ```
 
