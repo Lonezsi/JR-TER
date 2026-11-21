@@ -140,6 +140,11 @@ public class Library {
             + " route TEXT NOT NULL, before TEXT NOT NULL, created_at REAL NOT NULL,"
             + " updated_at REAL NOT NULL, undone_at REAL NOT NULL DEFAULT 0)",
         "CREATE INDEX IF NOT EXISTS guest_edits_song ON guest_edits(song_id, id DESC)",
+        "CREATE TABLE IF NOT EXISTS sync_folders (id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE,"
+            + " enabled INTEGER NOT NULL DEFAULT 1, last_scan REAL NOT NULL DEFAULT 0,"
+            + " created_at REAL NOT NULL, kind TEXT NOT NULL DEFAULT 'collector')",
+        "CREATE TABLE IF NOT EXISTS sync_seen (path TEXT PRIMARY KEY, digest TEXT NOT NULL,"
+            + " size INTEGER NOT NULL, mtime REAL NOT NULL, checked_at REAL NOT NULL)",
     };
 
     /** Columns older libraries may lack: table, name, declaration (as the Python migrations). */
@@ -161,6 +166,7 @@ public class Library {
         {"albums", "opened", "INTEGER NOT NULL DEFAULT 0"},
         {"albums", "stickers", "TEXT NOT NULL DEFAULT ''"},
         {"songs", "shared_from", "TEXT DEFAULT ''"},
+        {"sync_folders", "kind", "TEXT NOT NULL DEFAULT 'collector'"},
     };
 
     private final Config config;

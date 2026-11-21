@@ -35,3 +35,5 @@ web/img/favicon-preview.png
 server/target/
 
 desktop/target/
+
+server/run/
