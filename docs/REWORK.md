@@ -91,12 +91,13 @@ checks and the matching Python tests agree.
 - [x] 9d: sharing, search, the grave, the timetable. Grave, search and timetable (`tools/parity_grave_search.py`;
   deletes in every controller bury first, Python and Spring restore each other's graves); sound presets and sharing (shares, link invitations,
   the guest proxy by forward, guest edits and undo, guests in vocals; `tools/parity_sharing.py`)
-- [ ] 9e: export, sync, appearance, devlog, updater, youtube. Devlog (entries in `jriter/devlog.json`, read by both servers), appearance and export/import/erase done (`tools/parity_export.py`).
+- [x] 9e: export, sync, appearance, devlog, updater, youtube. Devlog (entries in `jriter/devlog.json`, read by both servers), appearance and export/import/erase done (`tools/parity_export.py`).
   Sync and the updater done too (9e2): `SyncController` (watched folders, scan, stock, import, sample upload; `tools/parity_sync.py`)
   and `Updater` (check, apply, now, restart, the 15-minute auto update when `JRITER_WATCHDOG=1`). Unlike Python, a pull that changed
   `server/` rebuilds the jar with Maven (`JRITER_MVN` overrides the command) and only a good build restarts; a failed build keeps the old jar running.
   `hostsetup/Start-JriterJar.ps1` is the launcher for the jar: it runs a copy in `server/run/` so Maven can rewrite `target/`, keeping the
-  old one as `jriter.prev.jar`. Youtube is 9e3.
+  old one as `jriter.prev.jar`.
+  YouTube done too (9e3): posts, the account file, both Google sign-ins, the mix, the upload job (resumable, with retries) and the pinned ffmpeg fetch (`Video`, `YouTube`, `YouTubeController`; `tools/parity_youtube.py`, `YouTubeUploadTest` against a local stand-in). The checks never reach Google; a real upload through Spring is untested.
 - [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
 - [ ] 12: `tools/check_libraries.py` copies the host's data and compares every real library through Spring and Python
   (files hashed, answers equal, export v2 row counts). Passes today for what Spring serves (4 libraries, 60 files);

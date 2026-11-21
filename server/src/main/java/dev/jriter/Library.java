@@ -167,6 +167,10 @@ public class Library {
         {"albums", "stickers", "TEXT NOT NULL DEFAULT ''"},
         {"songs", "shared_from", "TEXT DEFAULT ''"},
         {"sync_folders", "kind", "TEXT NOT NULL DEFAULT 'collector'"},
+        {"youtube_posts", "video_id", "TEXT NOT NULL DEFAULT ''"},
+        {"youtube_posts", "mix_digest", "TEXT NOT NULL DEFAULT ''"},
+        {"youtube_posts", "video_id", "TEXT NOT NULL DEFAULT ''"},
+        {"youtube_posts", "mix_digest", "TEXT NOT NULL DEFAULT ''"},
     };
 
     private final Config config;

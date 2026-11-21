@@ -18,15 +18,15 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * What is switched on and the settings the whole app shares: a port of the routes of
  * jriter/modules/core.py (/api/health lives in WebController). The video.forget() call Python
- * makes when ffmpeg_path changes has no counterpart: Spring has no video module yet.
+ * makes when ffmpeg_path changes is Video.forget().
  */
 @RestController
 public class CoreController {
     static final List<String> EFFECT_KINDS = List.of("eq", "comp", "drive", "delay", "reverb", "width", "gain", "limiter");
-    /** config.MODULES, sorted, minus youtube (task 9e3 adds it). */
+    /** config.MODULES, sorted. */
     static final List<String> MODULES = List.of("albums", "appearance", "arrange", "artwork", "auth", "core",
             "devlog", "export", "grave", "lyrics", "orarend", "playlists", "renders", "search", "sharing", "songs",
-            "sound", "sync", "updater", "versions", "vocals");
+            "sound", "sync", "updater", "versions", "vocals", "youtube");
     private static final long STARTED = System.currentTimeMillis();
 
     private final Config config;
@@ -39,10 +39,11 @@ public class CoreController {
     private final AppearanceController appearance;
     private final OrarendController orarend;
     private final Updater updater;
+    private final Video video;
 
     public CoreController(Config config, Settings settings, Problems problems, Library library, Accounts accounts,
                           Auth auth, DevlogController devlog, AppearanceController appearance,
-                          OrarendController orarend, Updater updater) {
+                          OrarendController orarend, Updater updater, Video video) {
         this.config = config;
         this.settings = settings;
         this.problems = problems;
@@ -53,6 +54,7 @@ public class CoreController {
         this.appearance = appearance;
         this.orarend = orarend;
         this.updater = updater;
+        this.video = video;
     }
 
     // -- settings ---------------------------------------------------------------------
@@ -112,7 +114,10 @@ public class CoreController {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) view).entrySet()) merged.put((String) e.getKey(), e.getValue());
             patch.put("lyrics_view", merged);
         }
-        return settings.save(acct, patch);
+        Map<String, Object> saved = settings.save(acct, patch);
+        // the ffmpeg lookup is cached; somebody who has just typed a path in should be believed
+        if (patch.containsKey("ffmpeg_path")) video.forget();
+        return saved;
     }
 
     private static Object effectPresets(Object value) {
@@ -252,6 +257,7 @@ public class CoreController {
             return m("count", row.get("n"), "bytes", row.get("bytes"), "distinct_files", n(distinct, "n"));
         });
         s.put("vocals", () -> m());
+        s.put("youtube", () -> m("published", n(db.one("SELECT COUNT(*) AS n FROM youtube_posts WHERE status = 'published'"), "n")));
         Map<String, Object> out = new LinkedHashMap<>();
         for (Map.Entry<String, Supplier<Object>> e : s.entrySet()) {
             try {

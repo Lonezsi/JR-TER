@@ -159,9 +159,9 @@ try:
     check("state has Python's keys", set(s) == set(p), (sorted(s), sorted(p)))
     for key in ("name", "version", "settings", "audio", "storage", "failed"):
         check("state." + key, same(s.get(key), p.get(key)), (s.get(key), p.get(key)))
-    check("state.modules is Python's minus youtube", s["modules"] == [m for m in p["modules"] if m != "youtube"],
+    check("state.modules is Python's", s["modules"] == p["modules"],
           (s["modules"], p["modules"]))
-    ps = {k: v for k, v in p["summary"].items() if k != "youtube"}
+    ps = dict(p["summary"])
     check("summary has the same modules", set(s["summary"]) == set(ps), (sorted(s["summary"]), sorted(ps)))
     for k in sorted(ps):
         check("summary." + k, same(s["summary"].get(k), ps[k]), (s["summary"].get(k), ps[k]))
