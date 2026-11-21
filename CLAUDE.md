@@ -19,6 +19,8 @@ never rename it. Put every release on both: commit on `main`, then bring the fil
 and update `web/index.html`: assets are served `immutable` for a year.
 
 **The DAW.** `web/daw.html` and `web/daw/` are plain ES modules with no build step. The plan
-is in `docs/DAW.md`. `node --test tests/daw/*.test.mjs` runs its tests.
+is in `docs/DAW.md`. `node --test tests/daw/*.test.mjs` runs its tests. `node tests/daw/e2e.mjs` drives the page with real touch events in an emulated phone
+(needs Edge or Chrome); run it before shipping anything that touches the DAW's UI, because screenshots
+can't tap. Screenshots missed two phone bugs that it found.
 
 Never touch `data/`. Back up what you replace.

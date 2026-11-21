@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.5.0",
+  "date": "2026-11-21",
+  "name": "JR!TER",
+  "title": "Chords and scripts",
+  "notes": [
+   "The DAW works on phones now. Two things were broken: dragging a note could only ever stretch it, and messages sat on top of the buttons at the bottom. Every button has a word under it, and the ? button shows how it all works.",
+   "A chord editor opens first. Pick a root and a type, or type a progression like Cmaj9 Am7/G Dm9:2 G13. It handles 9ths, 11ths, 13ths, alterations like #9 b13, and slash basses. Invert, drop 2 or 3, spread, and let voice leading keep the chords close. To MIDI turns them into notes, one way.",
+   "A note script language, with Humanize (set the amount) and four arpeggiators that you can read and change. Write your own in a few lines: each note: or each chord:.",
+   "Songs keep their chords and scripts in the .json file, and older files still open."
+  ]
+ },
+ {
   "version": "4.4.0",
   "date": "2026-11-21",
   "name": "JR!TER",
