@@ -88,8 +88,9 @@ checks and the matching Python tests agree.
   machine tokens, the guess limit, the Foyer sign-in (`server/`, `tools/parity_door.py`)
 - [x] 9b: songs, versions, blobs, renders (`Library`, `Blobs`, `AudioMeta`, three controllers; `tools/parity_library.py`)
 - [x] 9c: lyrics, arrange, artwork, vocals, albums, playlists (six controllers, `tools/parity_media.py`; grave, guest and search hooks wait for 9d)
-- [ ] 9d: sharing, search, the grave, the timetable. Grave, search and timetable done (`tools/parity_grave_search.py`;
-  deletes in every controller bury first, Python and Spring restore each other's graves); sound presets + sharing next (9d2)
+- [x] 9d: sharing, search, the grave, the timetable. Grave, search and timetable (`tools/parity_grave_search.py`;
+  deletes in every controller bury first, Python and Spring restore each other's graves); sound presets and sharing (shares, link invitations,
+  the guest proxy by forward, guest edits and undo, guests in vocals; `tools/parity_sharing.py`)
 - [ ] 9e: export, sync, appearance, devlog, updater, youtube. Devlog (entries now in `jriter/devlog.json`, read by both servers),\n  appearance and export/import/erase done (`tools/parity_export.py`); sync + updater are 9e2 (the updater must rebuild and restart the jar),\n  youtube is 9e3
 - [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
 - [ ] 12: `tools/check_libraries.py` copies the host's data and compares every real library through Spring and Python

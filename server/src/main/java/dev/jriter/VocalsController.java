@@ -48,7 +48,13 @@ public class VocalsController {
         return row;
     }
 
-    // shortcut: guests come with sharing (9d), so whoever is acting here is the library's account
+    /** A guest may change or delete only the takes they recorded themselves. */
+    static void mineOrRefuse(HttpServletRequest req, Map<String, Object> take) {
+        long g = Api.guest(req);
+        if (g != 0 && Accounts.num(take.get("author")) != g)
+            throw new ApiError("Only whoever recorded this can change or delete it.", 403);
+    }
+
     private Map<String, Object> out(Map<String, Object> row, long me) {
         Map<String, Object> o = new LinkedHashMap<>(row);
         Object chain;
@@ -76,7 +82,7 @@ public class VocalsController {
         Map<String, Object> song = SongsController.getSong(db, id);
         List<Object> takes = new java.util.ArrayList<>();
         for (Map<String, Object> r : db.query("SELECT * FROM vocal_takes WHERE song_id = ? ORDER BY id", song.get("id")))
-            takes.add(out(r, acct));
+            takes.add(out(r, Api.actor(req)));
         return Map.of("takes", takes);
     }
 
@@ -123,7 +129,7 @@ public class VocalsController {
         }
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("song_id", song.get("id"));
-        v.put("author", acct);
+        v.put("author", Api.actor(req));
         v.put("name", label);
         v.put("digest", stored.digest());
         v.put("ext", ext);
@@ -134,7 +140,7 @@ public class VocalsController {
         v.put("updated_at", now);
         long made = db.insert("vocal_takes", v);
         SongsController.touch(db, song.get("id"));
-        return Map.of("take", out(take(db, String.valueOf(made)), acct));
+        return Map.of("take", out(take(db, String.valueOf(made)), Api.actor(req)));
     }
 
     private static double number(Object v, String field) {
@@ -152,6 +158,7 @@ public class VocalsController {
         long acct = Api.acct(req);
         Library.Db db = library.of(acct);
         Map<String, Object> take = take(db, id);
+        mineOrRefuse(req, take);
         Map<String, Object> body = Body.json(req);
         Map<String, Object> f = new LinkedHashMap<>();
         if (body.containsKey("name")) {
@@ -172,10 +179,10 @@ public class VocalsController {
                     throw new ApiError("an effect is one of: " + String.join(", ", EFFECTS));
             f.put("chain", JSON.writeValueAsString(chain));
         }
-        if (f.isEmpty()) return Map.of("take", out(take, acct));
+        if (f.isEmpty()) return Map.of("take", out(take, Api.actor(req)));
         f.put("updated_at", Accounts.now());
         db.update("vocal_takes", Accounts.num(take.get("id")), f);
-        return Map.of("take", out(take(db, String.valueOf(take.get("id"))), acct));
+        return Map.of("take", out(take(db, String.valueOf(take.get("id"))), Api.actor(req)));
     }
 
     @DeleteMapping("/api/vocals/{id}")
@@ -183,6 +190,7 @@ public class VocalsController {
         long acct = Api.acct(req);
         Library.Db db = library.of(acct);
         Map<String, Object> take = take(db, id);
+        mineOrRefuse(req, take);
         grave.buryTake(db, acct, take.get("id"));
         db.run("DELETE FROM vocal_takes WHERE id = ?", take.get("id"));
         return Map.of("deleted", take.get("id"));

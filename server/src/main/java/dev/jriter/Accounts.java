@@ -143,6 +143,53 @@ public class Accounts {
         return n;
     }
 
+    // -- shares (accounts.py): a row here is the whole permission model ---------------
+    static String shareDigest(String raw) { return sha256Hex("jriter-share:" + (raw == null ? "" : raw)); }
+
+    public long addShare(long from, long songId, long to, String asName, String tokenDigest) {
+        return insert("INSERT INTO shares (from_account, song_id, to_account, as_name, created_at, token_digest)"
+                + " VALUES (?, ?, ?, ?, ?, ?)", from, songId, to, asName, now(), tokenDigest);
+    }
+
+    /** A share with nobody on the other end yet: {id, token}. Only the digest is kept. */
+    public Object[] makeShareLink(long from, long songId, String asName) {
+        String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes(18));
+        long id = addShare(from, songId, NOBODY_YET, asName, shareDigest(raw));
+        return new Object[] {id, raw};
+    }
+
+    /** The unclaimed, unrevoked share this link opens, or null. */
+    public Map<String, Object> shareByToken(String raw) {
+        Map<String, Object> row = one("SELECT * FROM shares WHERE token_digest = ? AND token_digest != ''", shareDigest(raw));
+        if (row == null || dbl(row.get("revoked_at")) != 0 || num(row.get("to_account")) != NOBODY_YET) return null;
+        return row;
+    }
+
+    /** Hand a link share to whoever opened it, once (one UPDATE with the owner test in its WHERE). */
+    public boolean claimShare(long shareId, long to) {
+        return run("UPDATE shares SET to_account = ?, token_digest = '' WHERE id = ? AND to_account = ? AND revoked_at = 0",
+                to, shareId, NOBODY_YET) == 1;
+    }
+
+    public Map<String, Object> share(long id) { return one("SELECT * FROM shares WHERE id = ?", id); }
+
+    public Map<String, Object> shareBetween(long from, long songId, long to) {
+        return one("SELECT * FROM shares WHERE from_account = ? AND song_id = ? AND to_account = ?", from, songId, to);
+    }
+
+    public List<Map<String, Object>> sharesTo(long account) {
+        return query("SELECT * FROM shares WHERE to_account = ? AND revoked_at = 0 ORDER BY created_at DESC", account);
+    }
+
+    public List<Map<String, Object>> sharesFrom(long account, Long songId) {
+        if (songId == null)
+            return query("SELECT * FROM shares WHERE from_account = ? AND revoked_at = 0 ORDER BY created_at DESC", account);
+        return query("SELECT * FROM shares WHERE from_account = ? AND song_id = ? AND revoked_at = 0 ORDER BY created_at DESC",
+                account, songId);
+    }
+
+    public void revokeShare(long id) { run("UPDATE shares SET revoked_at = ? WHERE id = ?", now(), id); }
+
     // -- passwords ---------------------------------------------------------------
     /** scrypt N=2^14 r=8 p=1 dkLen=32, base64: the same as hashlib.scrypt in Python. */
     public static String hash(String password, byte[] salt) {

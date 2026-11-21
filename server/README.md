@@ -3,7 +3,8 @@
 The Java port of the Python server, module by module (see `../docs/REWORK.md`). It opens the
 same SQLite files and blob folder, so the Python server stays the way back.
 
-Ported so far: the devlog, the display font, export/import/erase (	ools/parity_export.py), lyrics, arrange, artwork, vocals, albums and playlists (`tools/parity_media.py`), songs, versions, blobs and renders (`tools/parity_library.py`), and the door (accounts, sessions, invites, machine tokens, the guess limit, the
+Ported so far: sound presets and sharing (shares, links, the guest proxy, guest edits and undo; `tools/parity_sharing.py`), the devlog, the display font, export/import/erase (	ools/parity_export.py), lyrics, arrange, artwork, vocals, albums and playlists (`tools/parity_media.py`), songs, versions, blobs and renders (`tools/parity_library.py`), and the door (accounts, sessions, invites, machine tokens, the guess limit, the
+python tools/parity_sharing.py        # and for sound presets, shares, links, the guest proxy and undo
 Foyer sign-in), `/api/health`, the page and bundle serving. Every other `/api/...` answers
 404 "no such endpoint" until its module is ported.
 

@@ -15,6 +15,21 @@ final class Api {
         return who;
     }
 
+    /** Request attribute: the guest account, when a shared request runs in the owner's library. */
+    static final String GUEST = "jriter.guest";
+
+    /** The guest a shared request is for, or 0 when it is nobody's but the caller's. */
+    static long guest(HttpServletRequest req) {
+        Object g = req.getAttribute(GUEST);
+        return g == null ? 0 : (Long) g;
+    }
+
+    /** Who is actually doing this: the guest when it came through a share, else the library's account. */
+    static long actor(HttpServletRequest req) {
+        long g = guest(req);
+        return g != 0 ? g : acct(req);
+    }
+
     /**
      * A whole number from the query. Missing or empty gives the default. (Python's as_int is
      * called as as_int(value, default) in a few handlers, which makes a missing value an

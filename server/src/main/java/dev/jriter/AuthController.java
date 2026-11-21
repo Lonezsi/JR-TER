@@ -144,6 +144,17 @@ public class AuthController {
         return json(Map.of("ok", true), cookie(req, auth.issue(Accounts.num(made.get("id"))), Auth.SESSION_DAYS));
     }
 
+    /** An account made by opening a share link: {account id, Set-Cookie value} (auth.sign_up_for_share). */
+    Object[] signUpForShare(HttpServletRequest req, String handle, String password, String name) {
+        String ip = ip(req);
+        waitOr429(ip);
+        if (accounts.count() == 0) throw new ApiError("This library has no owner yet.", 409);
+        Map<String, Object> made = accounts.create(handle, password == null ? "" : password, name, null);
+        auth.clear(ip);
+        long id = Accounts.num(made.get("id"));
+        return new Object[] {id, cookie(req, auth.issue(id), Auth.SESSION_DAYS)};
+    }
+
     ResponseEntity<Object> foyerNew(HttpServletRequest req) {
         Map<String, Object> f = auth.foyer(req.getHeader("Cookie"));
         if (f == null) throw new ApiError("Sign in on Foyer first.", 401);
