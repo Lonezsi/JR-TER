@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 public class Config {
     public final Path data;
     public final Path web;
+    /** The repo (or install) folder; jriter/devlog.json lives under it. */
+    public final Path repo;
     public final Path glass;
     public final Path glassDefs;
     /** Foyer's address, or "" for off. */
@@ -18,6 +20,7 @@ public class Config {
     @Autowired
     public Config() {
         Path repo = repoRoot();
+        this.repo = repo;
         this.data = Path.of(first(env("JRITER_DATA"), env("JONG_DATA"), repo.resolve("data").toString()));
         this.web = Path.of(first(env("JRITER_WEB"), repo.resolve("web").toString()));
         Path parent = repo.toAbsolutePath().getParent();
@@ -31,6 +34,7 @@ public class Config {
 
     public Config(Path data, Path web, Path glass, String foyer) {
         this.data = data;
+        this.repo = web.toAbsolutePath().getParent();
         this.web = web;
         this.glass = glass;
         this.glassDefs = glass.getParent().resolve("glass-defs.html");
