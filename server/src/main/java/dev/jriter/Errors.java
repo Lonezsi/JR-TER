@@ -14,10 +14,15 @@ public class Errors {
         return ResponseEntity.status(e.status).body(Map.of("error", e.getMessage()));
     }
 
+    private final Problems problems;
+
+    public Errors(Problems problems) { this.problems = problems; }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Object> other(Exception e) {
+    public ResponseEntity<Object> other(Exception e, jakarta.servlet.http.HttpServletRequest req) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+        body.put("ref", problems.record(req.getRequestURI(), e, req.getMethod()));
         e.printStackTrace();
         return ResponseEntity.status(500).body(body);
     }

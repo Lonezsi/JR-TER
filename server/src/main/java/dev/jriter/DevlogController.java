@@ -41,6 +41,12 @@ public class DevlogController {
         return cache;
     }
 
+    /** The version is the top of the devlog, not a number of its own. */
+    String version() {
+        List<Map<String, Object>> all = entries();
+        return all.isEmpty() ? "" : String.valueOf(all.get(0).get("version"));
+    }
+
     /** Python's devlog.parse: 1 to 4 whole-number parts, else null. */
     static long[] parse(Object version) {
         String s = version == null ? "" : String.valueOf(version);

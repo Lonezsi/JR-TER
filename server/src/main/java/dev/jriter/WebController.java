@@ -40,7 +40,10 @@ public class WebController {
     private final Accounts accounts;
     private final Auth auth;
 
-    public WebController(Config config, Accounts accounts, Auth auth) {
+    private final Problems problems;
+
+    public WebController(Config config, Accounts accounts, Auth auth, Problems problems) {
+        this.problems = problems;
         this.config = config;
         this.accounts = accounts;
         this.auth = auth;
@@ -58,7 +61,9 @@ public class WebController {
             out.put("degraded", List.of("the database did not answer: " + e.getMessage()));
             return out;
         }
-        // shortcut: no problems log or module registry yet, so only the door can be degraded.
+        Object kept = problems.count().get("kept");
+        if (((Integer) kept) > 0) out.put("problems", kept);
+        // shortcut: no module registry, so only the door can be degraded.
         String door = auth.damaged();
         if (door != null) out.put("degraded", List.of(door));
         return out;

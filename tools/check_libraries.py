@@ -47,7 +47,7 @@ sys.path.insert(0, ROOT)
 
 #: Keys whose value is the moment the answer was made, so two servers asked a second
 #: apart can never agree on them. Nothing else is allowed to differ.
-VOLATILE = {"now", "taken_at", "checked_at", "uptime"}
+VOLATILE = {"now", "taken_at", "checked_at", "uptime", "started"}
 #: GETs that reach out of the machine or are about the door, not the library.
 SKIP_PREFIXES = ("/api/update", "/api/auth", "/api/youtube")
 
@@ -272,6 +272,10 @@ try:
             if pattern == "/api/export/erase" and sj and pj:
                 # the two servers hold different copies of the data: compare what, not where or how big
                 sj, pj = ([(g["how"], os.path.basename(g["path"])) for g in j["goes"]] for j in (sj, pj))
+            if pattern == "/api/state" and sj and pj:
+                # youtube is the one module Spring has not got yet (task 9e3); drop it from Python's side
+                pj["modules"] = [m for m in pj.get("modules", []) if m != "youtube"]
+                pj.get("summary", {}).pop("youtube", None)
             d = first_difference(sj, pj) if pj is not None else None
             if d:
                 check("GET %s same answer" % pattern, False, d)

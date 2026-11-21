@@ -58,7 +58,7 @@ public class AppearanceController {
         }
     }
 
-    private Map<String, Object> state(long acct) {
+    Map<String, Object> state(long acct) {
         Path p = find(acct);
         Map<String, Object> out = new LinkedHashMap<>();
         if (p == null) {

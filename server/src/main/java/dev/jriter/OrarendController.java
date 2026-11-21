@@ -83,6 +83,16 @@ public class OrarendController {
         }
     }
 
+    /** What /api/state says: nothing when there is no week. */
+    Map<String, Object> summary() {
+        Map<String, Object> found = read();
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (found == null || found.get("broken") != null) return out;
+        Object c = found.get("classes");
+        out.put("classes", c instanceof List<?> l ? l.size() : 0);
+        return out;
+    }
+
     private static Map<String, Object> broken(String why) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("broken", why == null ? "unreadable" : why);
