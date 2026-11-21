@@ -296,6 +296,26 @@ def test_it_leaves_alone_what_it_should(stopped, monkeypatch):
         assert auto.pulls == [], "it pulled %s" % why
 
 
+def test_a_live_branch_updates_from_itself(stopped, monkeypatch):
+    """The host runs live-4.3.0, not main; main has the old interface."""
+    pulled = []
+
+    def git(*a):
+        if a[:2] == ("rev-parse", "--abbrev-ref"):
+            return "live-4.3.0", ""
+        pulled.append(a)
+        return "", ""
+
+    auto = _Auto(monkeypatch, branch="live-4.3.0")
+    monkeypatch.setattr(updater, "_git", git)
+    monkeypatch.setattr(updater, "_pull", lambda: updater._git(
+        "pull", "--ff-only", "origin", updater._branch()) and auto.pulls.append(1) or _pulled(py=False))
+    monkeypatch.delenv("JRITER_BRANCH", raising=False)
+    updater._auto_once()
+    assert auto.pulls == [1]
+    assert ("pull", "--ff-only", "origin", "live-4.3.0") in pulled
+
+
 def test_switching_auto_update_off_is_honoured(stopped, monkeypatch):
     auto = _Auto(monkeypatch)
     monkeypatch.setattr(updater.config, "settings", lambda: {"auto_update": False})

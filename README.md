@@ -429,7 +429,7 @@ None of it shows on a phone.
 ## Settings
 
 `JRITER_DATA` moves the library. `JRITER_PORT` and `JRITER_HOST` move the server.
-`JRITER_REPO` and `JRITER_BRANCH` point the updater somewhere else.
+`JRITER_REPO` and `JRITER_BRANCH` point the updater somewhere else. With no `JRITER_BRANCH`, a checkout that is on a `live-*` branch updates from that branch.
 
 The accent colour and the library name are in Settings. Everything in the interface
 derives from the one accent value.
