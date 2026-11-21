@@ -55,6 +55,12 @@ public final class Config {
         return out;
     }
 
+    public List<String> vstFolders() {
+        List<String> out = new ArrayList<>();
+        node.path("vst_folders").forEach(f -> out.add(f.asText()));
+        return out;
+    }
+
     public Config set(String key, String value) { node.put(key, value); return this; }
     public Config addFolder(String folder) {
         ArrayNode a = node.withArrayProperty("folders");

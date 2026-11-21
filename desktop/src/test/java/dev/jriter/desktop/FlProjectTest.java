@@ -128,12 +128,13 @@ class FlProjectTest {
         Path f = tmp.resolve("Song.flp");
         Files.write(f, flp(e.toByteArray()));
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        int code = Main.plugins(new java.util.ArrayList<>(List.of(f.toString())), new PrintStream(buf, true));
+        Config cfg = new Config(tmp.resolve("c.json"));
+        int code = Main.plugins(cfg, new java.util.ArrayList<>(List.of(f.toString())), new PrintStream(buf, true));
         assertEquals(0, code);
         String s = buf.toString();
         assertTrue(s.contains("Serum") && s.contains("VST3"), s);
         buf.reset();
-        Main.plugins(new java.util.ArrayList<>(List.of(f.toString(), "--json")), new PrintStream(buf, true));
+        Main.plugins(cfg, new java.util.ArrayList<>(List.of(f.toString(), "--json")), new PrintStream(buf, true));
         assertTrue(buf.toString().contains("\"name\":\"Serum\""), buf.toString());
     }
 }

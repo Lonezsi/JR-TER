@@ -10,7 +10,10 @@ So VST support in JR!TER comes in steps, each useful alone.
 2. **Keep the list with the song.** Send the list with each FL render (a header `X-Plugins`),
    store it on the render in both servers (`jriter/modules/renders.py`, `RendersController`),
    and show a "Plugins" box on the song. Needs the Svelte `ui/` source.
-3. **Say what is missing.** Compare a project's VSTs with the ones installed on this PC (the
+3. **Say what is missing. Done in the CLI.** `jriter-cli plugins` looks in the usual VST2/VST3
+   folders (plus `vst_folders` in client.json, or `--vst-folder DIR`) and marks each VST
+   "missing here" (JSON: `installed`), matching by path, file name or plugin name
+   (`VstFolders.java`). Showing it in the web UI waits for step 2. Original idea: compare a project's VSTs with the ones installed on this PC (the
    desktop app can look in the usual VST folders) and show "missing here".
 4. **Play in the DAW tab.** The tab from task 23 plays MIDI with browser instruments (Web Audio
    Modules are the web's version of plugins). Hosting real VSTs needs a native host inside the

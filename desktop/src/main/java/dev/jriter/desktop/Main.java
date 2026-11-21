@@ -119,7 +119,7 @@ public final class Main {
                     return failed > 0 && sent == 0 ? 1 : 0;
                 }
                 case "render": return render(cfg, a, out);
-                case "plugins": return plugins(a, out);
+                case "plugins": return plugins(cfg, a, out);
                 case "watch": {
                     boolean once = a.contains("--once");
                     out.println("Watching " + cfg.folders().size() + " folder(s), every " + cfg.intervalMinutes() + " minute(s). Ctrl-C to stop.");
@@ -210,8 +210,17 @@ public final class Main {
         return done == 0 && !failed.isEmpty() ? 1 : 0;
     }
 
-    static int plugins(List<String> a, java.io.PrintStream out) {
+    static int plugins(Config cfg, List<String> a, java.io.PrintStream out) {
         boolean json = a.remove("--json");
+        List<Path> vstDirs = new java.util.ArrayList<>();
+        for (int i = 0; i < a.size() - 1; ) {
+            if (a.get(i).equals("--vst-folder")) { vstDirs.add(Path.of(a.get(i + 1))); a.remove(i); a.remove(i); }
+            else i++;
+        }
+        if (vstDirs.isEmpty()) vstDirs = VstFolders.defaults(cfg);
+        boolean known = !vstDirs.isEmpty();
+        VstFolders.Installed inst = VstFolders.scan(vstDirs);
+        if (!known && !json) out.println("(no VST folders found on this PC, so nothing is marked missing)");
         Path path = Path.of(a.get(0)).toAbsolutePath();
         if (!Files.exists(path)) { out.println("There is nothing at " + path); return 1; }
         List<Path> projects = Files.isDirectory(path) ? FlRender.projectsIn(path) : List.of(path);
@@ -230,13 +239,20 @@ public final class Main {
                         var po = arr.addObject();
                         po.put("kind", x.kind()); po.put("name", x.name()); po.put("vendor", x.vendor());
                         po.put("path", x.path()); po.put("uses", x.uses());
+                        if (known && !x.kind().equals("fl")) po.put("installed", VstFolders.has(inst, x));
                     }
                 } else {
                     out.println(p.getFileName());
                     if (pl.isEmpty()) out.println("  no plugins found");
-                    for (FlProject.Plugin x : pl)
+                    int missing = 0;
+                    for (FlProject.Plugin x : pl) {
+                        boolean gone = known && !VstFolders.has(inst, x);
+                        if (gone) missing++;
                         out.println("  " + String.format("%-5s", x.kind().toUpperCase()) + " " + x.name()
-                                + (x.vendor().isEmpty() ? "" : "  (" + x.vendor() + ")") + (x.uses() > 1 ? "  x" + x.uses() : ""));
+                                + (x.vendor().isEmpty() ? "" : "  (" + x.vendor() + ")") + (x.uses() > 1 ? "  x" + x.uses() : "")
+                                + (gone ? "  missing here" : ""));
+                    }
+                    if (missing > 0) out.println("  " + missing + " VST(s) missing here");
                 }
             } catch (IOException | RuntimeException e) {
                 if (!json) { out.println(p.getFileName()); out.println("  could not read: " + e.getMessage()); }
@@ -271,7 +287,7 @@ public final class Main {
                   jriter-cli push-file FILE [--yes]
                   jriter-cli push-folder FOLDER [--yes]
                   jriter-cli render FLP_OR_FOLDER   render with FL Studio, send to Renders
-                  jriter-cli plugins FLP_OR_FOLDER [--json]   which plugins a project uses
+                  jriter-cli plugins FLP_OR_FOLDER [--json] [--vst-folder DIR]   plugins a project uses, missing ones marked
                   jriter-cli flpath FL64.EXE
                   jriter-cli watch [--once]     keep sending new renders
                   jriter-cli shell install|remove    right-click menu
