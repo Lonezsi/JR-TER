@@ -171,10 +171,13 @@ def _pull():
         "before": before,
         "after": after,
         "files": names,
+        # devlog.json counts: the version is read from it once, at start, so a release
+        # that only adds a note would otherwise never show its new version.
         # Python has already imported the old modules, so the new ones are on disk and
         # not in memory. Saying this is the difference between an update that worked and
         # an update that looks like it did nothing.
-        "restart_required": changed and any(n.endswith(".py") for n in names),
+        "restart_required": changed and any(
+            n.endswith(".py") or n == "jriter/devlog.json" for n in names),
         "message": ("Updated. Restart JR!TER to run the new code."
                     if changed else "Already up to date."),
     }

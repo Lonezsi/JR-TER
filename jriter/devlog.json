@@ -1,5 +1,18 @@
 [
  {
+  "version": "4.4.0",
+  "date": "2026-11-21",
+  "name": "JR!TER",
+  "title": "A studio in your pocket",
+  "notes": [
+   "The DAW: open it from the command palette (Go to, DAW) or the top menu. It plays MIDI files with built-in instruments and has a piano roll to edit them. Save as .mid or as a plain-text .json.",
+   "It works with your thumb: tap to add a note, drag to move or resize it, drag empty space to pan, pinch to zoom, long-press a note to delete it. Play sits at the bottom of the screen.",
+   "Albums have a Release to RouteNote button: a release page that checks the cover and mixes and hands the details to your PC.",
+   "Stickers on an album's case are cut off at its edge now.",
+   "JR!TER updates itself again, and every new version shows up here."
+  ]
+ },
+ {
   "version": "4.3.0",
   "date": "2026-11-20",
   "name": "JR!TER",

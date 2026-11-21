@@ -207,7 +207,8 @@ look by day.
 resize, right-click to delete, and play it with built-in browser instruments (piano, pad,
 bass, pluck, drums). Space plays, `L` loops, `j`/`k` change track, `N` adds one, `Ctrl+Z`
 undoes. Save as `.mid` or as a plain-text `.json` that explains itself. It is plain ES
-modules in `web/daw/` (no build step); it becomes a song tab once the Svelte `ui/` is here.
+modules in `web/daw/` (no build step) with phone controls (tap, drag, pinch, long-press);
+the plan is in `docs/DAW.md`. It becomes a song tab once the Svelte `ui/` is here.
 
 **Phone.** The sidebar follows your thumb from the edge, Back closes whatever is on top,
 and the player grows out of the mini bar.
