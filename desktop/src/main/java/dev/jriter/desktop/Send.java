@@ -12,12 +12,35 @@ public final class Send {
 
     /** A fresh render goes to the Renders list, never straight onto a song. True if it was new there. */
     public static boolean render(Library lib, Path file, double projectAt, double renderedAt, boolean fl) {
+        return render(lib, file, projectAt, renderedAt, fl, "");
+    }
+
+    /** The plugin list as an X-Plugins header value: pure-ASCII JSON, at most 6000 chars (Tomcat allows 8 KB per header). */
+    public static String pluginsHeader(java.util.List<FlProject.Plugin> pl, VstFolders.Installed inst) {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        mapper.getFactory().configure(com.fasterxml.jackson.core.json.JsonWriteFeature.ESCAPE_NON_ASCII.mappedFeature(), true);
+        var arr = mapper.createArrayNode();
+        for (FlProject.Plugin x : pl) {
+            var o = arr.addObject();
+            o.put("kind", x.kind()); o.put("name", x.name()); o.put("vendor", x.vendor()); o.put("uses", x.uses());
+            if (inst != null && !x.kind().equals("fl")) o.put("installed", VstFolders.has(inst, x));
+        }
+        try {
+            String s = mapper.writeValueAsString(arr);
+            while (s.length() > 6000 && arr.size() > 0) { arr.remove(arr.size() - 1); s = mapper.writeValueAsString(arr); }
+            return arr.size() == 0 ? "" : s;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) { return ""; }
+    }
+
+    /** Same, with the project's plugin list (see docs/VST.md step 2); plugins may be blank. */
+    public static boolean render(Library lib, Path file, double projectAt, double renderedAt, boolean fl, String plugins) {
         Map<String, String> h = new LinkedHashMap<>();
         h.put("X-Filename", file.getFileName().toString());
         h.put("X-Source-Path", file.toAbsolutePath().toString());
         if (fl) h.put("X-Origin", "fl");
         if (projectAt > 0) h.put("X-Project-At", Double.toString(projectAt));
         if (renderedAt > 0) h.put("X-Rendered-At", Double.toString(renderedAt));
+        if (plugins != null && !plugins.isBlank()) h.put("X-Plugins", plugins);
         return lib.upload("/api/renders", file, h).path("added").asBoolean(false);
     }
 

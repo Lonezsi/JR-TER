@@ -200,6 +200,8 @@ public final class Main {
         if (!Files.exists(path)) { out.println("There is nothing at " + path); return 1; }
         Path outDir = cfg.renderOut().isBlank() ? null : Path.of(cfg.renderOut());
         Library lib = new Library(cfg.server(), cfg.token());
+        List<Path> vstDirs = VstFolders.defaults(cfg);
+        VstFolders.Installed inst = vstDirs.isEmpty() ? null : VstFolders.scan(vstDirs);
         List<String> failed = new ArrayList<>();
         int done = 0;
         for (Path p : projects) {
@@ -207,7 +209,9 @@ public final class Main {
                 FlRender.Rendered r = FlRender.render(p, outDir, cfg.renderFormat(), cfg.flPath(), 1800, 4.0, t -> out.println("  " + t));
                 done++;
                 try {
-                    boolean added = Send.render(lib, r.audio(), r.projectAt(), r.renderedAt(), true);
+                    String pl = "";
+                    try { pl = Send.pluginsHeader(FlProject.plugins(p), inst); } catch (IOException | RuntimeException e) { /* no list is fine */ }
+                    boolean added = Send.render(lib, r.audio(), r.projectAt(), r.renderedAt(), true, pl);
                     out.println("  " + r.audio().getFileName() + (added ? " is waiting in Renders" : " was already there"));
                 } catch (RuntimeException e) { out.println("  could not send " + r.audio().getFileName() + ": " + e.getMessage()); }
             } catch (FlRender.RenderException e) {

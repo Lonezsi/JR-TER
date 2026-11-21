@@ -76,6 +76,7 @@ def MIGRATE():
     db.add_column_if_missing("renders", "project_at", "REAL NOT NULL DEFAULT 0")
     db.add_column_if_missing("renders", "rendered_at", "REAL NOT NULL DEFAULT 0")
     _add_shape_columns()
+    db.add_column_if_missing("renders", "plugins", "TEXT NOT NULL DEFAULT ''")
 
 
 def get(render_id):
@@ -94,6 +95,7 @@ def _decorate(rows):
         row["waiting"] = not row["used_at"]
         raw = row.pop("peaks", "") or ""
         row["shape"] = [int(n) for n in raw.split(",") if n.isdigit()]
+        row["plugins"] = versions.plugin_list(row.get("plugins"))
     return rows
 
 
@@ -134,7 +136,7 @@ def _shape_of(digest, ext):
 
 
 def _remember(digest, ext, size, filename, source_path, origin, duration=0.0, bitrate=0,
-              project_at=0.0, rendered_at=0.0):
+              project_at=0.0, rendered_at=0.0, plugins=""):
     """Write the row, or hand back the one that already holds these bytes.
 
     The same render arriving twice, from a re-scan or a second machine, is one entry. It
@@ -152,6 +154,8 @@ def _remember(digest, ext, size, filename, source_path, origin, duration=0.0, bi
             learned["project_at"] = project_at
         if rendered_at and not existing.get("rendered_at"):
             learned["rendered_at"] = rendered_at
+        if plugins and not existing.get("plugins"):
+            learned["plugins"] = plugins
         if learned:
             db.update("renders", existing["id"], learned)
             return get(existing["id"]), False
@@ -163,7 +167,7 @@ def _remember(digest, ext, size, filename, source_path, origin, duration=0.0, bi
         "origin": origin, "created_at": time.time(),
         "project_at": project_at or 0.0, "rendered_at": rendered_at or 0.0,
         "peaks": shape["peaks"], "peak_db": shape["peak_db"],
-        "trouble": shape["trouble"]})
+        "trouble": shape["trouble"], "plugins": plugins or ""})
     return get(render_id), True
 
 
@@ -201,7 +205,8 @@ def upload(req):
                            (req.headers.get("X-Source-Path") or "").strip(),
                            (req.headers.get("X-Origin") or "upload").strip(),
                            meta["duration"], meta["bitrate"],
-                           _stamp(req, "X-Project-At"), _stamp(req, "X-Rendered-At"))
+                           _stamp(req, "X-Project-At"), _stamp(req, "X-Rendered-At"),
+                           versions.clean_plugins(req.headers.get("X-Plugins") or ""))
     return {"render": _decorate([row])[0], "added": added}
 
 
@@ -307,7 +312,8 @@ def attach(req):
         # Carried through rather than dropped: these say when the work happened, and the
         # song's own updated_at is bumped by saving a lyric.
         project_at=render.get("project_at") or 0.0,
-        rendered_at=render.get("rendered_at") or 0.0)
+        rendered_at=render.get("rendered_at") or 0.0,
+        plugins=render.get("plugins") or "")
     db.update("renders", render["id"], {"used_at": time.time(), "song_id": song["id"],
                                         "version_id": version["id"]})
     return {"render": _decorate([get(render["id"])])[0], "song": songs.get(song["id"]),

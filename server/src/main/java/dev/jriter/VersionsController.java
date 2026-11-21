@@ -56,6 +56,50 @@ public class VersionsController {
         return out;
     }
 
+    static final java.util.Set<String> PLUGIN_KINDS = java.util.Set.of("vst2", "vst3", "fl");
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** A plugin list from an X-Plugins header as compact JSON, or "" if nothing usable (see versions.clean_plugins). */
+    static String cleanPlugins(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        try {
+            com.fasterxml.jackson.databind.JsonNode in = MAPPER.readTree(raw);
+            if (in == null || !in.isArray()) return "";
+            com.fasterxml.jackson.databind.node.ArrayNode out = MAPPER.createArrayNode();
+            int seen = 0;
+            for (com.fasterxml.jackson.databind.JsonNode it : in) {
+                if (seen++ >= 200) break;
+                if (!it.isObject() || !PLUGIN_KINDS.contains(it.path("kind").asText(""))) continue;
+                String name = cut(it.path("name").asText("")); 
+                if (name.isEmpty()) continue;
+                com.fasterxml.jackson.databind.node.ObjectNode o = out.addObject();
+                o.put("kind", it.path("kind").asText());
+                o.put("name", name);
+                o.put("vendor", cut(it.path("vendor").asText("")));
+                o.put("uses", Math.max(1, it.path("uses").asInt(1)));
+                if (it.path("installed").isBoolean()) o.put("installed", it.path("installed").asBoolean());
+            }
+            return out.isEmpty() ? "" : MAPPER.writeValueAsString(out);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static String cut(String s) {
+        s = s.strip();
+        return s.length() > 200 ? s.substring(0, 200) : s;
+    }
+
+    /** The stored string as a list; empty for nothing or damage. */
+    static List<Object> pluginList(Object text) {
+        if (text == null || text.toString().isBlank()) return new ArrayList<>();
+        try {
+            return MAPPER.readValue(text.toString(), new com.fasterxml.jackson.core.type.TypeReference<List<Object>>() {});
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
     static List<Integer> shapeList(Object raw) {
         List<Integer> out = new ArrayList<>();
         if (raw == null) return out;
@@ -69,6 +113,11 @@ public class VersionsController {
 
     Added addStored(long acct, long songId, String digest, String ext, long size, double duration, int bitrate,
                     String label, String filename, String sourcePath, double projectAt, double renderedAt) {
+        return addStored(acct, songId, digest, ext, size, duration, bitrate, label, filename, sourcePath, projectAt, renderedAt, "");
+    }
+
+    Added addStored(long acct, long songId, String digest, String ext, long size, double duration, int bitrate,
+                    String label, String filename, String sourcePath, double projectAt, double renderedAt, String plugins) {
         Library.Db db = library.of(acct);
         Map<String, Object> same = db.one("SELECT * FROM versions WHERE song_id = ? AND digest = ?", songId, digest);
         if (same != null) return new Added(same, true);
@@ -88,6 +137,7 @@ public class VersionsController {
         v.put("created_at", Accounts.now());
         v.put("project_at", projectAt);
         v.put("rendered_at", renderedAt);
+        v.put("plugins", plugins == null ? "" : plugins);
         v.putAll(shapeOf(blobs.pathFor(acct, digest), ext));
         long id = db.insert("versions", v);
         Map<String, Object> song = new LinkedHashMap<>();
@@ -102,7 +152,7 @@ public class VersionsController {
         Library.Db db = library.of(Api.acct(req));
         Map<String, Object> song = SongsController.getSong(db, id);
         List<Map<String, Object>> rows = db.query("SELECT * FROM versions WHERE song_id = ? ORDER BY n DESC", song.get("id"));
-        for (Map<String, Object> r : rows) r.put("shape", shapeList(r.remove("peaks")));
+        for (Map<String, Object> r : rows) { r.put("shape", shapeList(r.remove("peaks"))); r.put("plugins", pluginList(r.get("plugins"))); }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("versions", rows);
         out.put("current_version_id", song.get("current_version_id"));

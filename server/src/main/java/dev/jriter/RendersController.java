@@ -53,6 +53,7 @@ public class RendersController {
         row.put("name", name.isEmpty() ? "render" : name);
         row.put("waiting", Accounts.dbl(row.get("used_at")) == 0);
         row.put("shape", VersionsController.shapeList(row.remove("peaks")));
+        row.put("plugins", VersionsController.pluginList(row.get("plugins")));
         return row;
     }
 
@@ -89,13 +90,14 @@ public class RendersController {
     record Remembered(Map<String, Object> row, boolean added) {}
 
     Remembered remember(long acct, String digest, String ext, long size, String filename, String sourcePath,
-                        String origin, double duration, int bitrate, double projectAt, double renderedAt) {
+                        String origin, double duration, int bitrate, double projectAt, double renderedAt, String plugins) {
         Library.Db db = library.of(acct);
         Map<String, Object> existing = db.one("SELECT * FROM renders WHERE digest = ?", digest);
         if (existing != null) {
             Map<String, Object> learned = new LinkedHashMap<>();
             if (projectAt != 0 && Accounts.dbl(existing.get("project_at")) == 0) learned.put("project_at", projectAt);
             if (renderedAt != 0 && Accounts.dbl(existing.get("rendered_at")) == 0) learned.put("rendered_at", renderedAt);
+            if (!plugins.isEmpty() && String.valueOf(existing.get("plugins") == null ? "" : existing.get("plugins")).isEmpty()) learned.put("plugins", plugins);
             if (!learned.isEmpty()) {
                 db.update("renders", Accounts.num(existing.get("id")), learned);
                 return new Remembered(getRender(db, existing.get("id")), false);
@@ -114,6 +116,7 @@ public class RendersController {
         v.put("created_at", Accounts.now());
         v.put("project_at", projectAt);
         v.put("rendered_at", renderedAt);
+        v.put("plugins", plugins);
         v.putAll(VersionsController.shapeOf(blobs.pathFor(acct, digest), ext));
         long id = db.insert("renders", v);
         return new Remembered(getRender(db, id), true);
@@ -146,7 +149,8 @@ public class RendersController {
         String origin = Api.header(req, "X-Origin");
         Remembered r = remember(acct, s.digest(), ext, s.size(), filename, Api.header(req, "X-Source-Path"),
                 origin.isEmpty() ? "upload" : origin, meta.duration(), meta.bitrate(),
-                stamp(req, "X-Project-At"), stamp(req, "X-Rendered-At"));
+                stamp(req, "X-Project-At"), stamp(req, "X-Rendered-At"),
+                VersionsController.cleanPlugins(Api.header(req, "X-Plugins")));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("render", decorate1(library.of(acct), r.row()));
         out.put("added", r.added());
@@ -224,7 +228,7 @@ public class RendersController {
             AudioMeta.Probe meta = AudioMeta.probe(blobs.pathFor(acct, s.digest()), ext);
             Remembered r = remember(acct, s.digest(), ext, s.size(), item.getFileName().toString(), item.toString(),
                     origin.isEmpty() ? "import" : origin, meta.duration(), meta.bitrate(),
-                    projectBeside(item), mtime(item));
+                    projectBeside(item), mtime(item), "");
             if (r.added()) added.add(r.row());
             else already++;
         }
@@ -259,7 +263,8 @@ public class RendersController {
         VersionsController.Added a = versions.addStored(acct, Accounts.num(song.get("id")), (String) render.get("digest"),
                 (String) render.get("ext"), Accounts.num(render.get("size")), Accounts.dbl(render.get("duration")),
                 (int) Accounts.num(render.get("bitrate")), "", (String) render.get("filename"),
-                (String) render.get("source_path"), Accounts.dbl(render.get("project_at")), Accounts.dbl(render.get("rendered_at")));
+                (String) render.get("source_path"), Accounts.dbl(render.get("project_at")), Accounts.dbl(render.get("rendered_at")),
+                render.get("plugins") == null ? "" : render.get("plugins").toString());
         Map<String, Object> used = new LinkedHashMap<>();
         used.put("used_at", Accounts.now());
         used.put("song_id", song.get("id"));

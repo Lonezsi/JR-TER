@@ -431,3 +431,34 @@ def test_renders_that_predate_the_shape_can_be_looked_at_afterwards(server, wav)
     _, listing = server.get("/api/renders?all=1")
     mine = [r for r in listing["renders"] if r["id"] == render_id][0]
     assert mine["shape"], "it was not looked at after all"
+
+
+def test_plugins_travel_with_a_render_and_onto_the_version(server, wav):
+    import json
+    sent = json.dumps([
+        {"kind": "vst3", "name": "Serum", "vendor": "Xfer", "uses": 2, "installed": False},
+        {"kind": "bogus", "name": "Nope"},
+        {"kind": "fl", "name": "Fruity Reeverb 2"},
+    ])
+    status, result = server.upload("/api/renders", wav(), filename="plug.wav",
+                                   headers={"X-Plugins": sent})
+    assert status == 200, result
+    got = result["render"]["plugins"]
+    assert [p["name"] for p in got] == ["Serum", "Fruity Reeverb 2"], "the bad item was kept"
+    assert got[0]["installed"] is False and got[1]["uses"] == 1
+
+    _, made = server.post("/api/renders/%s/attach" % result["render"]["id"], {"title": "Plug"})
+    _, listing = server.get("/api/songs/%s/versions" % made["song"]["id"])
+    assert listing["versions"][0]["plugins"] == got
+
+
+def test_a_garbage_plugin_header_is_ignored_and_a_later_one_fills_in(server, wav):
+    import json
+    path = wav()
+    _, first = server.upload("/api/renders", path, filename="g.wav",
+                             headers={"X-Plugins": "not json"})
+    assert first["render"]["plugins"] == []
+    _, second = server.upload("/api/renders", path, filename="g.wav", headers={
+        "X-Plugins": json.dumps([{"kind": "vst2", "name": "Sylenth1", "uses": 1}])})
+    assert second["added"] is False
+    assert second["render"]["plugins"][0]["name"] == "Sylenth1"

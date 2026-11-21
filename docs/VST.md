@@ -7,13 +7,17 @@ So VST support in JR!TER comes in steps, each useful alone.
    project and lists its VSTs (name, vendor, VST2 or VST3, path) and FL's own plugins, with how
    many times each is used. Code: `desktop/.../FlProject.java`. Tested on made-up files only, so
    check it against a real project of yours.
-2. **Keep the list with the song.** Send the list with each FL render (a header `X-Plugins`),
-   store it on the render in both servers (`jriter/modules/renders.py`, `RendersController`),
-   and show a "Plugins" box on the song. Needs the Svelte `ui/` source.
+2. **Keep the list with the song. Server half done.** `jriter-cli render` sends the list with each FL
+   render (header `X-Plugins`: JSON of kind, name, vendor, uses, and `installed` when the VST folders are
+   known). Both servers (`jriter/modules/renders.py` + `versions.py`, `RendersController` +
+   `VersionsController`) clean it, store it in a `plugins` column on the render, copy it onto the version
+   when the render is attached, and return it as a `plugins` list in `/api/renders` and
+   `/api/songs/ID/versions`. It is also in the library export. Still to do: the "Plugins" box on the
+   song (with "missing here" from `installed`), which needs the Svelte `ui/` source.
 3. **Say what is missing. Done in the CLI.** `jriter-cli plugins` looks in the usual VST2/VST3
    folders (plus `vst_folders` in client.json, or `--vst-folder DIR`) and marks each VST
    "missing here" (JSON: `installed`), matching by path, file name or plugin name
-   (`VstFolders.java`). Showing it in the web UI waits for step 2. Original idea: compare a project's VSTs with the ones installed on this PC (the
+   (`VstFolders.java`). Showing it in the web UI waits for the box in step 2. Original idea: compare a project's VSTs with the ones installed on this PC (the
    desktop app can look in the usual VST folders) and show "missing here".
 4. **Play in the DAW tab.** The page from task 23 (`/daw.html`, code in `web/daw/`; it becomes a song tab once `ui/` lands) plays MIDI with browser instruments (Web Audio
    Modules are the web's version of plugins). Hosting real VSTs needs a native host inside the

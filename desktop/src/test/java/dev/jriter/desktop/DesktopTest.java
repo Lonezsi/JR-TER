@@ -105,6 +105,28 @@ class DesktopTest {
         assertEquals("J%C3%B3zsi%20dal.wav", lastHeaders.get("x-filename-enc"));
     }
 
+    @Test void renderUploadCarriesThePluginList() throws Exception {
+        Path f = tmp.resolve("p.wav");
+        Files.writeString(f, "audio");
+        assertTrue(Send.render(new Library(url(), "tok"), f, 0, 0, true, "[{\"kind\":\"fl\",\"name\":\"X\"}]"));
+        assertEquals("[{\"kind\":\"fl\",\"name\":\"X\"}]", lastHeaders.get("x-plugins"));
+    }
+
+    @Test void pluginsHeaderIsAsciiAndBounded() throws Exception {
+        var one = java.util.List.of(new FlProject.Plugin("vst3", "Szép", "V", "C:/a.vst3", 2));
+        String s = Send.pluginsHeader(one, null);
+        assertTrue(s.chars().allMatch(c -> c < 128), s);
+        assertTrue(s.toLowerCase().contains("\\u00e9"), s);
+        assertFalse(s.contains("installed"), s);
+        var many = new java.util.ArrayList<FlProject.Plugin>();
+        for (int i = 0; i < 300; i++) many.add(new FlProject.Plugin("vst2", "Plugin number " + i + "x".repeat(40), "Vendor", "p", 1));
+        String big = Send.pluginsHeader(many, new VstFolders.Installed(java.util.Set.of(), java.util.Set.of()));
+        assertTrue(big.length() <= 6000);
+        assertEquals('[', big.charAt(0));
+        assertEquals(']', big.charAt(big.length() - 1));
+        assertEquals("", Send.pluginsHeader(java.util.List.of(), null));
+    }
+
     @Test void flRankPrefers64BitThenNewest() {
         List<Path> l = new ArrayList<>(List.of(Path.of("C:/IL/FL Studio 20/FL.exe"), Path.of("C:/IL/FL Studio 20/FL64.exe"), Path.of("C:/IL/FL Studio 2024/FL64.exe")));
         l.sort(FlRender.RANK);
