@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+  JR!TER release page: turn an album into a release card for RouteNote.
+  What it is: one page, plain ES modules, no build step, no dependencies.
+  Files: /release/card.js (the card and its checks, no DOM; holds the agent's instructions),
+         /release/release.js (the page), /release/release.css.
+  Use: /release.html?album=ID. Fill in the details, then Download (card + cover + mixes into
+  your Downloads folder) or Hand to Wh;le (the same, then opens jriter://release/ID, which the
+  JR!TER desktop app answers by starting Claude Code on the card, in your own browser, where you
+  sign in yourself). It stops for your OK before the final submit. See docs/ROUTENOTE.md.
+  It becomes a button on the album page once the Svelte ui/ source is committed.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release · JR!TER</title>
+<link rel="stylesheet" href="/glass.css">
+<link rel="stylesheet" href="/release/release.css">
+</head>
+<body>
+<main class="wrap" id="app"><p class="mute">Loading…</p></main>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script type="module" src="/release/release.js"></script>
+</body>
+</html>
