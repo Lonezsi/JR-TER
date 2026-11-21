@@ -118,5 +118,41 @@ class DesktopTest {
                 Windows.commandLine(Path.of("C:\\Pr F\\jriter-cli.exe"), "push-file", "%1"));
         assertEquals(5, Windows.entries().size());
     }
+
+    @Test void releaseLinkAcceptsOnlyDigits() {
+        assertEquals(Optional.of("12"), Release.parseUrl("jriter://release/12"));
+        assertEquals(Optional.of("12"), Release.parseUrl("jriter://release/12/"));
+        assertTrue(Release.parseUrl("jriter://release/1;calc").isEmpty());
+        assertTrue(Release.parseUrl("jriter://release/1&calc").isEmpty());
+        assertTrue(Release.parseUrl("jriter://other/1").isEmpty());
+        assertTrue(Release.parseUrl("jriter://release/").isEmpty());
+        assertTrue(Release.parseUrl(null).isEmpty());
+    }
+
+    @Test void releaseCommandHasFixedTextAndOnlyTheId() {
+        List<String> c = Release.command(Path.of("Downloads"), "12");
+        assertEquals("claude", c.get(c.size() - 2));
+        assertTrue(c.get(c.size() - 1).contains("jriter-release-12.json"));
+        assertTrue(c.get(c.size() - 1).contains("final submit"));
+        assertEquals("/D", c.get(4));
+    }
+
+    @Test void protocolCommandHasNoShellInIt() {
+        Path exe = Path.of("Apps", "jriter-cli.exe");
+        String line = Windows.protocolCommand(exe);
+        assertEquals("\"" + exe + "\" url \"%1\"", line);
+        assertFalse(line.contains("cmd"));
+    }
+
+    @Test void releaseWaitsForTheFilesTheCardNames() throws Exception {
+        Files.writeString(tmp.resolve("jriter-release-5.json"),
+                "{\"cover\":{\"file\":\"c.png\"},\"tracks\":[{\"file\":\"t.wav\"},{\"file\":\"\"}]}");
+        assertFalse(Release.ready(tmp, "5"));
+        Files.writeString(tmp.resolve("c.png"), "x");
+        Files.writeString(tmp.resolve("t.wav"), "x");
+        assertTrue(Release.ready(tmp, "5"));
+        Files.writeString(tmp.resolve("jriter-release-6.json"), "{\"tracks\":[{\"file\":\"../evil.wav\"}]}");
+        assertThrows(java.io.IOException.class, () -> Release.ready(tmp, "6"));
+    }
 }
 

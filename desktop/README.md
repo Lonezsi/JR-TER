@@ -19,6 +19,8 @@ jriter-cli scan | push [--yes] | watch [--once]
 jriter-cli push-file FILE | push-folder FOLDER
 jriter-cli render X.flp|FOLDER              FL Studio renders, the audio goes to Renders
 jriter-cli plugins X.flp|FOLDER [--json] [--vst-folder DIR]    which VSTs and FL plugins a project uses, VSTs not installed here marked
+jriter-cli release ALBUM_ID [--folder DIR]   Claude Code on a RouteNote release card from /release.html (docs/ROUTENOTE.md)
+jriter-cli url jriter://release/ID           the same, from the link; `shell install` registers it
 jriter-cli flpath "C:\...\FL64.exe"
 jriter-cli shell install|remove             right-click menu (HKCU only)
 jriter-cli autostart on|off                 start the tray at logon

@@ -120,6 +120,16 @@ public final class Main {
                 }
                 case "render": return render(cfg, a, out);
                 case "plugins": return plugins(cfg, a, out);
+                case "url": {
+                    var id = a.isEmpty() ? Optional.<String>empty() : Release.parseUrl(a.get(0));
+                    if (id.isEmpty()) { out.println("Not a JR!TER link I know: expected jriter://release/ID"); return 2; }
+                    return Release.run(id.get(), Release.defaultFolder(), 60, true, out);
+                }
+                case "release": {
+                    String folder = opt(a, "--folder");
+                    if (a.isEmpty() || !a.get(0).matches("\\d{1,9}")) { out.println("Usage: jriter-cli release ALBUM_ID [--folder DIR]"); return 2; }
+                    return Release.run(a.get(0), folder == null ? Release.defaultFolder() : Path.of(folder), 60, true, out);
+                }
                 case "watch": {
                     boolean once = a.contains("--once");
                     out.println("Watching " + cfg.folders().size() + " folder(s), every " + cfg.intervalMinutes() + " minute(s). Ctrl-C to stop.");
@@ -288,6 +298,8 @@ public final class Main {
                   jriter-cli push-folder FOLDER [--yes]
                   jriter-cli render FLP_OR_FOLDER   render with FL Studio, send to Renders
                   jriter-cli plugins FLP_OR_FOLDER [--json] [--vst-folder DIR]   plugins a project uses, missing ones marked
+                  jriter-cli release ALBUM_ID [--folder DIR]   start Claude Code on a downloaded RouteNote release card
+                  jriter-cli url jriter://release/ID           the same, from the link on the release page
                   jriter-cli flpath FL64.EXE
                   jriter-cli watch [--once]     keep sending new renders
                   jriter-cli shell install|remove    right-click menu

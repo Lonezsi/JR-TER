@@ -105,10 +105,23 @@ public final class Windows {
             reg("add", key + "\\command", "/ve", "/d", commandLine(cli, e.command(), e.arg()), "/f");
             n++;
         }
-        return n;
+        // jriter://release/ID, from the release page: starts the RouteNote agent on this PC.
+        reg("add", PROTOCOL_KEY, "/ve", "/d", "URL:JR!TER", "/f");
+        reg("add", PROTOCOL_KEY, "/v", "URL Protocol", "/d", "", "/f");
+        reg("add", PROTOCOL_KEY + "\\shell\\open\\command", "/ve", "/d", protocolCommand(cli), "/f");
+        return n + 1;
+    }
+
+    static final String PROTOCOL_KEY = KEY_ROOT + "\\jriter";
+
+    /** The link handler. No cmd in between: a link comes from a web page, and cmd would read
+     *  characters like & in it as commands. The exe itself accepts only jriter://release/DIGITS. */
+    static String protocolCommand(Path cli) {
+        return "\"" + cli + "\" url \"%1\"";
     }
 
     public static void removeMenu() {
+        reg("delete", PROTOCOL_KEY, "/f");
         for (Entry e : entries()) for (String parent : e.parents())
             reg("delete", KEY_ROOT + "\\" + parent + "\\" + e.name(), "/f");
     }
