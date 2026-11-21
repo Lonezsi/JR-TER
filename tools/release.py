@@ -1,12 +1,12 @@
-"""Prepend a patch release to jriter/devlog.py."""
+"""Prepend a patch release to jriter/devlog.json (read by the Python and Spring servers)."""
 import datetime
-import re
+import json
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PATH = ROOT / "jriter" / "devlog.py"
+PATH = ROOT / "jriter" / "devlog.json"
 
 
 def main():
@@ -14,28 +14,17 @@ def main():
         raise SystemExit('usage: python tools/release.py "release message"')
 
     message = sys.argv[1].strip()
-    source = PATH.read_text(encoding="utf-8")
-    match = re.search(r'"version": "(\d+)\.(\d+)\.(\d+)"', source)
-    if not match:
-        raise SystemExit("could not find the current version in jriter/devlog.py")
-
-    major, minor, patch = (int(part) for part in match.groups())
+    entries = json.loads(PATH.read_text(encoding="utf-8"))
+    major, minor, patch = (int(part) for part in entries[0]["version"].split("."))
     version = "%d.%d.%d" % (major, minor, patch + 1)
-    today = datetime.date.today().isoformat()
-    entry = '''    {
-        "version": "%s",
-        "date": "%s",
-        "name": JRITER,
-        "title": %r,
-        "notes": [
-            %r,
-        ],
-    },
-''' % (version, today, message, message)
-    marker = "ENTRIES = [\n"
-    if marker not in source:
-        raise SystemExit("could not find the release list in jriter/devlog.py")
-    PATH.write_text(source.replace(marker, marker + entry, 1), encoding="utf-8")
+    entries.insert(0, {
+        "version": version,
+        "date": datetime.date.today().isoformat(),
+        "name": "JR!TER",
+        "title": message,
+        "notes": [message],
+    })
+    PATH.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print("prepared JR!TER %s" % version)
 
 

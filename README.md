@@ -396,7 +396,7 @@ jriter/
   blobs.py             content addressed storage
   http.py              routing, static files, byte ranges for audio
   registry.py          loads whichever modules are switched on
-  devlog.py            the release notes, and the version they name
+  devlog.py            loads the release notes (devlog.json) and compares versions
   modules/             one file per feature
 ui/                    the interface: Svelte 5 + TypeScript, built with Vite
   src/shell/           sidebar, phone drawer, player, search, Now Playing
