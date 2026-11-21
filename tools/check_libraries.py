@@ -268,7 +268,11 @@ try:
         elif s_status != p_status:
             check("GET %s same status" % pattern, False, "spring %d, python %d" % (s_status, p_status))
         elif p_status == 200:
-            d = first_difference(as_json(s_raw), as_json(p_raw)) if as_json(p_raw) is not None else None
+            sj, pj = as_json(s_raw), as_json(p_raw)
+            if pattern == "/api/export/erase" and sj and pj:
+                # the two servers hold different copies of the data: compare what, not where or how big
+                sj, pj = ([(g["how"], os.path.basename(g["path"])) for g in j["goes"]] for j in (sj, pj))
+            d = first_difference(sj, pj) if pj is not None else None
             if d:
                 check("GET %s same answer" % pattern, False, d)
 

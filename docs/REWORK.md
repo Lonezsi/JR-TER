@@ -90,7 +90,7 @@ checks and the matching Python tests agree.
 - [x] 9c: lyrics, arrange, artwork, vocals, albums, playlists (six controllers, `tools/parity_media.py`; grave, guest and search hooks wait for 9d)
 - [ ] 9d: sharing, search, the grave, the timetable. Grave, search and timetable done (`tools/parity_grave_search.py`;
   deletes in every controller bury first, Python and Spring restore each other's graves); sound presets + sharing next (9d2)
-- [ ] 9e: export, sync, appearance, devlog, updater, youtube
+- [ ] 9e: export, sync, appearance, devlog, updater, youtube. Devlog (entries now in `jriter/devlog.json`, read by both servers),\n  appearance and export/import/erase done (`tools/parity_export.py`); sync + updater are 9e2 (the updater must rebuild and restart the jar),\n  youtube is 9e3
 - [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
 - [ ] 12: `tools/check_libraries.py` copies the host's data and compares every real library through Spring and Python
   (files hashed, answers equal, export v2 row counts). Passes today for what Spring serves (4 libraries, 60 files);
