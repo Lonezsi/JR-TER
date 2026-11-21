@@ -1,0 +1,47 @@
+/* The three views (Chords, Roll, Script) and the two editors. Loaded after daw.css. */
+.views { display: flex; gap: var(--d-s1); padding: var(--d-s1); background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
+.views button { flex: 1; border-color: transparent; background: transparent; }
+.views button[aria-selected="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+
+.main[data-view="chords"] .tracks, .main[data-view="chords"] .roll, .main[data-view="chords"] .scripts { display: none; }
+.main[data-view="roll"] .chords, .main[data-view="roll"] .scripts { display: none; }
+.main[data-view="script"] .roll, .main[data-view="script"] .chords { display: none; }
+
+.chords, .scripts { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
+  background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
+.cv-line { display: flex; flex-wrap: wrap; gap: var(--d-s2); align-items: center; }
+.cv-line label { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
+.cv-title { color: var(--d-mute); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.cv-err { color: #ff8f8f; min-height: 1.4em; }
+.cv-strip { display: flex; gap: var(--d-s2); overflow-x: auto; padding-bottom: var(--d-s1); }
+.cc { flex: none; min-width: 84px; flex-direction: column; gap: 2px; padding: var(--d-s2) var(--d-s3); }
+.cc b { font-size: 16px; font-weight: 600; }
+.cc small { color: var(--d-mute); font-size: 11px; }
+.cc[aria-pressed="true"] small { color: var(--d-acc-ink); }
+.cv-chips { display: flex; flex-wrap: wrap; gap: var(--d-s1); }
+.cv-chips button { min-width: 36px; padding: var(--d-s1) var(--d-s2); }
+.cv-step { display: inline-flex; align-items: center; gap: var(--d-s1); color: var(--d-mute); }
+.cv-step output { min-width: 2.5ch; text-align: center; color: var(--d-fg); }
+.cv-edit { display: flex; flex-direction: column; gap: var(--d-s3); padding: var(--d-s3); border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
+.cv-keys { width: 100%; height: 72px; display: block; touch-action: manipulation; border-radius: var(--r-sm, 9px); }
+.cv-sym { width: 160px; }
+
+.sv-code { width: 100%; min-height: 220px; flex: 1; resize: vertical; font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre; tab-size: 2; }
+.sv-param { display: grid; grid-template-columns: 8em 1fr 4em; gap: var(--d-s2); align-items: center; }
+.sv-param output { text-align: right; color: var(--d-fg); }
+.sv-doc { color: var(--d-mute); font-size: 12px; }
+
+/* Phones: loose rows, big targets, everything inside the screen. */
+@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
+  .views { order: 0; }
+  .chords, .scripts { padding: var(--d-s2); }
+  .cv-chips button { min-width: 44px; }
+  .cv-sym { width: 100%; }
+  .sv-param { grid-template-columns: 6em 1fr 3.5em; }
+  .sv-code { min-height: 180px; }
+}
+
+/* Children keep their size; the panel scrolls instead of squashing them. */
+.chords > *, .scripts > * { flex-shrink: 0; }
+/* The note tools belong to the roll. */
+body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-erase, body:not([data-view="roll"]) #tool-select { display: none; }

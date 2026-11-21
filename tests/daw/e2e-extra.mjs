@@ -1,0 +1,88 @@
+// e2e-extra.mjs: the chord editor and the note script, on the emulated phone.
+// Called by e2e.mjs, which hands over its helpers.
+export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, SITE }) {
+  const val = (sel) => js(`document.querySelector(${JSON.stringify(sel)}).value`);
+  const set = (sel, v, event = "change") => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event(${JSON.stringify(event)}, { bubbles: true })); })()`);
+  const view = () => js("window.jriterDaw.view()");
+  const noSideways = async (label) => {
+    const w = await js("document.documentElement.scrollWidth");
+    need(w <= 390, label + " is " + w + "px wide on a 390px phone");
+  };
+
+  await scenario("the DAW opens on the chord editor", async () => {
+    await send("Page.navigate", { url: SITE + "/daw.html" });
+    await sleep(1300);
+    need((await view()) === "chords", "opened on " + (await view()));
+    need(await js(`!!document.querySelector("#cv-sym")`), "no chord editor on screen");
+    await noSideways("the chord editor");
+  });
+  await scenario("tapping a root and a type rewrites the chord", async () => {
+    await tapEl('[data-act="root"][data-v="D"]');
+    await tapEl('[data-act="quality"][data-v="m7"]');
+    const sym = (await song()).chords.chords[0].symbol;
+    need(sym === "Dm7", "symbol is " + sym);
+  });
+  await scenario("a very complex chord can be typed; a bad one is refused", async () => {
+    await set("#cv-sym", "C7#9b13/E");
+    need((await song()).chords.chords[0].symbol === "C7#9b13/E", "kept " + (await song()).chords.chords[0].symbol);
+    await set("#cv-sym", "Cxyz");
+    need((await js(`document.querySelector(".cv-err").textContent`)).includes("Can't read chord"), "no error shown");
+    need((await song()).chords.chords[0].symbol === "C7#9b13/E", "a bad chord replaced a good one");
+  });
+  await scenario("the progression can be typed as text", async () => {
+    await set("#cv-text", "Cmaj9 Am7/G Dm9:2 | G13");
+    const c = (await song()).chords.chords;
+    need(c.length === 4 && c[2].beats === 2 && c[1].symbol === "Am7/G", JSON.stringify(c));
+  });
+  await scenario("inversion and drop change the voicing", async () => {
+    await tapEl('[data-act="pick"][data-i="0"]');
+    await tapEl('[data-act="inv+"]');
+    await tapEl('[data-act="drop"][data-v="2"]');
+    const c = (await song()).chords.chords[0];
+    need(c.inversion === 1 && c.drop === 2, JSON.stringify(c));
+  });
+  await scenario("a chord can be added, and moved", async () => {
+    const n0 = (await song()).chords.chords.length;
+    await tapEl('[data-act="add"]');
+    need((await song()).chords.chords.length === n0 + 1, "no chord added");
+    await tapEl('[data-act="left"]');
+  });
+  await scenario("To MIDI writes notes into a new track and opens the roll", async () => {
+    const before = (await song()).tracks.length;
+    await tapEl("#cv-midi");
+    const s = await song();
+    need(s.tracks.length === before + 1, "tracks " + before + " -> " + s.tracks.length);
+    const t = s.tracks[s.tracks.length - 1];
+    need(t.name === "Chords" && t.notes.length >= 12, t.name + " has " + t.notes.length + " notes");
+    need((await view()) === "roll", "view is " + (await view()));
+  });
+  await scenario("the script view runs Humanize on the track, and Undo is one step", async () => {
+    await tapEl("#view-script");
+    need((await view()) === "script", "view is " + (await view()));
+    await noSideways("the script view");
+    const before = JSON.stringify((await song()).tracks[(await js("window.jriterDaw.selected()"))].notes);
+    await tapEl("#sv-run");
+    const sel = await js("window.jriterDaw.selected()");
+    const after = JSON.stringify((await song()).tracks[sel].notes);
+    need(after !== before, "Humanize changed nothing");
+  });
+  await scenario("an arpeggio script turns chords into runs of notes", async () => {
+    const sel = await js("window.jriterDaw.selected()");
+    const before = (await song()).tracks[sel].notes.length;
+    await set("#sv-pick", "1");
+    await tapEl("#sv-run");
+    const after = (await song()).tracks[sel].notes.length;
+    need(after > before, "notes " + before + " -> " + after);
+  });
+  await scenario("a mistake in a script names the line", async () => {
+    await set("#sv-code", "each note:\n  pitch = nope + 1");
+    await tapEl("#sv-run");
+    const msg = await js(`document.querySelector("#scriptview .cv-err").textContent`);
+    need(/line 2/.test(msg) && /nope/.test(msg), "message was: " + msg);
+  });
+  await scenario("the three views fit the phone, and Roll still takes notes", async () => {
+    await tapEl("#view-chords"); await noSideways("chords");
+    await tapEl("#view-roll"); await noSideways("roll");
+    need((await view()) === "roll", "view is " + (await view()));
+  });
+}
