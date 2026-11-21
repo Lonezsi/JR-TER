@@ -1,0 +1,56 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { parseMidi, writeMidi, songToText, textToSong } from "../../web/daw/midi.js";
+
+test("parses running status, velocity-0 note-off and tempo", () => {
+  const trk = [
+    0, 0xff, 0x51, 3, 0x09, 0x27, 0xc0, // 600000 us = 100 bpm
+    0, 0x90, 60, 100,
+    0x60, 62, 80, // running status, note on at 96 ticks
+    0x60, 60, 0, // running status, velocity 0 = off at 192
+    0x60, 62, 0, // off at 288
+    0, 0xff, 0x2f, 0,
+  ];
+  const f = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96,
+    0x4d, 0x54, 0x72, 0x6b, 0, 0, 0, trk.length, ...trk];
+  const m = parseMidi(new Uint8Array(f));
+  assert.equal(m.bpm, 100);
+  assert.equal(m.tracks.length, 1);
+  assert.deepEqual(m.tracks[0].notes, [
+    { pitch: 60, start: 0, length: 2, velocity: 100 },
+    { pitch: 62, start: 1, length: 2, velocity: 80 },
+  ]);
+});
+
+const song = {
+  bpm: 133, bars: 2,
+  tracks: [
+    { name: "Lead", instrument: "piano", volume: 0.7, notes: [{ pitch: 64, start: 0.5, length: 1.25, velocity: 99 }, { pitch: 67, start: 2, length: 0.5, velocity: 70 }] },
+    { name: "Kick", instrument: "drums", channel: 9, notes: [{ pitch: 36, start: 0, length: 0.25, velocity: 120 }] },
+  ],
+};
+
+test("writeMidi then parseMidi keeps the notes", () => {
+  const m = parseMidi(writeMidi(song));
+  assert.equal(m.bpm, 133);
+  assert.equal(m.tracks.length, 2);
+  assert.equal(m.tracks[0].name, "Lead");
+  assert.deepEqual(m.tracks[0].notes, song.tracks[0].notes);
+  assert.deepEqual(m.tracks[1].notes, song.tracks[1].notes);
+  assert.equal(m.tracks[1].channel, 9);
+});
+
+test("text format round trips", () => {
+  const back = textToSong(songToText(song));
+  assert.equal(back.bpm, 133);
+  assert.equal(back.bars, 2);
+  assert.deepEqual(back.tracks[0].notes, song.tracks[0].notes);
+  assert.equal(back.tracks[0].volume, 0.7);
+});
+
+test("text format rejects other files and newer versions", () => {
+  assert.throws(() => textToSong(JSON.stringify({ format: "jriter-daw", version: 99 })), /newer/);
+  assert.throws(() => textToSong("{}"), /not a JR!TER/);
+  assert.throws(() => textToSong("nope"), /JSON/);
+  assert.throws(() => parseMidi(new Uint8Array([1, 2, 3, 4])), /not a MIDI/);
+});
