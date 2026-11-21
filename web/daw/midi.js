@@ -5,7 +5,10 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 1;
+export const TEXT_VERSION = 2; // 2 added chords and scripts; version 1 files still open
+
+import { DEFAULT_PROGRESSION } from "./chords.js";
+import { defaultScripts } from "./script.js";
 
 export function parseMidi(buf) {
   const d = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
@@ -108,9 +111,14 @@ export function songToText(song) {
     about: "A JR!TER DAW song. bpm = tempo; bars = loop length (4 beats each). Each track has an " +
       "instrument (piano, pad, bass, pluck, drums), volume 0-1, and notes: pitch is a MIDI " +
       "number (60 = middle C), start and length are in beats, velocity is 1-127. Edit it by " +
-      "hand and open it again on /daw.html.",
+      "hand and open it again on /daw.html. chords is the chord editor's progression (symbols like " +
+      "Cmaj9 or G13/B, beats each, how to voice them); it is only a way to write notes, so the notes " +
+      "in tracks are the music. scripts are note scripts (see web/daw/script.js for the language): " +
+      "name, code, and the values of the sliders its params make.",
     bpm: song.bpm,
     bars: song.bars,
+    chords: song.chords ?? JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)),
+    scripts: (song.scripts ?? defaultScripts()).map((x) => ({ name: x.name, code: x.code, values: { ...x.values } })),
     tracks: song.tracks.map((t) => ({
       name: t.name, instrument: t.instrument, volume: t.volume ?? 0.8,
       mute: !!t.mute, solo: !!t.solo, notes: t.notes.map((n) => ({ ...n })),
@@ -127,6 +135,8 @@ export function textToSong(text) {
   return {
     bpm: Math.min(300, Math.max(20, num(j.bpm, 120))),
     bars: Math.min(64, Math.max(1, Math.round(num(j.bars, 4)))),
+    chords: readChords(j.chords),
+    scripts: readScripts(j.scripts),
     tracks: (Array.isArray(j.tracks) ? j.tracks : []).map((t, i) => ({
       name: String(t.name ?? "Track " + (i + 1)),
       instrument: String(t.instrument ?? "piano"),
@@ -142,10 +152,24 @@ export function textToSong(text) {
   };
 }
 
+function readChords(c) {
+  const d = JSON.parse(JSON.stringify(DEFAULT_PROGRESSION));
+  if (!c || !Array.isArray(c.chords)) return d;
+  const chords = c.chords.filter((x) => x && typeof x.symbol === "string").map((x) => ({ ...x, beats: x.beats > 0 ? Number(x.beats) : 4 }));
+  return { ...d, ...c, chords: chords.length ? chords : d.chords };
+}
+function readScripts(list) {
+  if (!Array.isArray(list)) return defaultScripts();
+  return list.filter((x) => x && typeof x.code === "string").map((x, i) => ({
+    name: String(x.name ?? "Script " + (i + 1)), code: x.code, values: x.values && typeof x.values === "object" ? { ...x.values } : {},
+  }));
+}
+
 // Turn a parsed MIDI file into a DAW song (instrument chosen from program / channel).
 export function midiToSong(m, instrumentFor) {
   return {
     bpm: m.bpm, bars: Math.min(64, m.bars),
+    chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
     tracks: m.tracks.map((t, i) => ({
       name: t.name || "Track " + (i + 1),
       instrument: instrumentFor(t.program, t.channel),

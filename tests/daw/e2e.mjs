@@ -95,6 +95,7 @@ async function pinch(cx, cy, from, to) {
 const rect = (sel) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, l: r.left, t: r.top, w: r.width, h: r.height, visible: r.width > 0 && r.height > 0 }; })()`);
 // Tap the centre of an element, and say what is on top of it if it is not the element.
 async function tapEl(sel) {
+  await js(`document.querySelector(${JSON.stringify(sel)})?.scrollIntoView({ block: "center", inline: "center" })`); await sleep(60);
   const r = await rect(sel);
   if (!r || !r.visible) throw new Error(sel + " is not on screen");
   const top = await js(`(() => { const e = document.elementFromPoint(${r.x}, ${r.y}); const t = document.querySelector(${JSON.stringify(sel)}); return t && e && (t === e || t.contains(e)) ? "" : e ? e.tagName + "#" + e.id + "." + e.className : "nothing"; })()`);

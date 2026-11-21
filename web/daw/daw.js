@@ -3,6 +3,10 @@
 import { parseMidi, writeMidi, songToText, textToSong, midiToSong } from "./midi.js";
 import { classify } from "./gestures.js";
 import { createSynth, instrumentFor, INSTRUMENTS } from "./synth.js";
+import { mountChords } from "./chordview.js";
+import { mountScripts } from "./scriptview.js";
+import { DEFAULT_PROGRESSION } from "./chords.js";
+import { run as runScript, defaultScripts } from "./script.js";
 
 const $ = (id) => document.getElementById(id);
 const KEY = "jriter-daw";
@@ -17,6 +21,8 @@ let lastLen = matchMedia("(pointer: coarse)").matches ? 0.5 : 0.25; // a thumb c
 let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
 let looping = true, playing = false, tool = "draw", wakeLock = null;
+const VIEWS = ["chords", "roll", "script"];
+let view = "chords"; // the DAW always opens on the chord editor
 let ctx = null, synth = null, master = null, gains = [];
 let t0 = 0, scheduled = 0, timer = 0, raf = 0;
 
@@ -24,7 +30,8 @@ function defaultSong() {
   const notes = [];
   [60, 64, 67, 72, 67, 64, 60, 64].forEach((p, i) => notes.push({ pitch: p, start: i * 0.5, length: 0.5, velocity: 90 }));
   [60, 64, 67, 72, 67, 64, 60, 64].forEach((p, i) => notes.push({ pitch: p, start: 4 + i * 0.5, length: 0.5, velocity: 90 }));
-  return { bpm: 120, bars: 4, tracks: [{ name: "Piano", instrument: "piano", volume: 0.8, mute: false, solo: false, notes }] };
+  return { bpm: 120, bars: 4, chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
+    tracks: [{ name: "Piano", instrument: "piano", volume: 0.8, mute: false, solo: false, notes }] };
 }
 function loadSaved() {
   try { const t = localStorage.getItem(KEY); return t ? textToSong(t) : null; } catch { return null; }
@@ -48,6 +55,7 @@ function changed(rebuildTracks = true) {
   renderBar();
   syncGains();
   draw();
+  refreshView();
 }
 
 function toast(text, action) {
@@ -140,10 +148,12 @@ const HELP = [
   ["▶", "Play runs the loop. Loop turns repeating on and off.", "Space, L"],
   ["⋯", "More: tempo, bars, new track, open and save .mid or .json.", "N, Ctrl+Z"],
   ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
+  ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
+  ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+3"],
 ];
 function renderHelp() {
   const box = $("helpbox");
-  box.innerHTML = `<div class="helphead"><strong>How it works</strong><button id="helpx" aria-label="Close help">×</button></div>` +
+  box.innerHTML = `<div class="helphead"><strong>How it works<small id="verstamp"></small></strong><button id="helpx" aria-label="Close help">×</button></div>` +
     HELP.map(([ic, text, desk]) => `<div class="helprow"><span class="ic">${ic}</span><span>${text} <span class="desk">(${desk})</span></span></div>`).join("");
   $("helpx").onclick = () => setHelp(false);
 }
@@ -522,6 +532,7 @@ async function openBytes(name, bytes) {
     if (/\.(json|txt)$/i.test(name)) s = textToSong(new TextDecoder().decode(bytes));
     else {
       s = midiToSong(parseMidi(bytes), instrumentFor);
+      s.chords = song.chords; s.scripts = song.scripts; // a MIDI file has none of its own: keep yours
       if (!s.tracks.length) throw new Error("That MIDI file has no notes.");
     }
     const before = snap(); stop();
@@ -548,7 +559,8 @@ addEventListener("drop", async (e) => {
 addEventListener("keydown", (e) => {
   if (e.target.closest && e.target.closest("input,select,textarea")) return;
   const k = e.key;
-  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
+  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[123]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
+  else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   else if (k === " ") { e.preventDefault(); togglePlay(); }
   else if (k === "?") setHelp($("helpbox").hidden);
@@ -566,6 +578,78 @@ addEventListener("keydown", (e) => {
   else if (k === "-") setZoom(zoom / 1.25);
 });
 
+// ---- views: Chords, Roll, Script --------------------------------------------------------
+const VIEW_LABELS = { chords: ["♫", "Chords"], roll: ["▤", "Roll"], script: ["ƒ", "Script"] };
+function renderViews() {
+  $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
+  VIEWS.forEach((v) => { $("view-" + v).onclick = () => setView(v); });
+}
+function setView(v) {
+  if (!VIEWS.includes(v)) return;
+  view = v;
+  $("main").dataset.view = v;
+  document.body.dataset.view = v;
+  for (const b of VIEWS) $("view-" + b)?.setAttribute("aria-selected", b === v);
+  refreshView();
+  if (v === "roll") { resize(); draw(); }
+}
+function refreshView() {
+  if (view === "chords") chordUI.render();
+  else if (view === "script") scriptUI.render();
+}
+
+const instrumentNow = () => (song.tracks[sel] ? song.tracks[sel].instrument : "piano");
+function sound(pitches) {
+  audio(); syncGains();
+  pitches.forEach((pitch, i) => synth.playNote({ instrument: instrumentNow(), pitch, time: ctx.currentTime + i * 0.012, length: 0.7, velocity: 90 }, master));
+}
+function hear(notes, onEnd) {
+  audio();
+  const gn = ctx.createGain(); gn.connect(master);
+  const spb = 60 / song.bpm, at = ctx.currentTime + 0.05;
+  let end = 0;
+  for (const n of notes) {
+    synth.playNote({ instrument: instrumentNow(), pitch: n.pitch, time: at + n.start * spb, length: n.length * spb, velocity: n.velocity }, gn);
+    end = Math.max(end, n.start + n.length);
+  }
+  const timer = setTimeout(() => onEnd && onEnd(), (end * spb + 0.6) * 1000);
+  return () => { clearTimeout(timer); gn.disconnect(); };
+}
+// One way: chords become notes in a track, and that is the last the song hears of chords.
+function toMidi(notes, target) {
+  if (!notes.length) return toast("There is nothing to write yet.");
+  edit(() => {
+    let t = target === "selected" ? song.tracks[sel] : null;
+    if (!t) {
+      t = { name: "Chords", instrument: "piano", volume: 0.8, mute: false, solo: false, notes: [] };
+      song.tracks.push(t); sel = song.tracks.length - 1;
+    }
+    t.notes.push(...notes.map((n) => ({ ...n })));
+    t.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+    const end = Math.max(...notes.map((n) => n.start + n.length));
+    song.bars = clamp(Math.max(song.bars, Math.ceil(end / 4)), 1, 64);
+    selNote = null;
+  });
+  scrollX = 0;
+  setView("roll");
+  const [lo, hi] = range(), top = Math.max(...notes.map((n) => n.pitch));
+  scrollY = Math.max(0, (hi - top) * ROW - 24); draw();
+  toast("Chords are notes now. Edit them in the roll.");
+}
+function runOn(code, values, name) {
+  const t = song.tracks[sel];
+  if (!t) return { ok: false, message: "There is no track to run it on." };
+  try {
+    const out = runScript(code, t.notes, { values });
+    edit(() => { t.notes = out; selNote = null; });
+    toast((name || "Script") + " ran on " + t.name + ": " + out.length + " notes.", { label: "Undo", run: doUndo });
+    return { ok: true };
+  } catch (e) { return { ok: false, message: e.message }; }
+}
+const chordUI = mountChords($("chordview"), { song: () => song, change: edit, undo: doUndo, sound, hear, toMidi, toast });
+const scriptUI = mountScripts($("scriptview"), { song: () => song, change: edit, undo: doUndo, save, trackName: () => (song.tracks[sel] ? song.tracks[sel].name : "no track"),
+  runOn: (code, values, name) => runOn(code, values, name) });
+
 // ---- errors are shown, and the page can be scripted ----------------------------------------
 // A failure on a phone used to be silence. Now it is a message, and the tests (and anyone
 // with a console) can read and drive the page without clicking: anything you can click you
@@ -580,11 +664,14 @@ window.jriterDaw = {
   playing: () => playing,
   tool: () => tool,
   selected: () => sel,
+  view: () => view,
+  setView,
 };
 
 // ---- start ------------------------------------------------------------------------------
 new ResizeObserver(resize).observe($("rollbox"));
-renderBar(); renderTracks(); renderHelp(); resize();
+{ const asked = new URLSearchParams(location.search).get("view"); if (VIEWS.includes(asked)) view = asked; } // /daw.html?view=roll
+renderBar(); renderTracks(); renderHelp(); renderViews(); setView(view); resize();
 try {
   if (!localStorage.getItem("jriter-daw-help")) { localStorage.setItem("jriter-daw-help", "1"); setHelp(true); }
 } catch { /* no storage: the ? button still works */ }
@@ -593,6 +680,7 @@ try {
   if (first) scrollY = Math.max(0, (hi - first.pitch) * ROW - H / 2);
   draw();
 }
+fetch("/api/state").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.version) $("verstamp").textContent = " · DAW " + j.version; }).catch(() => {});
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
   fetch(src, { credentials: "include" })
