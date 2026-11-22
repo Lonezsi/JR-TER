@@ -45,10 +45,10 @@ TAKEN = {
     "song_titles": ("id", "song_id", "title", "changed_at"),
     "versions": ("id", "song_id", "n", "digest", "ext", "size", "duration", "bitrate",
                  "label", "filename", "source_path", "created_at", "project_at",
-                 "rendered_at", "peak_db", "trouble"),
+                 "rendered_at", "peak_db", "trouble", "plugins"),
     "renders": ("id", "digest", "ext", "size", "duration", "bitrate", "filename",
                 "source_path", "origin", "created_at", "used_at", "project_at",
-                "rendered_at", "peak_db", "trouble", "song_id", "version_id"),
+                "rendered_at", "peak_db", "trouble", "plugins", "song_id", "version_id"),
     "lyric_sheets": ("id", "song_id", "name", "position", "is_current", "created_at"),
     "lyric_revisions": ("id", "sheet_id", "text", "created_at"),
     "albums": ("id", "title", "year", "notes", "cover_digest", "cover_ext", "stickers",
@@ -61,6 +61,7 @@ TAKEN = {
                       "updated_at"),
     "arrangements": ("song_id", "version_id", "bpm", "offset", "per_bar", "enabled",
                      "data", "updated_at"),
+    "daw_projects": ("song_id", "text", "rev", "updated_at", "updated_by"),
     "youtube_posts": ("id", "song_id", "version_id", "url", "title", "status", "note",
                       "created_at", "updated_at", "video_id", "mix_digest"),
     "sync_folders": ("id", "path", "enabled", "last_scan", "created_at"),
@@ -376,7 +377,7 @@ def erase(req):
 #: The rest of TAKEN belongs to the machine or account that made it and never comes in.
 IMPORTED = ["songs", "song_titles", "albums", "album_songs", "versions", "renders",
             "lyric_sheets", "lyric_revisions", "artwork", "sound_presets", "arrangements",
-            "playlists", "playlist_items", "vocal_takes"]
+            "daw_projects", "playlists", "playlist_items", "vocal_takes"]
 #: column -> the table whose new ids it must be rewritten to.
 POINTS_AT = {"song_id": "songs", "album_id": "albums", "sheet_id": "lyric_sheets",
              "playlist_id": "playlists", "render_id": "renders", "version_id": "versions",

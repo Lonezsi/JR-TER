@@ -156,6 +156,7 @@ MODULES = [
     "lyrics",
     "albums",
     "sound",
+    "daw",
     "arrange",
     # On, because "which render is the one that is actually online" turned out to be a
     # real question. JR!TER still does not push the file to YouTube: it opens the upload

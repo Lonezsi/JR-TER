@@ -140,3 +140,11 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
 .al-pt:focus-visible::before { background: var(--d-acc); }
 .al-menu { display: flex; flex-direction: column; gap: var(--d-s1); max-height: 220px; overflow: auto; padding: var(--d-s2); border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
 .al-menu button { text-align: left; }
+
+/* together: who else is in this project */
+.people { display: inline-flex; gap: var(--d-s1); margin-left: var(--d-s2); }
+.people .badge { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 600;
+  background: hsl(var(--hue) 70% 60%); color: #111; }
+.friends { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
+.friends .chip { border: 1px solid var(--d-line); background: none; color: inherit; border-radius: 999px; padding: 2px var(--d-s2); font: inherit; cursor: pointer; }
+body.offline .people::after { content: "offline"; color: var(--d-mute); font-size: 11px; align-self: center; }
