@@ -160,4 +160,38 @@ export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, 
     need((await song()).tracks[0].fx.length === 0, "effect not removed");
     await noSideways("mixer after effects");
   });
+  await scenario("the sampler: a library sound becomes a track, chops, an audio clip plays, fits the phone", async () => {
+    // A one-second 440 Hz tone as a data: URL stands in for a take from the library.
+    const n = 8000, pcm = Buffer.alloc(44 + n * 2);
+    pcm.write("RIFF", 0); pcm.writeUInt32LE(36 + n * 2, 4); pcm.write("WAVEfmt ", 8); pcm.writeUInt32LE(16, 16);
+    pcm.writeUInt16LE(1, 20); pcm.writeUInt16LE(1, 22); pcm.writeUInt32LE(n, 24); pcm.writeUInt32LE(n * 2, 28);
+    pcm.writeUInt16LE(2, 32); pcm.writeUInt16LE(16, 34); pcm.write("data", 36); pcm.writeUInt32LE(n * 2, 40);
+    for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(12000 * Math.sin((2 * Math.PI * 440 * i) / n * 1)), 44 + i * 2);
+    const src = "data:audio/wav;base64," + pcm.toString("base64");
+    const before = (await song()).tracks.length;
+    await js(`window.jriterDaw.addSampler(${JSON.stringify({ name: "Tone", src, seconds: 1, kind: "take" })})`);
+    await tapEl("#view-sampler");
+    need((await view()) === "sampler", "view is " + (await view()));
+    await noSideways("sampler");
+    let s = await song();
+    need(s.tracks.length === before + 1 && s.tracks[before].instrument === "sampler", "no sampler track");
+    await sleep(500);
+    await tapEl('[data-chop="8"]');
+    const sample = await js("window.jriterDaw.sample()");
+    need(sample && sample.slices.length === 7, "slices: " + JSON.stringify(sample && sample.slices));
+    await noSideways("sampler with a chopped sound");
+    await tapEl('[data-act="place"]');
+    need((await view()) === "song", "Place did not open the Song tab");
+    await tapEl(".song .cv-line button[data-brush^='t']");
+    const n0 = (await js("window.jriterDaw.clips()")).length;
+    await tapEl('.sl-cell[data-lane="3"][data-bar="0"]');
+    const clips = await js("window.jriterDaw.clips()");
+    need(clips.length === n0 + 1 && clips[n0].track === before, "no audio clip: " + JSON.stringify(clips[n0]));
+    await noSideways("song tab with an audio clip");
+    if (!(await js("window.jriterDaw.mode()") === "song")) await tapEl("#mode");
+    await tapEl("#play");
+    await sleep(900);
+    need(await js("window.jriterDaw.playing()"), "not playing");
+    await tapEl("#play");
+  });
 }

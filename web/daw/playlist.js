@@ -15,15 +15,19 @@ export const MAX_BARS = 256;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const int = (v, d) => (Number.isFinite(v) ? Math.round(v) : d);
 
-export function cleanClips(list, nPatterns) {
+// A clip is either a pattern clip ({ pattern }) or an audio clip ({ track }: it plays that
+// track's sample, see sampler.js). nTracks is how many tracks the song has.
+export function cleanClips(list, nPatterns, nTracks = 0) {
   if (!Array.isArray(list)) return [];
   const out = [];
   for (const c of list) {
     if (!c || typeof c !== "object") continue;
+    const track = c.pattern == null ? int(c.track, -1) : -1;
     const pattern = int(c.pattern, -1);
-    if (pattern < 0 || pattern >= nPatterns) continue;
+    if (track < 0 && (pattern < 0 || pattern >= nPatterns)) continue;
+    if (track >= nTracks) continue;
     out.push({
-      pattern,
+      ...(track >= 0 ? { track } : { pattern }),
       lane: clamp(int(c.lane, 0), 0, MAX_LANES - 1),
       start: clamp(int(c.start, 0), 0, MAX_BARS - 1),
       length: clamp(int(c.length, 1), 1, MAX_BARS),
@@ -45,6 +49,7 @@ export function songNotes(song) {
   const patLen = song.bars * 4;
   const out = song.tracks.map(() => []);
   for (const c of song.clips || []) {
+    if (c.track != null) continue; // audio clips are played by sampler.js
     const p = pats[c.pattern];
     if (!p) continue;
     song.tracks.forEach((_, i) => {
@@ -68,6 +73,11 @@ export function songNotes(song) {
 export function addClip(song, pattern, lane, start) {
   song.clips = song.clips || [];
   song.clips.push({ pattern, lane: clamp(lane, 0, MAX_LANES - 1), start: clamp(start, 0, MAX_BARS - 1), length: clamp(song.bars, 1, MAX_BARS), offset: 0 });
+  return song.clips.length - 1;
+}
+export function addAudioClip(song, track, lane, start, bars) {
+  song.clips = song.clips || [];
+  song.clips.push({ track, lane: clamp(lane, 0, MAX_LANES - 1), start: clamp(start, 0, MAX_BARS - 1), length: clamp(bars, 1, MAX_BARS), offset: 0 });
   return song.clips.length - 1;
 }
 export function moveClip(song, i, lane, start) {
@@ -94,11 +104,11 @@ export function removeClip(song, i) {
 }
 // A pattern was inserted at index `at`: clips pointing at it or after move up one.
 export function fixClipsAfterInsert(song, at) {
-  for (const c of song.clips || []) if (c.pattern >= at) c.pattern++;
+  for (const c of song.clips || []) if (c.pattern != null && c.pattern >= at) c.pattern++;
 }
 // Pattern k was deleted: its clips go, later ones move down one.
 export function fixClipsAfterRemove(song, k) {
   if (!song.clips) return;
   song.clips = song.clips.filter((c) => c.pattern !== k);
-  for (const c of song.clips) if (c.pattern > k) c.pattern--;
+  for (const c of song.clips) if (c.pattern != null && c.pattern > k) c.pattern--;
 }

@@ -11,6 +11,8 @@ import { mountRack } from "./rackview.js";
 import { mountSong } from "./songview.js";
 import { songNotes, songBars } from "./playlist.js";
 import { createMixer } from "./mixgraph.js";
+import { mountSampler } from "./samplerview.js";
+import { sliceFor, playSlice, songAudio, sampleEnd, chop } from "./sampler.js";
 import { mountMixer } from "./mixerview.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
@@ -27,10 +29,10 @@ let lastLen = matchMedia("(pointer: coarse)").matches ? 0.5 : 0.25; // a thumb c
 let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
 let looping = true, playing = false, tool = "draw", wakeLock = null;
-const VIEWS = ["chords", "rack", "roll", "script", "song", "mixer"];
+const VIEWS = ["chords", "rack", "roll", "script", "song", "mixer", "sampler"];
 let view = "chords"; // the DAW always opens on the chord editor
 let ctx = null, synth = null, mix = null;
-let t0 = 0, scheduled = 0, timer = 0, raf = 0, songCache = null;
+let t0 = 0, scheduled = 0, timer = 0, raf = 0, songCache = null, audioCache = null, lastAudition = null;
 
 function defaultSong() {
   const notes = [];
@@ -163,6 +165,7 @@ const HELP = [
   ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
   ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays.", "Alt+5, S"],
   ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
+  ["〰", "Sampler: add a take, vocal or render from your library with +, drag its ends to trim, Chop cuts it into pieces that play up the keys. Place puts it on the Song tab as a clip.", "Alt+7"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
 function renderHelp() {
@@ -201,7 +204,7 @@ function renderTracks() {
     const el = document.createElement("div");
     el.className = "track" + (i === sel ? " sel" : "");
     el.innerHTML = `<div class="row"><input type="text" aria-label="Track name"><button data-a="del" data-tip="Delete track" aria-label="Delete track">×</button></div>
-      <div class="row"><select aria-label="Instrument">${INSTRUMENTS.map((n) => `<option${n === t.instrument ? " selected" : ""}>${n}</option>`).join("")}</select>
+      <div class="row"><select aria-label="Instrument">${(t.sample ? [...INSTRUMENTS, "sampler"] : INSTRUMENTS).map((n) => `<option${n === t.instrument ? " selected" : ""}>${n}</option>`).join("")}</select>
       <button data-a="mute" data-tip="Mute" aria-label="Mute" aria-pressed="${!!t.mute}">M</button>
       <button data-a="solo" data-tip="Solo" aria-label="Solo" aria-pressed="${!!t.solo}">S</button></div>
       <div class="row"><input type="range" min="0" max="1" step="0.01" aria-label="Volume" value="${t.volume}"></div>`;
@@ -494,10 +497,74 @@ function syncGains() {
   mix.sync(song);
 
 }
+// Sounds from the library, decoded once each. bufferOf waits; bufferNow never does (it starts
+// the load and answers null, so a note that arrives early is skipped instead of late).
+const buffers = new Map();
+let toldBad = false;
+function bufferOf(src) {
+  audio();
+  let b = buffers.get(src);
+  if (!b) {
+    b = { buf: null, promise: null };
+    b.promise = fetch(src, { credentials: "include" })
+      .then((r) => { if (!r.ok) throw new Error("The library said " + r.status + "."); return r.arrayBuffer(); })
+      .then((a) => ctx.decodeAudioData(a))
+      .then((x) => { b.buf = x; return x; })
+      .catch((e) => { buffers.delete(src); if (!toldBad) { toldBad = true; toast("Could not load a sound: " + (e.message || "unreadable audio")); setTimeout(() => { toldBad = false; }, 4000); } throw e; });
+    buffers.set(src, b);
+  }
+  return b.promise;
+}
+function bufferNow(src) {
+  const b = buffers.get(src);
+  if (b) return b.buf;
+  bufferOf(src).catch(() => {});
+  return null;
+}
+// One note on one track: a sampler plays its sound (chopped pieces play to their end, pitched
+// ones are gated by the note), every other instrument goes to the synth.
+function voice(t, n, time, len, dest) {
+  if (t.instrument === "sampler" && t.sample) {
+    const buf = bufferNow(t.sample.src), sl = sliceFor(t.sample, n.pitch);
+    if (buf && sl) playSlice(ctx, buf, sl, time, t.sample.slices.length ? 0 : len, n.velocity, dest);
+    return;
+  }
+  synth.playNote({ instrument: t.instrument, pitch: n.pitch, time, length: len, velocity: n.velocity }, dest);
+}
 function preview(t, n) {
   audio(); syncGains();
   const i = song.tracks.indexOf(t);
-  synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: ctx.currentTime, length: 0.3, velocity: n.velocity }, mix.input(i));
+  voice(t, n, ctx.currentTime, 0.3, mix.input(i));
+}
+function hearLibrary(src) {
+  audio(); syncGains();
+  bufferOf(src).then((buf) => {
+    try { lastAudition?.stop(); } catch { /* already over */ }
+    lastAudition = playSlice(ctx, buf, { from: 0, to: 4, rate: 1 }, ctx.currentTime + 0.02, 0, 100, mix.master());
+  }).catch(() => {});
+}
+function audition(t, from, to) {
+  audio(); syncGains();
+  const i = song.tracks.indexOf(t);
+  bufferOf(t.sample.src).then((buf) => {
+    try { lastAudition?.stop(); } catch { /* already over */ }
+    lastAudition = playSlice(ctx, buf, { from, to, rate: 1 }, ctx.currentTime + 0.02, 0, 100, mix.input(i));
+  }).catch(() => {});
+}
+function addSampler(sound) {
+  edit(() => {
+    song.tracks.push({ name: sound.name, instrument: "sampler", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes: [],
+      sample: { name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [] } });
+    sel = song.tracks.length - 1; selNote = null;
+  });
+  bufferOf(sound.src).then((buf) => {
+    const t = song.tracks.find((x) => x.sample && x.sample.src === sound.src);
+    if (t && !t.sample.seconds) { t.sample.seconds = buf.duration; save(); refreshView(); }
+  }).catch(() => {});
+  toast("Added " + sound.name + ". Draw notes for it, or place it on the Song tab.", { label: "Undo", run: doUndo });
+}
+function placeOnSong(i) {
+  songUI.paintWith("t" + i); setView("song");
 }
 const curBeat = () => (ctx ? ((ctx.currentTime - t0) * song.bpm) / 60 : 0);
 function togglePlay() { if (playing) stop(); else play(0); }
@@ -509,6 +576,8 @@ function setMode(m) {
 function play(from) {
   audio(); stop(true); syncGains();
   songCache = inSong() ? songNotes(song) : null;
+  audioCache = inSong() ? songAudio(song) : null;
+  for (const t of song.tracks) if (t.sample) bufferOf(t.sample.src).catch(() => {}); // ready by the first note
   playing = true;
   t0 = ctx.currentTime + 0.05 - (from * 60) / song.bpm;
   scheduled = from;
@@ -537,9 +606,15 @@ function tick() {
       for (const n of songCache ? songCache[i] || [] : allNotes(t, song)) {
         const abs = n.start + k * len;
         if (abs < scheduled || abs >= end || n.start >= len) continue;
-        synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: t0 + abs * spb, length: Math.min(n.length, len - n.start) * spb, velocity: n.velocity }, mix.input(i));
+        voice(t, n, t0 + abs * spb, Math.min(n.length, len - n.start) * spb, mix.input(i));
       }
     });
+    for (const ev of audioCache || []) {
+      const abs = ev.start + k * len, t = song.tracks[ev.track];
+      if (abs < scheduled || abs >= end || !t || !t.sample) continue;
+      const buf = bufferNow(t.sample.src);
+      if (buf) playSlice(ctx, buf, { from: t.sample.start + ev.offset * spb, to: sampleEnd(t.sample), rate: 1 }, t0 + abs * spb, ev.length * spb, 100, mix.input(ev.track));
+    }
   }
   scheduled = Math.max(scheduled, end);
 }
@@ -585,7 +660,7 @@ addEventListener("drop", async (e) => {
 addEventListener("keydown", (e) => {
   if (e.target.closest && e.target.closest("input,select,textarea")) return;
   const k = e.key;
-  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[123456]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
+  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[1234567]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
   else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   else if (k === " ") { e.preventDefault(); togglePlay(); }
@@ -607,7 +682,7 @@ addEventListener("keydown", (e) => {
 });
 
 // ---- views: Chords, Roll, Script --------------------------------------------------------
-const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Song"], mixer: ["◫", "Mixer"] };
+const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Song"], mixer: ["◫", "Mixer"], sampler: ["〰", "Sampler"] };
 function renderViews() {
   $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => setView(v); });
@@ -627,6 +702,7 @@ function refreshView() {
   else if (view === "rack") rackUI.render();
   else if (view === "song") songUI.render();
   else if (view === "mixer") mixUI.render();
+  else if (view === "sampler") samplerUI.render();
 }
 
 const instrumentNow = () => (song.tracks[sel] ? song.tracks[sel].instrument : "piano");
@@ -716,9 +792,14 @@ const mixUI = mountMixer($("mixerview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, sync: syncGains, selected: () => sel,
   select: (i) => { sel = i; selNote = null; renderTracks(); },
 });
+const samplerUI = mountSampler($("samplerview"), {
+  song: () => song, selected: () => sel, change: edit, snap, pushUndo, save, toast, addSampler, placeOnSong,
+  buffer: bufferOf, hear: hearLibrary, audition,
+});
 const songUI = mountSong($("songview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, setMode,
   editPattern: (k) => { switchPattern(k); setView("rack"); },
+  editSample: (i) => { sel = i; selNote = null; renderTracks(); setView("sampler"); },
 });
 
 // ---- errors are shown, and the page can be scripted ----------------------------------------
@@ -744,6 +825,9 @@ window.jriterDaw = {
   selected: () => sel,
   view: () => view,
   setView,
+  addSampler,
+  sample: () => (song.tracks[sel] && song.tracks[sel].sample ? JSON.parse(JSON.stringify(song.tracks[sel].sample)) : null),
+  chop: (n) => edit(() => { const t = song.tracks[sel]; if (t && t.sample) chop(t.sample, n); }),
 };
 
 // ---- start ------------------------------------------------------------------------------

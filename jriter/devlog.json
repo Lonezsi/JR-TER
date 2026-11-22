@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.9.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Sampler",
+  "notes": [
+   "The DAW has a Sampler tab (Alt+7): pick a take, a vocal take or a waiting render from your library and add it as a track with +.",
+   "Drag the ends of its waveform to trim it. Chop it in 4, 8 or 16 pieces, or hold on the waveform to add or remove a cut; each piece plays on its own key.",
+   "Place puts the sound on the Song tab as an audio clip you can move, repeat, split and delete like a pattern. It plays through the track's mixer strip.",
+   "Songs save the samples in the .json file (format 6), and older song files still open."
+  ]
+ },
+ {
   "version": "4.8.0",
   "date": "2026-11-22",
   "name": "JR!TER",
