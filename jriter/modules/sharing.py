@@ -504,6 +504,9 @@ GUEST_MAY = {
     ("PUT", "/api/sound/<id>"): ("preset", "changed the sound"),
     ("PATCH", "/api/sound/<id>"): ("preset", "renamed a sound"),
     ("POST", "/api/sound/<id>/current"): ("preset", "chose which sound"),
+    ("GET", "/api/songs/<id>/daw"): ("song", None),
+    ("PUT", "/api/songs/<id>/daw"): ("song", "changed the DAW project"),
+    ("POST", "/api/songs/<id>/daw/here"): ("song", None),
     ("GET", "/api/songs/<id>/versions"): ("song", None),
     ("POST", "/api/songs/<id>/versions"): ("song", "uploaded a mix"),
     ("PATCH", "/api/versions/<id>"): ("version", "renamed a mix"),
@@ -543,6 +546,7 @@ _SONG_TABLES = (
     ("artwork", "song_id = ?"),
     ("versions", "song_id = ?"),
     ("arrangements", "song_id = ?"),
+    ("daw_projects", "song_id = ?"),
 )
 
 #: Saves in a row from one person, closer together than this, are one change. The equaliser
@@ -658,7 +662,7 @@ def _run_as_guest(handler, inner, what, pattern, song_id, me, share, req):
 
 
 def _key(table):
-    return "song_id" if table == "arrangements" else "id"
+    return "song_id" if table in ("arrangements", "daw_projects") else "id"
 
 
 def _difference(before, after):

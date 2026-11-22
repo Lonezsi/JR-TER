@@ -50,7 +50,15 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    uploads it as a new version of that song; without a song it goes to the waiting renders, and if
    the library can't take it, it downloads. The song page has a DAW tab (a hand patch of the built
    bundle until `ui/` is here). Not yet: the project text stored beside the version on the server.
-8. **Together.** A friend opens the same project and edits live, a cursor per person.
+8. **Together. Done in 4.12.0.** A song's project is stored on the server (`jriter/modules/daw.py`, Spring
+   `DawController.java`, table `daw_projects` with a revision): `GET`/`PUT /api/songs/ID/daw` and
+   `POST /api/songs/ID/daw/here` (who is in the project and their cursor, in memory, gone after 12 s).
+   A save names the revision it grew from; a stale one gets the current text back and the browser joins the two
+   with `web/daw/merge.js` (`merge3`, tested; the same thing changed by both: yours wins). `web/daw/together.js`
+   saves 400 ms after a change and polls once a second. A friend opens `/daw.html?song=ID&share=SHARE`, which
+   goes through the share's own door (`/api/shared/SHARE/on/songs/ID/daw`); their saves are in the song's
+   history and can be undone. The owner's More menu lists the song's shares and copies the link.
+   Not yet: a cursor on the Song tab (the piano roll has one), a guest's sampler hears only the guest's own library.
 
 The project format is `jriter-daw` JSON (version 7; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

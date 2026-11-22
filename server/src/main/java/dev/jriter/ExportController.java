@@ -72,6 +72,7 @@ public class ExportController {
         TAKEN.put("artwork", new String[] {"id", "song_id", "digest", "ext", "position", "caption", "created_at"});
         TAKEN.put("sound_presets", new String[] {"id", "song_id", "name", "is_current", "data", "created_at", "updated_at"});
         TAKEN.put("arrangements", new String[] {"song_id", "version_id", "bpm", "offset", "per_bar", "enabled", "data", "updated_at"});
+        TAKEN.put("daw_projects", new String[] {"song_id", "text", "rev", "updated_at", "updated_by"});
         TAKEN.put("youtube_posts", new String[] {"id", "song_id", "version_id", "url", "title", "status", "note",
                 "created_at", "updated_at", "video_id", "mix_digest"});
         TAKEN.put("sync_folders", new String[] {"id", "path", "enabled", "last_scan", "created_at"});
@@ -142,7 +143,7 @@ public class ExportController {
             """;
 
     static final List<String> IMPORTED = List.of("songs", "song_titles", "albums", "album_songs", "versions", "renders",
-            "lyric_sheets", "lyric_revisions", "artwork", "sound_presets", "arrangements",
+            "lyric_sheets", "lyric_revisions", "artwork", "sound_presets", "arrangements", "daw_projects",
             "playlists", "playlist_items", "vocal_takes");
     static final Map<String, String> POINTS_AT = Map.of("song_id", "songs", "album_id", "albums",
             "sheet_id", "lyric_sheets", "playlist_id", "playlists", "render_id", "renders",

@@ -61,6 +61,7 @@ TAKEN = {
                       "updated_at"),
     "arrangements": ("song_id", "version_id", "bpm", "offset", "per_bar", "enabled",
                      "data", "updated_at"),
+    "daw_projects": ("song_id", "text", "rev", "updated_at", "updated_by"),
     "youtube_posts": ("id", "song_id", "version_id", "url", "title", "status", "note",
                       "created_at", "updated_at", "video_id", "mix_digest"),
     "sync_folders": ("id", "path", "enabled", "last_scan", "created_at"),
@@ -376,7 +377,7 @@ def erase(req):
 #: The rest of TAKEN belongs to the machine or account that made it and never comes in.
 IMPORTED = ["songs", "song_titles", "albums", "album_songs", "versions", "renders",
             "lyric_sheets", "lyric_revisions", "artwork", "sound_presets", "arrangements",
-            "playlists", "playlist_items", "vocal_takes"]
+            "daw_projects", "playlists", "playlist_items", "vocal_takes"]
 #: column -> the table whose new ids it must be rewritten to.
 POINTS_AT = {"song_id": "songs", "album_id": "albums", "sheet_id": "lyric_sheets",
              "playlist_id": "playlists", "render_id": "renders", "version_id": "versions",

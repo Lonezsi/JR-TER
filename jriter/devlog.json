@@ -1,5 +1,18 @@
 [
  {
+  "version": "4.12.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Together",
+  "notes": [
+   "A song's DAW project now lives on the server, not only in the browser. The project already saved on this computer moves up the first time you open that song's DAW.",
+   "A friend you shared the song with opens the same project and edits with you. Under More, the Together row has a button per friend that copies their link.",
+   "Changes arrive within about a second. A round badge per person shows who is in the project and which tab they are on, and on the piano roll their cursor is a line in their colour. If you both edit the same thing, yours stays.",
+   "A friend's DAW edits go in the song's history like their other changes, so you can undo them. Both servers do this.",
+   "Not tried with two real people yet."
+  ]
+ },
+ {
   "version": "4.11.0",
   "date": "2026-11-22",
   "name": "JR!TER",

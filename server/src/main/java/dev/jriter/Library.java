@@ -116,6 +116,11 @@ public class Library {
             + " name TEXT NOT NULL DEFAULT 'Current', is_current INTEGER NOT NULL DEFAULT 0,"
             + " data TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL, updated_at REAL NOT NULL)",
         "CREATE INDEX IF NOT EXISTS presets_song ON sound_presets(song_id)",
+        // daw (daw.py): a song's DAW project, for editing together
+        "CREATE TABLE IF NOT EXISTS daw_projects (song_id INTEGER PRIMARY KEY"
+            + " REFERENCES songs(id) ON DELETE CASCADE, text TEXT NOT NULL DEFAULT '',"
+            + " rev INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0,"
+            + " updated_by INTEGER NOT NULL DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS youtube_posts (id INTEGER PRIMARY KEY,"
             + " song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE, version_id INTEGER,"
             + " url TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '',"

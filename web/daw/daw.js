@@ -16,10 +16,14 @@ import { sliceFor, playSlice, songAudio, sampleEnd, chop } from "./sampler.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
 import { encodeWav, bounceSeconds } from "./bounce.js";
+import { startTogether, apiPrefix } from "./together.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
 const songId = new URLSearchParams(location.search).get("song"); // /daw.html?song=ID: this library song's own project
+const shareId = new URLSearchParams(location.search).get("share"); // &share=ID: a friend working on the owner's song through that share
+const API = apiPrefix(shareId);
+let together = null, people = [], myBeat = null;
 const KEY = songId ? "jriter-daw:song:" + songId : "jriter-daw";
 const SNAP = 0.25; // a 16th note, in beats
 let ROW = 14;
@@ -47,7 +51,7 @@ function defaultSong() {
 function loadSaved() {
   try { const t = localStorage.getItem(KEY); return t ? textToSong(t) : null; } catch { return null; }
 }
-function save() { try { localStorage.setItem(KEY, songToText(song)); } catch { /* storage full or off: the file buttons still work */ } }
+function save() { try { localStorage.setItem(KEY, songToText(song)); } catch { /* storage full or off: the file buttons still work */ } if (together) together.saved(); }
 
 // ---- undo: snapshots of the song text -------------------------------------------------
 const snap = () => songToText(song);
@@ -111,7 +115,7 @@ function renderBar() {
     `<span class="sep"></span>` +
     btn("tool-draw", "✎", "Draw notes (P)", true, "Draw") + btn("tool-erase", "⌫", "Erase notes (E)", false, "Erase") +
     btn("tool-select", "⌖", "Select only (V)", false, "Select") +
-    btn("help", "?", "How it works (?)", false, "Help") + btn("more", "⋯", "More", false, "More") + `</div><div class="more" id="morebox"><span class="name">DAW</span>` +
+    btn("help", "?", "How it works (?)", false, "Help") + btn("more", "⋯", "More", false, "More") + `<span class="people" id="people"></span></div><div class="more" id="morebox"><span class="name">DAW</span>` +
     `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
     `<label>Bars <input id="bars" type="number" min="1" max="64" step="1"></label>` +
     `<label>Pattern <select id="pat" aria-label="Pattern"></select></label>` +
@@ -120,7 +124,9 @@ function renderBar() {
     `<span class="sep"></span>` +
     btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") +
     btn("savejson", ICONS.json, "Save as .json text") +
-    btn("bounce", "⤓", "Bounce to audio: a new version of the song (B)") + `</div>`;
+    btn("bounce", "⤓", "Bounce to audio: a new version of the song (B)") +
+    (songId && !shareId ? `<span class="sep"></span><span class="friends" id="friends"></span>` : "") + `</div>`;
+  if (songId && !shareId) loadFriends();
   for (const t of ["draw", "erase", "select"]) $("tool-" + t).onclick = () => setTool(t);
   $("more").onclick = () => setMore(!bar.classList.contains("open"));
   $("help").onclick = () => setHelp($("helpbox").hidden);
@@ -305,6 +311,14 @@ function draw() {
     const px = x(curBeat() % total);
     g.fillStyle = acc; g.fillRect(Math.round(px), 0, 2, H);
   }
+  for (const p of people) {
+    const c = p.cursor || {};
+    if (c.tab !== "roll" || typeof c.beat !== "number") continue;
+    const px = Math.round(x(c.beat));
+    if (px < GUTTER || px > W) continue;
+    g.globalAlpha = 1; g.fillStyle = `hsl(${p.hue} 70% 60%)`; g.fillRect(px, 0, 2, H);
+    g.font = "11px system-ui, sans-serif"; g.textAlign = "left"; g.fillText(p.name, px + 4, 12);
+  }
   const cur = song.tracks[sel];
   if (cur && !cur.notes.length && !playing) {
     g.globalAlpha = 0.8; g.fillStyle = mute; g.font = "13px system-ui, sans-serif"; g.textAlign = "center";
@@ -474,7 +488,8 @@ function touchUp(e, cancelled) {
 }
 
 cv.addEventListener("pointerdown", (e) => { cv.focus(); if (e.pointerType === "mouse") mouseDown(e); else touchDown(e); });
-cv.addEventListener("pointermove", (e) => { if (e.pointerType !== "mouse") touchMove(e); else if (drag) dragTo(e); });
+cv.addEventListener("pointermove", (e) => { myBeat = Math.round(cell(e).beat * 4) / 4;
+   if (e.pointerType !== "mouse") touchMove(e); else if (drag) dragTo(e); });
 cv.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse") endDrag(); else touchUp(e, false); });
 cv.addEventListener("pointercancel", (e) => { if (e.pointerType === "mouse") endDrag(); else touchUp(e, true); });
 cv.addEventListener("contextmenu", (e) => {
@@ -572,7 +587,7 @@ async function bounce() {
     const bytes = encodeWav([out.getChannelData(0), out.getChannelData(1)], 44100);
     let saved = false;
     try {
-      const r = await fetch(songId ? `/api/songs/${encodeURIComponent(songId)}/versions` : "/api/renders", {
+      const r = await fetch(songId ? `${API}/songs/${encodeURIComponent(songId)}/versions` : "/api/renders", {
         method: "POST", credentials: "include", body: bytes,
         headers: songId ? { "X-Filename": "daw-bounce.wav", "X-Label": "DAW bounce", "X-Duration": String(secs) } : { "X-Filename": "daw-bounce.wav", "X-Origin": "daw" } });
       if (r.ok) {
@@ -893,6 +908,44 @@ window.jriterDaw = {
   chop: (n) => edit(() => { const t = song.tracks[sel]; if (t && t.sample) chop(t.sample, n); }),
 };
 
+// ---- together: a project kept on the server, friends in it with you --------------------------------
+const esc = (t) => String(t).replace(/[&<>"]/g, "");
+const TABS = { chords: "the chords", rack: "the rack", roll: "the piano roll", script: "the script", song: "the song", mixer: "the mixer", sampler: "the sampler" };
+function showPeople(list) {
+  const before = people.map((p) => String(p.id));
+  people = list;
+  const el = $("people");
+  if (el) el.innerHTML = list.map((p) => { const tip = esc(p.name) + " is on " + (TABS[(p.cursor || {}).tab] || "the DAW"); return `<span class="badge" style="--hue:${p.hue}" data-tip="${tip}" title="${tip}">${esc(p.name).slice(0, 1).toUpperCase()}</span>`; }).join("");
+  for (const p of list) if (!before.includes(String(p.id))) toast(p.name + " joined.");
+  if (view === "roll" && list.length) draw();
+}
+async function loadFriends() {
+  const el = $("friends");
+  if (!el) return;
+  try {
+    const r = await fetch("/api/shares?song=" + encodeURIComponent(songId), { credentials: "include" });
+    const j = r.ok ? await r.json() : { shares: [] };
+    const mine = (j.shares || []).filter((s) => s.to_account && !s.revoked_at);
+    el.innerHTML = mine.length ? "Together: " + mine.map((s) => `<button type="button" class="chip" data-share="${s.id}" title="Copy the link ${esc(s.to_name)} opens to edit with you">${esc(s.to_name)}</button>`).join("") : "";
+    el.onclick = (e) => {
+      const b = e.target.closest("[data-share]");
+      if (!b) return;
+      const link = location.origin + location.pathname + "?song=" + songId + "&share=" + b.dataset.share;
+      (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast("Link copied. " + b.textContent + " opens it signed in."), () => toast(link));
+    };
+  } catch { /* the list is a convenience */ }
+}
+if (songId) {
+  together = startTogether({
+    songId, shareId,
+    getText: () => songToText(song),
+    applyText: (text) => { const keep = sel; song = textToSong(text); sel = Math.min(keep, song.tracks.length - 1); selNote = null; changed(true); },
+    getCursor: () => ({ tab: view, track: sel, beat: myBeat }),
+    onPeople: showPeople,
+    onStatus: (s) => { document.body.classList.toggle("offline", s === "offline"); },
+  });
+}
+
 // ---- start ------------------------------------------------------------------------------
 new ResizeObserver(resize).observe($("rollbox"));
 { const asked = new URLSearchParams(location.search).get("view"); if (VIEWS.includes(asked)) view = asked; } // /daw.html?view=roll
@@ -906,7 +959,7 @@ try {
   draw();
 }
 fetch("/api/state").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.version) $("verstamp").textContent = " · DAW " + j.version; }).catch(() => {});
-if (songId) fetch("/api/songs/" + encodeURIComponent(songId), { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((j) => { const n = document.querySelector("#morebox .name"); if (j && j.song && n) n.textContent = "DAW · " + j.song.title; }).catch(() => {});
+if (songId) fetch(API + "/songs/" + encodeURIComponent(songId), { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((j) => { const n = document.querySelector("#morebox .name"); if (j && j.song && n) n.textContent = "DAW · " + j.song.title; }).catch(() => {});
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
   fetch(src, { credentials: "include" })

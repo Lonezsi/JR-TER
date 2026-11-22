@@ -24,12 +24,13 @@ final class GuestEdits {
         {"artwork", "song_id = ?"},
         {"versions", "song_id = ?"},
         {"arrangements", "song_id = ?"},
+        {"daw_projects", "song_id = ?"},
     };
 
     /** Saves in a row from one person closer together than this (seconds) are one change. */
     static final double SITTING = 120;
 
-    static String key(String table) { return table.equals("arrangements") ? "song_id" : "id"; }
+    static String key(String table) { return table.equals("arrangements") || table.equals("daw_projects") ? "song_id" : "id"; }
 
     static long num(Object o) { return o == null ? 0 : ((Number) o).longValue(); }
 
