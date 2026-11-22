@@ -5,10 +5,11 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 3; // 2 added chords and scripts, 3 patterns, steps and swing; older files still open
+export const TEXT_VERSION = 4; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode; older files still open
 
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
+import { cleanClips } from "./playlist.js";
 import { withPatterns, cleanSteps, emptySteps, defaultKey } from "./pattern.js";
 
 export function parseMidi(buf) {
@@ -115,7 +116,8 @@ export function songToText(song) {
       "track in the same order, notes (pitch is a MIDI number, 60 = middle C; start and length are in " +
       "beats; velocity 1-127) and steps (16 entries, one bar of sixteenths: null = off, or " +
       "{velocity, pitch}; the bar repeats over the loop). pattern = the index of the pattern open in " +
-      "the editor. Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
+      "the editor. clips place patterns on the song timeline: pattern (index), lane, start, length and offset, all in bars; " +
+      "a clip longer than its pattern repeats it; mode is song or pattern, what Play plays. Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
       "progression (symbols like Cmaj9 or G13/B, beats each, how to voice them); it is only a way to " +
       "write notes, so the notes are the music. scripts are note scripts (see web/daw/script.js for " +
       "the language): name, code, and the values of the sliders its params make.",
@@ -123,6 +125,8 @@ export function songToText(song) {
     bars: song.bars,
     swing: song.swing || 0,
     pattern: song.pattern || 0,
+    mode: song.mode === "song" ? "song" : "pattern",
+    clips: (song.clips || []).map((c) => ({ ...c })),
     chords: song.chords ?? JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)),
     scripts: (song.scripts ?? defaultScripts()).map((x) => ({ name: x.name, code: x.code, values: { ...x.values } })),
     tracks: song.tracks.map((t) => ({
@@ -175,6 +179,8 @@ export function textToSong(text) {
     song.pattern = 0;
     song.patterns[0].tracks = rawTracks.map((t) => ({ notes: readNotes(t && t.notes), steps: emptySteps() }));
   }
+  song.mode = j.mode === "song" ? "song" : "pattern";
+  song.clips = cleanClips(j.clips, song.patterns.length);
   const cur = song.patterns[song.pattern];
   song.tracks.forEach((t, i) => {
     const src = cur.tracks[i];
@@ -199,7 +205,7 @@ function readScripts(list) {
 // Turn a parsed MIDI file into a DAW song (instrument chosen from program / channel).
 export function midiToSong(m, instrumentFor) {
   return {
-    bpm: m.bpm, bars: Math.min(64, m.bars), swing: 0, pattern: 0, patterns: [{ name: "Pattern 1", tracks: [] }],
+    bpm: m.bpm, bars: Math.min(64, m.bars), swing: 0, pattern: 0, mode: "pattern", clips: [], patterns: [{ name: "Pattern 1", tracks: [] }],
     chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
     tracks: m.tracks.map((t, i) => ({
       name: t.name || "Track " + (i + 1),

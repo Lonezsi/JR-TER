@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.7.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Song mode",
+  "notes": [
+   "The DAW has a Song tab: lanes of bars where you place your patterns as clips. Tap a lane to place the pattern you paint with, drag a clip to move it, hold it to delete it (Undo brings it back).",
+   "Drag the end of a clip to repeat the pattern over more bars. Split cuts a clip in half, and Edit opens its pattern in the Rack.",
+   "Play can run just the pattern or the whole song: the Song button in the top bar, or the S key. Save as .mid writes the whole song when Song is on.",
+   "Songs save their clips in the .json file, and older song files still open with an empty timeline."
+  ]
+ },
+ {
   "version": "4.6.0",
   "date": "2026-11-22",
   "name": "JR!TER",

@@ -4,7 +4,8 @@
   What it is: one page, plain ES modules, no build step, no dependencies.
   Files: /daw/midi.js (read/write .mid and the plain-text song format, no DOM),
          /daw/chords.js (chord symbols to notes), /daw/pattern.js (patterns and steps, no DOM),
-         /daw/rackview.js (the channel rack), /daw/script.js (the note script language),
+         /daw/rackview.js (the channel rack),
+         /daw/playlist.js (clips on the song timeline, no DOM), /daw/songview.js (the Song tab), /daw/script.js (the note script language),
          /daw/synth.js (Web Audio instruments), /daw/gestures.js (touch), /daw/chordview.js and
          /daw/scriptview.js (the two editors), /daw/daw.js (the page), /daw/daw.css, /daw/views.css.
   For the song tab in the Svelte ui/: import midi.js and synth.js as they are, and load a
@@ -29,6 +30,7 @@
     <canvas id="roll" tabindex="0" aria-label="Piano roll"></canvas>
   </section>
   <section class="rack" id="rackview" aria-label="Channel rack"></section>
+  <section class="song" id="songview" aria-label="Song playlist"></section>
   <section class="chords" id="chordview" aria-label="Chord editor"></section>
   <section class="scripts" id="scriptview" aria-label="Note scripts"></section>
 </main>

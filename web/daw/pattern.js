@@ -10,6 +10,8 @@
 // One row of steps is one bar (16 sixteenths) and repeats over song.bars. Swing 0..1 delays the
 // odd steps (2nd, 4th, ...) by swing * 1/8 beat.
 
+import { fixClipsAfterInsert, fixClipsAfterRemove } from "./playlist.js";
+
 export const STEPS = 16;
 export const STEP_BEATS = 0.25;
 
@@ -92,6 +94,7 @@ export function addPattern(song, dup) {
     ? { name: song.patterns[at].name + " copy", tracks: copy(song.patterns[at].tracks) }
     : { name, tracks: [] };
   song.patterns.splice(at + 1, 0, fresh);
+  fixClipsAfterInsert(song, at + 1);
   load(song, at + 1);
 }
 
@@ -99,6 +102,7 @@ export function removePattern(song, k) {
   song.patterns = withPatterns(song);
   if (song.patterns.length <= 1) return false;
   song.patterns.splice(k, 1);
+  fixClipsAfterRemove(song, k);
   load(song, clamp(k > 0 ? k - 1 : 0, 0, song.patterns.length - 1));
   return true;
 }

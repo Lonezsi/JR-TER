@@ -22,8 +22,10 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
 2. **Channel rack and step sequencer. Done in 4.6.0.** Code: `web/daw/pattern.js` (patterns and
    steps, tested), `rackview.js` (the Rack tab). The song format is v3. Channels with 16-step rows, swing, per-step velocity
    and pitch. A pattern holds both steps and piano-roll notes; patterns 1..n with a picker.
-3. **Playlist / song mode.** Pattern clips on lanes along a timeline: drag, cut, repeat-drag.
-   Play one pattern or the whole song.
+3. **Playlist / song mode. Done in 4.7.0.** Pattern clips on lanes along a timeline: tap to place,
+   drag to move, drag the end to repeat, Split, hold to delete. Play runs the pattern or the whole
+   song (`S`). Code: `web/daw/playlist.js` (clips and the notes they make, tested), `songview.js`
+   (the Song tab). The song format is v4: `clips` and `mode`.
 4. **Mixer.** An insert per channel with Web Audio effects (EQ, compressor, delay, reverb from
    a generated impulse, distortion), sends, a master limiter, meters.
 5. **Sampler and audio clips.** Any render or vocal take in the library becomes an instrument
@@ -34,5 +36,5 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    makes a render, so it becomes a version of the song with the project text stored beside it.
 8. **Together.** A friend opens the same project and edits live, a cursor per person.
 
-The project format is `jriter-daw` JSON (version 3; see `web/daw/midi.js` `songToText`). Old
-files keep opening: a version 1 or 2 file becomes one pattern, and gets the default chords and scripts if it has none.
+The project format is `jriter-daw` JSON (version 4; see `web/daw/midi.js` `songToText`). Old
+files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

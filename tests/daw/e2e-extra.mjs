@@ -113,4 +113,25 @@ export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, 
     need((await song()).tracks[kick].steps[0], "pattern 1 lost its steps");
     await noSideways("rack after patterns");
   });
+  await scenario("the song playlist: place, repeat-drag, split, song mode, fits the phone", async () => {
+    await tapEl("#view-song");
+    need((await view()) === "song", "view is " + (await view()));
+    await noSideways("song tab");
+    const n0 = (await js("window.jriterDaw.clips()")).length;
+    await tapEl('.sl-cell[data-lane="0"][data-bar="0"]');
+    let clips = await js("window.jriterDaw.clips()");
+    need(clips.length === n0 + 1, "no clip placed: " + clips.length);
+    const i = clips.length - 1, len0 = clips[i].length;
+    const e = await rect(`.sl-clip[data-c="${i}"] .sl-end`);
+    await dragAt({ x: e.x, y: e.y }, { x: e.x + 72, y: e.y });
+    clips = await js("window.jriterDaw.clips()");
+    need(clips[i].length === len0 + 2, "repeat-drag: length " + len0 + " -> " + clips[i].length);
+    await tapEl('[data-act="split"]');
+    clips = await js("window.jriterDaw.clips()");
+    need(clips.length === n0 + 2 && clips[i + 1].offset > 0, "split gave " + JSON.stringify(clips));
+    await tapEl("#mode");
+    need((await js("window.jriterDaw.mode()")) === "song", "mode did not switch");
+    need((await song()).mode === "song" && (await song()).clips.length === n0 + 2, "mode or clips not saved");
+    await noSideways("song tab with clips");
+  });
 }

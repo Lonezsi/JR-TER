@@ -55,10 +55,10 @@ test("text format rejects other files and newer versions", () => {
   assert.throws(() => parseMidi(new Uint8Array([1, 2, 3, 4])), /not a MIDI/);
 });
 
-test("chords and scripts are saved with the song (version 3)", () => {
+test("chords and scripts are saved with the song (version 4)", () => {
   const text = songToText({ ...song, chords: { chords: [{ symbol: "Dm9", beats: 2 }], voiceLead: false, strumMs: 10, velocity: 80 },
     scripts: [{ name: "Mine", code: "each note:\n  pitch += 1", values: { x: 3 } }] });
-  assert.equal(JSON.parse(text).version, 3);
+  assert.equal(JSON.parse(text).version, 4);
   const back = textToSong(text);
   assert.equal(back.chords.chords[0].symbol, "Dm9");
   assert.equal(back.chords.voiceLead, false);
@@ -95,4 +95,17 @@ test("a version 2 file opens as one pattern with its notes", () => {
   assert.equal(s.tracks[0].notes.length, 1);
   assert.equal(s.tracks[0].steps.length, 16);
   assert.equal(s.tracks[0].key, 60);
+});
+
+import { songToText as _toText, textToSong as _fromText } from "../../web/daw/midi.js";
+test("song format v4 keeps clips and mode; a v3 file opens with none", () => {
+  const s = _fromText(_toText({ bpm: 120, bars: 2, swing: 0, pattern: 0, patterns: [{ name: "A", tracks: [] }], tracks: [{ name: "T", instrument: "piano", notes: [], steps: [] }] }));
+  s.clips = [{ pattern: 0, lane: 1, start: 2, length: 3, offset: 0 }]; s.mode = "song";
+  const back = _fromText(_toText(s));
+  assert.deepEqual(back.clips, s.clips);
+  assert.equal(back.mode, "song");
+  const old = JSON.parse(_toText(s)); old.version = 3; delete old.clips; delete old.mode;
+  const o = _fromText(JSON.stringify(old));
+  assert.deepEqual(o.clips, []);
+  assert.equal(o.mode, "pattern");
 });
