@@ -4,11 +4,12 @@ Uploads are a raw request body rather than a multipart form. The filename and an
 else travels in headers, which means the desktop client and the browser use the identical
 call, and neither of them needs a multipart encoder.
 """
+import json
 import os
 import time
 
 from .. import audio_meta, blobs, config, db, finding, registry
-from ..wire import Error, Response, as_int
+from ..wire import Error, Response, as_int, need
 from . import songs
 
 NAME = "versions"
@@ -65,10 +66,65 @@ def _add_shape_columns():
     db.add_column_if_missing("versions", "trouble", "TEXT NOT NULL DEFAULT ''")
 
 
+def _add_plugins_column():
+    """The plugins an FL project uses, as sent with the render (see docs/VST.md step 2)."""
+    db.add_column_if_missing("versions", "plugins", "TEXT NOT NULL DEFAULT ''")
+
+
+def _add_daw_column():
+    """The DAW project text a bounce was made from (see docs/DAW.md step 7b)."""
+    db.add_column_if_missing("versions", "daw", "TEXT NOT NULL DEFAULT ''")
+
+
+PLUGIN_KINDS = ("vst2", "vst3", "fl")
+
+
+def clean_plugins(raw):
+    """A plugin list from an X-Plugins header, as compact JSON, or '' if nothing usable.
+
+    At most 200 items; each needs a known kind and a name; strings are cut to 200
+    characters. Anything else is dropped rather than stored, since it came off the wire.
+    """
+    try:
+        items = json.loads(raw or "")
+    except ValueError:
+        return ""
+    if not isinstance(items, list):
+        return ""
+    out = []
+    for it in items[:200]:
+        if not isinstance(it, dict) or it.get("kind") not in PLUGIN_KINDS:
+            continue
+        name = str(it.get("name") or "").strip()[:200]
+        if not name:
+            continue
+        try:
+            uses = max(1, int(it.get("uses") or 1))
+        except (TypeError, ValueError):
+            uses = 1
+        item = {"kind": it["kind"], "name": name,
+                "vendor": str(it.get("vendor") or "").strip()[:200], "uses": uses}
+        if isinstance(it.get("installed"), bool):
+            item["installed"] = it["installed"]
+        out.append(item)
+    return json.dumps(out, separators=(",", ":"), ensure_ascii=False) if out else ""
+
+
+def plugin_list(text):
+    """The stored string as a list; [] for empty or damaged."""
+    try:
+        got = json.loads(text or "")
+    except ValueError:
+        return []
+    return got if isinstance(got, list) else []
+
+
 #: Named steps, each run once ever and recorded by name. See jriter/registry.py.
 MIGRATE = [
     ("dates_from_the_render", _add_date_columns),
     ("shape_and_trouble", _add_shape_columns),
+    ("plugin_list", _add_plugins_column),
+    ("daw_project", _add_daw_column),
 ]
 
 def get(version_id):
@@ -85,6 +141,8 @@ def list_versions(req):
         # Numbers to draw with, rather than the string they are stored as.
         raw = row.pop("peaks", "") or ""
         row["shape"] = [int(n) for n in raw.split(",") if n.isdigit()]
+        row["plugins"] = plugin_list(row.get("plugins"))
+        row["has_daw"] = bool(row.pop("daw", ""))   # the text itself is fetched on its own
     return {"versions": rows, "current_version_id": song["current_version_id"]}
 
 
@@ -101,7 +159,8 @@ def _shape_of(digest, ext):
 
 
 def add_stored(song_id, digest, ext, size, duration=0.0, bitrate=0,
-               label="", filename="", source_path="", project_at=0.0, rendered_at=0.0):
+               label="", filename="", source_path="", project_at=0.0, rendered_at=0.0,
+               plugins=""):
     """Make a version out of bytes that are already in the blob store.
 
     An upload calls this once the body has landed, and the renders list calls it when a
@@ -121,6 +180,7 @@ def add_stored(song_id, digest, ext, size, duration=0.0, bitrate=0,
         "label": label or "", "filename": filename or "",
         "source_path": source_path or "", "created_at": time.time(),
         "project_at": project_at or 0.0, "rendered_at": rendered_at or 0.0,
+        "plugins": plugins or "",
         **_shape_of(digest, ext)})
     db.update("songs", song_id, {"current_version_id": version_id,
                                  "updated_at": time.time()})
@@ -164,6 +224,24 @@ def upload(req):
         label=(req.headers.get("X-Label") or "").strip(), filename=filename,
         source_path=(req.headers.get("X-Source-Path") or "").strip())
     return {"version": version, "duplicate": False}
+
+
+def get_daw(req):
+    """The DAW project a bounce was made from."""
+    version = get(req.params["id"])
+    if not version.get("daw"):
+        raise Error("That version has no DAW project.", 404)
+    return {"version_id": version["id"], "song_id": version["song_id"], "n": version["n"],
+            "text": version["daw"]}
+
+
+def put_daw(req):
+    from . import daw
+    version = get(req.params["id"])
+    text = need((req.json() or {}), "text")
+    daw.check_text(text)
+    db.update("versions", version["id"], {"daw": text})
+    return {"ok": True}
 
 
 def have(req):
@@ -335,6 +413,8 @@ def ROUTES():
         ("PATCH", "/api/versions/<id>"): patch_version,
         ("DELETE", "/api/versions/<id>"): delete_version,
         ("POST", "/api/versions/<id>/current"): make_current,
+        ("GET", "/api/versions/<id>/daw"): get_daw,
+        ("PUT", "/api/versions/<id>/daw"): put_daw,
         ("GET", "/api/versions/<id>/audio"): audio,
         ("GET", "/api/versions/<id>/download"): download,
     }

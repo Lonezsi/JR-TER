@@ -24,6 +24,7 @@ const $ = (id) => document.getElementById(id);
 const songId = new URLSearchParams(location.search).get("song"); // /daw.html?song=ID: this library song's own project
 const shareId = new URLSearchParams(location.search).get("share"); // &share=ID: a friend working on the owner's song through that share
 const API = apiPrefix(shareId);
+let versionId = new URLSearchParams(location.search).get("version"); // &version=ID: open the project that bounce was made from
 let together = null, people = [], myBeat = null;
 const KEY = songId ? "jriter-daw:song:" + songId : "jriter-daw";
 const COARSE = matchMedia("(pointer: coarse)").matches;
@@ -131,8 +132,8 @@ function renderBar() {
     btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") +
     btn("savejson", ICONS.json, "Save as .json text") +
     btn("bounce", "⤓", "Bounce to audio: a new version of the song (B)") +
-    (songId && !shareId ? `<span class="sep"></span><span class="friends" id="friends"></span>` : "") + `</div>`;
-  if (songId && !shareId) loadFriends();
+    (songId && !shareId ? `<span class="sep"></span><span class="friends" id="friends"></span><span class="friends" id="bounces"></span>` : "") + `</div>`;
+  if (songId && !shareId) { loadFriends(); loadBounces(); }
   for (const t of ["draw", "erase", "select"]) $("tool-" + t).onclick = () => setTool(t);
   $("more").onclick = () => setMore(!bar.classList.contains("open"));
   $("help").onclick = () => setHelp($("helpbox").hidden);
@@ -186,7 +187,7 @@ const HELP = [
   ["✎", "Draw adds notes, Erase removes them, Select only picks them.", "P, E, V"],
   ["▶", "Play runs the loop. Loop turns repeating on and off.", "Space, L"],
   ["⋯", "More: tempo, bars, new track, open and save .mid or .json.", "N, Ctrl+Z"],
-  ["⤓", "Bounce: render the song to audio and save it as a new version of the library song (or a waiting render when opened without one).", "B"],
+  ["⤓", "Bounce: render the song to audio and save it as a new version of the library song (or a waiting render when opened without one). The project is kept with the version; More, Bounces opens it again.", "B"],
   ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
   ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
   ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
@@ -613,6 +614,11 @@ async function bounce() {
       if (r.ok) {
         const j = await r.json().catch(() => ({}));
         saved = true;
+        if (songId && j.version && j.version.id) {
+          // keep the project this sound came from beside it; failing only means no project
+          try { await fetch("/api/versions/" + j.version.id + "/daw", { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: songToText(song) }) }); } catch { /* audio is saved anyway */ }
+          loadBounces();
+        }
         if (songId) toast(j.duplicate ? (j.message || "Nothing new to add.") : "Saved as v" + (j.version ? j.version.n : "?") + " of the song.", { label: "Open", run: () => location.assign("/#/song/" + songId + "/takes") });
         else toast("Bounced. It waits in Renders for a song.");
       }
@@ -974,8 +980,33 @@ async function loadFriends() {
     };
   } catch { /* the list is a convenience */ }
 }
+// A bounce keeps the project it was made from. Open it (undo brings your own back).
+async function openVersion(id) {
+  try {
+    const r = await fetch("/api/versions/" + encodeURIComponent(id) + "/daw", { credentials: "include" });
+    if (!r.ok) throw new Error("That version has no DAW project.");
+    const j = await r.json();
+    await openBytes("v" + j.n + ".json", new TextEncoder().encode(j.text));
+  } catch (err) { toast(err.message || "Could not open that project."); }
+}
+async function loadBounces() {
+  const el = $("bounces");
+  if (!el) return;
+  try {
+    const r = await fetch("/api/songs/" + encodeURIComponent(songId) + "/versions", { credentials: "include" });
+    const j = r.ok ? await r.json() : { versions: [] };
+    const mine = (j.versions || []).filter((v) => v.has_daw);
+    el.innerHTML = mine.length ? "Bounces: " + mine.map((v) => `<button type="button" class="chip" data-version="${v.id}" title="Open the project that made v${v.n}">v${v.n}</button>`).join("") : "";
+    el.onclick = (e) => {
+      const b = e.target.closest("[data-version]");
+      if (b) { setMore(false); openVersion(b.dataset.version); }
+    };
+  } catch { /* the list is a convenience */ }
+}
+const openAsked = () => { if (versionId) { const id = versionId; versionId = null; openVersion(id); } };
 if (songId) {
   together = startTogether({
+    onReady: openAsked,
     songId, shareId,
     getText: () => songToText(song),
     applyText: (text) => { const keep = sel; song = textToSong(text); sel = Math.min(keep, song.tracks.length - 1); selNote = null; changed(true); },
@@ -999,6 +1030,7 @@ try {
 }
 fetch("/api/state").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.version) $("verstamp").textContent = " · DAW " + j.version; }).catch(() => {});
 if (songId) fetch(API + "/songs/" + encodeURIComponent(songId), { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((j) => { const n = document.querySelector("#morebox .name"); if (j && j.song && n) n.textContent = "DAW · " + j.song.title; }).catch(() => {});
+if (songId && versionId && !together) openAsked();
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
   fetch(src, { credentials: "include" })

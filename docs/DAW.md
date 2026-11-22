@@ -49,7 +49,10 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    with its own saved project. Bounce (B, in More) renders offline (`bounce.js` writes the .wav) and
    uploads it as a new version of that song; without a song it goes to the waiting renders, and if
    the library can't take it, it downloads. The song page has a DAW tab (a hand patch of the built
-   bundle until `ui/` is here). Not yet: the project text stored beside the version on the server.
+   bundle until `ui/` is here). **7b, done in 4.14.0:** Bounce also saves the project text on the
+   version (`versions.daw`, both servers; `GET/PUT /api/versions/<id>/daw`; the versions list only
+   says `has_daw`). `/daw.html?song=ID&version=VID` or More, Bounces opens it (undoable). Not yet: an
+   "Open in DAW" button on the song page's version list (needs `ui/` source).
 5b. **Your one-shots, and snap. Done in 4.13.0.** Sounds you bring from your computer live in the library
    (`jriter/modules/samples.py`, Spring `SamplesController.java`, table `samples`; `GET/POST /api/samples`,
    `PATCH/DELETE /api/samples/ID`, `POST /api/samples/ID/restore`, `GET /api/samples/ID/audio`; delete only hides).

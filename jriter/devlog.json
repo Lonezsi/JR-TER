@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.14.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Bounces remember their project",
+  "notes": [
+   "Bounce now keeps the DAW project it was made from, stored on the version itself (on both servers). Change the song afterwards and the old bounce still knows how it was built.",
+   "In the DAW, More has a new Bounces list: tap a version to open its project. Undo brings your own project back. A link like /daw.html?song=ID&version=VID does the same.",
+   "The song page has no button for this yet (its source is not on the server), so use the DAW's More list for now. Old bounces have no project."
+  ]
+ },
+ {
   "version": "4.13.0",
   "date": "2026-11-22",
   "name": "JR!TER",

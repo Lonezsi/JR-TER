@@ -87,10 +87,8 @@ def get_project(req):
     return out
 
 
-def put_project(req):
-    song = songs.get(req.params["id"])
-    body = req.json() or {}
-    text = need(body, "text")
+def check_text(text):
+    """Refuse anything that is not a DAW project of a sane size (versions use it too)."""
     if not isinstance(text, str) or len(text) > MAX_TEXT:
         raise Error("That project is too big.", 413)
     try:
@@ -99,6 +97,13 @@ def put_project(req):
         raise Error("That is not a DAW project.")
     if not isinstance(parsed, dict) or not isinstance(parsed.get("tracks"), list):
         raise Error("That is not a DAW project.")
+
+
+def put_project(req):
+    song = songs.get(req.params["id"])
+    body = req.json() or {}
+    text = need(body, "text")
+    check_text(text)
     try:
         base = int(body.get("base", 0))
     except (TypeError, ValueError):
