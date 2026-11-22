@@ -8,6 +8,7 @@
 //   start    where playing begins, in seconds; end = where it stops (0 = the end of the sound)
 //   root     the MIDI pitch that plays it as it is (60 = middle C)
 //   slices   cut points in seconds, sorted, strictly between start and end
+//   oneshot  true: every note plays the whole sound (start..end), however short the note; a hit, not a held key
 // No slices: any note plays start..end, sped up or slowed down by its distance from root.
 // With slices: root plays the first piece, root+1 the second, and so on, at normal speed.
 //
@@ -20,6 +21,9 @@ const num = (v, d) => (Number.isFinite(v) ? v : d);
 
 export function sampleEnd(s) { return s.end > 0 ? s.end : s.seconds; }
 
+// How long a note holds the sound, in seconds: 0 means play it to its end (chopped pieces, one-shots).
+export function gateFor(s, len) { return s.slices.length || s.oneshot ? 0 : len; }
+
 export function cleanSample(x) {
   if (!x || typeof x !== "object" || typeof x.src !== "string" || !x.src) return null;
   const seconds = Math.max(0, num(x.seconds, 0));
@@ -28,7 +32,7 @@ export function cleanSample(x) {
   if (end && end <= start) end = 0;
   const s = {
     name: String(x.name ?? "Sample").slice(0, 80), src: x.src, seconds, start, end,
-    root: clamp(Math.round(num(x.root, 60)), 0, 127), slices: [],
+    root: clamp(Math.round(num(x.root, 60)), 0, 127), slices: [], oneshot: x.oneshot === true,
   };
   const hi = sampleEnd(s) || 1e6;
   const cuts = (Array.isArray(x.slices) ? x.slices : []).map(Number).filter((t) => Number.isFinite(t) && t > start && t < hi);

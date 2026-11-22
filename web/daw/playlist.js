@@ -14,6 +14,10 @@ export const MAX_BARS = 256;
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const int = (v, d) => (Number.isFinite(v) ? Math.round(v) : d);
+// Clips sit on a sixteenth-of-a-bar grid (version 8 of the project text); older files only had whole bars.
+export const QB = 16;
+const qb = (v, d) => (Number.isFinite(v) ? Math.round(v * QB) / QB : d);
+const MIN = 1 / QB;
 
 // A clip is either a pattern clip ({ pattern }) or an audio clip ({ track }: it plays that
 // track's sample, see sampler.js). nTracks is how many tracks the song has.
@@ -29,9 +33,9 @@ export function cleanClips(list, nPatterns, nTracks = 0) {
     out.push({
       ...(track >= 0 ? { track } : { pattern }),
       lane: clamp(int(c.lane, 0), 0, MAX_LANES - 1),
-      start: clamp(int(c.start, 0), 0, MAX_BARS - 1),
-      length: clamp(int(c.length, 1), 1, MAX_BARS),
-      offset: clamp(int(c.offset, 0), 0, MAX_BARS),
+      start: clamp(qb(c.start, 0), 0, MAX_BARS - MIN),
+      length: clamp(qb(c.length, 1), MIN, MAX_BARS),
+      offset: clamp(qb(c.offset, 0), 0, MAX_BARS),
     });
   }
   return out;
@@ -72,26 +76,27 @@ export function songNotes(song) {
 
 export function addClip(song, pattern, lane, start) {
   song.clips = song.clips || [];
-  song.clips.push({ pattern, lane: clamp(lane, 0, MAX_LANES - 1), start: clamp(start, 0, MAX_BARS - 1), length: clamp(song.bars, 1, MAX_BARS), offset: 0 });
+  song.clips.push({ pattern, lane: clamp(lane, 0, MAX_LANES - 1), start: clamp(qb(start, 0), 0, MAX_BARS - 1), length: clamp(song.bars, 1, MAX_BARS), offset: 0 });
   return song.clips.length - 1;
 }
 export function addAudioClip(song, track, lane, start, bars) {
   song.clips = song.clips || [];
-  song.clips.push({ track, lane: clamp(lane, 0, MAX_LANES - 1), start: clamp(start, 0, MAX_BARS - 1), length: clamp(bars, 1, MAX_BARS), offset: 0 });
+  song.clips.push({ track, lane: clamp(lane, 0, MAX_LANES - 1), start: clamp(qb(start, 0), 0, MAX_BARS - 1), length: clamp(bars, 1, MAX_BARS), offset: 0 });
   return song.clips.length - 1;
 }
 export function moveClip(song, i, lane, start) {
   const c = song.clips[i];
   if (!c) return;
   c.lane = clamp(lane, 0, MAX_LANES - 1);
-  c.start = clamp(start, 0, MAX_BARS - c.length);
+  c.start = clamp(qb(start, 0), 0, MAX_BARS - c.length);
 }
 export function resizeClip(song, i, length) {
   const c = song.clips[i];
-  if (c) c.length = clamp(length, 1, MAX_BARS - c.start);
+  if (c) c.length = clamp(qb(length, 1), MIN, MAX_BARS - c.start);
 }
 // Cut at a bar strictly inside the clip. The second half keeps playing from where the first stopped.
 export function splitClip(song, i, atBar) {
+  atBar = qb(atBar, 0);
   const c = song.clips[i];
   if (!c || atBar <= c.start || atBar >= c.start + c.length) return false;
   const second = { ...c, start: atBar, length: c.start + c.length - atBar, offset: c.offset + (atBar - c.start) };

@@ -1,5 +1,19 @@
 [
  {
+  "version": "4.13.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Your one-shots",
+  "notes": [
+   "The Sampler tab has a new first choice, My one-shots. Add files or a whole folder (or drop them on the tab), filter by name or folder, hear one, and delete one (Undo brings it back). They live in your library, so Bounce and a library copy include them.",
+   "+ Inst makes a sampler instrument out of a one-shot, and + Rack makes it a rack channel (the rack also has a + Sample button). A one-shot plays the whole sound however short the step is; the One-shot switch turns that off.",
+   "Choosing sampler on an empty track opens the picker and fills that track. A sampler track with no sound stays silent.",
+   "Snap now follows the zoom in the piano roll: zoom in and notes snap finer, zoom out and they snap coarser. Pick a fixed snap, or None, under More, Snap. It is a setting of yours and is not shared with friends editing the same project.",
+   "The Song tab zooms (the - and + buttons, Ctrl+wheel, or pinch), has its own Snap box, and clips can now start and end between bars, down to a sixteenth of a bar. Project files are now version 8; older ones open as before.",
+   "Not tried with your own sounds on a real song yet. A friend editing through a share cannot hear your one-shots."
+  ]
+ },
+ {
   "version": "4.12.0",
   "date": "2026-11-22",
   "name": "JR!TER",

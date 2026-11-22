@@ -116,6 +116,12 @@ public class Library {
             + " name TEXT NOT NULL DEFAULT 'Current', is_current INTEGER NOT NULL DEFAULT 0,"
             + " data TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL, updated_at REAL NOT NULL)",
         "CREATE INDEX IF NOT EXISTS presets_song ON sound_presets(song_id)",
+        // samples (samples.py): your own one-shots for the DAW
+        "CREATE TABLE IF NOT EXISTS samples (id INTEGER PRIMARY KEY, name TEXT NOT NULL,"
+            + " folder TEXT NOT NULL DEFAULT '', digest TEXT NOT NULL, ext TEXT NOT NULL,"
+            + " size INTEGER NOT NULL DEFAULT 0, duration REAL NOT NULL DEFAULT 0,"
+            + " created_at REAL NOT NULL, deleted_at REAL NOT NULL DEFAULT 0)",
+        "CREATE INDEX IF NOT EXISTS samples_folder ON samples(folder, name)",
         // daw (daw.py): a song's DAW project, for editing together
         "CREATE TABLE IF NOT EXISTS daw_projects (song_id INTEGER PRIMARY KEY"
             + " REFERENCES songs(id) ON DELETE CASCADE, text TEXT NOT NULL DEFAULT '',"

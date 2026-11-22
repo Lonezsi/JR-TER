@@ -47,5 +47,24 @@ test("adding and deleting patterns keeps clips pointing at the right pattern", (
 
 test("cleanClips drops bad clips and clamps the rest", () => {
   const out = cleanClips([{ pattern: 0, lane: 99, start: -3, length: 0 }, { pattern: 5 }, null, { pattern: "x" }], 2);
-  assert.deepEqual(out, [{ pattern: 0, lane: 15, start: 0, length: 1, offset: 0 }]);
+  assert.deepEqual(out, [{ pattern: 0, lane: 15, start: 0, length: 0.0625, offset: 0 }]);
+});
+
+test("clips can sit between bars, down to a sixteenth of a bar", () => {
+  const s = mk(); addClip(s, 0, 0, 1.5);
+  assert.equal(s.clips[0].start, 1.5);
+  assert.deepEqual(songNotes(s)[0].map((n) => n.start), [6, 10]);
+  moveClip(s, 0, 0, 2.03);
+  assert.equal(s.clips[0].start, 2);          // 2.03 snaps to the sixteenth grid: 2
+  moveClip(s, 0, 0, 2.07);
+  assert.equal(s.clips[0].start, 2.0625);
+  resizeClip(s, 0, 0.01);
+  assert.equal(s.clips[0].length, 0.0625);    // never shorter than a sixteenth of a bar
+  assert.deepEqual(cleanClips([{ pattern: 0, lane: 0, start: 0.5, length: 0.25, offset: 0.125 }], 1), [{ pattern: 0, lane: 0, start: 0.5, length: 0.25, offset: 0.125 }]);
+});
+
+test("a clip split between bars keeps both halves in step", () => {
+  const s = mk(); addClip(s, 0, 0, 0); resizeClip(s, 0, 2);
+  assert.equal(splitClip(s, 0, 0.5), true);
+  assert.deepEqual(s.clips.map((c) => [c.start, c.length, c.offset]), [[0, 0.5, 0], [0.5, 1.5, 0.5]]);
 });

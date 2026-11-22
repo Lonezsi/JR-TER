@@ -1,6 +1,6 @@
 // e2e-extra.mjs: the chord editor and the note script, on the emulated phone.
 // Called by e2e.mjs, which hands over its helpers.
-export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rect, song, send, SITE, dragAt }) {
+export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rect, song, fresh, send, SITE, dragAt }) {
   const val = (sel) => js(`document.querySelector(${JSON.stringify(sel)}).value`);
   const set = (sel, v, event = "change") => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event(${JSON.stringify(event)}, { bubbles: true })); })()`);
   const view = () => js("window.jriterDaw.view()");
@@ -222,7 +222,7 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     a = await js("window.jriterDaw.automation()");
     need(a[0].points.length === 1, "hold did not delete a point: " + JSON.stringify(a[0].points));
     const s = await song();
-    need(s.version === 7 && s.automation.length === 1, "saved version " + s.version);
+    need(s.version === 8 && s.automation.length === 1, "saved version " + s.version);
   });
   await scenario("the Euclid script turns a chord into three hits", async () => {
     await tapEl("#view-script");
@@ -232,5 +232,82 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     need(!(await js(`document.querySelector("#scriptview .cv-err").textContent`)), "script error: " + (await js(`document.querySelector("#scriptview .cv-err").textContent`)));
     const n = (await song()).tracks[0].notes;
     need(n.length === 6 && n[0].start === 0 && n[2].start === 0.75, "notes: " + JSON.stringify(n.map((x) => [x.pitch, x.start])));
+  });
+
+  // ---- snap follows the zoom; the Song tab zooms; one-shots ----------------------------------
+  const API = "window.jriterDaw";
+  await scenario("roll: snap is Auto and follows the zoom, and a chosen snap decides where a note lands", async () => {
+    await fresh();
+    await js(`localStorage.removeItem("jriter-daw-snap")`);
+    await js(`${API}.setSnap("auto")`);
+    const at = async (zoom) => { await js(`${API}.setZoom(${zoom})`); return (await js(`${API}.snap()`)).beats; };
+    need((await at(1)) === 0.5, "phone, zoom 1 should snap to an eighth, got " + (await js(`${API}.snap()`)).beats);
+    need((await at(4)) === 0.125, "zoomed in should snap finer, got " + (await js(`${API}.snap()`)).beats);
+    need((await at(0.25)) === 4, "zoomed out should snap to bars, got " + (await js(`${API}.snap()`)).beats);
+    await js(`${API}.setZoom(1)`);
+    const cv2 = await rect("#roll");
+    await js(`${API}.setSnap("1/2")`);
+    await tapAt(cv2.l + 44 + 64 * 1.4 + 1, cv2.t + 120);
+    let n = (await song()).tracks[0].notes;
+    need(n.length === 1 && n[0].start === 1, "snap 1/2: note at " + JSON.stringify(n.map((x) => x.start)));
+    await fresh();
+    await js(`${API}.setSnap("1/8")`);
+    await tapAt(cv2.l + 44 + 64 * 1.4 + 1, cv2.t + 120);
+    n = (await song()).tracks[0].notes;
+    need(n.length === 1 && n[0].start === 1.375, "snap 1/8: note at " + JSON.stringify(n.map((x) => x.start)));
+    await js(`${API}.setSnap("none")`);
+    need((await js(`${API}.snap()`)).beats === 0, "none should be 0");
+    await js(`${API}.setSnap("auto")`);
+    await tapEl("#more"); await sleep(100);
+    need(await js(`document.querySelector("#snap").options[0].textContent.startsWith("Auto (")`), "the Snap box should say what Auto is now");
+    await tapEl("#more");
+  });
+  await scenario("song tab: zoom in, then a tap lands between bars; at zoom 1 it lands on the bar", async () => {
+    await fresh();
+    await js(`${API}.setView("song")`);
+    await sleep(120);
+    await js(`${API}.setSongSnap("auto")`);
+    need((await js(`${API}.songSnap()`)).beats === 4, "song snap at zoom 1 should be a bar, got " + (await js(`${API}.songSnap()`)).beats);
+    await js(`${API}.setSongZoom(4)`);
+    need((await js(`${API}.songSnap()`)).beats === 0.5, "song snap at zoom 4 should be half a beat, got " + (await js(`${API}.songSnap()`)).beats);
+    await noSideways("song tab zoomed in");
+    await tapEl('.sl-cell[data-lane="0"][data-bar="1"]');
+    let c = await js(`${API}.clips()`);
+    need(c.length === 1 && c[0].start === 1.5, "zoomed in, the clip should start at 1.5, got " + JSON.stringify(c));
+    await fresh();
+    await js(`${API}.setView("song")`);
+    await js(`${API}.setSongZoom(1)`);
+    await sleep(100);
+    await tapEl('.sl-cell[data-lane="0"][data-bar="1"]');
+    c = await js(`${API}.clips()`);
+    need(c.length === 1 && c[0].start === 1, "at zoom 1 the clip should start on bar 1, got " + JSON.stringify(c));
+    const t = (await song());
+    need(t.version === 8, "version " + t.version);
+    await noSideways("song tab");
+  });
+  await scenario("one-shots: the Sampler tab has My one-shots, + Sample in the rack opens it, picking sampler on an empty track opens it", async () => {
+    await fresh();
+    await js(`${API}.setView("rack")`);
+    await sleep(100);
+    await tapEl('[data-act="sample"]');
+    need((await view()) === "sampler", "view is " + (await view()));
+    need(await js(`document.querySelector("#sp-from").options[0].value === "oneshots"`), "no My one-shots option");
+    await js(`(() => { const e = document.querySelector("#sp-from"); e.value = "oneshots"; e.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    await sleep(300);
+    need(await js(`!!document.querySelector('[data-act="files"]') && !!document.querySelector('[data-act="folder"]')`), "no Add files / Add a folder buttons");
+    await noSideways("sampler, My one-shots");
+    // a track set to sampler with no sound is silent and sends you to pick one
+    await js(`${API}.setView("roll")`);
+    const before = (await song()).tracks.length;
+    await js(`(() => { const s = document.querySelector(".track select"); s.value = "sampler"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    await sleep(150);
+    need((await view()) === "sampler", "picking sampler should open the Sampler tab, view is " + (await view()));
+    // a one-shot added from there fills that track instead of making another
+    const tone = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+    await js(`${API}.addSampler(${JSON.stringify({ name: "Kick", src: tone, seconds: 0.1, kind: "oneshot" })})`);
+    const s2 = await song();
+    need(s2.tracks.length === before && s2.tracks[0].instrument === "sampler" && s2.tracks[0].sample && s2.tracks[0].sample.oneshot === true, "the empty sampler track should have been filled: " + JSON.stringify(s2.tracks[0]));
+    await tapEl('[data-act="oneshot"]');
+    need((await js(`${API}.sample()`)).oneshot === false, "the One-shot switch should turn it off");
   });
 }

@@ -50,6 +50,16 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    uploads it as a new version of that song; without a song it goes to the waiting renders, and if
    the library can't take it, it downloads. The song page has a DAW tab (a hand patch of the built
    bundle until `ui/` is here). Not yet: the project text stored beside the version on the server.
+5b. **Your one-shots, and snap. Done in 4.13.0.** Sounds you bring from your computer live in the library
+   (`jriter/modules/samples.py`, Spring `SamplesController.java`, table `samples`; `GET/POST /api/samples`,
+   `PATCH/DELETE /api/samples/ID`, `POST /api/samples/ID/restore`, `GET /api/samples/ID/audio`; delete only hides).
+   The Sampler tab's first choice, My one-shots (`samplerview.js`, `library.js` mySamples/uploadSamples), adds files or a
+   folder, filters, and makes a sampler instrument (+ Inst) or a rack channel (+ Rack, or + Sample in the rack).
+   `sample.oneshot` plays the whole sound whatever the note length (`gateFor` in `sampler.js`). Snap lives in
+   `web/daw/snap.js` (tested): a setting is Auto, a step or None; Auto picks the finest straight step that is still
+   wide enough to hit, so it follows the zoom. It is a view setting kept in localStorage `jriter-daw-snap`
+   (`roll` and `song`), not in the project. The Song tab zooms and clips sit on sixteenths of a bar (format v8).
+   Not yet: stretching audio clips to the tempo; a guest hears only their own one-shots.
 8. **Together. Done in 4.12.0.** A song's project is stored on the server (`jriter/modules/daw.py`, Spring
    `DawController.java`, table `daw_projects` with a revision): `GET`/`PUT /api/songs/ID/daw` and
    `POST /api/songs/ID/daw/here` (who is in the project and their cursor, in memory, gone after 12 s).
@@ -60,5 +70,5 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    history and can be undone. The owner's More menu lists the song's shares and copies the link.
    Not yet: a cursor on the Song tab (the piano roll has one), a guest's sampler hears only the guest's own library.
 
-The project format is `jriter-daw` JSON (version 7; see `web/daw/midi.js` `songToText`). Old
+The project format is `jriter-daw` JSON (version 8; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

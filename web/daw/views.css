@@ -148,3 +148,8 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
 .friends { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
 .friends .chip { border: 1px solid var(--d-line); background: none; color: inherit; border-radius: 999px; padding: 2px var(--d-s2); font: inherit; cursor: pointer; }
 body.offline .people::after { content: "offline"; color: var(--d-mute); font-size: 11px; align-self: center; }
+
+/* the Sampler tab, My one-shots */
+.sp-folder { margin-top: var(--d-s2); color: var(--d-mute); font-size: 11px; }
+.cv-line input[type="search"] { flex: 1; min-width: 8ch; }
+.sp-list .sp-row button[data-add], .sp-list .sp-row button[data-rack] { font-size: 11px; }

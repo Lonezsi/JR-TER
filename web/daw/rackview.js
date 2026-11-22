@@ -2,7 +2,7 @@
 //
 //   mountRack(el, api) -> { render, playhead(step) }
 //   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), selected(), select(i),
-//        addTrack(), addDrums(), preview(trackIndex, step), usePattern(k), newPattern(dup), removePattern()
+//        addTrack(), addDrums(), addSample(), preview(trackIndex, step), usePattern(k), newPattern(dup), removePattern()
 // Tap a step to turn it on or off. Drag a lit step up or down: velocity (or pitch in the Pitch lane).
 import { STEPS } from "./pattern.js";
 
@@ -34,7 +34,8 @@ export function mountRack(el, api) {
         `<button data-lane="velocity" aria-pressed="${lane === "velocity"}">Velocity</button>` +
         `<button data-lane="pitch" aria-pressed="${lane === "pitch"}">Pitch</button>` +
         `<button data-act="chan" aria-label="New channel" data-tip="New channel">+ Channel</button>` +
-        `<button data-act="drums" aria-label="Add kick, snare and hat with a beat" data-tip="Add kick, snare and hat with a beat">+ Drums</button></div>` +
+        `<button data-act="drums" aria-label="Add kick, snare and hat with a beat" data-tip="Add kick, snare and hat with a beat">+ Drums</button>` +
+        `<button data-act="sample" aria-label="Add one of your own one-shots as a channel" data-tip="Add one of your own one-shots as a channel">+ Sample</button></div>` +
       `<div class="rk-rows">` +
       song.tracks.map((t, ti) => {
         const steps = (t.steps || []);
@@ -119,6 +120,7 @@ export function mountRack(el, api) {
     else if (a === "delpat") api.removePattern();
     else if (a === "chan") api.addTrack();
     else if (a === "drums") api.addDrums();
+    else if (a === "sample") api.addSample();
   });
   el.addEventListener("keydown", (e) => {
     const b = e.target.closest && e.target.closest(".rk-step");

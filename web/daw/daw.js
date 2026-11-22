@@ -12,11 +12,12 @@ import { mountSong } from "./songview.js";
 import { songNotes, songBars } from "./playlist.js";
 import { createMixer } from "./mixgraph.js";
 import { mountSampler } from "./samplerview.js";
-import { sliceFor, playSlice, songAudio, sampleEnd, chop } from "./sampler.js";
+import { sliceFor, playSlice, songAudio, sampleEnd, chop, gateFor } from "./sampler.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
 import { encodeWav, bounceSeconds } from "./bounce.js";
 import { startTogether, apiPrefix } from "./together.js";
+import { ROLL_STEPS, stepFor, autoStep, snapFloor, snapRound, snapOptions, loadSnap, saveSnap } from "./snap.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
@@ -25,7 +26,11 @@ const shareId = new URLSearchParams(location.search).get("share"); // &share=ID:
 const API = apiPrefix(shareId);
 let together = null, people = [], myBeat = null;
 const KEY = songId ? "jriter-daw:song:" + songId : "jriter-daw";
-const SNAP = 0.25; // a 16th note, in beats
+const COARSE = matchMedia("(pointer: coarse)").matches;
+const snapSet = loadSnap(localStorage); // { roll, song }: "auto" follows the zoom (snap.js)
+// How far notes snap, in beats (0 = not at all). Auto: the finest step still wide enough to hit.
+const step = () => stepFor(snapSet.roll, pxBeat(), COARSE ? 22 : 14, ROLL_STEPS);
+const minLen = () => step() || 1 / 16;
 let ROW = 14;
 const GUTTER = 44;
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -119,6 +124,7 @@ function renderBar() {
     `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
     `<label>Bars <input id="bars" type="number" min="1" max="64" step="1"></label>` +
     `<label>Pattern <select id="pat" aria-label="Pattern"></select></label>` +
+    `<label>Snap <select id="snap" aria-label="Snap"></select></label>` +
     `<span class="sep"></span>` +
     btn("add", ICONS.add, "New track (N)") + btn("undo", ICONS.undo, "Undo (Ctrl+Z)") +
     `<span class="sep"></span>` +
@@ -137,6 +143,8 @@ function renderBar() {
   $("bpm").onchange = (e) => { edit(() => { song.bpm = clamp(+e.target.value || 120, 20, 300); }); if (playing) play(curBeat() % loopLen()); };
   $("bars").onchange = (e) => edit(() => { song.bars = clamp(Math.round(+e.target.value) || 4, 1, 64); });
   $("pat").onchange = (e) => switchPattern(+e.target.value);
+  $("snap").onchange = (e) => { snapSet.roll = e.target.value; saveSnap(localStorage, { roll: snapSet.roll }); draw(); showSnap(); };
+  showSnap();
   $("add").onclick = addTrack;
   $("undo").onclick = doUndo;
   $("open").onclick = () => $("file").click();
@@ -161,11 +169,18 @@ function setMore(open) {
   if (open) setHelp(false);
 }
 
+// The Snap box says what Auto is right now, and keeps up with the zoom.
+function showSnap() {
+  const el = $("snap");
+  if (el) el.innerHTML = snapOptions(ROLL_STEPS, snapSet.roll, step());
+}
+
 // ---- the help sheet: one list, so the words live in one place ------------------------------
 const HELP = [
   ["＋", "Tap an empty square to add a note.", "click"],
   ["↔", "Drag a note to move it. Drag its right end to make it longer.", "drag"],
   ["⌫", "Hold a note to delete it. Undo brings it back.", "right-click, or Delete"],
+  ["⋮", "Snap follows the zoom: zoom in and notes snap finer. Pick a fixed one under More, Snap.", "More"],
   ["✥", "Drag empty space to scroll. Pinch with two fingers to zoom.", "wheel; Ctrl+wheel; + and -"],
   ["♪", "Tap a key on the left to hear it.", "click"],
   ["✎", "Draw adds notes, Erase removes them, Select only picks them.", "P, E, V"],
@@ -216,7 +231,7 @@ function renderTracks() {
     const el = document.createElement("div");
     el.className = "track" + (i === sel ? " sel" : "");
     el.innerHTML = `<div class="row"><input type="text" aria-label="Track name"><button data-a="del" data-tip="Delete track" aria-label="Delete track">×</button></div>
-      <div class="row"><select aria-label="Instrument">${(t.sample ? [...INSTRUMENTS, "sampler"] : INSTRUMENTS).map((n) => `<option${n === t.instrument ? " selected" : ""}>${n}</option>`).join("")}</select>
+      <div class="row"><select aria-label="Instrument">${[...INSTRUMENTS, "sampler"].map((n) => `<option${n === t.instrument ? " selected" : ""}>${n}</option>`).join("")}</select>
       <button data-a="mute" data-tip="Mute" aria-label="Mute" aria-pressed="${!!t.mute}">M</button>
       <button data-a="solo" data-tip="Solo" aria-label="Solo" aria-pressed="${!!t.solo}">S</button></div>
       <div class="row"><input type="range" min="0" max="1" step="0.01" aria-label="Volume" value="${t.volume}"></div>`;
@@ -224,7 +239,10 @@ function renderTracks() {
     name.value = t.name;
     name.oninput = () => { t.name = name.value; save(); };
     name.onchange = () => { const b = snap(); pushUndo(b); };
-    el.querySelector("select").onchange = (e) => edit(() => { t.instrument = e.target.value; });
+    el.querySelector("select").onchange = (e) => {
+      edit(() => { t.instrument = e.target.value; });
+      if (t.instrument === "sampler" && !t.sample) { sel = i; samplerUI.show("oneshots"); setView("sampler"); toast("Pick a sound for this track: + Inst puts it here."); }
+    };
     el.querySelector("[data-a=mute]").onclick = () => edit(() => { t.mute = !t.mute; });
     el.querySelector("[data-a=solo]").onclick = () => edit(() => { t.solo = !t.solo; });
     el.querySelector("[data-a=del]").onclick = (e) => { e.stopPropagation(); removeTrack(i); };
@@ -285,11 +303,12 @@ function draw() {
     g.fillStyle = grid; g.fillRect(GUTTER, yy + ROW - 1, W - GUTTER, 1);
   }
   const total = loopLen();
-  for (let b = 0; b <= total; b += SNAP) {
-    const xx = x(b);
+  let ls = step() || autoStep(pb, 14, ROLL_STEPS); // grid lines at the snap, never closer than 6px
+  while (ls * pb < 6) ls *= 2;
+  for (let i = 0; i * ls <= total + 1e-9; i++) {
+    const b = i * ls, xx = x(b);
     if (xx < GUTTER - 1 || xx > W) continue;
-    const isBar = b % 4 === 0, isBeat = b % 1 === 0;
-    if (!isBeat && pb < 90) continue;
+    const isBar = Math.abs(b / 4 - Math.round(b / 4)) < 1e-6, isBeat = Math.abs(b - Math.round(b)) < 1e-6;
     g.fillStyle = isBar ? bar : grid;
     g.fillRect(Math.round(xx), 0, 1, H);
     if (isBar && b < total) { g.fillStyle = mute; g.fillText(String(b / 4 + 1), xx + 4, 8); }
@@ -355,9 +374,9 @@ function removeNote(n) {
   edit(() => { const t = song.tracks[sel]; t.notes.splice(t.notes.indexOf(n), 1); if (selNote === n) selNote = null; });
 }
 function addNoteAt(c) {
-  const start = Math.floor(c.beat / SNAP) * SNAP;
+  const start = Math.max(0, snapFloor(c.beat, step()));
   if (start >= loopLen()) return null;
-  const n = { pitch: c.pitch, start, length: lastLen, velocity: 90 };
+  const n = { pitch: c.pitch, start, length: Math.max(lastLen, minLen()), velocity: 90 };
   edit(() => { song.tracks[sel].notes.push(n); });
   return n;
 }
@@ -384,10 +403,10 @@ function mouseDown(e) {
   if (tool === "erase") { if (n) removeNote(n); return; }
   if (!n) {
     if (tool === "select") { selNote = null; draw(); return; }
-    const start = Math.floor(c.beat / SNAP) * SNAP;
+    const start = Math.max(0, snapFloor(c.beat, step()));
     if (start >= loopLen()) return;
     const before = snap();
-    n = { pitch: c.pitch, start, length: lastLen, velocity: 90 };
+    n = { pitch: c.pitch, start, length: Math.max(lastLen, minLen()), velocity: 90 };
     t.notes.push(n);
     selNote = n; preview(t, n);
     drag = { n, mode: "move", before, c0: c, start0: n.start };
@@ -401,11 +420,11 @@ function mouseDown(e) {
 function dragTo(e) {
   const c = cell(e), n = drag.n;
   if (drag.mode === "move") {
-    const ns = Math.max(0, drag.start0 + Math.round((c.beat - drag.c0.beat) / SNAP) * SNAP);
+    const ns = Math.max(0, snapRound(drag.start0 + (c.beat - drag.c0.beat), step()));
     if (n.pitch !== c.pitch) preview(song.tracks[sel], { ...n, pitch: c.pitch });
-    n.start = Math.min(ns, loopLen() - SNAP); n.pitch = c.pitch;
+    n.start = Math.min(ns, loopLen() - minLen()); n.pitch = c.pitch;
   } else {
-    n.length = Math.max(SNAP, Math.round((c.beat - n.start) / SNAP) * SNAP);
+    n.length = Math.max(minLen(), snapRound(c.beat - n.start, step()));
     lastLen = n.length;
   }
   draw();
@@ -457,7 +476,7 @@ function touchMove(e) {
     zoom = clamp(pinch.zoom0 * k.scale, 0.25, 4);
     scrollX = pinch.beat0 * pxBeat() - (k.x - r.left - GUTTER);
     scrollY = pinch.sy0 - k.dy;
-    draw(); return;
+    draw(); showSnap(); return;
   }
   if (!touch || touch.done) return;
   const k = classify(gs);
@@ -504,7 +523,7 @@ cv.addEventListener("wheel", (e) => {
   if (e.shiftKey) scrollX += e.deltaY; else { scrollY += e.deltaY; scrollX += e.deltaX; }
   draw();
 }, { passive: false });
-function setZoom(z) { zoom = clamp(z, 0.25, 4); draw(); }
+function setZoom(z) { zoom = clamp(z, 0.25, 4); draw(); showSnap(); }
 
 // ---- sound ------------------------------------------------------------------------------
 function audio() {
@@ -548,9 +567,10 @@ function voice(t, n, time, len, dest) { voiceOn(ctx, synth, bufferNow, t, n, tim
 function voiceOn(c, syn, getBuf, t, n, time, len, dest) {
   if (t.instrument === "sampler" && t.sample) {
     const buf = getBuf(t.sample.src), sl = sliceFor(t.sample, n.pitch);
-    if (buf && sl) playSlice(c, buf, sl, time, t.sample.slices.length ? 0 : len, n.velocity, dest);
+    if (buf && sl) playSlice(c, buf, sl, time, gateFor(t.sample, len), n.velocity, dest);
     return;
   }
+  if (t.instrument === "sampler") return; // no sound picked yet: nothing to play
   syn.playNote({ instrument: t.instrument, pitch: n.pitch, time, length: len, velocity: n.velocity }, dest);
 }
 // ---- bounce: render the song offline to a .wav and keep it ---------------------------------
@@ -621,17 +641,26 @@ function audition(t, from, to) {
     lastAudition = playSlice(ctx, buf, { from, to, rate: 1 }, ctx.currentTime + 0.02, 0, 100, mix.input(i));
   }).catch(() => {});
 }
-function addSampler(sound) {
+let pendingRack = false; // set by + Sample in the rack: the next sound added becomes a rack channel
+function addSampler(sound, opts = {}) {
+  const rack = !!opts.rack || pendingRack, one = sound.kind === "oneshot";
+  const sample = { name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [], oneshot: one };
+  const empty = song.tracks[sel] && song.tracks[sel].instrument === "sampler" && !song.tracks[sel].sample;
+  pendingRack = false;
   edit(() => {
-    song.tracks.push({ name: sound.name, instrument: "sampler", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes: [],
-      sample: { name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [] } });
+    if (empty) { const t = song.tracks[sel]; t.sample = sample; t.name = sound.name; selNote = null; return; }
+    song.tracks.push({ name: sound.name, instrument: "sampler", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes: [], sample });
     sel = song.tracks.length - 1; selNote = null;
   });
+  if (rack) { setView("rack"); toast("Added " + sound.name + " to the rack. Tap steps to play it.", { label: "Undo", run: doUndo }); return loadDuration(sound); }
+  loadDuration(sound);
+  toast("Added " + sound.name + ". Draw notes for it, or place it on the Song tab.", { label: "Undo", run: doUndo });
+}
+function loadDuration(sound) {
   bufferOf(sound.src).then((buf) => {
     const t = song.tracks.find((x) => x.sample && x.sample.src === sound.src);
     if (t && !t.sample.seconds) { t.sample.seconds = buf.duration; save(); refreshView(); }
   }).catch(() => {});
-  toast("Added " + sound.name + ". Draw notes for it, or place it on the Song tab.", { label: "Undo", run: doUndo });
 }
 function placeOnSong(i) {
   songUI.paintWith("t" + i); setView("song");
@@ -765,6 +794,7 @@ function renderViews() {
 function setView(v) {
   if (!VIEWS.includes(v)) return;
   view = v;
+  if (v !== "sampler") pendingRack = false; // + Sample in the rack only lasts while you are picking the sound
   $("main").dataset.view = v;
   document.body.dataset.view = v;
   for (const b of VIEWS) $("view-" + b)?.setAttribute("aria-selected", b === v);
@@ -860,6 +890,7 @@ const rackUI = mountRack($("rackview"), {
   song: () => song, change: edit, snap, pushUndo, save, selected: () => sel,
   select: (i) => { sel = i; selNote = null; renderTracks(); draw(); },
   addTrack, addDrums, usePattern: switchPattern, newPattern, removePattern: dropPattern,
+  addSample: () => { pendingRack = true; samplerUI.show("oneshots"); setView("sampler"); toast("Pick a sound: + Rack (or + Inst) adds it as a channel."); },
   preview: (i, step) => { const t = song.tracks[i]; if (t) preview(t, { pitch: step.pitch, velocity: step.velocity }); },
 });
 
@@ -900,6 +931,14 @@ window.jriterDaw = {
   addLane: (target) => edit(() => { song.automation = song.automation || []; song.automation.push({ target, points: [] }); }),
   addPoint: (lane, beat, value) => edit(() => { autoAdd(song.automation[lane], beat, value); }),
   tool: () => tool,
+  snap: () => ({ setting: snapSet.roll, beats: step() }),
+  setSnap: (v) => { snapSet.roll = v; saveSnap(localStorage, { roll: v }); draw(); showSnap(); },
+  setZoom,
+  zoomLevel: () => zoom,
+  songZoom: () => songUI.zoom(),
+  setSongZoom: (z) => songUI.setZoom(z),
+  songSnap: () => songUI.snap(),
+  setSongSnap: (v) => songUI.setSnap(v),
   selected: () => sel,
   view: () => view,
   setView,
