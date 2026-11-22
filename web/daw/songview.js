@@ -9,6 +9,7 @@
 import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, MAX_LANES, MAX_BARS } from "./playlist.js";
 
 import { clipBars } from "./sampler.js";
+import { mountLanes } from "./autolanes.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -16,6 +17,7 @@ const BAR_PX = 36;
 
 export function mountSong(el, api) {
   let brush = 0, selected = -1, drag = null, hold = 0;
+  const autoLanes = mountLanes(el, api, { barPx: BAR_PX, render: () => render() });
 
   function render() {
     const song = api.song();
@@ -55,10 +57,11 @@ export function mountSong(el, api) {
       `<div class="cv-line sl-tools">` +
         `<button data-act="edit" aria-label="Edit this pattern in the rack" data-tip="Edit this pattern in the rack"${sel ? "" : " disabled"}>Edit</button>` +
         `<button data-act="split" aria-label="Cut the clip in half" data-tip="Cut the clip in half"${sel && sel.length > 1 ? "" : " disabled"}>Split</button>` +
-        `<button data-act="del" aria-label="Delete the clip" data-tip="Delete the clip"${sel ? "" : " disabled"}>Delete</button></div>` +
+        `<button data-act="del" aria-label="Delete the clip" data-tip="Delete the clip"${sel ? "" : " disabled"}>Delete</button>` +
+        `<span class="sl-sep"></span>${autoLanes.button()}</div>` + autoLanes.menu(song) +
       `<div class="sl-scroll"><div class="sl-grid" style="--bar:${BAR_PX}px;width:${bars * BAR_PX}px">` +
-        `<div class="sl-ruler">${ruler}</div>${lanesHtml}<div class="sl-head" hidden></div></div></div>` +
-      `<div class="sv-doc">Tap a lane to place the pattern. Drag a clip to move it, drag its end to repeat it. Hold a clip to delete it.</div>`;
+        `<div class="sl-ruler">${ruler}</div>${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>` +
+      `<div class="sv-doc">Tap a lane to place the pattern. Drag a clip to move it, drag its end to repeat it. Hold a clip to delete it. Automate draws a knob's moves over time: tap a lane to add a point, drag it, hold it to delete it.</div>`;
   }
 
   const barAt = (e, grid) => Math.floor((e.clientX - grid.getBoundingClientRect().left) / BAR_PX);

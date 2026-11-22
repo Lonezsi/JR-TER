@@ -38,11 +38,16 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    as an audio clip (a clip with `track` instead of `pattern`), through the track's mixer strip.
    Code: `web/daw/sampler.js` (model and maths, tested), `library.js` (asks `/api/songs`, versions,
    vocals, renders), `samplerview.js`. Not yet: audio from your own computer, stretching clips to the tempo.
-6. **Automation and more script.** Automation lanes for any knob. The pattern script exists
-   (step 1b); next: `euclid`, scales, and scripts that read other tracks.
+6. **Automation and more script. Done in 4.10.0.** Automation lanes on the Song tab: "+ Automate" lists
+   every knob (a track's volume, pan, sends and each insert effect setting, the master, the two buses);
+   tap a lane to add a point, drag it, hold it to delete it, arrows on a focused point. Playback feeds the
+   mixer the value at the playhead every tick. Code: `web/daw/automation.js` (model and maths, tested),
+   `autolanes.js` (the lanes). The song format is v7: `automation`. Script additions in `script.js`:
+   `euclid HITS of STEPS step X [rotate Y]`, `scale minor D` with `snap`, `shift`, `degree`, and
+   `use "Kick" as kick` with `playing`, `starts`, `lowest`, `highest`. Three scripts ship for them.
 7. **Into the song.** A DAW tab in `ui/` once the Svelte source is here. Bouncing the project
    makes a render, so it becomes a version of the song with the project text stored beside it.
 8. **Together.** A friend opens the same project and edits live, a cursor per person.
 
-The project format is `jriter-daw` JSON (version 6; see `web/daw/midi.js` `songToText`). Old
+The project format is `jriter-daw` JSON (version 7; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

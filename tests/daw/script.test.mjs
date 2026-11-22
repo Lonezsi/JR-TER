@@ -9,9 +9,9 @@ const key = (n) => n.map((x) => [x.pitch, x.start, x.length, x.velocity]);
 
 test("every default script parses, and nothing is stored twice", () => {
   const all = defaultScripts();
-  assert.equal(all.length, 6);
+  assert.equal(all.length, 9);
   for (const s of all) assert.doesNotThrow(() => parseScript(s.code), s.name);
-  assert.equal(new Set(all.map((s) => s.name)).size, 6);
+  assert.equal(new Set(all.map((s) => s.name)).size, 9);
 });
 
 test("humanize with amount 0 changes nothing", () => {
@@ -91,4 +91,44 @@ test("a script cannot reach anything but the notes", () => {
   assert.throws(() => run("each note:\n  pitch = constructor", triad), ScriptError);
   assert.throws(() => run("each note:\n  pitch = globalThis", triad), ScriptError);
   assert.throws(() => run("each note:\n  pitch = fetch(1)", triad), ScriptError);
+});
+
+import { euclid } from "../../web/daw/script.js";
+const bits = (a) => a.map((x) => (x ? "x" : ".")).join("");
+
+test("euclid spreads hits evenly, and rotate shifts them", () => {
+  assert.equal(bits(euclid(3, 8)), "x..x..x.");
+  assert.equal(bits(euclid(5, 8)), "x.x.xx.x");
+  assert.equal(bits(euclid(3, 8, 1)), "..x..x.x");
+  assert.equal(euclid(3, 8, 1).filter(Boolean).length, 3);
+  assert.equal(euclid(0, 4).some(Boolean), false);
+  assert.equal(euclid(9, 4).every(Boolean), true);
+});
+
+test("the euclid statement places the chord at the hits", () => {
+  const two = [60, 64].map((pitch) => ({ pitch, start: 0, length: 2, velocity: 90 }));
+  const out = run("each chord:\n  euclid 3 of 8 step 1/16n", two);
+  assert.deepEqual([...new Set(out.map((n) => n.start))], [0, 0.75, 1.5]);
+  assert.equal(out.length, 6);
+});
+
+test("scales snap, shift and name degrees", () => {
+  const n = (pitch) => [{ pitch, start: 0, length: 1, velocity: 90 }];
+  assert.equal(run("scale minor D\neach note:\n  pitch = snap(pitch)", n(63))[0].pitch, 62); // a tie goes down
+  assert.equal(run("scale minor D\neach note:\n  pitch = snap(pitch)", n(64))[0].pitch, 64);
+  assert.equal(run("scale major C\neach note:\n  pitch = shift(pitch, 2)", n(60))[0].pitch, 64);
+  assert.equal(run("scale major C\neach note:\n  pitch = shift(pitch, -1)", n(60))[0].pitch, 59);
+  assert.equal(run("scale major C\neach note:\n  pitch = degree(pitch) + 50", n(67))[0].pitch, 55);
+  assert.equal(run("scale blues F#\neach note:\n  pitch = snap(pitch)", n(66))[0].pitch, 66);
+  assert.throws(() => run("scale nope\neach note:\n  pitch = 1", n(60)), /there is no scale nope/);
+});
+
+test("a script can read another track", () => {
+  const kick = { Kick: [{ pitch: 36, start: 0, length: 0.25, velocity: 100 }] };
+  const notes = [0, 1].map((start) => ({ pitch: 60, start, length: 0.5, velocity: 100 }));
+  const code = 'use "kick" as k\neach note:\n  if starts(k): velocity = 50';
+  const out = run(code, notes, { tracks: kick });
+  assert.deepEqual(out.map((x) => x.velocity), [50, 100]);
+  assert.throws(() => run('use "Bass" as b\neach note:\n  pitch += 0', notes, { tracks: kick }), /there is no track called "Bass"/);
+  assert.equal(run('use "Kick" as k\neach note:\n  pitch = lowest(k) + 24 * playing(k)', notes, { tracks: kick })[0].pitch, 60);
 });

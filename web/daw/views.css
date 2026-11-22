@@ -127,3 +127,16 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
 .sp-len { flex: none; color: var(--d-mute); font-size: 11px; min-width: 3ch; text-align: right; }
 .sp-wave { width: 100%; height: 120px; display: block; touch-action: none; border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
 .sl-clip.audio { background-image: repeating-linear-gradient(90deg, #fff3 0 2px, transparent 2px 5px); }
+
+/* automation lanes (autolanes.js) */
+.al-head { position: sticky; left: 0; align-self: flex-start; display: flex; gap: var(--d-s2); align-items: center; padding: var(--d-s1) var(--d-s2); color: var(--d-mute); font-size: 11px; border-top: 1px solid var(--d-line); }
+.al-head button { padding: 0 var(--d-s1); min-width: 24px; }
+.al-lane { position: relative; flex: none; height: 64px; touch-action: pan-x; cursor: crosshair;
+  background-image: repeating-linear-gradient(90deg, var(--d-bar) 0 1px, transparent 1px calc(var(--bar) * 4)), repeating-linear-gradient(90deg, var(--d-line) 0 1px, transparent 1px var(--bar)); }
+.al-lane svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+.al-lane polyline { fill: none; stroke: var(--d-acc); stroke-width: 2; stroke-linejoin: round; }
+.al-pt { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; padding: 0; border: 0; background: transparent; touch-action: none; cursor: grab; }
+.al-pt::before { content: ""; position: absolute; left: 7px; top: 7px; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; background: var(--d-panel); border: 2px solid var(--d-acc); }
+.al-pt:focus-visible::before { background: var(--d-acc); }
+.al-menu { display: flex; flex-direction: column; gap: var(--d-s1); max-height: 220px; overflow: auto; padding: var(--d-s2); border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
+.al-menu button { text-align: left; }

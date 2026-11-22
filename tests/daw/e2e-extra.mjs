@@ -1,6 +1,6 @@
 // e2e-extra.mjs: the chord editor and the note script, on the emulated phone.
 // Called by e2e.mjs, which hands over its helpers.
-export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, SITE, dragAt }) {
+export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rect, song, send, SITE, dragAt }) {
   const val = (sel) => js(`document.querySelector(${JSON.stringify(sel)}).value`);
   const set = (sel, v, event = "change") => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event(${JSON.stringify(event)}, { bubbles: true })); })()`);
   const view = () => js("window.jriterDaw.view()");
@@ -193,5 +193,44 @@ export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, 
     await sleep(900);
     need(await js("window.jriterDaw.playing()"), "not playing");
     await tapEl("#play");
+  });
+
+  await scenario("automation lanes: add a lane, tap points in, hold one to delete it, play, fits the phone", async () => {
+    const text = JSON.stringify({ format: "jriter-daw", version: 1, bpm: 120, bars: 4, tracks: [
+      { name: "Bass", instrument: "piano", volume: 0.8, notes: [{ pitch: 60, start: 0, length: 2, velocity: 90 }, { pitch: 64, start: 0, length: 2, velocity: 90 }] },
+      { name: "Kick", instrument: "drums", volume: 0.8, notes: [{ pitch: 36, start: 0, length: 0.25, velocity: 100 }] }] });
+    await js(`window.jriterDaw.load(${JSON.stringify(text)})`);
+    await tapEl("#view-song");
+    await tapEl('[data-al="open"]');
+    await tapEl('.al-menu [data-target="t0.volume"]');
+    need((await js("window.jriterDaw.automation()")).length === 1, "no lane");
+    await js(`document.querySelector(".sl-scroll").scrollLeft = 0`);
+    await sleep(80);
+    const lane = await rect(".al-lane");
+    await tapAt(lane.l + 50, lane.t + 20);
+    await tapAt(lane.l + 150, lane.t + 44);
+    let a = await js("window.jriterDaw.automation()");
+    need(a[0].points.length === 2 && a[0].points[0].beat < a[0].points[1].beat, "points: " + JSON.stringify(a[0].points));
+    need(a[0].points[0].value > a[0].points[1].value, "the higher tap should be the higher value: " + JSON.stringify(a[0].points));
+    await noSideways("song tab with an automation lane");
+    await tapEl("#play");
+    await sleep(700);
+    need(await js("window.jriterDaw.playing()"), "not playing with automation");
+    await tapEl("#play");
+    const pt = await rect('.al-pt[data-i="0"]');
+    await holdAt(pt.x, pt.y, 700);
+    a = await js("window.jriterDaw.automation()");
+    need(a[0].points.length === 1, "hold did not delete a point: " + JSON.stringify(a[0].points));
+    const s = await song();
+    need(s.version === 7 && s.automation.length === 1, "saved version " + s.version);
+  });
+  await scenario("the Euclid script turns a chord into three hits", async () => {
+    await tapEl("#view-script");
+    await js(`(() => { const e = document.querySelector("#sv-pick"); const i = [...e.options].findIndex((o) => o.textContent.startsWith("Euclid")); e.value = i; e.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    await sleep(100);
+    await tapEl("#sv-run");
+    need(!(await js(`document.querySelector("#scriptview .cv-err").textContent`)), "script error: " + (await js(`document.querySelector("#scriptview .cv-err").textContent`)));
+    const n = (await song()).tracks[0].notes;
+    need(n.length === 6 && n[0].start === 0 && n[2].start === 0.75, "notes: " + JSON.stringify(n.map((x) => [x.pitch, x.start])));
   });
 }
