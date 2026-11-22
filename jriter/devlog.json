@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.11.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Bounce",
+  "notes": [
+   "A song page has a DAW tab. It opens the DAW for that song, and the DAW remembers a separate project for each song.",
+   "Bounce (the arrow button under More, or the B key) renders the project to audio and saves it as a new version of the song. Open it from the toast, or find it under Renders.",
+   "Opened without a song, Bounce puts the audio in the waiting renders. If the library cannot take it, the file downloads instead."
+  ]
+ },
+ {
   "version": "4.10.0",
   "date": "2026-11-22",
   "name": "JR!TER",
