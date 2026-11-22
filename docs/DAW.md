@@ -19,7 +19,8 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    Six scripts ship with every song (Humanize, four arpeggios, Strum). The language is described
    at the top of `script.js`. Touch is tested for real: `node tests/daw/e2e.mjs` drives the page
    in an emulated phone (Edge needed).
-2. **Channel rack and step sequencer.** Channels with 16-step rows, swing, per-step velocity
+2. **Channel rack and step sequencer. Done in 4.6.0.** Code: `web/daw/pattern.js` (patterns and
+   steps, tested), `rackview.js` (the Rack tab). The song format is v3. Channels with 16-step rows, swing, per-step velocity
    and pitch. A pattern holds both steps and piano-roll notes; patterns 1..n with a picker.
 3. **Playlist / song mode.** Pattern clips on lanes along a timeline: drag, cut, repeat-drag.
    Play one pattern or the whole song.
@@ -33,5 +34,5 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    makes a render, so it becomes a version of the song with the project text stored beside it.
 8. **Together.** A friend opens the same project and edits live, a cursor per person.
 
-The project format is `jriter-daw` JSON (version 2; see `web/daw/midi.js` `songToText`). Old
-files keep opening: a version 1 file gets the default chords and scripts.
+The project format is `jriter-daw` JSON (version 3; see `web/daw/midi.js` `songToText`). Old
+files keep opening: a version 1 or 2 file becomes one pattern, and gets the default chords and scripts if it has none.
