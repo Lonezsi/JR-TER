@@ -14,6 +14,7 @@ import { createMixer } from "./mixgraph.js";
 import { mountSampler } from "./samplerview.js";
 import { sliceFor, playSlice, songAudio, sampleEnd, chop } from "./sampler.js";
 import { mountMixer } from "./mixerview.js";
+import { automated, addPoint as autoAdd } from "./automation.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
@@ -38,7 +39,7 @@ function defaultSong() {
   const notes = [];
   [60, 64, 67, 72, 67, 64, 60, 64].forEach((p, i) => notes.push({ pitch: p, start: i * 0.5, length: 0.5, velocity: 90 }));
   [60, 64, 67, 72, 67, 64, 60, 64].forEach((p, i) => notes.push({ pitch: p, start: 4 + i * 0.5, length: 0.5, velocity: 90 }));
-  return { bpm: 120, bars: 4, swing: 0, pattern: 0, mode: "pattern", clips: [], patterns: [{ name: "Pattern 1", tracks: [] }], chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
+  return { bpm: 120, bars: 4, swing: 0, pattern: 0, mode: "pattern", clips: [], automation: [], patterns: [{ name: "Pattern 1", tracks: [] }], chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
     tracks: [{ name: "Piano", instrument: "piano", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes }] };
 }
 function loadSaved() {
@@ -163,7 +164,7 @@ const HELP = [
   ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
   ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
   ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
-  ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays.", "Alt+5, S"],
+  ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays. Automate draws a knob's moves over time under the clips.", "Alt+5, S"],
   ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
   ["〰", "Sampler: add a take, vocal or render from your library with +, drag its ends to trim, Chop cuts it into pieces that play up the keys. Place puts it on the Song tab as a clip.", "Alt+7"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
@@ -598,6 +599,10 @@ function stop(quiet) {
 }
 function tick() {
   const spb = 60 / song.bpm, len = playLen();
+  if (mix && (song.automation || []).length) { // knobs that move: the mixer follows the lanes
+    const b = curBeat();
+    mix.sync({ ...song, ...automated(song, looping ? b % len : b) });
+  }
   const upTo = curBeat() + 0.12 / spb;
   if (!looping && scheduled >= len) { if (curBeat() > len + 1) { playing = false; stop(); } return; }
   const end = looping ? upTo : Math.min(upTo, len);
@@ -747,7 +752,7 @@ function runOn(code, values, name) {
   const t = song.tracks[sel];
   if (!t) return { ok: false, message: "There is no track to run it on." };
   try {
-    const out = runScript(code, t.notes, { values });
+    const out = runScript(code, t.notes, { values, tracks: Object.fromEntries(song.tracks.map((x) => [x.name, allNotes(x, song)])) });
     edit(() => { t.notes = out; selNote = null; });
     toast((name || "Script") + " ran on " + t.name + ": " + out.length + " notes.", { label: "Undo", run: doUndo });
     return { ok: true };
@@ -821,6 +826,9 @@ window.jriterDaw = {
   playing: () => playing,
   levels: () => (mix ? mix.levels() : null),
   mixer: () => JSON.parse(JSON.stringify(song.mixer || null)),
+  automation: () => JSON.parse(JSON.stringify(song.automation || [])),
+  addLane: (target) => edit(() => { song.automation = song.automation || []; song.automation.push({ target, points: [] }); }),
+  addPoint: (lane, beat, value) => edit(() => { autoAdd(song.automation[lane], beat, value); }),
   tool: () => tool,
   selected: () => sel,
   view: () => view,

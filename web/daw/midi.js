@@ -5,8 +5,9 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 6; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips; older files still open
+export const TEXT_VERSION = 7; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation; older files still open
 
+import { cleanAutomation } from "./automation.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
 import { cleanSample } from "./sampler.js";
@@ -128,7 +129,10 @@ export function songToText(song) {
       "(volume, fx; a limiter always follows) and the two send buses. A track with instrument sampler has a sample " +
       "from the library: src is where its audio comes from, start and end are seconds (end 0 = to the end), root is the " +
       "MIDI pitch that plays it as it is, slices are cut points in seconds (with cuts, root plays piece 1, root+1 piece 2, and so on). " +
-      "A clip with track instead of pattern is an audio clip: it plays that track's sample from offset bars in, for length bars.",
+      "A clip with track instead of pattern is an audio clip: it plays that track's sample from offset bars in, for length bars. " +
+      "automation is knobs that move over time: each lane has a target (t0.volume, t0.pan, t0.send0, t0.fx1.mix for the second effect of track 0, " +
+      "master.volume, master.fx0.low, bus0.volume) and points of { beat, value }, sorted by beat (4 beats a bar), the value in the knob's own range; " +
+      "the value slides in a straight line between points and holds before the first and after the last.",
     bpm: song.bpm,
     bars: song.bars,
     swing: song.swing || 0,
@@ -137,6 +141,7 @@ export function songToText(song) {
     clips: (song.clips || []).map((c) => ({ ...c })),
     chords: song.chords ?? JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)),
     mixer: cleanMixer(song.mixer),
+    automation: cleanAutomation(song.automation, song),
     scripts: (song.scripts ?? defaultScripts()).map((x) =>({ name: x.name, code: x.code, values: { ...x.values } })),
     tracks: song.tracks.map((t) => ({
       name: t.name, instrument: t.instrument, key: t.key ?? defaultKey(t.instrument), volume: t.volume ?? 0.8,
@@ -193,6 +198,7 @@ export function textToSong(text) {
   }
   song.mode = j.mode === "song" ? "song" : "pattern";
   song.clips = cleanClips(j.clips, song.patterns.length, song.tracks.length);
+  song.automation = cleanAutomation(j.automation, song);
   const cur = song.patterns[song.pattern];
   song.tracks.forEach((t, i) => {
     const src = cur.tracks[i];
@@ -217,7 +223,7 @@ function readScripts(list) {
 // Turn a parsed MIDI file into a DAW song (instrument chosen from program / channel).
 export function midiToSong(m, instrumentFor) {
   return {
-    bpm: m.bpm, bars: Math.min(64, m.bars), swing: 0, pattern: 0, mode: "pattern", clips: [], patterns: [{ name: "Pattern 1", tracks: [] }],
+    bpm: m.bpm, bars: Math.min(64, m.bars), swing: 0, pattern: 0, mode: "pattern", clips: [], automation: [], patterns: [{ name: "Pattern 1", tracks: [] }],
     chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(), mixer: defaultMixer(),
     tracks: m.tracks.map((t, i) => ({
       name: t.name || "Track " + (i + 1),

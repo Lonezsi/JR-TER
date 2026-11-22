@@ -11,6 +11,7 @@
 // odd steps (2nd, 4th, ...) by swing * 1/8 beat.
 
 import { fixClipsAfterInsert, fixClipsAfterRemove } from "./playlist.js";
+import { fixAutomationAfterTrackRemove } from "./automation.js";
 
 export const STEPS = 16;
 export const STEP_BEATS = 0.25;
@@ -112,6 +113,7 @@ export function removeTrackEverywhere(song, i) {
   song.patterns = withPatterns(song);
   for (const p of song.patterns) if (i < p.tracks.length) p.tracks.splice(i, 1);
   song.tracks.splice(i, 1);
+  fixAutomationAfterTrackRemove(song, i);
   // Audio clips (sampler.js) point at a track: the deleted one's go, later ones move down.
   if (song.clips) {
     song.clips = song.clips.filter((c) => c.track !== i);

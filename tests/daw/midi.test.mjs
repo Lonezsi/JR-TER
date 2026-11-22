@@ -55,10 +55,10 @@ test("text format rejects other files and newer versions", () => {
   assert.throws(() => parseMidi(new Uint8Array([1, 2, 3, 4])), /not a MIDI/);
 });
 
-test("chords and scripts are saved with the song (version 6)", () => {
+test("chords and scripts are saved with the song (version 7)", () => {
   const text = songToText({ ...song, chords: { chords: [{ symbol: "Dm9", beats: 2 }], voiceLead: false, strumMs: 10, velocity: 80 },
     scripts: [{ name: "Mine", code: "each note:\n  pitch += 1", values: { x: 3 } }] });
-  assert.equal(JSON.parse(text).version, 6);
+  assert.equal(JSON.parse(text).version, 7);
   const back = textToSong(text);
   assert.equal(back.chords.chords[0].symbol, "Dm9");
   assert.equal(back.chords.voiceLead, false);
@@ -70,7 +70,7 @@ test("a version 1 file still opens, with the default chords and scripts", () => 
   const s = textToSong(old);
   assert.equal(s.bpm, 100);
   assert.equal(s.chords.chords[0].symbol, "Cmaj9");
-  assert.equal(s.scripts.length, 6);
+  assert.equal(s.scripts.length, 9);
 });
 
 test("patterns, steps, swing and key round trip (version 3)", () => {

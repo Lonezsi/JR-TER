@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.10.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Automation and pattern scripts",
+  "notes": [
+   "The Song tab has automation lanes. Press + Automate, pick a knob (a track's volume, pan, a send, any effect setting, the master), then tap the lane to add points, drag them, hold one to delete it.",
+   "While the song plays, the mixer follows the lanes, so a fader can fade in or a filter can sweep. Stopping puts every knob back.",
+   "Scripts learned euclid (3 of 8 spreads three hits evenly), scales (scale minor D, then snap, shift and degree) and reading other tracks (use \"Kick\" as kick, then starts, playing, lowest, highest). New songs get three example scripts.",
+   "Songs save the lanes in the .json file (format 7), and older song files still open."
+  ]
+ },
+ {
   "version": "4.9.0",
   "date": "2026-11-22",
   "name": "JR!TER",
