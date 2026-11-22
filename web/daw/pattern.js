@@ -112,4 +112,9 @@ export function removeTrackEverywhere(song, i) {
   song.patterns = withPatterns(song);
   for (const p of song.patterns) if (i < p.tracks.length) p.tracks.splice(i, 1);
   song.tracks.splice(i, 1);
+  // Audio clips (sampler.js) point at a track: the deleted one's go, later ones move down.
+  if (song.clips) {
+    song.clips = song.clips.filter((c) => c.track !== i);
+    for (const c of song.clips) if (c.track != null && c.track > i) c.track--;
+  }
 }

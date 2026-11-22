@@ -55,10 +55,10 @@ test("text format rejects other files and newer versions", () => {
   assert.throws(() => parseMidi(new Uint8Array([1, 2, 3, 4])), /not a MIDI/);
 });
 
-test("chords and scripts are saved with the song (version 5)", () => {
+test("chords and scripts are saved with the song (version 6)", () => {
   const text = songToText({ ...song, chords: { chords: [{ symbol: "Dm9", beats: 2 }], voiceLead: false, strumMs: 10, velocity: 80 },
     scripts: [{ name: "Mine", code: "each note:\n  pitch += 1", values: { x: 3 } }] });
-  assert.equal(JSON.parse(text).version, 5);
+  assert.equal(JSON.parse(text).version, 6);
   const back = textToSong(text);
   assert.equal(back.chords.chords[0].symbol, "Dm9");
   assert.equal(back.chords.voiceLead, false);

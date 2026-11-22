@@ -5,10 +5,11 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 5; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer; older files still open
+export const TEXT_VERSION = 6; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips; older files still open
 
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
+import { cleanSample } from "./sampler.js";
 import { cleanClips } from "./playlist.js";
 import { cleanTrackMix, cleanMixer, defaultMixer } from "./mixer.js";
 import { withPatterns, cleanSteps, emptySteps, defaultKey } from "./pattern.js";
@@ -124,7 +125,10 @@ export function songToText(song) {
       "the language): name, code, and the values of the sliders its params make. Mixer: each track has pan " +
       "(-1..1), sends (how much goes to the Reverb and Delay buses, 0..1) and fx, its insert effects in order " +
       "(eq, comp, dist, delay, reverb, each with its settings; on = false bypasses it). mixer holds the master " +
-      "(volume, fx; a limiter always follows) and the two send buses.",
+      "(volume, fx; a limiter always follows) and the two send buses. A track with instrument sampler has a sample " +
+      "from the library: src is where its audio comes from, start and end are seconds (end 0 = to the end), root is the " +
+      "MIDI pitch that plays it as it is, slices are cut points in seconds (with cuts, root plays piece 1, root+1 piece 2, and so on). " +
+      "A clip with track instead of pattern is an audio clip: it plays that track's sample from offset bars in, for length bars.",
     bpm: song.bpm,
     bars: song.bars,
     swing: song.swing || 0,
@@ -137,6 +141,7 @@ export function songToText(song) {
     tracks: song.tracks.map((t) => ({
       name: t.name, instrument: t.instrument, key: t.key ?? defaultKey(t.instrument), volume: t.volume ?? 0.8,
       mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t),
+      ...(cleanSample(t.sample) ? { sample: cleanSample(t.sample) } : {}),
     })),
     patterns: withPatterns(song),
   }, null, 1);
@@ -171,6 +176,7 @@ export function textToSong(text) {
         volume: Math.min(1, Math.max(0, num(t.volume, 0.8))),
         mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t),
         notes: [], steps: emptySteps(),
+        ...(cleanSample(t.sample) ? { sample: cleanSample(t.sample) } : {}),
       };
     }),
   };
@@ -186,7 +192,7 @@ export function textToSong(text) {
     song.patterns[0].tracks = rawTracks.map((t) => ({ notes: readNotes(t && t.notes), steps: emptySteps() }));
   }
   song.mode = j.mode === "song" ? "song" : "pattern";
-  song.clips = cleanClips(j.clips, song.patterns.length);
+  song.clips = cleanClips(j.clips, song.patterns.length, song.tracks.length);
   const cur = song.patterns[song.pattern];
   song.tracks.forEach((t, i) => {
     const src = cur.tracks[i];

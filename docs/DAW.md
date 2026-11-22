@@ -30,13 +30,19 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    (EQ, compressor, drive, delay, reverb from a generated impulse), a master with effects and a fixed
    limiter, meters. Code: `web/daw/mixer.js` (model and maths, tested), `mixgraph.js` (the Web Audio graph),
    `mixerview.js` (the Mixer tab). The song format is v5: per-track `pan`, `sends`, `fx` and a `mixer`.
-5. **Sampler and audio clips.** Any render or vocal take in the library becomes an instrument
-   or a clip, chopped from its waveform. FL can't reach your songs; this can.
+5. **Sampler and audio clips. Done in 4.9.0.** A take, vocal take or waiting render from the library
+   becomes a sampler track (`instrument: "sampler"`, with a `sample` on the track). The Sampler tab
+   (Alt+7) lists the library's sounds, draws the waveform, trims it by dragging the ends, and
+   chops it: Chop 4/8/16 or hold on the waveform to add or remove a cut; then root plays piece 1,
+   root+1 piece 2, and so on (no cuts: every key plays it, pitched). Place puts it on the Song tab
+   as an audio clip (a clip with `track` instead of `pattern`), through the track's mixer strip.
+   Code: `web/daw/sampler.js` (model and maths, tested), `library.js` (asks `/api/songs`, versions,
+   vocals, renders), `samplerview.js`. Not yet: audio from your own computer, stretching clips to the tempo.
 6. **Automation and more script.** Automation lanes for any knob. The pattern script exists
    (step 1b); next: `euclid`, scales, and scripts that read other tracks.
 7. **Into the song.** A DAW tab in `ui/` once the Svelte source is here. Bouncing the project
    makes a render, so it becomes a version of the song with the project text stored beside it.
 8. **Together.** A friend opens the same project and edits live, a cursor per person.
 
-The project format is `jriter-daw` JSON (version 5; see `web/daw/midi.js` `songToText`). Old
+The project format is `jriter-daw` JSON (version 6; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

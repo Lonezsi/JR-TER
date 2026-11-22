@@ -1,11 +1,14 @@
 // songview.js: the song playlist. Lanes along a bar timeline; pattern clips on them.
 //
-//   mountSong(el, api) -> { render, playhead(beat) }
+//   mountSong(el, api) -> { render, playhead(beat), paintWith(brush) }
 //   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), toast(text, action),
-//        setMode(m), editPattern(k), undo()
+//        setMode(m), editPattern(k), editSample(track), undo()
+// The brush is a pattern number, or "t3": an audio clip of track 3's sample (sampler.js).
 // Tap an empty cell to place the pattern you paint with. Drag a clip to move it, drag its end to
 // repeat it, hold it to delete it. Model and maths: playlist.js.
-import { addClip, moveClip, resizeClip, splitClip, removeClip, songBars, MAX_LANES, MAX_BARS } from "./playlist.js";
+import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, MAX_LANES, MAX_BARS } from "./playlist.js";
+
+import { clipBars } from "./sampler.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -18,7 +21,9 @@ export function mountSong(el, api) {
     const song = api.song();
     const pats = song.patterns || [];
     const clips = song.clips || [];
-    brush = clamp(brush, 0, Math.max(0, pats.length - 1));
+    const samplers = song.tracks.map((t, i) => (t.sample ? i : -1)).filter((i) => i >= 0);
+    if (typeof brush === "string" && !samplers.includes(+brush.slice(1))) brush = 0;
+    if (typeof brush === "number") brush = clamp(brush, 0, Math.max(0, pats.length - 1));
     if (selected >= clips.length) selected = -1;
     const lanes = clamp(Math.max(4, ...clips.map((c) => c.lane + 2)), 4, MAX_LANES);
     const bars = clamp(songBars(song) + 8, 16, MAX_BARS);
@@ -30,8 +35,11 @@ export function mountSong(el, api) {
       for (let b = 0; b < bars; b++) cells += `<button class="sl-cell${b % 4 === 0 ? " beat" : ""}" data-lane="${l}" data-bar="${b}" aria-label="Lane ${l + 1}, bar ${b + 1}" tabindex="-1"></button>`;
       lanesHtml += `<div class="sl-lane" data-lane="${l}">${cells}` +
         clips.map((c, i) => c.lane !== l ? "" :
-          `<button class="sl-clip${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BAR_PX}px;width:${c.length * BAR_PX}px;--h:${(c.pattern * 67) % 360}" aria-label="${esc((pats[c.pattern] || {}).name)}, bar ${c.start + 1}, ${c.length} bars">` +
-          `<span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`).join("") +
+          (c.track != null
+            ? `<button class="sl-clip audio${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BAR_PX}px;width:${c.length * BAR_PX}px;--h:${(c.track * 67 + 200) % 360}" aria-label="${esc((song.tracks[c.track] || {}).name)}, audio, bar ${c.start + 1}, ${c.length} bars">` +
+              `<span class="sl-lbl">〰 ${esc((song.tracks[c.track] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`
+            : `<button class="sl-clip${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BAR_PX}px;width:${c.length * BAR_PX}px;--h:${(c.pattern * 67) % 360}" aria-label="${esc((pats[c.pattern] || {}).name)}, bar ${c.start + 1}, ${c.length} bars">` +
+              `<span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`)).join("") +
         `</div>`;
     }
     el.innerHTML =
@@ -42,6 +50,7 @@ export function mountSong(el, api) {
         `<span class="sl-sep"></span>` +
         `<span class="sl-paint">Paint with</span>` +
         pats.map((p, i) => `<button data-brush="${i}" aria-pressed="${i === brush}" data-tip="${esc(p.name)}" aria-label="Paint ${esc(p.name)}">${i + 1}</button>`).join("") +
+        samplers.map((i) => `<button data-brush="t${i}" aria-pressed="${brush === "t" + i}" data-tip="Audio: ${esc(song.tracks[i].name)}" aria-label="Paint audio ${esc(song.tracks[i].name)}">〰 ${esc(song.tracks[i].name)}</button>`).join("") +
       `</div>` +
       `<div class="cv-line sl-tools">` +
         `<button data-act="edit" aria-label="Edit this pattern in the rack" data-tip="Edit this pattern in the rack"${sel ? "" : " disabled"}>Edit</button>` +
@@ -69,7 +78,7 @@ export function mountSong(el, api) {
     if (!clip) return;
     const i = +clip.dataset.c, c = api.song().clips[i], grid = el.querySelector(".sl-grid");
     const atEnd = !!e.target.closest(".sl-end");
-    selected = i; brush = c.pattern;
+    selected = i; if (c.pattern != null) brush = c.pattern;
     drag = { i, end: atEnd, id: e.pointerId, x0: e.clientX, y0: e.clientY, bar0: barAt(e, grid), start0: c.start, len0: c.length, moved: false, before: api.snap(), grid };
     try { clip.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
     clearTimeout(hold);
@@ -105,19 +114,22 @@ export function mountSong(el, api) {
     const cell = e.target.closest(".sl-cell");
     if (cell) {
       const song = api.song(), bar = +cell.dataset.bar, lane = +cell.dataset.lane;
-      api.change(() => { selected = addClip(song, brush, lane, bar); });
+      api.change(() => {
+        if (typeof brush === "string") { const t = +brush.slice(1); selected = addAudioClip(song, t, lane, bar, clipBars(song.tracks[t].sample, song.bpm)); }
+        else selected = addClip(song, brush, lane, bar);
+      });
       return;
     }
     if (e.target.closest(".sl-clip")) return;
     const mode = e.target.closest("[data-mode]");
     if (mode) return api.setMode(mode.dataset.mode);
     const br = e.target.closest("[data-brush]");
-    if (br) { brush = +br.dataset.brush; return render(); }
+    if (br) { brush = br.dataset.brush[0] === "t" ? br.dataset.brush : +br.dataset.brush; return render(); }
     const act = e.target.closest("[data-act]");
     if (!act || act.disabled) return;
     const song = api.song(), c = song.clips[selected];
     if (!c) return;
-    if (act.dataset.act === "edit") api.editPattern(c.pattern);
+    if (act.dataset.act === "edit") { if (c.track != null) api.editSample(c.track); else api.editPattern(c.pattern); }
     else if (act.dataset.act === "split") api.change(() => { splitClip(song, selected, c.start + Math.floor(c.length / 2)); });
     else if (act.dataset.act === "del") removeSel(selected);
   });
@@ -129,7 +141,7 @@ export function mountSong(el, api) {
     if (!c) return;
     const k = e.key;
     if (k === "Delete" || k === "Backspace") { e.preventDefault(); return removeSel(i); }
-    if (k === "Enter") { e.preventDefault(); return api.editPattern(c.pattern); }
+    if (k === "Enter") { e.preventDefault(); return c.track != null ? api.editSample(c.track) : api.editPattern(c.pattern); }
     const d = k === "ArrowRight" || k === "ArrowDown" ? 1 : -1;
     if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { if (e.shiftKey) resizeClip(song, i, c.length + d); else moveClip(song, i, c.lane, c.start + d); });
     else if (k === "ArrowUp" || k === "ArrowDown") api.change(() => moveClip(song, i, c.lane + d, c.start));
@@ -145,5 +157,5 @@ export function mountSong(el, api) {
     head.hidden = false;
     head.style.transform = `translateX(${(beat / 4) * BAR_PX}px)`;
   }
-  return { render, playhead };
+  return { render, playhead, paintWith: (b) => { brush = b; render(); } };
 }
