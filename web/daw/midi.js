@@ -5,11 +5,12 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 4; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode; older files still open
+export const TEXT_VERSION = 5; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer; older files still open
 
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
 import { cleanClips } from "./playlist.js";
+import { cleanTrackMix, cleanMixer, defaultMixer } from "./mixer.js";
 import { withPatterns, cleanSteps, emptySteps, defaultKey } from "./pattern.js";
 
 export function parseMidi(buf) {
@@ -120,7 +121,10 @@ export function songToText(song) {
       "a clip longer than its pattern repeats it; mode is song or pattern, what Play plays. Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
       "progression (symbols like Cmaj9 or G13/B, beats each, how to voice them); it is only a way to " +
       "write notes, so the notes are the music. scripts are note scripts (see web/daw/script.js for " +
-      "the language): name, code, and the values of the sliders its params make.",
+      "the language): name, code, and the values of the sliders its params make. Mixer: each track has pan " +
+      "(-1..1), sends (how much goes to the Reverb and Delay buses, 0..1) and fx, its insert effects in order " +
+      "(eq, comp, dist, delay, reverb, each with its settings; on = false bypasses it). mixer holds the master " +
+      "(volume, fx; a limiter always follows) and the two send buses.",
     bpm: song.bpm,
     bars: song.bars,
     swing: song.swing || 0,
@@ -128,10 +132,11 @@ export function songToText(song) {
     mode: song.mode === "song" ? "song" : "pattern",
     clips: (song.clips || []).map((c) => ({ ...c })),
     chords: song.chords ?? JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)),
-    scripts: (song.scripts ?? defaultScripts()).map((x) => ({ name: x.name, code: x.code, values: { ...x.values } })),
+    mixer: cleanMixer(song.mixer),
+    scripts: (song.scripts ?? defaultScripts()).map((x) =>({ name: x.name, code: x.code, values: { ...x.values } })),
     tracks: song.tracks.map((t) => ({
       name: t.name, instrument: t.instrument, key: t.key ?? defaultKey(t.instrument), volume: t.volume ?? 0.8,
-      mute: !!t.mute, solo: !!t.solo,
+      mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t),
     })),
     patterns: withPatterns(song),
   }, null, 1);
@@ -156,6 +161,7 @@ export function textToSong(text) {
     swing: Math.min(1, Math.max(0, num(j.swing, 0))),
     chords: readChords(j.chords),
     scripts: readScripts(j.scripts),
+    mixer: cleanMixer(j.mixer),
     tracks: rawTracks.map((t, i) => {
       const instrument = String(t.instrument ?? "piano");
       return {
@@ -163,7 +169,7 @@ export function textToSong(text) {
         instrument,
         key: Math.min(127, Math.max(0, Math.round(num(t.key, defaultKey(instrument))))),
         volume: Math.min(1, Math.max(0, num(t.volume, 0.8))),
-        mute: !!t.mute, solo: !!t.solo,
+        mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t),
         notes: [], steps: emptySteps(),
       };
     }),
@@ -206,12 +212,12 @@ function readScripts(list) {
 export function midiToSong(m, instrumentFor) {
   return {
     bpm: m.bpm, bars: Math.min(64, m.bars), swing: 0, pattern: 0, mode: "pattern", clips: [], patterns: [{ name: "Pattern 1", tracks: [] }],
-    chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
+    chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(), mixer: defaultMixer(),
     tracks: m.tracks.map((t, i) => ({
       name: t.name || "Track " + (i + 1),
       instrument: instrumentFor(t.program, t.channel),
       channel: t.channel, program: t.program, volume: 0.8, mute: false, solo: false,
-      key: defaultKey(instrumentFor(t.program, t.channel)), steps: emptySteps(),
+      key: defaultKey(instrumentFor(t.program, t.channel)), steps: emptySteps(), ...cleanTrackMix({}),
       notes: t.notes,
     })),
   };

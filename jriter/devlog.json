@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.8.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Mixer",
+  "notes": [
+   "The DAW has a Mixer tab (Alt+6): a strip for every track with a level meter, volume, pan, mute and solo.",
+   "Each strip can hold effects: EQ, compressor, drive, delay and reverb. Switch them on and off, reorder them, set their sliders. Removing one can be undone.",
+   "Every track has two send knobs that feed shared Reverb and Delay strips, and the master ends in a limiter so the sum never clips.",
+   "Songs save the whole mixer in the .json file, and older song files still open with a clean mixer."
+  ]
+ },
+ {
   "version": "4.7.0",
   "date": "2026-11-22",
   "name": "JR!TER",

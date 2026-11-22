@@ -26,8 +26,10 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    drag to move, drag the end to repeat, Split, hold to delete. Play runs the pattern or the whole
    song (`S`). Code: `web/daw/playlist.js` (clips and the notes they make, tested), `songview.js`
    (the Song tab). The song format is v4: `clips` and `mode`.
-4. **Mixer.** An insert per channel with Web Audio effects (EQ, compressor, delay, reverb from
-   a generated impulse, distortion), sends, a master limiter, meters.
+4. **Mixer. Done in 4.8.0.** A strip per track: pan, two sends (Reverb and Delay buses), insert effects
+   (EQ, compressor, drive, delay, reverb from a generated impulse), a master with effects and a fixed
+   limiter, meters. Code: `web/daw/mixer.js` (model and maths, tested), `mixgraph.js` (the Web Audio graph),
+   `mixerview.js` (the Mixer tab). The song format is v5: per-track `pan`, `sends`, `fx` and a `mixer`.
 5. **Sampler and audio clips.** Any render or vocal take in the library becomes an instrument
    or a clip, chopped from its waveform. FL can't reach your songs; this can.
 6. **Automation and more script.** Automation lanes for any knob. The pattern script exists
@@ -36,5 +38,5 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    makes a render, so it becomes a version of the song with the project text stored beside it.
 8. **Together.** A friend opens the same project and edits live, a cursor per person.
 
-The project format is `jriter-daw` JSON (version 4; see `web/daw/midi.js` `songToText`). Old
+The project format is `jriter-daw` JSON (version 5; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

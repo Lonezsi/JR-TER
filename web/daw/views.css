@@ -8,9 +8,11 @@
 .main[data-view="roll"] .chords, .main[data-view="roll"] .scripts, .main[data-view="roll"] .rack { display: none; }
 .main[data-view="script"] .roll, .main[data-view="script"] .chords, .main[data-view="script"] .rack { display: none; }
 .main:not([data-view="song"]) .song { display: none; }
+.main:not([data-view="mixer"]) .mixer { display: none; }
+.main[data-view="mixer"] .tracks, .main[data-view="mixer"] .roll, .main[data-view="mixer"] .chords, .main[data-view="mixer"] .scripts, .main[data-view="mixer"] .rack { display: none; }
 .main[data-view="song"] .tracks, .main[data-view="song"] .roll, .main[data-view="song"] .chords, .main[data-view="song"] .scripts, .main[data-view="song"] .rack { display: none; }
 
-.chords, .scripts, .rack, .song { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
+.chords, .scripts, .rack, .song, .mixer { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
   background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
 .cv-line { display: flex; flex-wrap: wrap; gap: var(--d-s2); align-items: center; }
 .cv-line label { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
@@ -37,7 +39,7 @@
 /* Phones: loose rows, big targets, everything inside the screen. */
 @media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
   .views { order: 0; }
-  .chords, .scripts, .rack, .song { padding: var(--d-s2); }
+  .chords, .scripts, .rack, .song, .mixer { padding: var(--d-s2); }
   .cv-chips button { min-width: 44px; }
   .cv-sym { width: 100%; }
   .sv-param { grid-template-columns: 6em 1fr 3.5em; }
@@ -45,7 +47,7 @@
 }
 
 /* Children keep their size; the panel scrolls instead of squashing them. */
-.chords > *, .scripts > *, .rack > *, .song > * { flex-shrink: 0; }
+.chords > *, .scripts > *, .rack > *, .song > *, .mixer > * { flex-shrink: 0; }
 /* The note tools belong to the roll. */
 body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-erase, body:not([data-view="roll"]) #tool-select { display: none; }
 
@@ -89,3 +91,28 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
 .sl-end { position: absolute; right: 0; top: 0; bottom: 0; width: 14px; cursor: ew-resize; background: #fff3; }
 .sl-head { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--d-acc); pointer-events: none; }
 .sl-head[hidden] { display: none; }
+
+/* The mixer: a scrolling row of strips (inside its own box, never the page), then the effects. */
+.mx-strips { display: flex; gap: var(--d-s2); overflow-x: auto; padding-bottom: var(--d-s2); }
+.mx-strip { flex: none; width: 68px; display: flex; flex-direction: column; gap: var(--d-s2); align-items: stretch; padding: var(--d-s2); border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
+.mx-strip.sel { border-color: var(--d-acc); }
+.mx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: var(--d-s1); font-size: 11px; }
+.mx-name[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+.mx-mid { display: flex; gap: var(--d-s1); justify-content: center; height: 120px; }
+.mx-meter { width: 8px; height: 100%; background: var(--d-line); border-radius: 4px; position: relative; overflow: hidden; }
+.mx-meter i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--d-acc); border-radius: 4px; }
+.mx-fader { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 100%; margin: 0; }
+.mx-pan, .mx-send { width: 100%; margin: 0; }
+.mx-ms { display: flex; gap: var(--d-s1); }
+.mx-ms button { flex: 1; padding: var(--d-s1); }
+.mx-ms button[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+.mx-who { font-weight: 600; }
+.mx-chain { display: flex; flex-wrap: wrap; gap: var(--d-s3); }
+.mx-fx { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: var(--d-s2); padding: var(--d-s3); border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
+.mx-fx.off { opacity: .55; }
+.mx-fxh { display: flex; gap: var(--d-s1); align-items: center; }
+.mx-gap { flex: 1; }
+.mx-fxh button[aria-checked="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+.mx-p { display: grid; grid-template-columns: 5.5em 1fr 4.5em; gap: var(--d-s2); align-items: center; color: var(--d-mute); }
+.mx-p output { text-align: right; color: var(--d-fg); }
+.mx-param { min-width: 0; width: 100%; }
