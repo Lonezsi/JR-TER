@@ -134,4 +134,30 @@ export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, 
     need((await song()).mode === "song" && (await song()).clips.length === n0 + 2, "mode or clips not saved");
     await noSideways("song tab with clips");
   });
+  await scenario("the mixer: strips, an effect, a fader, meters while playing, fits the phone", async () => {
+    await tapEl("#view-mixer");
+    need((await view()) === "mixer", "view is " + (await view()));
+    await noSideways("mixer");
+    const s0 = await song();
+    const strips = await js(`document.querySelectorAll(".mx-strip").length`);
+    need(strips === s0.tracks.length + 3, "strips " + strips + " for " + s0.tracks.length + " tracks");
+    await tapEl('.mx-name[data-pick="t0"]');
+    await tapEl('[data-add="reverb"]');
+    let s = await song();
+    need(s.tracks[0].fx.length === 1 && s.tracks[0].fx[0].type === "reverb", "no reverb on track 1: " + JSON.stringify(s.tracks[0].fx));
+    await set('.mx-fader[data-id="t0"]', "0.3", "input");
+    await set('.mx-fader[data-id="t0"]', "0.3", "change");
+    s = await song();
+    need(Math.abs(s.tracks[0].volume - 0.3) < 0.01, "volume is " + s.tracks[0].volume);
+    await set('.mx-send[data-id="t0"][data-k="send0"]', "0.5", "input");
+    need(Math.abs((await song()).tracks[0].sends[0] - 0.5) < 0.01, "send did not change");
+    await tapEl("#play");
+    await sleep(700);
+    const lv = await js("window.jriterDaw.levels()");
+    need(lv && lv.tracks.length === s.tracks.length, "levels " + JSON.stringify(lv));
+    await tapEl("#play");
+    await tapEl('[data-fx="del"][data-i="0"]');
+    need((await song()).tracks[0].fx.length === 0, "effect not removed");
+    await noSideways("mixer after effects");
+  });
 }

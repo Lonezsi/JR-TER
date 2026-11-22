@@ -6,6 +6,7 @@
          /daw/chords.js (chord symbols to notes), /daw/pattern.js (patterns and steps, no DOM),
          /daw/rackview.js (the channel rack),
          /daw/playlist.js (clips on the song timeline, no DOM), /daw/songview.js (the Song tab), /daw/script.js (the note script language),
+         /daw/mixer.js (mixer model and maths, no DOM), /daw/mixgraph.js (the mixer as Web Audio), /daw/mixerview.js (the Mixer tab),
          /daw/synth.js (Web Audio instruments), /daw/gestures.js (touch), /daw/chordview.js and
          /daw/scriptview.js (the two editors), /daw/daw.js (the page), /daw/daw.css, /daw/views.css.
   For the song tab in the Svelte ui/: import midi.js and synth.js as they are, and load a
@@ -31,6 +32,7 @@
   </section>
   <section class="rack" id="rackview" aria-label="Channel rack"></section>
   <section class="song" id="songview" aria-label="Song playlist"></section>
+  <section class="mixer" id="mixerview" aria-label="Mixer"></section>
   <section class="chords" id="chordview" aria-label="Chord editor"></section>
   <section class="scripts" id="scriptview" aria-label="Note scripts"></section>
 </main>

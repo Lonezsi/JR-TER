@@ -10,6 +10,8 @@ import { run as runScript, defaultScripts } from "./script.js";
 import { mountRack } from "./rackview.js";
 import { mountSong } from "./songview.js";
 import { songNotes, songBars } from "./playlist.js";
+import { createMixer } from "./mixgraph.js";
+import { mountMixer } from "./mixerview.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
@@ -25,9 +27,9 @@ let lastLen = matchMedia("(pointer: coarse)").matches ? 0.5 : 0.25; // a thumb c
 let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
 let looping = true, playing = false, tool = "draw", wakeLock = null;
-const VIEWS = ["chords", "rack", "roll", "script", "song"];
+const VIEWS = ["chords", "rack", "roll", "script", "song", "mixer"];
 let view = "chords"; // the DAW always opens on the chord editor
-let ctx = null, synth = null, master = null, gains = [];
+let ctx = null, synth = null, mix = null;
 let t0 = 0, scheduled = 0, timer = 0, raf = 0, songCache = null;
 
 function defaultSong() {
@@ -160,6 +162,7 @@ const HELP = [
   ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
   ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
   ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays.", "Alt+5, S"],
+  ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
 function renderHelp() {
@@ -484,20 +487,17 @@ function audio() {
   if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   synth = createSynth(ctx);
-  master = ctx.createGain(); master.gain.value = 0.8;
-  const comp = ctx.createDynamicsCompressor();
-  master.connect(comp); comp.connect(ctx.destination);
+  mix = createMixer(ctx);
 }
 function syncGains() {
   if (!ctx) return;
-  while (gains.length < song.tracks.length) { const gn = ctx.createGain(); gn.connect(master); gains.push(gn); }
-  const solo = song.tracks.some((t) => t.solo);
-  song.tracks.forEach((t, i) => { gains[i].gain.value = (t.mute || (solo && !t.solo)) ? 0 : t.volume; });
+  mix.sync(song);
+
 }
 function preview(t, n) {
   audio(); syncGains();
   const i = song.tracks.indexOf(t);
-  synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: ctx.currentTime, length: 0.3, velocity: n.velocity }, gains[i]);
+  synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: ctx.currentTime, length: 0.3, velocity: n.velocity }, mix.input(i));
 }
 const curBeat = () => (ctx ? ((ctx.currentTime - t0) * song.bpm) / 60 : 0);
 function togglePlay() { if (playing) stop(); else play(0); }
@@ -521,9 +521,10 @@ function stop(quiet) {
   if (!quiet) {
     playing = false; renderBar(); draw(); rackUI.playhead(-1); songUI.playhead(-1);
     wakeLock?.release().catch(() => {}); wakeLock = null;
-    // Cut hanging tails by rebuilding the track gains.
-    for (const gn of gains) gn.disconnect();
-    gains = []; if (ctx) syncGains();
+    // Cut hanging tails: every strip gets a fresh input.
+    if (mix) { mix.cut(); syncGains(); }
+    mixUI.meters(null);
+
   }
 }
 function tick() {
@@ -536,7 +537,7 @@ function tick() {
       for (const n of songCache ? songCache[i] || [] : allNotes(t, song)) {
         const abs = n.start + k * len;
         if (abs < scheduled || abs >= end || n.start >= len) continue;
-        synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: t0 + abs * spb, length: Math.min(n.length, len - n.start) * spb, velocity: n.velocity }, gains[i]);
+        synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: t0 + abs * spb, length: Math.min(n.length, len - n.start) * spb, velocity: n.velocity }, mix.input(i));
       }
     });
   }
@@ -546,6 +547,7 @@ function frame() {
   draw();
   if (view === "rack") rackUI.playhead(playing ? Math.floor((curBeat() % 4) / 0.25) : -1);
   if (view === "song") songUI.playhead(playing ? curBeat() % playLen() : -1);
+  if (view === "mixer") mixUI.meters(playing && mix ? mix.levels() : null);
   if (playing) raf = requestAnimationFrame(frame);
 }
 
@@ -583,7 +585,7 @@ addEventListener("drop", async (e) => {
 addEventListener("keydown", (e) => {
   if (e.target.closest && e.target.closest("input,select,textarea")) return;
   const k = e.key;
-  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[12345]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
+  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[123456]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
   else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   else if (k === " ") { e.preventDefault(); togglePlay(); }
@@ -605,7 +607,7 @@ addEventListener("keydown", (e) => {
 });
 
 // ---- views: Chords, Roll, Script --------------------------------------------------------
-const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Song"] };
+const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Song"], mixer: ["◫", "Mixer"] };
 function renderViews() {
   $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => setView(v); });
@@ -624,16 +626,17 @@ function refreshView() {
   else if (view === "script") scriptUI.render();
   else if (view === "rack") rackUI.render();
   else if (view === "song") songUI.render();
+  else if (view === "mixer") mixUI.render();
 }
 
 const instrumentNow = () => (song.tracks[sel] ? song.tracks[sel].instrument : "piano");
 function sound(pitches) {
   audio(); syncGains();
-  pitches.forEach((pitch, i) => synth.playNote({ instrument: instrumentNow(), pitch, time: ctx.currentTime + i * 0.012, length: 0.7, velocity: 90 }, master));
+  pitches.forEach((pitch, i) => synth.playNote({ instrument: instrumentNow(), pitch, time: ctx.currentTime + i * 0.012, length: 0.7, velocity: 90 }, mix.master()));
 }
 function hear(notes, onEnd) {
   audio();
-  const gn = ctx.createGain(); gn.connect(master);
+  const gn = ctx.createGain(); gn.connect(mix.master());
   const spb = 60 / song.bpm, at = ctx.currentTime + 0.05;
   let end = 0;
   for (const n of notes) {
@@ -709,6 +712,10 @@ const rackUI = mountRack($("rackview"), {
   preview: (i, step) => { const t = song.tracks[i]; if (t) preview(t, { pitch: step.pitch, velocity: step.velocity }); },
 });
 
+const mixUI = mountMixer($("mixerview"), {
+  song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, sync: syncGains, selected: () => sel,
+  select: (i) => { sel = i; selNote = null; renderTracks(); },
+});
 const songUI = mountSong($("songview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, setMode,
   editPattern: (k) => { switchPattern(k); setView("rack"); },
@@ -731,6 +738,8 @@ window.jriterDaw = {
   zoom: () => zoom,
   scroll: () => ({ x: scrollX, y: scrollY }),
   playing: () => playing,
+  levels: () => (mix ? mix.levels() : null),
+  mixer: () => JSON.parse(JSON.stringify(song.mixer || null)),
   tool: () => tool,
   selected: () => sel,
   view: () => view,
