@@ -58,7 +58,7 @@ public class ExportController {
         TAKEN.put("songs", new String[] {"id", "title", "notes", "current_version_id", "created_at", "updated_at", "opened"});
         TAKEN.put("song_titles", new String[] {"id", "song_id", "title", "changed_at"});
         TAKEN.put("versions", new String[] {"id", "song_id", "n", "digest", "ext", "size", "duration", "bitrate",
-                "label", "filename", "source_path", "created_at", "project_at", "rendered_at", "peak_db", "trouble", "plugins"});
+                "label", "filename", "source_path", "created_at", "project_at", "rendered_at", "peak_db", "trouble", "plugins", "daw"});
         TAKEN.put("renders", new String[] {"id", "digest", "ext", "size", "duration", "bitrate", "filename",
                 "source_path", "origin", "created_at", "used_at", "project_at", "rendered_at", "peak_db", "trouble", "plugins",
                 "song_id", "version_id"});

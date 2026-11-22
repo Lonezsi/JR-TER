@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Takes of a song: a port of jriter/modules/versions.py. */
@@ -152,7 +153,7 @@ public class VersionsController {
         Library.Db db = library.of(Api.acct(req));
         Map<String, Object> song = SongsController.getSong(db, id);
         List<Map<String, Object>> rows = db.query("SELECT * FROM versions WHERE song_id = ? ORDER BY n DESC", song.get("id"));
-        for (Map<String, Object> r : rows) { r.put("shape", shapeList(r.remove("peaks"))); r.put("plugins", pluginList(r.get("plugins"))); }
+        for (Map<String, Object> r : rows) { r.put("shape", shapeList(r.remove("peaks"))); r.put("plugins", pluginList(r.get("plugins"))); Object d = r.remove("daw"); r.put("has_daw", d != null && !d.toString().isEmpty()); }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("versions", rows);
         out.put("current_version_id", song.get("current_version_id"));
@@ -198,6 +199,33 @@ public class VersionsController {
         out.put("version", a.version());
         out.put("duplicate", false);
         return out;
+    }
+
+    /** The DAW project a bounce was made from. */
+    @GetMapping("/api/versions/{id}/daw")
+    public Object getDaw(HttpServletRequest req, @PathVariable String id) {
+        Map<String, Object> v = getVersion(library.of(Api.acct(req)), id);
+        Object text = v.get("daw");
+        if (text == null || text.toString().isEmpty()) throw new ApiError("That version has no DAW project.", 404);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("version_id", v.get("id"));
+        out.put("song_id", v.get("song_id"));
+        out.put("n", v.get("n"));
+        out.put("text", text);
+        return out;
+    }
+
+    @PutMapping("/api/versions/{id}/daw")
+    public Object putDaw(HttpServletRequest req, @PathVariable String id) {
+        Library.Db db = library.of(Api.acct(req));
+        Map<String, Object> v = getVersion(db, id);
+        Object text = Body.json(req).get("text");
+        if (text == null) throw new ApiError("text is needed");
+        DawController.checkText(text);
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("daw", text);
+        db.update("versions", Accounts.num(v.get("id")), patch);
+        return Map.of("ok", true);
     }
 
     @GetMapping("/api/versions/have")

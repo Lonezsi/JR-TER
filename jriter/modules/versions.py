@@ -9,7 +9,7 @@ import os
 import time
 
 from .. import audio_meta, blobs, config, db, finding, registry
-from ..wire import Error, Response, as_int
+from ..wire import Error, Response, as_int, need
 from . import songs
 
 NAME = "versions"
@@ -71,6 +71,11 @@ def _add_plugins_column():
     db.add_column_if_missing("versions", "plugins", "TEXT NOT NULL DEFAULT ''")
 
 
+def _add_daw_column():
+    """The DAW project text a bounce was made from (see docs/DAW.md step 7b)."""
+    db.add_column_if_missing("versions", "daw", "TEXT NOT NULL DEFAULT ''")
+
+
 PLUGIN_KINDS = ("vst2", "vst3", "fl")
 
 
@@ -119,6 +124,7 @@ MIGRATE = [
     ("dates_from_the_render", _add_date_columns),
     ("shape_and_trouble", _add_shape_columns),
     ("plugin_list", _add_plugins_column),
+    ("daw_project", _add_daw_column),
 ]
 
 def get(version_id):
@@ -136,6 +142,7 @@ def list_versions(req):
         raw = row.pop("peaks", "") or ""
         row["shape"] = [int(n) for n in raw.split(",") if n.isdigit()]
         row["plugins"] = plugin_list(row.get("plugins"))
+        row["has_daw"] = bool(row.pop("daw", ""))   # the text itself is fetched on its own
     return {"versions": rows, "current_version_id": song["current_version_id"]}
 
 
@@ -217,6 +224,24 @@ def upload(req):
         label=(req.headers.get("X-Label") or "").strip(), filename=filename,
         source_path=(req.headers.get("X-Source-Path") or "").strip())
     return {"version": version, "duplicate": False}
+
+
+def get_daw(req):
+    """The DAW project a bounce was made from."""
+    version = get(req.params["id"])
+    if not version.get("daw"):
+        raise Error("That version has no DAW project.", 404)
+    return {"version_id": version["id"], "song_id": version["song_id"], "n": version["n"],
+            "text": version["daw"]}
+
+
+def put_daw(req):
+    from . import daw
+    version = get(req.params["id"])
+    text = need((req.json() or {}), "text")
+    daw.check_text(text)
+    db.update("versions", version["id"], {"daw": text})
+    return {"ok": True}
 
 
 def have(req):
@@ -388,6 +413,8 @@ def ROUTES():
         ("PATCH", "/api/versions/<id>"): patch_version,
         ("DELETE", "/api/versions/<id>"): delete_version,
         ("POST", "/api/versions/<id>/current"): make_current,
+        ("GET", "/api/versions/<id>/daw"): get_daw,
+        ("PUT", "/api/versions/<id>/daw"): put_daw,
         ("GET", "/api/versions/<id>/audio"): audio,
         ("GET", "/api/versions/<id>/download"): download,
     }

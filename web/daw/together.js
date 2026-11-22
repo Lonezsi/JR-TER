@@ -10,7 +10,7 @@ import { mergeTexts } from "./merge.js";
 
 export function apiPrefix(shareId) { return shareId ? `/api/shared/${encodeURIComponent(shareId)}/on` : "/api"; }
 
-export function startTogether({ songId, shareId, getText, applyText, getCursor, onPeople, onStatus }) {
+export function startTogether({ songId, shareId, getText, applyText, getCursor, onPeople, onStatus, onReady }) {
   const url = `${apiPrefix(shareId)}/songs/${encodeURIComponent(songId)}/daw`;
   let rev = 0, baseText = "", pushTimer = 0, busy = false, again = false, ready = false, stopped = false;
   const call = async (method, path, body) => {
@@ -70,6 +70,7 @@ export function startTogether({ songId, shareId, getText, applyText, getCursor, 
       else take(j);
       status("ok");
     } catch { status("offline"); ready = false; }
+    if (ready && onReady) onReady();
     if (ready) beat();
   })();
 

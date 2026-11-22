@@ -45,7 +45,7 @@ TAKEN = {
     "song_titles": ("id", "song_id", "title", "changed_at"),
     "versions": ("id", "song_id", "n", "digest", "ext", "size", "duration", "bitrate",
                  "label", "filename", "source_path", "created_at", "project_at",
-                 "rendered_at", "peak_db", "trouble", "plugins"),
+                 "rendered_at", "peak_db", "trouble", "plugins", "daw"),
     "renders": ("id", "digest", "ext", "size", "duration", "bitrate", "filename",
                 "source_path", "origin", "created_at", "used_at", "project_at",
                 "rendered_at", "peak_db", "trouble", "plugins", "song_id", "version_id"),
