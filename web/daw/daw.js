@@ -8,6 +8,8 @@ import { mountScripts } from "./scriptview.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { run as runScript, defaultScripts } from "./script.js";
 import { mountRack } from "./rackview.js";
+import { mountSong } from "./songview.js";
+import { songNotes, songBars } from "./playlist.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
@@ -23,16 +25,16 @@ let lastLen = matchMedia("(pointer: coarse)").matches ? 0.5 : 0.25; // a thumb c
 let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
 let looping = true, playing = false, tool = "draw", wakeLock = null;
-const VIEWS = ["chords", "rack", "roll", "script"];
+const VIEWS = ["chords", "rack", "roll", "script", "song"];
 let view = "chords"; // the DAW always opens on the chord editor
 let ctx = null, synth = null, master = null, gains = [];
-let t0 = 0, scheduled = 0, timer = 0, raf = 0;
+let t0 = 0, scheduled = 0, timer = 0, raf = 0, songCache = null;
 
 function defaultSong() {
   const notes = [];
   [60, 64, 67, 72, 67, 64, 60, 64].forEach((p, i) => notes.push({ pitch: p, start: i * 0.5, length: 0.5, velocity: 90 }));
   [60, 64, 67, 72, 67, 64, 60, 64].forEach((p, i) => notes.push({ pitch: p, start: 4 + i * 0.5, length: 0.5, velocity: 90 }));
-  return { bpm: 120, bars: 4, swing: 0, pattern: 0, patterns: [{ name: "Pattern 1", tracks: [] }], chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
+  return { bpm: 120, bars: 4, swing: 0, pattern: 0, mode: "pattern", clips: [], patterns: [{ name: "Pattern 1", tracks: [] }], chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
     tracks: [{ name: "Piano", instrument: "piano", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes }] };
 }
 function loadSaved() {
@@ -90,6 +92,7 @@ function renderBar() {
     $("play").setAttribute("aria-label", playing ? "Stop" : "Play");
     $("play").dataset.tip = playing ? "Stop (Space)" : "Play (Space)";
     $("loop").setAttribute("aria-pressed", looping);
+    $("mode").setAttribute("aria-pressed", song.mode === "song");
     for (const t of ["draw", "erase", "select"]) $("tool-" + t).setAttribute("aria-pressed", tool === t);
     $("bpm").value = song.bpm; $("bars").value = song.bars;
     $("pat").innerHTML = (song.patterns || []).map((p, i) => `<option value="${i}"${i === song.pattern ? " selected" : ""}>${i + 1}. ${p.name.replace(/[&<>"]/g, "")}</option>`).join("");
@@ -97,7 +100,7 @@ function renderBar() {
   }
   bar.dataset.built = "1";
   bar.innerHTML = `<div class="transport">` + btn("home", "⌂", "Back to the library", undefined, "Library") +
-    btn("play", ICONS.play, "Play (Space)", undefined, "Play") + btn("loop", ICONS.loop, "Loop (L)", looping, "Loop") +
+    btn("play", ICONS.play, "Play (Space)", undefined, "Play") + btn("loop", ICONS.loop, "Loop (L)", looping, "Loop") + btn("mode", "☰", "Play the whole song, or just this pattern (S)", song.mode === "song", "Song") +
     `<span class="sep"></span>` +
     btn("tool-draw", "✎", "Draw notes (P)", true, "Draw") + btn("tool-erase", "⌫", "Erase notes (E)", false, "Erase") +
     btn("tool-select", "⌖", "Select only (V)", false, "Select") +
@@ -116,13 +119,14 @@ function renderBar() {
   $("home").onclick = () => location.assign("/");
   $("play").onclick = () => togglePlay();
   $("loop").onclick = () => { looping = !looping; renderBar(); };
+  $("mode").onclick = () => setMode(song.mode === "song" ? "pattern" : "song");
   $("bpm").onchange = (e) => { edit(() => { song.bpm = clamp(+e.target.value || 120, 20, 300); }); if (playing) play(curBeat() % loopLen()); };
   $("bars").onchange = (e) => edit(() => { song.bars = clamp(Math.round(+e.target.value) || 4, 1, 64); });
   $("pat").onchange = (e) => switchPattern(+e.target.value);
   $("add").onclick = addTrack;
   $("undo").onclick = doUndo;
   $("open").onclick = () => $("file").click();
-  $("savemid").onclick = () => download("song.mid", writeMidi({ ...song, tracks: song.tracks.map((t) => ({ ...t, notes: allNotes(t, song) })) }), "audio/midi");
+  $("savemid").onclick = () => { const all = song.mode === "song" && (song.clips || []).length ? songNotes(song) : null; download("song.mid", writeMidi({ ...song, tracks: song.tracks.map((t, i) => ({ ...t, notes: all ? all[i] : allNotes(t, song) })) }), "audio/midi"); };
   $("savejson").onclick = () => download("song.json", songToText(song), "application/json");
   renderBar();
 }
@@ -155,6 +159,7 @@ const HELP = [
   ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
   ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
   ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
+  ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays.", "Alt+5, S"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
 function renderHelp() {
@@ -224,6 +229,8 @@ const cv = $("roll"), g = cv.getContext("2d");
 let W = 0, H = 0;
 const pxBeat = () => 64 * zoom;
 const loopLen = () => song.bars * 4;
+const inSong = () => song.mode === "song" && (song.clips || []).length > 0;
+const playLen = () => (inSong() ? songBars(song) * 4 : loopLen());
 function range() {
   let lo = 36, hi = 96;
   for (const t of song.tracks) for (const n of t.notes) { lo = Math.min(lo, n.pitch - 2); hi = Math.max(hi, n.pitch + 2); }
@@ -494,8 +501,14 @@ function preview(t, n) {
 }
 const curBeat = () => (ctx ? ((ctx.currentTime - t0) * song.bpm) / 60 : 0);
 function togglePlay() { if (playing) stop(); else play(0); }
+function setMode(m) {
+  edit(() => { song.mode = m; });
+  if (m === "song" && !(song.clips || []).length) toast("Place a pattern on the Song tab first.");
+  if (playing) play(0);
+}
 function play(from) {
   audio(); stop(true); syncGains();
+  songCache = inSong() ? songNotes(song) : null;
   playing = true;
   t0 = ctx.currentTime + 0.05 - (from * 60) / song.bpm;
   scheduled = from;
@@ -506,7 +519,7 @@ function play(from) {
 function stop(quiet) {
   clearInterval(timer); cancelAnimationFrame(raf);
   if (!quiet) {
-    playing = false; renderBar(); draw(); rackUI.playhead(-1);
+    playing = false; renderBar(); draw(); rackUI.playhead(-1); songUI.playhead(-1);
     wakeLock?.release().catch(() => {}); wakeLock = null;
     // Cut hanging tails by rebuilding the track gains.
     for (const gn of gains) gn.disconnect();
@@ -514,13 +527,13 @@ function stop(quiet) {
   }
 }
 function tick() {
-  const spb = 60 / song.bpm, len = loopLen();
+  const spb = 60 / song.bpm, len = playLen();
   const upTo = curBeat() + 0.12 / spb;
   if (!looping && scheduled >= len) { if (curBeat() > len + 1) { playing = false; stop(); } return; }
   const end = looping ? upTo : Math.min(upTo, len);
   for (let k = Math.floor(scheduled / len); k * len < end; k++) {
     song.tracks.forEach((t, i) => {
-      for (const n of allNotes(t, song)) {
+      for (const n of songCache ? songCache[i] || [] : allNotes(t, song)) {
         const abs = n.start + k * len;
         if (abs < scheduled || abs >= end || n.start >= len) continue;
         synth.playNote({ instrument: t.instrument, pitch: n.pitch, time: t0 + abs * spb, length: Math.min(n.length, len - n.start) * spb, velocity: n.velocity }, gains[i]);
@@ -532,6 +545,7 @@ function tick() {
 function frame() {
   draw();
   if (view === "rack") rackUI.playhead(playing ? Math.floor((curBeat() % 4) / 0.25) : -1);
+  if (view === "song") songUI.playhead(playing ? curBeat() % playLen() : -1);
   if (playing) raf = requestAnimationFrame(frame);
 }
 
@@ -569,7 +583,7 @@ addEventListener("drop", async (e) => {
 addEventListener("keydown", (e) => {
   if (e.target.closest && e.target.closest("input,select,textarea")) return;
   const k = e.key;
-  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[1234]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
+  if (e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[12345]$/.test(e.code)) { e.preventDefault(); setView(VIEWS[+e.code.slice(5) - 1]); }
   else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); doUndo(); }
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   else if (k === " ") { e.preventDefault(); togglePlay(); }
@@ -580,6 +594,7 @@ addEventListener("keydown", (e) => {
   else if (k === "e" || k === "E") setTool("erase");
   else if (k === "v" || k === "V") setTool("select");
   else if (k === "l" || k === "L") { looping = !looping; renderBar(); }
+  else if (k === "s" || k === "S") setMode(song.mode === "song" ? "pattern" : "song");
   else if (k === "j" || k === "k") {
     sel = clamp(sel + (k === "j" ? 1 : -1), 0, song.tracks.length - 1); selNote = null; renderTracks(); draw();
   } else if (k === "n" || k === "N") addTrack();
@@ -590,7 +605,7 @@ addEventListener("keydown", (e) => {
 });
 
 // ---- views: Chords, Roll, Script --------------------------------------------------------
-const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"] };
+const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Song"] };
 function renderViews() {
   $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => setView(v); });
@@ -608,6 +623,7 @@ function refreshView() {
   if (view === "chords") chordUI.render();
   else if (view === "script") scriptUI.render();
   else if (view === "rack") rackUI.render();
+  else if (view === "song") songUI.render();
 }
 
 const instrumentNow = () => (song.tracks[sel] ? song.tracks[sel].instrument : "piano");
@@ -693,6 +709,11 @@ const rackUI = mountRack($("rackview"), {
   preview: (i, step) => { const t = song.tracks[i]; if (t) preview(t, { pitch: step.pitch, velocity: step.velocity }); },
 });
 
+const songUI = mountSong($("songview"), {
+  song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, setMode,
+  editPattern: (k) => { switchPattern(k); setView("rack"); },
+});
+
 // ---- errors are shown, and the page can be scripted ----------------------------------------
 // A failure on a phone used to be silence. Now it is a message, and the tests (and anyone
 // with a console) can read and drive the page without clicking: anything you can click you
@@ -702,6 +723,9 @@ addEventListener("unhandledrejection", (e) => toast("Something went wrong: " + (
 window.jriterDaw = {
   song: () => { const j = JSON.parse(songToText(song)); j.tracks.forEach((t, i) => { t.notes = song.tracks[i].notes.map((n) => ({ ...n })); t.steps = JSON.parse(JSON.stringify(song.tracks[i].steps)); }); return j; },
   pattern: () => song.pattern,
+  mode: () => song.mode,
+  setMode,
+  clips: () => JSON.parse(JSON.stringify(song.clips || [])),
   usePattern: switchPattern,
   load: (text) => { song = textToSong(text); sel = 0; selNote = null; changed(true); },
   zoom: () => zoom,

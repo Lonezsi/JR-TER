@@ -7,8 +7,10 @@
 .main[data-view="rack"] .tracks, .main[data-view="rack"] .roll, .main[data-view="rack"] .chords, .main[data-view="rack"] .scripts { display: none; }
 .main[data-view="roll"] .chords, .main[data-view="roll"] .scripts, .main[data-view="roll"] .rack { display: none; }
 .main[data-view="script"] .roll, .main[data-view="script"] .chords, .main[data-view="script"] .rack { display: none; }
+.main:not([data-view="song"]) .song { display: none; }
+.main[data-view="song"] .tracks, .main[data-view="song"] .roll, .main[data-view="song"] .chords, .main[data-view="song"] .scripts, .main[data-view="song"] .rack { display: none; }
 
-.chords, .scripts, .rack { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
+.chords, .scripts, .rack, .song { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
   background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
 .cv-line { display: flex; flex-wrap: wrap; gap: var(--d-s2); align-items: center; }
 .cv-line label { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
@@ -35,7 +37,7 @@
 /* Phones: loose rows, big targets, everything inside the screen. */
 @media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
   .views { order: 0; }
-  .chords, .scripts, .rack { padding: var(--d-s2); }
+  .chords, .scripts, .rack, .song { padding: var(--d-s2); }
   .cv-chips button { min-width: 44px; }
   .cv-sym { width: 100%; }
   .sv-param { grid-template-columns: 6em 1fr 3.5em; }
@@ -43,7 +45,7 @@
 }
 
 /* Children keep their size; the panel scrolls instead of squashing them. */
-.chords > *, .scripts > *, .rack > * { flex-shrink: 0; }
+.chords > *, .scripts > *, .rack > *, .song > * { flex-shrink: 0; }
 /* The note tools belong to the roll. */
 body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-erase, body:not([data-view="roll"]) #tool-select { display: none; }
 
@@ -67,3 +69,23 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
   .rk-steps { grid-template-columns: repeat(8, 1fr); gap: 4px; }
   .rk-step { height: 44px; }
 }
+
+/* The song playlist: lanes of bars with pattern clips on them. */
+.sl-sep { width: var(--d-s3); }
+.sl-paint { color: var(--d-mute); }
+.song .cv-line button[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+.sl-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--d-line); border-radius: var(--r-sm, 9px); }
+.sl-grid { position: relative; display: flex; flex-direction: column; }
+.sl-ruler { display: flex; height: 20px; color: var(--d-mute); font-size: 10px; }
+.sl-n { flex: none; width: var(--bar); padding-left: 3px; box-sizing: border-box; }
+.sl-lane { position: relative; display: flex; height: 44px; border-top: 1px solid var(--d-line); }
+.sl-cell { flex: none; width: var(--bar); height: 100%; padding: 0; border: 0; border-left: 1px solid var(--d-grid, var(--d-line)); border-radius: 0; background: transparent; }
+.sl-cell.beat { border-left-color: var(--d-bar); }
+.sl-clip { position: absolute; top: 3px; bottom: 3px; padding: 0 var(--d-s1); overflow: hidden; text-align: left; touch-action: none; border-radius: 6px;
+  background-color: hsl(var(--h) 45% 42% / .85); border: 1px solid hsl(var(--h) 60% 70%); color: #fff;
+  background-image: repeating-linear-gradient(90deg, transparent 0 calc(var(--bar) - 1px), #0004 calc(var(--bar) - 1px) var(--bar)); }
+.sl-clip.sel { border-color: var(--d-acc); box-shadow: 0 0 0 2px var(--d-acc); }
+.sl-lbl { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; pointer-events: none; }
+.sl-end { position: absolute; right: 0; top: 0; bottom: 0; width: 14px; cursor: ew-resize; background: #fff3; }
+.sl-head { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--d-acc); pointer-events: none; }
+.sl-head[hidden] { display: none; }
