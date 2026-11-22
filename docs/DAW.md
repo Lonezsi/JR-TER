@@ -45,8 +45,11 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    `autolanes.js` (the lanes). The song format is v7: `automation`. Script additions in `script.js`:
    `euclid HITS of STEPS step X [rotate Y]`, `scale minor D` with `snap`, `shift`, `degree`, and
    `use "Kick" as kick` with `playing`, `starts`, `lowest`, `highest`. Three scripts ship for them.
-7. **Into the song.** A DAW tab in `ui/` once the Svelte source is here. Bouncing the project
-   makes a render, so it becomes a version of the song with the project text stored beside it.
+7. **Into the song. Bounce done in 4.11.0.** `/daw.html?song=ID` opens the DAW for a library song
+   with its own saved project. Bounce (B, in More) renders offline (`bounce.js` writes the .wav) and
+   uploads it as a new version of that song; without a song it goes to the waiting renders, and if
+   the library can't take it, it downloads. The song page has a DAW tab (a hand patch of the built
+   bundle until `ui/` is here). Not yet: the project text stored beside the version on the server.
 8. **Together.** A friend opens the same project and edits live, a cursor per person.
 
 The project format is `jriter-daw` JSON (version 7; see `web/daw/midi.js` `songToText`). Old

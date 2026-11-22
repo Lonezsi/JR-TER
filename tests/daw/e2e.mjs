@@ -192,6 +192,16 @@ try {
     need((await song()).tracks.length === 2, "tracks: " + (await song()).tracks.length);
     await tapEl("#more");
   });
+  await scenario("Bounce renders the song and says where it went (a download here: no library)", async () => {
+    await tapEl("#more"); await sleep(100);
+    await js(`document.querySelectorAll(".toast").forEach((t) => t.remove())`);
+    await tapEl("#bounce");
+    let text = "";
+    for (let i = 0; i < 40 && !/downloaded|Saved as|Bounced\./.test(text); i++) { await sleep(250); text = await js(`[...document.querySelectorAll(".toast")].map((t) => t.textContent).join(" | ")`); }
+    need(/downloaded|Saved as|Bounced\./.test(text), "no bounce result toast, saw: " + text);
+    need(!/Could not bounce/.test(text), "bounce failed: " + text);
+    if (await js(`document.getElementById("bar").classList.contains("open")`)) await tapEl("#more");
+  });
   await scenario("the instrument dropdown changes the instrument", async () => {
     const sel = await js("window.jriterDaw.selected()");
     await js(`(() => { const s = document.querySelectorAll(".track select")[${sel}]; s.value = "bass"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);

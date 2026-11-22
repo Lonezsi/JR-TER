@@ -15,10 +15,12 @@ import { mountSampler } from "./samplerview.js";
 import { sliceFor, playSlice, songAudio, sampleEnd, chop } from "./sampler.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
+import { encodeWav, bounceSeconds } from "./bounce.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
-const KEY = "jriter-daw";
+const songId = new URLSearchParams(location.search).get("song"); // /daw.html?song=ID: this library song's own project
+const KEY = songId ? "jriter-daw:song:" + songId : "jriter-daw";
 const SNAP = 0.25; // a 16th note, in beats
 let ROW = 14;
 const GUTTER = 44;
@@ -117,11 +119,12 @@ function renderBar() {
     btn("add", ICONS.add, "New track (N)") + btn("undo", ICONS.undo, "Undo (Ctrl+Z)") +
     `<span class="sep"></span>` +
     btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") +
-    btn("savejson", ICONS.json, "Save as .json text") + `</div>`;
+    btn("savejson", ICONS.json, "Save as .json text") +
+    btn("bounce", "⤓", "Bounce to audio: a new version of the song (B)") + `</div>`;
   for (const t of ["draw", "erase", "select"]) $("tool-" + t).onclick = () => setTool(t);
   $("more").onclick = () => setMore(!bar.classList.contains("open"));
   $("help").onclick = () => setHelp($("helpbox").hidden);
-  $("home").onclick = () => location.assign("/");
+  $("home").onclick = () => location.assign(songId ? "/#/song/" + songId : "/");
   $("play").onclick = () => togglePlay();
   $("loop").onclick = () => { looping = !looping; renderBar(); };
   $("mode").onclick = () => setMode(song.mode === "song" ? "pattern" : "song");
@@ -132,6 +135,7 @@ function renderBar() {
   $("undo").onclick = doUndo;
   $("open").onclick = () => $("file").click();
   $("savemid").onclick = () => { const all = song.mode === "song" && (song.clips || []).length ? songNotes(song) : null; download("song.mid", writeMidi({ ...song, tracks: song.tracks.map((t, i) => ({ ...t, notes: all ? all[i] : allNotes(t, song) })) }), "audio/midi"); };
+  $("bounce").onclick = bounce;
   $("savejson").onclick = () => download("song.json", songToText(song), "application/json");
   renderBar();
 }
@@ -161,6 +165,7 @@ const HELP = [
   ["✎", "Draw adds notes, Erase removes them, Select only picks them.", "P, E, V"],
   ["▶", "Play runs the loop. Loop turns repeating on and off.", "Space, L"],
   ["⋯", "More: tempo, bars, new track, open and save .mid or .json.", "N, Ctrl+Z"],
+  ["⤓", "Bounce: render the song to audio and save it as a new version of the library song (or a waiting render when opened without one).", "B"],
   ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
   ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
   ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
@@ -524,13 +529,62 @@ function bufferNow(src) {
 }
 // One note on one track: a sampler plays its sound (chopped pieces play to their end, pitched
 // ones are gated by the note), every other instrument goes to the synth.
-function voice(t, n, time, len, dest) {
+function voice(t, n, time, len, dest) { voiceOn(ctx, synth, bufferNow, t, n, time, len, dest); }
+function voiceOn(c, syn, getBuf, t, n, time, len, dest) {
   if (t.instrument === "sampler" && t.sample) {
-    const buf = bufferNow(t.sample.src), sl = sliceFor(t.sample, n.pitch);
-    if (buf && sl) playSlice(ctx, buf, sl, time, t.sample.slices.length ? 0 : len, n.velocity, dest);
+    const buf = getBuf(t.sample.src), sl = sliceFor(t.sample, n.pitch);
+    if (buf && sl) playSlice(c, buf, sl, time, t.sample.slices.length ? 0 : len, n.velocity, dest);
     return;
   }
-  synth.playNote({ instrument: t.instrument, pitch: n.pitch, time, length: len, velocity: n.velocity }, dest);
+  syn.playNote({ instrument: t.instrument, pitch: n.pitch, time, length: len, velocity: n.velocity }, dest);
+}
+// ---- bounce: render the song offline to a .wav and keep it ---------------------------------
+let bouncing = false;
+async function bounce() {
+  if (bouncing) return;
+  bouncing = true; stop(); setMore(false); toast("Bouncing…");
+  try {
+    const beats = playLen(), spb = 60 / song.bpm, secs = bounceSeconds(beats, song.bpm);
+    const off = new OfflineAudioContext(2, Math.ceil(secs * 44100), 44100);
+    const syn = createSynth(off), m = createMixer(off);
+    m.sync(song);
+    await Promise.all(song.tracks.filter((t) => t.sample).map((t) => bufferOf(t.sample.src).catch(() => null)));
+    const getBuf = (src) => (buffers.get(src) || {}).buf || null;
+    const all = inSong() ? songNotes(song) : null;
+    song.tracks.forEach((t, i) => {
+      for (const n of all ? all[i] || [] : allNotes(t, song)) {
+        if (n.start >= beats) continue;
+        voiceOn(off, syn, getBuf, t, n, n.start * spb, Math.min(n.length, beats - n.start) * spb, m.input(i));
+      }
+    });
+    if (inSong()) for (const ev of songAudio(song)) {
+      const t = song.tracks[ev.track], buf = t && t.sample ? getBuf(t.sample.src) : null;
+      if (buf && ev.start < beats) playSlice(off, buf, { from: t.sample.start + ev.offset * spb, to: sampleEnd(t.sample), rate: 1 }, ev.start * spb, ev.length * spb, 100, m.input(ev.track));
+    }
+    if ((song.automation || []).length && typeof off.suspend === "function") {
+      try {
+        for (let b = 0.25; b < beats; b += 0.25) {
+          off.suspend(b * spb).then(() => { m.sync({ ...song, ...automated(song, b) }); off.resume(); });
+        }
+      } catch { /* renders without automation */ }
+    }
+    const out = await off.startRendering();
+    const bytes = encodeWav([out.getChannelData(0), out.getChannelData(1)], 44100);
+    let saved = false;
+    try {
+      const r = await fetch(songId ? `/api/songs/${encodeURIComponent(songId)}/versions` : "/api/renders", {
+        method: "POST", credentials: "include", body: bytes,
+        headers: songId ? { "X-Filename": "daw-bounce.wav", "X-Label": "DAW bounce", "X-Duration": String(secs) } : { "X-Filename": "daw-bounce.wav", "X-Origin": "daw" } });
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}));
+        saved = true;
+        if (songId) toast(j.duplicate ? (j.message || "Nothing new to add.") : "Saved as v" + (j.version ? j.version.n : "?") + " of the song.", { label: "Open", run: () => location.assign("/#/song/" + songId + "/takes") });
+        else toast("Bounced. It waits in Renders for a song.");
+      }
+    } catch { /* falls through to the download */ }
+    if (!saved) { download("daw-bounce.wav", bytes, "audio/wav"); toast("Could not save it to the library, so it downloaded instead."); }
+  } catch (err) { toast(err.message || "Could not bounce."); }
+  bouncing = false;
 }
 function preview(t, n) {
   audio(); syncGains();
@@ -676,6 +730,7 @@ addEventListener("keydown", (e) => {
   else if (k === "e" || k === "E") setTool("erase");
   else if (k === "v" || k === "V") setTool("select");
   else if (k === "l" || k === "L") { looping = !looping; renderBar(); }
+  else if (k === "b" || k === "B") bounce();
   else if (k === "s" || k === "S") setMode(song.mode === "song" ? "pattern" : "song");
   else if (k === "j" || k === "k") {
     sel = clamp(sel + (k === "j" ? 1 : -1), 0, song.tracks.length - 1); selNote = null; renderTracks(); draw();
@@ -851,6 +906,7 @@ try {
   draw();
 }
 fetch("/api/state").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.version) $("verstamp").textContent = " · DAW " + j.version; }).catch(() => {});
+if (songId) fetch("/api/songs/" + encodeURIComponent(songId), { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((j) => { const n = document.querySelector("#morebox .name"); if (j && j.song && n) n.textContent = "DAW · " + j.song.title; }).catch(() => {});
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
   fetch(src, { credentials: "include" })
