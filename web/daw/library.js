@@ -29,3 +29,45 @@ export async function waitingRenders() {
   const j = await get("/api/renders");
   return (j.renders || []).map((x) => ({ kind: "render", name: name(x.filename, "Render"), src: `/api/renders/${x.id}/audio`, seconds: x.duration || 0 }));
 }
+
+// ---- your own one-shots (server module samples): files you bring from your computer ----------
+
+export async function mySamples() {
+  const j = await get("/api/samples");
+  return (j.samples || []).map((x) => ({ kind: "oneshot", id: x.id, name: x.name, folder: x.folder || "", src: `/api/samples/${x.id}/audio`, seconds: x.duration || 0 }));
+}
+
+// How long a sound is, from its bytes. 0 when the browser cannot decode it (it is kept anyway).
+async function lengthOf(bytes) {
+  try {
+    const ctx = new OfflineAudioContext(1, 1, 44100);
+    return (await ctx.decodeAudioData(bytes.slice(0))).duration;
+  } catch { return 0; }
+}
+
+// The folder a file came from when a whole folder was picked or dropped: "Drums / Kicks".
+export const folderOf = (file) => String(file.webkitRelativePath || file._path || "").split("/").slice(0, -1).join(" / ");
+
+export const isSound = (file) => /\.(wav|mp3|ogg|opus|flac|m4a|aiff?)$/i.test(file.name) || /^audio\//.test(file.type);
+
+// Upload files one by one. Returns { added, skipped, failed } counts.
+export async function uploadSamples(files, onProgress) {
+  const out = { added: 0, skipped: 0, failed: 0 };
+  const list = [...files];
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    if (!isSound(f)) { out.skipped++; continue; }
+    if (onProgress) onProgress(i + 1, list.length, f.name);
+    try {
+      const bytes = await f.arrayBuffer();
+      const r = await fetch("/api/samples", { method: "POST", credentials: "include", body: bytes, headers: {
+        "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(f.name), "X-Folder": encodeURIComponent(folderOf(f)), "X-Duration": String(await lengthOf(bytes)) } });
+      if (r.status === 401 || r.status === 403) throw new Error("signin");
+      if (r.ok) out.added++; else out.failed++;
+    } catch (e) { if (e.message === "signin") throw e; out.failed++; }
+  }
+  return out;
+}
+
+export async function removeSample(id) { const r = await fetch("/api/samples/" + id, { method: "DELETE", credentials: "include" }); return r.ok; }
+export async function restoreSample(id) { const r = await fetch("/api/samples/" + id + "/restore", { method: "POST", credentials: "include" }); return r.ok; }

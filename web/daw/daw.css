@@ -110,4 +110,6 @@ body.drop .roll { border-color: var(--d-acc); }
   .help { top: auto; left: var(--d-s2); right: var(--d-s2); width: auto; bottom: calc(88px + env(safe-area-inset-bottom)); max-height: 60vh; overflow: auto; }
   /* Above the bottom bar, never on it. */
   .toasts { left: var(--d-s2); right: var(--d-s2); bottom: calc(88px + env(safe-area-inset-bottom)); max-width: none; }
+  /* With More open its sheet sits where the toasts do: they move to the top instead of covering its buttons. */
+  .bar.open ~ .toasts { bottom: auto; top: var(--d-s2); }
 }

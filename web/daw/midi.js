@@ -5,7 +5,7 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 7; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation; older files still open
+export const TEXT_VERSION = 8; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples; older files still open
 
 import { cleanAutomation } from "./automation.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";
@@ -119,7 +119,7 @@ export function songToText(song) {
       "track in the same order, notes (pitch is a MIDI number, 60 = middle C; start and length are in " +
       "beats; velocity 1-127) and steps (16 entries, one bar of sixteenths: null = off, or " +
       "{velocity, pitch}; the bar repeats over the loop). pattern = the index of the pattern open in " +
-      "the editor. clips place patterns on the song timeline: pattern (index), lane, start, length and offset, all in bars; " +
+      "the editor. clips place patterns on the song timeline: pattern (index), lane, start, length and offset, all in bars (down to a sixteenth of a bar); " +
       "a clip longer than its pattern repeats it; mode is song or pattern, what Play plays. Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
       "progression (symbols like Cmaj9 or G13/B, beats each, how to voice them); it is only a way to " +
       "write notes, so the notes are the music. scripts are note scripts (see web/daw/script.js for " +
@@ -128,7 +128,7 @@ export function songToText(song) {
       "(eq, comp, dist, delay, reverb, each with its settings; on = false bypasses it). mixer holds the master " +
       "(volume, fx; a limiter always follows) and the two send buses. A track with instrument sampler has a sample " +
       "from the library: src is where its audio comes from, start and end are seconds (end 0 = to the end), root is the " +
-      "MIDI pitch that plays it as it is, slices are cut points in seconds (with cuts, root plays piece 1, root+1 piece 2, and so on). " +
+      "MIDI pitch that plays it as it is, slices are cut points in seconds (with cuts, root plays piece 1, root+1 piece 2, and so on). oneshot true means every note plays the whole sound, whatever the note length (a drum hit or an effect); src may be /api/samples/ID/audio, one of your own one-shots. " +
       "A clip with track instead of pattern is an audio clip: it plays that track's sample from offset bars in, for length bars. " +
       "automation is knobs that move over time: each lane has a target (t0.volume, t0.pan, t0.send0, t0.fx1.mix for the second effect of track 0, " +
       "master.volume, master.fx0.low, bus0.volume) and points of { beat, value }, sorted by beat (4 beats a bar), the value in the knob's own range; " +

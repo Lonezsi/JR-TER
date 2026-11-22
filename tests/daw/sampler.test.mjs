@@ -1,3 +1,4 @@
+import { gateFor } from "../../web/daw/sampler.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { cleanSample, chop, addSlice, removeSliceNear, sliceFor, clipBars, songAudio, peaks } from "../../web/daw/sampler.js";
@@ -106,4 +107,13 @@ test("format v6 round trip keeps samples and audio clips; a v5 file still opens"
 
 test("peaks gives the loudest sample per stretch", () => {
   assert.deepEqual(peaks(new Float32Array([0, 0.5, -1, 0.25]), 2), [0.5, 1]);
+});
+
+test("a one-shot plays the whole sound however short the note, a plain sample follows the note", () => {
+  const base = { name: "k", src: "/a", seconds: 1, start: 0, end: 0, root: 60, slices: [] };
+  assert.equal(gateFor(base, 0.25), 0.25);
+  assert.equal(gateFor({ ...base, oneshot: true }, 0.25), 0);
+  assert.equal(gateFor({ ...base, slices: [0.5] }, 0.25), 0);
+  assert.equal(cleanSample({ ...base, oneshot: true }).oneshot, true);
+  assert.equal(cleanSample({ ...base, oneshot: "yes" }).oneshot, false);
 });

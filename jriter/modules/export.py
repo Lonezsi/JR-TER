@@ -81,6 +81,9 @@ TAKEN = {
     # Voices on a song. The recordings themselves are blobs, like renders.
     "vocal_takes": ("id", "song_id", "author", "name", "digest", "ext", "size", "duration",
                     "offset", "enabled", "gain", "chain", "created_at", "updated_at"),
+    # Your own one-shots for the DAW. The sounds are blobs; deleted ones are kept (deleted_at).
+    "samples": ("id", "name", "folder", "digest", "ext", "size", "duration", "created_at",
+                "deleted_at"),
 }
 
 #: Left out on purpose, and why. Anything that is in neither list is a table nobody has
@@ -156,6 +159,7 @@ ABOUT = ("Every row this library keeps, table by table. Ids are this library's o
 #: Which columns name a file in the blob store, per table.
 BLOB_COLUMNS = {"versions": ("digest", "ext"), "renders": ("digest", "ext"),
                 "artwork": ("digest", "ext"), "vocal_takes": ("digest", "ext"),
+                "samples": ("digest", "ext"),
                 "albums": ("cover_digest", "cover_ext")}
 
 
@@ -377,7 +381,7 @@ def erase(req):
 #: The rest of TAKEN belongs to the machine or account that made it and never comes in.
 IMPORTED = ["songs", "song_titles", "albums", "album_songs", "versions", "renders",
             "lyric_sheets", "lyric_revisions", "artwork", "sound_presets", "arrangements",
-            "daw_projects", "playlists", "playlist_items", "vocal_takes"]
+            "daw_projects", "playlists", "playlist_items", "vocal_takes", "samples"]
 #: column -> the table whose new ids it must be rewritten to.
 POINTS_AT = {"song_id": "songs", "album_id": "albums", "sheet_id": "lyric_sheets",
              "playlist_id": "playlists", "render_id": "renders", "version_id": "versions",

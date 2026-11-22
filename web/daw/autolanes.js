@@ -1,6 +1,6 @@
 // autolanes.js: automation lanes on the Song tab. The model and maths are in automation.js.
 //
-//   const lanes = mountLanes(el, api, { barPx, render })
+//   const lanes = mountLanes(el, api, { barPx, step, render })   barPx() and step() (beats, 0 = none) are asked every time: the Song tab zooms
 //   lanes.button()      the "+ Automate" button (put it in a button line)
 //   lanes.menu(song)    the list of knobs, empty when closed
 //   lanes.html(song, bars)   the lanes, to go inside the song grid
@@ -9,18 +9,18 @@
 // Tap a lane to add a point. Drag a point to move it (it stays between its neighbours). Hold a point
 // to delete it. With the keyboard on a point: arrows move it (Shift = a bar sideways), Delete removes it.
 import { targets, targetSpec, addPoint, removePoint } from "./automation.js";
+import { snapRound } from "./snap.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const H = 64;      // lane height in px
-const SNAP = 0.25; // beats
 const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
 
-export function mountLanes(el, api, { barPx, render }) {
+export function mountLanes(el, api, { barPx, step, render }) {
   let open = false, drag = null, hold = 0, quiet = 0; // quiet: the click a long press ends with must not add a point
-  const xOf = (beat) => (beat / 4) * barPx;
+  const xOf = (beat) => (beat / 4) * barPx();
   const yOf = (spec, v) => (1 - (v - spec.min) / (spec.max - spec.min)) * (H - 12) + 6;
-  const beatOf = (x) => Math.max(0, Math.round(((x / barPx) * 4) / SNAP) * SNAP);
+  const beatOf = (x) => Math.max(0, snapRound((x / barPx()) * 4, step()));
   const valueOf = (spec, y) => Math.round((spec.min + (1 - clamp((y - 6) / (H - 12), 0, 1)) * (spec.max - spec.min)) * 10000) / 10000;
 
   function line(lane, spec, width) {
@@ -40,7 +40,7 @@ export function mountLanes(el, api, { barPx, render }) {
       `</div>`;
   }
 
-  const html = (song, bars) => (song.automation || []).map((l, i) => laneHtml(song, l, i, bars * barPx)).join("");
+  const html = (song, bars) => (song.automation || []).map((l, i) => laneHtml(song, l, i, bars * barPx())).join("");
   const button = () => `<button data-al="open" aria-expanded="${open}" aria-label="Automate a knob" data-tip="Automate a knob over time">+ Automate</button>`;
   function menu(song) {
     if (!open) return "";
@@ -127,7 +127,7 @@ export function mountLanes(el, api, { barPx, render }) {
     const k = e.key;
     if (k === "Delete" || k === "Backspace") { e.preventDefault(); return dropPoint(l, i); }
     const lo = i > 0 ? ln.points[i - 1].beat : 0, hi = i < ln.points.length - 1 ? ln.points[i + 1].beat : Infinity;
-    if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { p.beat = clamp(p.beat + (k === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 4 : SNAP), lo, hi); });
+    if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { p.beat = clamp(p.beat + (k === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 4 : step() || 0.25), lo, hi); });
     else if (k === "ArrowUp" || k === "ArrowDown") api.change(() => { p.value = clamp(p.value + (k === "ArrowUp" ? 1 : -1) * (spec.max - spec.min) / 20, spec.min, spec.max); });
     else return;
     e.preventDefault(); refocus(l, i);

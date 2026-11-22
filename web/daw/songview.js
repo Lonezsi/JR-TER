@@ -9,15 +9,24 @@
 import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, MAX_LANES, MAX_BARS } from "./playlist.js";
 
 import { clipBars } from "./sampler.js";
+import { SONG_STEPS, stepFor, snapFloor, snapRound, snapOptions, loadSnap, saveSnap } from "./snap.js";
 import { mountLanes } from "./autolanes.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const BAR_PX = 36;
+const BAR_PX = 36;     // one bar at zoom 1
+const MIN_PX = 16;     // auto snap: the finest step that is still this wide on screen
+const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
+const QB = 16;         // clips sit on sixteenths of a bar
 
 export function mountSong(el, api) {
-  let brush = 0, selected = -1, drag = null, hold = 0;
-  const autoLanes = mountLanes(el, api, { barPx: BAR_PX, render: () => render() });
+  let brush = 0, selected = -1, drag = null, hold = 0, zoomS = 1;
+  const snapSet = loadSnap(localStorage);
+  const barPx = () => BAR_PX * zoomS;
+  // How far clips snap, in beats (0 = to the sixteenth of a bar, the grid clips live on).
+  const step = () => stepFor(snapSet.song, barPx() / 4, MIN_PX, SONG_STEPS);
+  const stepBars = () => Math.max(1 / QB, (step() || 0.25) / 4);
+  const autoLanes = mountLanes(el, api, { barPx, step, render: () => render() });
 
   function render() {
     const song = api.song();
@@ -28,19 +37,20 @@ export function mountSong(el, api) {
     if (typeof brush === "number") brush = clamp(brush, 0, Math.max(0, pats.length - 1));
     if (selected >= clips.length) selected = -1;
     const lanes = clamp(Math.max(4, ...clips.map((c) => c.lane + 2)), 4, MAX_LANES);
-    const bars = clamp(songBars(song) + 8, 16, MAX_BARS);
+    const bars = clamp(Math.ceil(songBars(song)) + 8, 16, MAX_BARS);
     const sel = clips[selected];
+    const BP = barPx(), every = BP >= 60 ? 1 : BP >= 24 ? 4 : 16;
     let ruler = "", lanesHtml = "";
-    for (let b = 0; b < bars; b++) ruler += `<span class="sl-n">${b % 4 === 0 ? b + 1 : ""}</span>`;
+    for (let b = 0; b < bars; b++) ruler += `<span class="sl-n">${b % every === 0 ? b + 1 : ""}</span>`;
     for (let l = 0; l < lanes; l++) {
       let cells = "";
       for (let b = 0; b < bars; b++) cells += `<button class="sl-cell${b % 4 === 0 ? " beat" : ""}" data-lane="${l}" data-bar="${b}" aria-label="Lane ${l + 1}, bar ${b + 1}" tabindex="-1"></button>`;
       lanesHtml += `<div class="sl-lane" data-lane="${l}">${cells}` +
         clips.map((c, i) => c.lane !== l ? "" :
           (c.track != null
-            ? `<button class="sl-clip audio${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BAR_PX}px;width:${c.length * BAR_PX}px;--h:${(c.track * 67 + 200) % 360}" aria-label="${esc((song.tracks[c.track] || {}).name)}, audio, bar ${c.start + 1}, ${c.length} bars">` +
+            ? `<button class="sl-clip audio${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BP}px;width:${c.length * BP}px;--h:${(c.track * 67 + 200) % 360}" aria-label="${esc((song.tracks[c.track] || {}).name)}, audio, bar ${c.start + 1}, ${c.length} bars">` +
               `<span class="sl-lbl">〰 ${esc((song.tracks[c.track] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`
-            : `<button class="sl-clip${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BAR_PX}px;width:${c.length * BAR_PX}px;--h:${(c.pattern * 67) % 360}" aria-label="${esc((pats[c.pattern] || {}).name)}, bar ${c.start + 1}, ${c.length} bars">` +
+            : `<button class="sl-clip${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BP}px;width:${c.length * BP}px;--h:${(c.pattern * 67) % 360}" aria-label="${esc((pats[c.pattern] || {}).name)}, bar ${c.start + 1}, ${c.length} bars">` +
               `<span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`)).join("") +
         `</div>`;
     }
@@ -56,15 +66,18 @@ export function mountSong(el, api) {
       `</div>` +
       `<div class="cv-line sl-tools">` +
         `<button data-act="edit" aria-label="Edit this pattern in the rack" data-tip="Edit this pattern in the rack"${sel ? "" : " disabled"}>Edit</button>` +
-        `<button data-act="split" aria-label="Cut the clip in half" data-tip="Cut the clip in half"${sel && sel.length > 1 ? "" : " disabled"}>Split</button>` +
+        `<button data-act="split" aria-label="Cut the clip in half" data-tip="Cut the clip in half"${sel && sel.length >= 2 / QB ? "" : " disabled"}>Split</button>` +
         `<button data-act="del" aria-label="Delete the clip" data-tip="Delete the clip"${sel ? "" : " disabled"}>Delete</button>` +
-        `<span class="sl-sep"></span>${autoLanes.button()}</div>` + autoLanes.menu(song) +
-      `<div class="sl-scroll"><div class="sl-grid" style="--bar:${BAR_PX}px;width:${bars * BAR_PX}px">` +
+        `<span class="sl-sep"></span>${autoLanes.button()}` +
+        `<span class="sl-sep"></span><button data-act="zoomout" aria-label="Zoom out" data-tip="Zoom out (Ctrl+wheel, or pinch)">−</button><button data-act="zoomin" aria-label="Zoom in" data-tip="Zoom in (Ctrl+wheel, or pinch)">+</button>` +
+        `<label>Snap <select data-snap aria-label="Snap">${snapOptions(SONG_STEPS, snapSet.song, step())}</select></label></div>` + autoLanes.menu(song) +
+      `<div class="sl-scroll"><div class="sl-grid" style="--bar:${BP}px;width:${bars * BP}px">` +
         `<div class="sl-ruler">${ruler}</div>${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>` +
       `<div class="sv-doc">Tap a lane to place the pattern. Drag a clip to move it, drag its end to repeat it. Hold a clip to delete it. Automate draws a knob's moves over time: tap a lane to add a point, drag it, hold it to delete it.</div>`;
   }
 
-  const barAt = (e, grid) => Math.floor((e.clientX - grid.getBoundingClientRect().left) / BAR_PX);
+  // Where the pointer is on the timeline, in bars (fractional).
+  const barAt = (e, grid) => (e.clientX - grid.getBoundingClientRect().left) / barPx();
   const laneAt = (e, grid) => {
     const rows = [...grid.querySelectorAll(".sl-lane")];
     for (const r of rows) { const b = r.getBoundingClientRect(); if (e.clientY >= b.top && e.clientY < b.bottom) return +r.dataset.lane; }
@@ -93,12 +106,14 @@ export function mountSong(el, api) {
     if (!drag || e.pointerId !== drag.id) return;
     if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
     drag.moved = true; clearTimeout(hold);
-    const song = api.song(), db = barAt(e, drag.grid) - drag.bar0;
-    if (drag.end) resizeClip(song, drag.i, drag.len0 + db);
-    else moveClip(song, drag.i, laneAt(e, drag.grid), drag.start0 + db);
+    const song = api.song(), db = barAt(e, drag.grid) - drag.bar0, sb = step() / 4;
+    // Snap the result, not the movement: a clip that started off the grid lands on it.
+    const snapped = (bars) => (sb > 0 ? snapRound(bars, sb) : bars);
+    if (drag.end) resizeClip(song, drag.i, Math.max(stepBars(), snapped(drag.len0 + db)));
+    else moveClip(song, drag.i, laneAt(e, drag.grid), snapped(drag.start0 + db));
     const c = song.clips[drag.i], node = el.querySelector(`.sl-clip[data-c="${drag.i}"]`);
     if (node) {
-      node.style.left = c.start * BAR_PX + "px"; node.style.width = c.length * BAR_PX + "px";
+      node.style.left = c.start * barPx() + "px"; node.style.width = c.length * barPx() + "px";
       const lane = el.querySelector(`.sl-lane[data-lane="${c.lane}"]`);
       if (lane && node.parentElement !== lane) lane.append(node);
     }
@@ -116,7 +131,9 @@ export function mountSong(el, api) {
   el.addEventListener("click", (e) => {
     const cell = e.target.closest(".sl-cell");
     if (cell) {
-      const song = api.song(), bar = +cell.dataset.bar, lane = +cell.dataset.lane;
+      // The cell is a whole bar; the tap lands somewhere in it, and snaps to the grid.
+      const grid = el.querySelector(".sl-grid"), at = barAt(e, grid), sb = step() / 4;
+      const song = api.song(), lane = +cell.dataset.lane, bar = Math.max(0, sb > 0 ? snapFloor(at, sb) : Math.floor(at * QB) / QB);
       api.change(() => {
         if (typeof brush === "string") { const t = +brush.slice(1); selected = addAudioClip(song, t, lane, bar, clipBars(song.tracks[t].sample, song.bpm)); }
         else selected = addClip(song, brush, lane, bar);
@@ -130,10 +147,12 @@ export function mountSong(el, api) {
     if (br) { brush = br.dataset.brush[0] === "t" ? br.dataset.brush : +br.dataset.brush; return render(); }
     const act = e.target.closest("[data-act]");
     if (!act || act.disabled) return;
+    if (act.dataset.act === "zoomin") return zoomBy(1);
+    if (act.dataset.act === "zoomout") return zoomBy(-1);
     const song = api.song(), c = song.clips[selected];
     if (!c) return;
     if (act.dataset.act === "edit") { if (c.track != null) api.editSample(c.track); else api.editPattern(c.pattern); }
-    else if (act.dataset.act === "split") api.change(() => { splitClip(song, selected, c.start + Math.floor(c.length / 2)); });
+    else if (act.dataset.act === "split") api.change(() => { splitClip(song, selected, c.start + Math.max(1 / QB, Math.round((c.length / 2) * QB) / QB)); });
     else if (act.dataset.act === "del") removeSel(selected);
   });
 
@@ -146,7 +165,7 @@ export function mountSong(el, api) {
     if (k === "Delete" || k === "Backspace") { e.preventDefault(); return removeSel(i); }
     if (k === "Enter") { e.preventDefault(); return c.track != null ? api.editSample(c.track) : api.editPattern(c.pattern); }
     const d = k === "ArrowRight" || k === "ArrowDown" ? 1 : -1;
-    if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { if (e.shiftKey) resizeClip(song, i, c.length + d); else moveClip(song, i, c.lane, c.start + d); });
+    if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { if (e.shiftKey) resizeClip(song, i, c.length + d * stepBars()); else moveClip(song, i, c.lane, c.start + d * stepBars()); });
     else if (k === "ArrowUp" || k === "ArrowDown") api.change(() => moveClip(song, i, c.lane + d, c.start));
     else return;
     e.preventDefault(); selected = i; render();
@@ -158,7 +177,56 @@ export function mountSong(el, api) {
     if (!head) return;
     if (beat < 0) { head.hidden = true; return; }
     head.hidden = false;
-    head.style.transform = `translateX(${(beat / 4) * BAR_PX}px)`;
+    head.style.transform = `translateX(${(beat / 4) * barPx()}px)`;
   }
-  return { render, playhead, paintWith: (b) => { brush = b; render(); } };
+  // ---- zoom: buttons, Ctrl+wheel, pinch. Keeps the bar under the middle (or the pointer) where it was.
+  function setZoomS(z, anchorX) {
+    const sc = el.querySelector(".sl-scroll"), old = barPx();
+    z = clamp(z, ZOOMS[0], ZOOMS[ZOOMS.length - 1]);
+    if (z === zoomS) return;
+    const r = sc ? sc.getBoundingClientRect() : null, ax = anchorX == null && r ? r.width / 2 : (anchorX ?? 0) - (r ? r.left : 0);
+    const bar = sc ? (sc.scrollLeft + ax) / old : 0;
+    zoomS = z; render();
+    const again = el.querySelector(".sl-scroll");
+    if (again) again.scrollLeft = Math.max(0, bar * barPx() - ax);
+  }
+  function zoomBy(dir) {
+    const i = ZOOMS.findIndex((z) => z >= zoomS - 1e-9);
+    setZoomS(ZOOMS[clamp((i < 0 ? ZOOMS.length - 1 : i) + dir, 0, ZOOMS.length - 1)]);
+  }
+  el.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey || !e.target.closest(".sl-scroll")) return;
+    e.preventDefault();
+    setZoomS(zoomS * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX);
+  }, { passive: false });
+  const fingers = new Map();
+  let pinch = null;
+  el.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" || !e.target.closest(".sl-scroll")) return;
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size === 2) {
+      const [a, b] = [...fingers.values()];
+      pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: zoomS };
+      clearTimeout(hold); drag = null; // two fingers is a zoom, not a clip being dragged
+    }
+  }, true);
+  el.addEventListener("pointermove", (e) => {
+    if (!fingers.has(e.pointerId)) return;
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && fingers.size === 2) {
+      const [a, b] = [...fingers.values()];
+      setZoomS(pinch.z0 * ((Math.hypot(a.x - b.x, a.y - b.y) || 1) / pinch.d0), (a.x + b.x) / 2);
+    }
+  });
+  const lift = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch = null; };
+  el.addEventListener("pointerup", lift);
+  el.addEventListener("pointercancel", lift);
+
+  el.addEventListener("change", (e) => {
+    const sel = e.target.closest && e.target.closest("[data-snap]");
+    if (!sel) return;
+    snapSet.song = sel.value; saveSnap(localStorage, { song: snapSet.song });
+    render();
+  });
+  return { render, playhead, paintWith: (b) => { brush = b; render(); }, zoom: () => zoomS, setZoom: (z) => setZoomS(z), snap: () => ({ setting: snapSet.song, beats: step() }), setSnap: (v) => { snapSet.song = v; saveSnap(localStorage, { song: v }); render(); } };
 }

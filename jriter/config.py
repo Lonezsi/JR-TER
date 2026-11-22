@@ -185,6 +185,8 @@ MODULES = [
     # Voices recorded over a song, by the owner and by anybody it is shared with. Off is a
     # song page with no Vocals section.
     "vocals",
+    # Your own one-shots (kicks, hits, effects) for the DAW. Off is a Sampler tab with no My one-shots.
+    "samples",
     # A week, and where the classes fall in it. Nothing to do with music, and it is here
     # rather than in Foyer because of how each site can be reached: this one is behind
     # Tailscale Funnel and a login, so it answers on a phone, and Foyer is on the tailnet
