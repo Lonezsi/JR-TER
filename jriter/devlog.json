@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.6.0",
+  "date": "2026-11-22",
+  "name": "JR!TER",
+  "title": "Beats",
+  "notes": [
+   "The DAW has a Rack tab: one row of 16 steps per channel. Tap a step to light it, drag a lit step up or down to change its velocity, or switch to Pitch and drag to change its note.",
+   "Patterns: pick 1, 2, 3 at the top of the Rack, add, duplicate or delete them. Each pattern keeps its own steps and piano-roll notes. [ and ] switch pattern from the keyboard.",
+   "Swing slider, and a + Drums button that adds a kick, snare and hat with a basic beat.",
+   "Songs save their patterns in the .json file, and older song files still open as one pattern."
+  ]
+ },
+ {
   "version": "4.5.0",
   "date": "2026-11-21",
   "name": "JR!TER",

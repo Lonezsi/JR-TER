@@ -5,10 +5,11 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 2; // 2 added chords and scripts; version 1 files still open
+export const TEXT_VERSION = 3; // 2 added chords and scripts, 3 patterns, steps and swing; older files still open
 
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
+import { withPatterns, cleanSteps, emptySteps, defaultKey } from "./pattern.js";
 
 export function parseMidi(buf) {
   const d = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
@@ -108,21 +109,27 @@ export function songToText(song) {
   return JSON.stringify({
     format: TEXT_FORMAT,
     version: TEXT_VERSION,
-    about: "A JR!TER DAW song. bpm = tempo; bars = loop length (4 beats each). Each track has an " +
-      "instrument (piano, pad, bass, pluck, drums), volume 0-1, and notes: pitch is a MIDI " +
-      "number (60 = middle C), start and length are in beats, velocity is 1-127. Edit it by " +
-      "hand and open it again on /daw.html. chords is the chord editor's progression (symbols like " +
-      "Cmaj9 or G13/B, beats each, how to voice them); it is only a way to write notes, so the notes " +
-      "in tracks are the music. scripts are note scripts (see web/daw/script.js for the language): " +
-      "name, code, and the values of the sliders its params make.",
+    about: "A JR!TER DAW song. bpm = tempo; bars = loop length (4 beats each); swing 0-1 delays every " +
+      "second sixteenth step. tracks are the channels: instrument (piano, pad, bass, pluck, drums), " +
+      "key = the pitch a new step plays, volume 0-1. patterns hold the music: each pattern has, per " +
+      "track in the same order, notes (pitch is a MIDI number, 60 = middle C; start and length are in " +
+      "beats; velocity 1-127) and steps (16 entries, one bar of sixteenths: null = off, or " +
+      "{velocity, pitch}; the bar repeats over the loop). pattern = the index of the pattern open in " +
+      "the editor. Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
+      "progression (symbols like Cmaj9 or G13/B, beats each, how to voice them); it is only a way to " +
+      "write notes, so the notes are the music. scripts are note scripts (see web/daw/script.js for " +
+      "the language): name, code, and the values of the sliders its params make.",
     bpm: song.bpm,
     bars: song.bars,
+    swing: song.swing || 0,
+    pattern: song.pattern || 0,
     chords: song.chords ?? JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)),
     scripts: (song.scripts ?? defaultScripts()).map((x) => ({ name: x.name, code: x.code, values: { ...x.values } })),
     tracks: song.tracks.map((t) => ({
-      name: t.name, instrument: t.instrument, volume: t.volume ?? 0.8,
-      mute: !!t.mute, solo: !!t.solo, notes: t.notes.map((n) => ({ ...n })),
+      name: t.name, instrument: t.instrument, key: t.key ?? defaultKey(t.instrument), volume: t.volume ?? 0.8,
+      mute: !!t.mute, solo: !!t.solo,
     })),
+    patterns: withPatterns(song),
   }, null, 1);
 }
 
@@ -132,24 +139,48 @@ export function textToSong(text) {
   if (!j || j.format !== TEXT_FORMAT) throw new Error("That is not a JR!TER DAW song.");
   if (j.version > TEXT_VERSION) throw new Error("That song is from a newer version of the DAW.");
   const num = (v, d) => (Number.isFinite(v) ? v : d);
-  return {
+  const readNotes = (list) => (Array.isArray(list) ? list : []).map((n) => ({
+    pitch: Math.min(127, Math.max(0, Math.round(num(n.pitch, 60)))),
+    start: Math.max(0, num(n.start, 0)),
+    length: Math.max(1 / 64, num(n.length, 0.25)),
+    velocity: Math.min(127, Math.max(1, Math.round(num(n.velocity, 90)))),
+  }));
+  const rawTracks = Array.isArray(j.tracks) ? j.tracks : [];
+  const song = {
     bpm: Math.min(300, Math.max(20, num(j.bpm, 120))),
     bars: Math.min(64, Math.max(1, Math.round(num(j.bars, 4)))),
+    swing: Math.min(1, Math.max(0, num(j.swing, 0))),
     chords: readChords(j.chords),
     scripts: readScripts(j.scripts),
-    tracks: (Array.isArray(j.tracks) ? j.tracks : []).map((t, i) => ({
-      name: String(t.name ?? "Track " + (i + 1)),
-      instrument: String(t.instrument ?? "piano"),
-      volume: Math.min(1, Math.max(0, num(t.volume, 0.8))),
-      mute: !!t.mute, solo: !!t.solo,
-      notes: (Array.isArray(t.notes) ? t.notes : []).map((n) => ({
-        pitch: Math.min(127, Math.max(0, Math.round(num(n.pitch, 60)))),
-        start: Math.max(0, num(n.start, 0)),
-        length: Math.max(1 / 64, num(n.length, 0.25)),
-        velocity: Math.min(127, Math.max(1, Math.round(num(n.velocity, 90)))),
-      })),
-    })),
+    tracks: rawTracks.map((t, i) => {
+      const instrument = String(t.instrument ?? "piano");
+      return {
+        name: String(t.name ?? "Track " + (i + 1)),
+        instrument,
+        key: Math.min(127, Math.max(0, Math.round(num(t.key, defaultKey(instrument))))),
+        volume: Math.min(1, Math.max(0, num(t.volume, 0.8))),
+        mute: !!t.mute, solo: !!t.solo,
+        notes: [], steps: emptySteps(),
+      };
+    }),
   };
+  if (Array.isArray(j.patterns) && j.patterns.length) {
+    song.patterns = j.patterns.map((p, k) => ({
+      name: String((p && p.name) ?? "Pattern " + (k + 1)),
+      tracks: (p && Array.isArray(p.tracks) ? p.tracks : []).map((t) => ({ notes: readNotes(t && t.notes), steps: cleanSteps(t && t.steps) })),
+    }));
+    song.pattern = Math.min(song.patterns.length - 1, Math.max(0, Math.round(num(j.pattern, 0))));
+  } else { // version 1 or 2: the notes sit in the tracks, and that is one pattern
+    song.patterns = [{ name: "Pattern 1", tracks: [] }];
+    song.pattern = 0;
+    song.patterns[0].tracks = rawTracks.map((t) => ({ notes: readNotes(t && t.notes), steps: emptySteps() }));
+  }
+  const cur = song.patterns[song.pattern];
+  song.tracks.forEach((t, i) => {
+    const src = cur.tracks[i];
+    if (src) { t.notes = src.notes.map((n) => ({ ...n })); t.steps = src.steps.map((x) => (x ? { ...x } : null)); }
+  });
+  return song;
 }
 
 function readChords(c) {
@@ -168,12 +199,13 @@ function readScripts(list) {
 // Turn a parsed MIDI file into a DAW song (instrument chosen from program / channel).
 export function midiToSong(m, instrumentFor) {
   return {
-    bpm: m.bpm, bars: Math.min(64, m.bars),
+    bpm: m.bpm, bars: Math.min(64, m.bars), swing: 0, pattern: 0, patterns: [{ name: "Pattern 1", tracks: [] }],
     chords: JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)), scripts: defaultScripts(),
     tracks: m.tracks.map((t, i) => ({
       name: t.name || "Track " + (i + 1),
       instrument: instrumentFor(t.program, t.channel),
       channel: t.channel, program: t.program, volume: 0.8, mute: false, solo: false,
+      key: defaultKey(instrumentFor(t.program, t.channel)), steps: emptySteps(),
       notes: t.notes,
     })),
   };

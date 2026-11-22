@@ -3,11 +3,12 @@
 .views button { flex: 1; border-color: transparent; background: transparent; }
 .views button[aria-selected="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
 
-.main[data-view="chords"] .tracks, .main[data-view="chords"] .roll, .main[data-view="chords"] .scripts { display: none; }
-.main[data-view="roll"] .chords, .main[data-view="roll"] .scripts { display: none; }
-.main[data-view="script"] .roll, .main[data-view="script"] .chords { display: none; }
+.main[data-view="chords"] .tracks, .main[data-view="chords"] .roll, .main[data-view="chords"] .scripts, .main[data-view="chords"] .rack { display: none; }
+.main[data-view="rack"] .tracks, .main[data-view="rack"] .roll, .main[data-view="rack"] .chords, .main[data-view="rack"] .scripts { display: none; }
+.main[data-view="roll"] .chords, .main[data-view="roll"] .scripts, .main[data-view="roll"] .rack { display: none; }
+.main[data-view="script"] .roll, .main[data-view="script"] .chords, .main[data-view="script"] .rack { display: none; }
 
-.chords, .scripts { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
+.chords, .scripts, .rack { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
   background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
 .cv-line { display: flex; flex-wrap: wrap; gap: var(--d-s2); align-items: center; }
 .cv-line label { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
@@ -34,7 +35,7 @@
 /* Phones: loose rows, big targets, everything inside the screen. */
 @media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
   .views { order: 0; }
-  .chords, .scripts { padding: var(--d-s2); }
+  .chords, .scripts, .rack { padding: var(--d-s2); }
   .cv-chips button { min-width: 44px; }
   .cv-sym { width: 100%; }
   .sv-param { grid-template-columns: 6em 1fr 3.5em; }
@@ -42,6 +43,27 @@
 }
 
 /* Children keep their size; the panel scrolls instead of squashing them. */
-.chords > *, .scripts > * { flex-shrink: 0; }
+.chords > *, .scripts > *, .rack > * { flex-shrink: 0; }
 /* The note tools belong to the roll. */
 body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-erase, body:not([data-view="roll"]) #tool-select { display: none; }
+
+/* The channel rack: a row of 16 steps per channel. */
+.rk-pats button[aria-pressed="true"], .rk-lane button[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+.rk-rows { display: flex; flex-direction: column; gap: var(--d-s2); }
+.rk-row { display: flex; gap: var(--d-s2); align-items: stretch; }
+.rk-name { flex: none; width: 96px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-row.sel .rk-name { border-color: var(--d-acc); }
+.rk-steps { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; touch-action: none; }
+.rk-step { position: relative; min-width: 0; height: 40px; padding: 0; overflow: hidden; background: var(--d-panel); border: 1px solid var(--d-line); border-radius: 6px; touch-action: none; }
+.rk-step.beat { border-color: var(--d-bar); }
+.rk-step::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--fill, 0) * 100%); background: var(--d-acc); opacity: 0; transition: height .08s; }
+.rk-step[aria-pressed="true"]::before { opacity: .85; min-height: 6px; }
+.rk-step span { position: relative; font-size: 9px; color: var(--d-acc-ink); }
+.rk-step.now { outline: 2px solid var(--d-fg); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .rk-step::before { transition: none; } }
+@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
+  .rk-row { flex-direction: column; gap: var(--d-s1); }
+  .rk-name { width: auto; }
+  .rk-steps { grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .rk-step { height: 44px; }
+}

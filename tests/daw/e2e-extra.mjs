@@ -1,6 +1,6 @@
 // e2e-extra.mjs: the chord editor and the note script, on the emulated phone.
 // Called by e2e.mjs, which hands over its helpers.
-export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, SITE }) {
+export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, SITE, dragAt }) {
   const val = (sel) => js(`document.querySelector(${JSON.stringify(sel)}).value`);
   const set = (sel, v, event = "change") => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event(${JSON.stringify(event)}, { bubbles: true })); })()`);
   const view = () => js("window.jriterDaw.view()");
@@ -84,5 +84,33 @@ export async function run({ scenario, need, js, sleep, tapEl, rect, song, send, 
     await tapEl("#view-chords"); await noSideways("chords");
     await tapEl("#view-roll"); await noSideways("roll");
     need((await view()) === "roll", "view is " + (await view()));
+  });
+  await scenario("the channel rack: drums, steps, velocity drag, patterns, fits the phone", async () => {
+    await tapEl("#view-rack");
+    need((await view()) === "rack", "view is " + (await view()));
+    await noSideways("rack");
+    const before = (await song()).tracks.length;
+    await tapEl('[data-act="drums"]');
+    let s = await song();
+    need(s.tracks.length === before + 3, "tracks " + before + " -> " + s.tracks.length);
+    const kick = s.tracks.length - 3;
+    need(s.tracks[kick].steps[0] && !s.tracks[kick].steps[1], "kick steps wrong");
+    await noSideways("rack with drums");
+    await tapEl(`.rk-step[data-t="${kick}"][data-i="1"]`);
+    need((await song()).tracks[kick].steps[1], "tapping a step did not light it");
+    await tapEl(`.rk-step[data-t="${kick}"][data-i="1"]`);
+    need(!(await song()).tracks[kick].steps[1], "tapping a lit step did not clear it");
+    const r = await rect(`.rk-step[data-t="${kick}"][data-i="0"]`);
+    const v0 = (await song()).tracks[kick].steps[0].velocity;
+    await dragAt({ x: r.x, y: r.y }, { x: r.x, y: r.y + 30 });
+    const v1 = (await song()).tracks[kick].steps[0].velocity;
+    need(v1 < v0, "dragging down kept velocity " + v0 + " -> " + v1);
+    await tapEl('[data-act="newpat"]');
+    s = await song();
+    need(s.patterns.length === 2 && (await js("window.jriterDaw.pattern()")) === 1, "no second pattern");
+    need(s.tracks[kick].steps.every((x) => x === null), "a new pattern was not empty");
+    await tapEl('[data-pat="0"]');
+    need((await song()).tracks[kick].steps[0], "pattern 1 lost its steps");
+    await noSideways("rack after patterns");
   });
 }

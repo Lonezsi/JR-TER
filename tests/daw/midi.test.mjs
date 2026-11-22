@@ -55,10 +55,10 @@ test("text format rejects other files and newer versions", () => {
   assert.throws(() => parseMidi(new Uint8Array([1, 2, 3, 4])), /not a MIDI/);
 });
 
-test("chords and scripts are saved with the song (version 2)", () => {
+test("chords and scripts are saved with the song (version 3)", () => {
   const text = songToText({ ...song, chords: { chords: [{ symbol: "Dm9", beats: 2 }], voiceLead: false, strumMs: 10, velocity: 80 },
     scripts: [{ name: "Mine", code: "each note:\n  pitch += 1", values: { x: 3 } }] });
-  assert.equal(JSON.parse(text).version, 2);
+  assert.equal(JSON.parse(text).version, 3);
   const back = textToSong(text);
   assert.equal(back.chords.chords[0].symbol, "Dm9");
   assert.equal(back.chords.voiceLead, false);
@@ -71,4 +71,28 @@ test("a version 1 file still opens, with the default chords and scripts", () => 
   assert.equal(s.bpm, 100);
   assert.equal(s.chords.chords[0].symbol, "Cmaj9");
   assert.equal(s.scripts.length, 6);
+});
+
+test("patterns, steps, swing and key round trip (version 3)", () => {
+  const step = { velocity: 90, pitch: 36 };
+  const steps = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 ? step : null));
+  const s = { bpm: 120, bars: 2, swing: 0.4, pattern: 1, scripts: [], chords: null,
+    patterns: [{ name: "A", tracks: [{ notes: [{ pitch: 60, start: 0, length: 1, velocity: 80 }], steps: Array(16).fill(null) }] }, { name: "B", tracks: [] }],
+    tracks: [{ name: "Kick", instrument: "drums", key: 36, volume: 0.8, notes: [], steps }] };
+  const back = textToSong(songToText(s));
+  assert.equal(back.swing, 0.4);
+  assert.equal(back.pattern, 1);
+  assert.equal(back.patterns.length, 2);
+  assert.equal(back.tracks[0].key, 36);
+  assert.deepEqual(back.tracks[0].steps[4], step);
+  assert.equal(back.patterns[0].tracks[0].notes.length, 1);
+});
+
+test("a version 2 file opens as one pattern with its notes", () => {
+  const old = JSON.stringify({ format: "jriter-daw", version: 2, bpm: 100, bars: 2, tracks: [{ name: "A", instrument: "bass", notes: [{ pitch: 40, start: 1, length: 1, velocity: 90 }] }] });
+  const s = textToSong(old);
+  assert.equal(s.patterns.length, 1);
+  assert.equal(s.tracks[0].notes.length, 1);
+  assert.equal(s.tracks[0].steps.length, 16);
+  assert.equal(s.tracks[0].key, 60);
 });
