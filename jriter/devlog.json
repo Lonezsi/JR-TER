@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.18.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "A browser for your sounds, and the DAW in JR!TER's glass",
+  "notes": [
+    "The Sampler is a browser of folders now: One-shots holds your own sounds in the folders they came in, and Samples holds your waiting renders and every song's takes and vocals. Click a folder to open it; the search box looks through all of them.",
+    "Press the pencil to arrange your one-shots: rename a folder or a sound, drag sounds and folders onto another folder to move them (a name with / in it nests), and delete a whole folder. Undo brings deleted sounds back. Deleting is only there, not on every row.",
+    "The DAW uses JR!TER's own controls: its dropdowns, number fields with their own arrows, sliders, readable tooltips and thin scrollbars, on glass panes over the accent light. On a phone too.",
+    "On a phone, the Sampler tab shows the sound you are editing first and the browser under it."
+  ]
+ },
+ {
   "version": "4.17.0",
   "date": "2026-11-23",
   "name": "JR!TER",

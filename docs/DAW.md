@@ -1,5 +1,14 @@
 # Where the DAW is going
 
+**JR!TER's controls and the browser (4.18.0).** `web/daw/ui.js` fits the app's own controls onto the plain
+HTML the views write: every `<select>` gets JR!TER's dropdown (the real select stays underneath, so `.value`
+and `change` work as before), number fields get a stepper instead of the browser's spinners, sliders get the
+filled track (`--fill`), and `[data-tip]` gets one readable tooltip. `web/daw/polish.css` (loaded last) is the
+look: JR!TER's glass panes over an accent-lit ground, `.field`, the menu, the scrollbars, on every screen size.
+The Sampler is a tree (`samplerview.js`): One-shots (folders split on " / ") and Samples (waiting renders,
+then each song). The pencil arranges one-shots: rename, drag to move, delete a folder (`changeSample` and
+`each` in `library.js`; `PATCH /api/samples/ID` with `name`/`folder`).
+
 The DAW (`/daw.html`, code in `web/daw/`) started as a MIDI player and a piano roll. The aim is
 a studio that feels like FL Studio's workflow (rack, patterns, playlist, mixer) and is better
 where a web app can be: it works with a thumb, its projects are plain text, it can be scripted,
