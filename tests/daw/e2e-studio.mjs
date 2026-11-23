@@ -145,6 +145,20 @@ try {
     for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) need(!overlap(boxes[i], boxes[j]), "buttons " + i + " and " + j + " overlap");
   });
   await shot("daw-studio-dark.png");
+  await scenario("a number field drags up to raise its value, and a plain click focuses it to type", async () => {
+    await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(100);
+    const r = await rect("#bpm");
+    if (!r || !r.visible) throw new Error("#bpm is not on screen");
+    const m = (type, y) => send("Input.dispatchMouseEvent", { type, x: r.x, y, button: "left", clickCount: 1, buttons: type === "mouseReleased" ? 0 : 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: r.x, y: r.y });
+    await m("mousePressed", r.y);
+    for (let i = 1; i <= 8; i++) { await sleep(16); await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: r.x, y: r.y - i * 5, button: "left", buttons: 1 }); }
+    await m("mouseReleased", r.y - 40); await sleep(150);
+    const bpm = (await js("window.jriterDaw.song()")).bpm;
+    need(bpm > 120, "dragging up should raise the BPM, got " + bpm);
+    await click("#bars");
+    need((await js("document.activeElement && document.activeElement.id")) === "bars", "a click should focus the field");
+  });
   await scenario("the Mixer tab hides and shows the bottom dock", async () => {
     await click("#view-mixer");
     need(!(await vis("#mixerview")), "mixer still shown");
