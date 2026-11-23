@@ -44,19 +44,12 @@ let zoom = 1, scrollX = 0, scrollY = 0;
 let undo = [];
 let looping = true, playing = false, tool = "draw", wakeLock = null;
 const VIEWS = ["chords", "rack", "roll", "script", "song", "mixer", "sampler"];
-/* The studio layout, on a wide screen with a mouse: the playlist in the middle, the Sampler
- * docked at the left as the browser and the Mixer docked along the bottom, so the editors
- * share the screen the way they do in a desktop DAW. The Sampler and Mixer tabs then show
- * and hide their docks instead of taking the middle. A phone keeps one view at a time. */
-const STUDIO = matchMedia("(min-width: 1100px) and (pointer: fine)");
-const DOCKS = ["sampler", "mixer"];
-const docked = { sampler: storedDock("sampler", true), mixer: storedDock("mixer", false) };
-function storedDock(name, fallback) {
-  try { const v = localStorage.getItem("jriter-daw-dock-" + name); return v === null ? fallback : v === "1"; } catch { return fallback; }
-}
-const studio = () => STUDIO.matches;
-const dockOpen = (v) => studio() && docked[v];
-let view = studio() ? "song" : "chords"; // a phone opens on the chord editor, the studio on the playlist
+// A wide window with a mouse is a studio: toolbar on top, the library (Sampler) docked left, the Mixer
+// docked at the bottom, the Song playlist in the middle. Phones keep one panel at a time.
+const studioMq = matchMedia("(min-width: 1100px) and (not (pointer: coarse))");
+let studio = studioMq.matches;
+const DOCKED = ["mixer", "sampler"];
+let view = studio ? "song" : "chords"; // phones open on the chord editor, the studio on the playlist
 let ctx = null, synth = null, mix = null;
 let t0 = 0, scheduled = 0, timer = 0, raf = 0, songCache = null, audioCache = null, lastAudition = null;
 
@@ -130,12 +123,11 @@ function renderBar() {
   }
   bar.dataset.built = "1";
   bar.innerHTML = `<div class="transport">` + btn("home", "⌂", "Back to the library", undefined, "Library") +
-    btn("play", ICONS.play, "Play (Space)", undefined, "Play") +
-    `<output class="lcd" id="lcd" aria-label="Position"><b>001:1</b><small>0:00</small></output>` + btn("loop", ICONS.loop, "Loop (L)", looping, "Loop") + btn("mode", "☰", "Play the whole song, or just this pattern (S)", song.mode === "song", "Song") +
+    btn("play", ICONS.play, "Play (Space)", undefined, "Play") + btn("loop", ICONS.loop, "Loop (L)", looping, "Loop") + btn("mode", "☰", "Play the whole song, or just this pattern (S)", song.mode === "song", "Song") +
     `<span class="sep"></span>` +
     btn("tool-draw", "✎", "Draw notes (P)", true, "Draw") + btn("tool-erase", "⌫", "Erase notes (E)", false, "Erase") +
     btn("tool-select", "⌖", "Select only (V)", false, "Select") +
-    btn("help", "?", "How it works (?)", false, "Help") + btn("more", "⋯", "More", false, "More") + `<span class="people" id="people"></span></div><div class="more" id="morebox"><span class="name">DAW</span>` +
+    btn("help", "?", "How it works (?)", false, "Help") + btn("more", "⋯", "More", false, "More") + `<span class="people" id="people"></span></div><div class="more" id="morebox"><span class="name">JR!TER DAW</span>` +
     `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
     `<label>Bars <input id="bars" type="number" min="1" max="64" step="1"></label>` +
     `<label>Pattern <select id="pat" aria-label="Pattern"></select></label>` +
@@ -208,6 +200,7 @@ const HELP = [
   ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays. Automate draws a knob's moves over time under the clips.", "Alt+5, S"],
   ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
   ["〰", "Sampler: add a take, vocal or render from your library with +, drag its ends to trim, Chop cuts it into pieces that play up the keys. Place puts it on the Song tab as a clip.", "Alt+7"],
+  ["▥", "On a computer the DAW is laid out like a studio: library on the left, mixer at the bottom. The Mixer and Sampler tabs show or hide them.", "Alt+6, Alt+7"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
 function renderHelp() {
@@ -774,10 +767,9 @@ function tick() {
 }
 function frame() {
   draw();
-  showCounter();
   if (view === "rack") rackUI.playhead(playing ? Math.floor((curBeat() % 4) / 0.25) : -1);
   if (view === "song") songUI.playhead(playing ? curBeat() % playLen() : -1);
-  if (view === "mixer" || dockOpen("mixer")) mixUI.meters(playing && mix ? mix.levels() : null);
+  if (view === "mixer" || (studio && dockOpen("mixer"))) mixUI.meters(playing && mix ? mix.levels() : null);
   if (playing) raf = requestAnimationFrame(frame);
 }
 
@@ -842,49 +834,42 @@ const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["
 function renderViews() {
   $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => pickView(v); });
-  showDocks();
 }
-/* A tab press: in the studio the Sampler and Mixer tabs open and close their docks. */
+// A tab press: in the studio the Mixer and Sampler tabs show or hide their docked panel.
 function pickView(v) {
-  if (studio() && DOCKS.includes(v)) return setDock(v, !docked[v]);
-  setView(v);
+  if (studio && DOCKED.includes(v)) toggleDock(v); else setView(v);
 }
-function setDock(v, on) {
-  docked[v] = on;
-  try { localStorage.setItem("jriter-daw-dock-" + v, on ? "1" : "0"); } catch { /* private window */ }
-  showDocks();
-  if (on) (v === "mixer" ? mixUI : samplerUI).render();
-  if (view === "roll") { resize(); draw(); }
+const dockClass = (v) => (v === "mixer" ? "nodock" : "nobrowser");
+const dockOpen = (v) => !document.body.classList.contains(dockClass(v));
+function toggleDock(v) {
+  document.body.classList.toggle(dockClass(v), dockOpen(v));
+  showDock(v);
 }
-function showDocks() {
-  const on = studio();
-  document.body.classList.toggle("studio", on);
-  for (const d of DOCKS) {
-    document.body.classList.toggle("dock-" + d, on && docked[d]);
-    const b = $("view-" + d);
-    if (!b) continue;
-    if (on) { b.setAttribute("role", "button"); b.removeAttribute("aria-selected"); b.setAttribute("aria-pressed", docked[d]); }
-    else { b.setAttribute("role", "tab"); b.removeAttribute("aria-pressed"); b.setAttribute("aria-selected", view === d); }
-  }
+function showDock(v) {
+  const open = dockOpen(v);
+  $("view-" + v)?.setAttribute("aria-selected", open);
+  if (open) (v === "mixer" ? mixUI : samplerUI).render();
+  resize(); draw();
 }
-function showCounter() {
-  const out = $("lcd");
-  if (!out) return;
-  const beat = playing ? curBeat() : 0, spb = 60 / (song.bpm || 120);
-  const s = Math.floor(beat * spb);
-  out.querySelector("b").textContent = String(Math.floor(beat / 4) + 1).padStart(3, "0") + ":" + (Math.floor(beat % 4) + 1);
-  out.querySelector("small").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+function applyStudio() {
+  document.body.classList.toggle("studio", studio);
+  if (studio) for (const v of DOCKED) $("view-" + v)?.setAttribute("aria-selected", dockOpen(v));
+  if (studio && DOCKED.includes(view)) setView("song"); else setView(view);
+  resize(); draw();
 }
+studioMq.addEventListener("change", (e) => { studio = e.matches; applyStudio(); });
 function setView(v) {
   if (!VIEWS.includes(v)) return;
-  // Something asked for the Sampler or the Mixer (+ Sample in the rack, say): in the studio
-  // that means its dock, and the middle stays what it was.
-  if (studio() && DOCKS.includes(v)) { if (!docked[v]) setDock(v, true); else (v === "mixer" ? mixUI : samplerUI).render(); return; }
+  if (studio && DOCKED.includes(v)) { // reveal the dock, leave the middle alone
+    document.body.classList.remove(dockClass(v));
+    showDock(v);
+    return;
+  }
   view = v;
   if (v !== "sampler") pendingRack = false; // + Sample in the rack only lasts while you are picking the sound
   $("main").dataset.view = v;
   document.body.dataset.view = v;
-  for (const b of VIEWS) if (!(studio() && DOCKS.includes(b))) $("view-" + b)?.setAttribute("aria-selected", b === v);
+  for (const b of VIEWS) $("view-" + b)?.setAttribute("aria-selected", studio && DOCKED.includes(b) ? dockOpen(b) : b === v);
   refreshView();
   if (v === "roll") { resize(); draw(); }
 }
@@ -895,8 +880,11 @@ function refreshView() {
   else if (view === "song") songUI.render();
   else if (view === "mixer") mixUI.render();
   else if (view === "sampler") samplerUI.render();
-  if (dockOpen("sampler") && view !== "sampler") samplerUI.render();
-  if (dockOpen("mixer") && view !== "mixer") mixUI.render();
+  if (studio) { // the docked panels stay current, but never under a hand that is typing in them
+    const typing = (id) => $(id).contains(document.activeElement);
+    if (view !== "mixer" && dockOpen("mixer") && !typing("mixerview")) mixUI.render();
+    if (view !== "sampler" && dockOpen("sampler") && !typing("samplerview")) samplerUI.render();
+  }
 }
 
 const instrumentNow = () => (song.tracks[sel] ? song.tracks[sel].instrument : "piano");
@@ -1104,10 +1092,7 @@ if (songId) {
 // ---- start ------------------------------------------------------------------------------
 new ResizeObserver(resize).observe($("rollbox"));
 { const asked = new URLSearchParams(location.search).get("view"); if (VIEWS.includes(asked)) view = asked; } // /daw.html?view=roll
-renderBar(); renderTracks(); renderHelp(); renderViews(); setView(view); resize();
-// Crossing into or out of the studio (a window resized, a tablet docked): the docks follow,
-// and a Sampler or Mixer that had the middle hands it to the playlist.
-STUDIO.addEventListener("change", () => { if (studio() && DOCKS.includes(view)) setView("song"); showDocks(); refreshView(); resize(); draw(); });
+renderBar(); renderTracks(); renderHelp(); renderViews(); applyStudio(); resize();
 try {
   if (!localStorage.getItem("jriter-daw-help")) { localStorage.setItem("jriter-daw-help", "1"); setHelp(true); }
 } catch { /* no storage: the ? button still works */ }

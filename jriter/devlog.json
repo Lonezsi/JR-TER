@@ -3,12 +3,12 @@
   "version": "4.17.0",
   "date": "2026-11-23",
   "name": "JR!TER",
-  "title": "The DAW, laid out like a studio",
+  "title": "The DAW looks like JR!TER",
   "notes": [
-    "On a computer with a wide screen the DAW now keeps the playlist in the middle, the Sampler docked at the left as your browser, and the Mixer docked along the bottom, so you see them all at once. The Sampler and Mixer tabs show and hide their docks.",
-    "A counter next to Play shows the bar and beat, with minutes and seconds under it.",
-    "The DAW wears JR!TER's own look now: the glass panels, the fonts and the accent light, instead of its own grey.",
-    "On a phone nothing changes: one view at a time, the transport at the bottom."
+    "The DAW now wears JR!TER's glass, type and light mode, and follows the light or dark choice in Settings.",
+    "On a computer it is laid out like a studio: toolbar on top, your library (the Sampler) on the left, the Song playlist in the middle, the mixer along the bottom.",
+    "The Mixer and Sampler tabs show or hide those side panels (Alt+6 and Alt+7 too).",
+    "Phones are unchanged: one panel at a time with the bottom bar."
   ]
  },
  {

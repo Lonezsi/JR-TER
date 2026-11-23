@@ -1,12 +1,5 @@
 # Where the DAW is going
 
-**Studio layout (4.17.0).** On a wide screen with a mouse (`body.studio`, `STUDIO` in `daw.js`) the
-Sampler is docked at the left as the browser and the Mixer along the bottom (`dock-sampler`,
-`dock-mixer`, kept in localStorage `jriter-daw-dock-*`); their tabs toggle the docks and the middle
-opens on the Song tab. The look and the grid are in `web/daw/studio.css`, which points the DAW's
-`--d-*` tokens at the shared glass. The page's container is `.daw-main`, not `.main`, so it isn't
-mistaken for JR!TER's glass pane.
-
 The DAW (`/daw.html`, code in `web/daw/`) started as a MIDI player and a piano roll. The aim is
 a studio that feels like FL Studio's workflow (rack, patterns, playlist, mixer) and is better
 where a web app can be: it works with a thumb, its projects are plain text, it can be scripted,
