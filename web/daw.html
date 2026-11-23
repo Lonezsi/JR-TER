@@ -10,6 +10,7 @@
          /daw/mixer.js (mixer model and maths, no DOM), /daw/mixgraph.js (the mixer as Web Audio), /daw/mixerview.js (the Mixer tab),
          /daw/synth.js (Web Audio instruments), /daw/gestures.js (touch), /daw/chordview.js and
          /daw/scriptview.js (the two editors), /daw/daw.js (the page), /daw/daw.css, /daw/views.css.
+  On a wide desktop window the page is a studio: toolbar on top, the Sampler (library) docked left, the Mixer docked at the bottom.
   For the song tab in the Svelte ui/: import midi.js and synth.js as they are, and load a
   song's MIDI with  /daw.html?src=URL  or parseMidi(arrayBuffer).
   Your song is yours: save it as .mid or as the .json text format (it explains itself).
@@ -19,6 +20,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DAW · JR!TER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap">
+<script>
+  /* Same light/dark choice as the rest of JR!TER (Settings, Appearance). */
+  (function () {
+    var want = "auto";
+    try { want = localStorage.getItem("jriter.theme") || "auto"; } catch (e) {}
+    var t = want === "auto" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : want;
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
 <link rel="stylesheet" href="/glass.css">
 <link rel="stylesheet" href="/daw/daw.css">
 <link rel="stylesheet" href="/daw/views.css">
@@ -33,11 +46,11 @@
   </section>
   <section class="rack" id="rackview" aria-label="Channel rack"></section>
   <section class="song" id="songview" aria-label="Song playlist"></section>
-  <section class="mixer" id="mixerview" aria-label="Mixer"></section>
-  <section class="sampler" id="samplerview" aria-label="Sampler"></section>
   <section class="chords" id="chordview" aria-label="Chord editor"></section>
   <section class="scripts" id="scriptview" aria-label="Note scripts"></section>
 </main>
+<section class="mixer" id="mixerview" aria-label="Mixer"></section>
+<section class="sampler" id="samplerview" aria-label="Sampler"></section>
 <section class="help" id="helpbox" role="dialog" aria-label="How the DAW works" hidden></section>
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <input type="file" id="file" accept=".mid,.midi,.json,audio/midi" hidden>
