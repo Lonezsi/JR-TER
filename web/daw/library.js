@@ -16,8 +16,8 @@ export async function librarySongs() {
 }
 
 // The takes (mixes, renders kept as versions) and vocal takes of one song.
-export async function soundsOf(songId) {
-  const [v, t] = await Promise.all([get(`/api/songs/${songId}/versions`), get(`/api/songs/${songId}/vocals`)]);
+export async function soundsOf(songId, prefix = "/api") {
+  const [v, t] = await Promise.all([get(`${prefix}/songs/${songId}/versions`), get(`${prefix}/songs/${songId}/vocals`)]);
   return [
     ...(v.versions || []).map((x) => ({ kind: "take", name: name(x.label || x.filename, "v" + x.n), src: `/api/versions/${x.id}/audio`, seconds: x.duration || 0 })),
     ...(t.takes || []).map((x) => ({ kind: "vocal", name: name(x.label || x.name, "Vocal"), src: `/api/vocals/${x.id}/audio`, seconds: x.duration || 0 })),

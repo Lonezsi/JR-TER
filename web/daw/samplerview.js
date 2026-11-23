@@ -20,7 +20,8 @@ const FROM = "jriter-daw-from";
 function remembered() { try { return localStorage.getItem(FROM) === "oneshots" ? "oneshots" : "renders"; } catch { return "renders"; } }
 
 export function mountSampler(el, api) {
-  let songs = null, listed = remembered(), sounds = null, problem = "", loading = false, query = "", busy = "";
+  const guest = api.guest || null; // a friend in the owner's song: only that song's takes and vocals
+  let songs = guest ? [{ id: guest.songId, title: "This song" }] : null, listed = guest ? guest.songId : remembered(), sounds = null, problem = "", loading = false, query = "", busy = "";
   let drag = null, hold = 0;
   const wave = new Map(); // src -> peaks
 
@@ -30,7 +31,7 @@ export function mountSampler(el, api) {
     listed = which; sounds = null; problem = ""; loading = true; render();
     try {
       if (!songs) songs = await librarySongs();
-      sounds = which === "oneshots" ? await mySamples() : which === "renders" ? await waitingRenders() : await soundsOf(which);
+      sounds = guest ? await soundsOf(guest.songId, guest.prefix) : which === "oneshots" ? await mySamples() : which === "renders" ? await waitingRenders() : await soundsOf(which);
     } catch (e) {
       problem = e.message === "signin" ? "Sign in to JR!TER to use your library's sounds." : "Could not reach your library. " + (e.message || "");
     }
@@ -39,7 +40,7 @@ export function mountSampler(el, api) {
 
   function render() {
     const t = track(), s = t && t.sample;
-    const opts = `<option value="oneshots"${listed === "oneshots" ? " selected" : ""}>My one-shots</option><option value="renders"${listed === "renders" ? " selected" : ""}>Renders waiting</option>` +
+    const opts = (guest ? "" : `<option value="oneshots"${listed === "oneshots" ? " selected" : ""}>My one-shots</option><option value="renders"${listed === "renders" ? " selected" : ""}>Renders waiting</option>`) +
       (songs || []).map((x) => `<option value="${x.id}"${String(x.id) === String(listed) ? " selected" : ""}>${esc(x.title)}</option>`).join("");
     const mine = listed === "oneshots";
     const rows = loading ? `<div class="sv-doc">Loading…</div>` : problem ? `<div class="cv-err">${esc(problem)}</div>` :
@@ -58,6 +59,7 @@ export function mountSampler(el, api) {
           `<input id="sp-files" type="file" multiple accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.opus,.m4a" hidden>` +
           `<input id="sp-dir" type="file" webkitdirectory multiple hidden>` : "") + `</div>` +
         (busy ? `<div class="sv-doc" role="status">${esc(busy)}</div>` : "") + `<div id="sp-listbox">${rows}</div>` +
+      (guest ? `<div class="sv-doc">You are in a friend's song: use its takes and vocals here. One-shots already in the song play for you too.</div>` : "") +
       (s ? `<div class="cv-title">${esc(t.name)}: ${esc(s.name)}</div>` +
         `<canvas class="sp-wave" id="sp-wave" tabindex="0" aria-label="Waveform of ${esc(s.name)}. Comma and period move the start, with Shift the end."></canvas>` +
         `<div class="cv-line" role="group" aria-label="Sampler tools">` +
