@@ -3,8 +3,9 @@
 //   mountRack(el, api) -> { render, playhead(step) }
 //   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), selected(), select(i),
 //        addTrack(), addDrums(), addSample(), preview(trackIndex, step), usePattern(k), newPattern(dup), removePattern()
-// Tap a step to turn it on or off. Drag a lit step up or down: velocity (or pitch in the Pitch lane).
+// Swing is a knob (knob.js). Tap a step to turn it on or off. Drag a lit step up or down: velocity (or pitch in the Pitch lane).
 import { STEPS } from "./pattern.js";
+import { knob, wireKnobs } from "./knob.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -29,7 +30,7 @@ export function mountRack(el, api) {
         `<button data-act="delpat" aria-label="Delete this pattern" data-tip="Delete this pattern"${pats.length < 2 ? " disabled" : ""}>Delete</button>` +
       `</div>` +
       `<div class="cv-line"><label>Name <input id="rk-name" type="text" value="${esc((pats[k] && pats[k].name) || "Pattern 1")}"></label>` +
-        `<label>Swing <input id="rk-swing" type="range" min="0" max="100" step="1" value="${Math.round((song.swing || 0) * 100)}"><output>${Math.round((song.swing || 0) * 100)}%</output></label></div>` +
+        `<label class="ins-k">${knob({ key: "swing", label: "Swing", value: Math.round((song.swing || 0) * 100), lo: 0, hi: 100, home: 0, step: 1, words: Math.round((song.swing || 0) * 100) + "%" })}<span>Swing</span><output>${Math.round((song.swing || 0) * 100)}%</output></label></div>` +
       `<div class="cv-line rk-lane" role="group" aria-label="What a drag changes">` +
         `<button data-lane="velocity" aria-pressed="${lane === "velocity"}">Velocity</button>` +
         `<button data-lane="pitch" aria-pressed="${lane === "pitch"}">Pitch</button>` +
@@ -134,10 +135,17 @@ export function mountRack(el, api) {
   });
   el.addEventListener("change", (e) => {
     if (e.target.id === "rk-name") api.change(() => { const s = api.song(); s.patterns[s.pattern].name = e.target.value || "Pattern"; });
-    else if (e.target.id === "rk-swing") { api.change(() => { api.song().swing = Number(e.target.value) / 100; }); }
   });
-  el.addEventListener("input", (e) => {
-    if (e.target.id === "rk-swing") { api.song().swing = Number(e.target.value) / 100; e.target.nextElementSibling.textContent = e.target.value + "%"; api.save(); }
+  let before = null;
+  wireKnobs(el, {
+    begin: () => { if (before === null) before = api.snap(); },
+    end: () => { if (before !== null && api.snap() !== before) { api.pushUndo(before); api.save(); } before = null; },
+    turn: (key, v, node) => {
+      api.song().swing = v / 100;
+      const out = node.closest(".ins-k")?.querySelector("output"); if (out) out.textContent = v + "%";
+      api.save();
+      return v + "%";
+    },
   });
 
   let lastStep = -1;

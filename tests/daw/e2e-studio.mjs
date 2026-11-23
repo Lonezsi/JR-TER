@@ -167,6 +167,17 @@ try {
     need(await vis("#mixerview"), "mixer did not come back");
     need((await js(`document.querySelectorAll("#mixerview .mx-strip").length`)) > 0, "mixer has no strips");
   });
+  await scenario("effect settings are knobs that answer the arrow keys; Swing is a knob", async () => {
+    await js(`document.querySelector('#mixerview [data-add="eq"]').click()`); await sleep(150);
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "EQ should have 3 knobs");
+    need((await js(`document.querySelectorAll("#mixerview .mx-param").length`)) === 0, "sliders are still there");
+    const v0 = await js(`(() => { const k = document.querySelector("#mixerview .mx-fx .mx-knob"); k.focus(); return +k.getAttribute("aria-valuenow"); })()`);
+    await js(`document.querySelector("#mixerview .mx-fx .mx-knob").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }))`);
+    need((await js(`+document.querySelector("#mixerview .mx-fx .mx-knob").getAttribute("aria-valuenow")`)) > v0, "ArrowUp did not turn the knob");
+    await js(`window.jriterDaw.setView("rack")`); await sleep(200);
+    need((await js(`!!document.querySelector('#rackview .mx-knob[data-knob="swing"]')`)), "no Swing knob");
+    await js(`window.jriterDaw.setView("song")`); await sleep(150);
+  });
   await scenario("the Sampler tab hides and shows the left dock; setView('sampler') only reveals it", async () => {
     await click("#view-sampler");
     need(!(await vis("#samplerview")), "library still shown");
