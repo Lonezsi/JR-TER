@@ -49,7 +49,7 @@ export function targetSpec(song, id) {
   const name = whoName(song, t.who);
   if (t.knob === "volume") return { min: 0, max: 1, label: name + ": Volume" };
   if (t.knob === "pan") return { min: -1, max: 1, label: name + ": Pan" };
-  if (t.knob === "send0" || t.knob === "send1") return { min: 0, max: 1, label: name + ": Send to " + cleanMixer(song.mixer).buses[+t.knob[4]].name };
+  if (/^send\d+$/.test(t.knob)) { const b = cleanMixer(song.mixer).buses[+t.knob.slice(4)]; return { min: 0, max: 1, label: name + ": Send to " + (b ? b.name : "a bus") }; }
   const fx = (fxListOf(song, t.who) || [])[t.k];
   const spec = fx && FX[fx.type].params[t.param];
   if (!spec) return null;
@@ -61,12 +61,13 @@ export function targets(song) {
   const out = [];
   const add = (id) => { const s = targetSpec(song, id); if (s) out.push({ id, ...s }); };
   const fxOf = (prefix, list) => list.forEach((f, k) => { for (const p of Object.keys(FX[f.type].params)) add(prefix + ".fx" + k + "." + p); });
+  const nb = cleanMixer(song.mixer).buses.length;
   song.tracks.forEach((t, i) => {
-    for (const k of ["volume", "pan", "send0", "send1"]) add("t" + i + "." + k);
-    fxOf("t" + i, cleanTrackMix(t).fx);
+    for (const k of ["volume", "pan", ...Array.from({ length: nb }, (_, b) => "send" + b)]) add("t" + i + "." + k);
+    fxOf("t" + i, cleanTrackMix(t, nb).fx);
   });
   add("master.volume"); fxOf("master", fxListOf(song, { kind: "master" }));
-  for (const b of [0, 1]) { add("bus" + b + ".volume"); fxOf("bus" + b, fxListOf(song, { kind: "bus", i: b })); }
+  for (let b = 0; b < nb; b++) { add("bus" + b + ".volume"); add("bus" + b + ".pan"); fxOf("bus" + b, fxListOf(song, { kind: "bus", i: b })); }
   return out;
 }
 
@@ -101,14 +102,14 @@ export function cleanAutomation(list, song) {
 
 // A copy of the song's tracks and mixer with every lane's value at `beat` applied. Never touches `song`.
 export function automated(song, beat) {
-  const tracks = song.tracks.map((t) => ({ ...t, ...cleanTrackMix(t) }));
   const mixer = JSON.parse(JSON.stringify(cleanMixer(song.mixer)));
+  const tracks = song.tracks.map((t) => ({ ...t, ...cleanTrackMix(t, mixer.buses.length) }));
   for (const lane of song.automation || []) {
     const v = valueAt(lane.points, beat), t = parse(lane.target);
     if (v === null || !t || !targetSpec(song, lane.target)) continue;
     const holder = t.who.kind === "t" ? tracks[t.who.i] : t.who.kind === "master" ? mixer.master : mixer.buses[t.who.i];
     if (t.knob === "volume" || t.knob === "pan") holder[t.knob] = v;
-    else if (t.knob === "send0" || t.knob === "send1") holder.sends[+t.knob[4]] = v;
+    else if (/^send\d+$/.test(t.knob)) { if (holder.sends) holder.sends[+t.knob.slice(4)] = v; }
     else if (holder.fx[t.k]) holder.fx[t.k][t.param] = v;
   }
   return { tracks, mixer };

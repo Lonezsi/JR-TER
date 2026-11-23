@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX } from "../../web/daw/mixer.js";
+import { newFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, addBus, removeBus, loops, MAX_BUSES } from "../../web/daw/mixer.js";
 import { songToText, textToSong } from "../../web/daw/midi.js";
 
 const seeded = () => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); };
@@ -22,13 +22,41 @@ test("cleanFx drops unknown types, clamps, and caps the chain", () => {
 });
 
 test("track mix and mixer fill in defaults", () => {
-  assert.deepEqual(cleanTrackMix({}), { pan: 0, sends: [0, 0], fx: [] });
+  assert.deepEqual(cleanTrackMix({}), { pan: 0, sends: [0, 0], out: "m", fx: [] });
   assert.equal(cleanTrackMix({ pan: 5, sends: [2, -1] }).pan, 1);
   const m = cleanMixer(null);
   assert.equal(m.buses.length, 2);
   assert.equal(m.buses[0].fx[0].type, "reverb");
   assert.equal(m.buses[1].fx[0].mix, 1);
   assert.equal(cleanMixer({ buses: [{ name: "X", volume: 0.1, fx: [] }] }).buses.length, 2);
+});
+
+test("routing: any number of buses, a send per bus, outputs, and never a loop", () => {
+  const s = ensureMix({ tracks: [{ name: "kick" }, { name: "snare" }] });
+  const drums = addBus(s, "Drums");
+  assert.equal(drums, 2);
+  assert.equal(s.mixer.buses.length, 3);
+  assert.deepEqual(s.tracks[0].sends, [0, 0, 0]);
+  s.tracks[0].out = "b2"; s.tracks[1].out = "b2";
+  s.mixer.buses[2].out = "b0";                       // drums into the reverb bus: fine
+  ensureMix(s);
+  assert.equal(s.tracks[0].out, "b2");
+  assert.equal(s.mixer.buses[2].out, "b0");
+  assert.equal(loops(s.mixer.buses, 0, 2), true);    // reverb back into drums would loop
+  s.mixer.buses[0].out = "b2"; ensureMix(s);
+  assert.equal(s.mixer.buses[0].out, "m", "a loop goes to the master");
+  s.mixer.buses[1].out = "b1"; ensureMix(s);
+  assert.equal(s.mixer.buses[1].out, "m", "into itself goes to the master");
+  // taking a bus out: what went into it goes to the master, later buses move down
+  s.tracks[1].sends = [0, 0.5, 0.9];
+  assert.equal(removeBus(s, 0), true);
+  assert.equal(s.tracks[0].out, "b1");
+  assert.deepEqual(s.tracks[1].sends, [0.5, 0.9]);
+  assert.equal(s.mixer.buses[1].out, "m");
+  assert.equal(removeBus(s, 0), false, "never fewer than two");
+  assert.equal(cleanTrackMix({ out: "b9" }, 3).out, "m", "a bus that is not there is the master");
+  for (let i = 0; i < 40; i++) addBus(s);
+  assert.equal(s.mixer.buses.length, MAX_BUSES);
 });
 
 test("ensureMix fills an old song", () => {
@@ -77,7 +105,8 @@ test("chainKey changes with order and bypass", () => {
 });
 
 test("the text format keeps the mixer; a version 4 file opens with defaults", () => {
-  const song = textToSong(songToText({ bpm: 120, bars: 4, tracks: [{ name: "T", instrument: "piano", notes: [], volume: 0.8, pan: -0.5, sends: [0.2, 0.7], fx: [newFx("eq"), { ...newFx("dist"), drive: 0.9 }] }] }));
+  const song = textToSong(songToText({ bpm: 120, bars: 4, tracks: [{ name: "T", instrument: "piano", notes: [], volume: 0.8, pan: -0.5, sends: [0.2, 0.7], out: "b1", fx: [newFx("eq"), { ...newFx("dist"), drive: 0.9 }] }] }));
+  assert.equal(song.tracks[0].out, "b1");
   song.mixer.master.volume = 0.3; song.mixer.buses[1].name = "Echo";
   const back = textToSong(songToText(song));
   assert.equal(back.tracks[0].pan, -0.5);

@@ -11,14 +11,14 @@
 // add as an instrument or a rack channel, delete (Undo brings it back).
 // Sounds come from library.js. Model and maths: sampler.js.
 import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate } from "./sampler.js";
-import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound } from "./library.js";
+import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound, MIDI_TYPE } from "./library.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const noteName = (m) => NOTE[m % 12] + (Math.floor(m / 12) - 1);
 const mmss = (s) => (s > 0 ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : "");
-const ICON = { take: "♪", vocal: "🎙", render: "▣", oneshot: "◆" };
+const ICON = { take: "♪", vocal: "🎙", render: "▣", oneshot: "◆", midi: "♫" };
 const OPEN = "jriter-daw-open";
 function opened() { try { return new Set(JSON.parse(localStorage.getItem(OPEN) || "[\"oneshots\"]")); } catch { return new Set(["oneshots"]); } }
 
@@ -84,7 +84,7 @@ export function mountSampler(el, api) {
           `<label>Tempo <input id="sp-bpm" type="number" min="0" max="400" step="0.01" value="${s.bpm || ""}" placeholder="off" aria-label="Tempo of the sound in BPM"></label>` +
           `<button data-act="guess" data-tip="Guess the tempo from the trim, as whole bars" aria-label="Guess the tempo">Guess</button>` +
           `<button data-act="keep" aria-pressed="${s.warp !== "pitch"}"${s.bpm ? "" : " disabled"} data-tip="Keep the pitch when stretching to the song tempo. Off: speed and pitch change together, like tape" aria-label="Keep pitch">Keep pitch</button>` +
-          `<button data-act="place" data-tip="Put it on the Song tab" aria-label="Place on the song">☰ Place</button></div>` +
+          `<button data-act="place" data-tip="Put it on the Layout tab" aria-label="Place on the song">☰ Place</button></div>` +
         `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
         `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>`
         : `<div class="sv-doc">Add a sound with Inst to get a sampler track. Select a sampler track to edit it here.</div>`) + `</div>`;
@@ -116,14 +116,16 @@ export function mountSampler(el, api) {
       return `<div class="sp-row sp-renaming" style="--depth:${depth}"><span class="sp-ic" aria-hidden="true">${ICON.oneshot}</span>` +
         `<input class="sp-rename" data-renamesound="${i}" value="${esc(x.name)}" aria-label="Name of the sound"></div>`;
     }
-    const arrange = mine && editing;
-    return `<div class="sp-row" role="treeitem" style="--depth:${depth}"${arrange ? ` draggable="true" data-movesound="${i}"` : ""}><span class="sp-ic" aria-hidden="true">${arrange ? "⠿" : ICON[x.kind] || "♪"}</span>` +
-      `<button class="sp-name" data-hear="${i}" data-tip="Hear it" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${mmss(x.seconds)}</span>` +
+    const arrange = mine && editing, midi = x.kind === "midi";
+    const drag = arrange ? ` draggable="true" data-movesound="${i}"` : midi ? ` draggable="true" data-midi="${i}"` : "";
+    return `<div class="sp-row${midi ? " midi" : ""}" role="treeitem" style="--depth:${depth}"${drag}><span class="sp-ic" aria-hidden="true">${arrange ? "⠿" : ICON[x.kind] || "♪"}</span>` +
+      `<button class="sp-name" data-hear="${i}" data-tip="${midi ? "Hear it. Drag it onto the roll or a pattern number" : "Hear it"}" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${midi ? "MIDI" : mmss(x.seconds)}</span>` +
       (arrange ? `<span class="sp-acts on"><button data-rename="${i}" data-tip="Rename" aria-label="Rename ${esc(x.name)}">✎</button>` +
           `<button data-del="${i}" data-tip="Delete (Undo brings it back)" aria-label="Delete ${esc(x.name)}">×</button></span>`
+        : midi ? `<span class="sp-acts"><button data-topat="${i}" data-tip="A new pattern with these notes, on the selected track" aria-label="Make a pattern from ${esc(x.name)}">Pattern</button></span>`
         : `<span class="sp-acts">` +
           `<button data-add="${i}" data-tip="Add as a sampler instrument" aria-label="Add ${esc(x.name)} as an instrument">Inst</button>` +
-          (mine ? `<button data-rack="${i}" data-tip="Add as a rack channel" aria-label="Add ${esc(x.name)} to the rack">Rack</button>` : "") +
+          (mine ? `<button data-rack="${i}" data-tip="Add to the Drumroll as a channel" aria-label="Add ${esc(x.name)} to the Drumroll">Drum</button>` : "") +
           `</span>`) + `</div>`;
   }
 
@@ -343,7 +345,8 @@ export function mountSampler(el, api) {
       el.querySelector(`[data-dir="${CSS.escape(k)}"]`)?.focus();
       return;
     }
-    if (b.dataset.hear != null) return api.hear(items[+b.dataset.hear].src);
+    if (b.dataset.hear != null) { const x = items[+b.dataset.hear]; return x.kind === "midi" ? api.hearMidi(x) : api.hear(x.src); }
+    if (b.dataset.topat != null) return api.midiToPattern(items[+b.dataset.topat], { fresh: true });
     if (b.dataset.add != null) return api.addSampler(items[+b.dataset.add]);
     if (b.dataset.rack != null) return api.addSampler(items[+b.dataset.rack], { rack: true });
     if (b.dataset.del != null) {
@@ -382,6 +385,15 @@ export function mountSampler(el, api) {
   el.addEventListener("focusout", (e) => { if (e.target.classList?.contains("sp-rename") && renaming) renameDone(e.target, true); });
 
   // Arranging: a sound or a folder dragged onto a folder (or onto One-shots, the top) moves there.
+  // A MIDI file is dragged out to the roll or a pattern; daw.js takes the drop.
+  el.addEventListener("dragstart", (e) => {
+    const m = !editing && e.target.closest?.("[data-midi]");
+    if (!m) return;
+    const x = items[+m.dataset.midi];
+    e.dataTransfer.setData(MIDI_TYPE, JSON.stringify({ name: x.name, src: x.src }));
+    e.dataTransfer.setData("text/plain", x.name);
+    e.dataTransfer.effectAllowed = "copy";
+  });
   el.addEventListener("dragstart", (e) => {
     const s = e.target.closest?.("[data-movesound]"), d = e.target.closest?.("[data-movedir]");
     if (!editing || (!s && !d)) return;

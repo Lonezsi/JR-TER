@@ -49,7 +49,7 @@ export function loadSnap(storage) {
     return { roll: ok(j.roll, ROLL_STEPS), song: ok(j.song, SONG_STEPS) };
   } catch { return { roll: "auto", song: "auto" }; }
 }
-// Merges into what is stored, so the roll and the Song tab each save only their own half.
+// Merges into what is stored, so the roll and the Layout tab each save only their own half.
 export function saveSnap(storage, patch) { try { storage.setItem(KEY, JSON.stringify({ ...loadSnap(storage), ...patch })); } catch { /* storage off: it stays for this visit */ } }
 
 // <option>s for a Snap select: Auto (showing what it is right now), each step, None.

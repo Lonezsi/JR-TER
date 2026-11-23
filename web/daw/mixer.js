@@ -1,15 +1,22 @@
 // mixer.js: the mixer's model and maths. Pure functions, no DOM, no Web Audio (tests/daw).
 //
-// Each track has (all optional in files, defaults fill in):  pan -1..1,  sends [a, b] 0..1
-// (how much goes to the Reverb and Delay buses),  fx: the track's insert effects, in order.
-// volume, mute and solo stay on the track as before. The song has
-//   mixer = { master: { volume, fx }, buses: [ {name, volume, fx}, {name, volume, fx} ] }
-// (always exactly two buses). The master ends in a fixed limiter that is not saved.
+// Routing works the way a desktop DAW's mixer does: every track is an insert, the buses are more
+// inserts, and any insert can feed any bus as well as its main output.
+//
+// Each track has (all optional in files, defaults fill in):  pan -1..1,  sends [..] 0..1, one per bus
+// (how much of it goes to that bus),  out: where its fader goes, "m" (the master, the default) or
+// "b<i>" (bus i),  fx: the track's insert effects, in order. volume, mute and solo stay on the track.
+// The song has
+//   mixer = { master: { volume, fx }, buses: [ {name, volume, pan, mute, out, fx, sends}, ... ] }
+// with 2..MAX_BUSES buses (the first two start as Reverb and Delay). A bus's sends feed later buses
+// only through `out`; a route that would make a loop (bus 1 into 2 into 1) goes to the master instead.
+// The master ends in a fixed limiter that is not saved.
 // An effect is { type, on, ...settings }. Types and their settings are in FX below:
 // [min, max, default, unit].  Unknown types are dropped, numbers are clamped.
 // Old song files (v1-v4) have none of this and open with defaults.
 
 export const MAX_FX = 8;
+export const MAX_BUSES = 16;
 
 export const FX = {
   eq:     { label: "EQ",     params: { low: [-12, 12, 0, "dB"], mid: [-12, 12, 0, "dB"], high: [-12, 12, 0, "dB"] } },
@@ -43,45 +50,99 @@ export function cleanFx(list) {
   return out;
 }
 
-export function cleanTrackMix(t) {
+// Where an insert's fader goes: "m", or "b<i>" for a bus that exists.
+const cleanOut = (o, buses) => (typeof o === "string" && /^b\d+$/.test(o) && +o.slice(1) < buses ? o : "m");
+
+// `buses` is how many buses the song has (sends are one per bus). Left out, it is what the track carries.
+export function cleanTrackMix(t, buses) {
   const s = t && Array.isArray(t.sends) ? t.sends : [];
+  const n = clamp(Math.round(num(buses, Math.max(2, s.length))), 2, MAX_BUSES);
   return {
     pan: clamp(num(t && t.pan, 0), -1, 1),
-    sends: [clamp(num(s[0], 0), 0, 1), clamp(num(s[1], 0), 0, 1)],
+    sends: Array.from({ length: n }, (_, i) => clamp(num(s[i], 0), 0, 1)),
+    out: cleanOut(t && t.out, n),
     fx: cleanFx(t && t.fx),
   };
+}
+
+export function newBus(name, fx = []) {
+  return { name, volume: 0.8, pan: 0, mute: false, out: "m", fx };
 }
 
 export function defaultMixer() {
   return {
     master: { volume: 0.8, fx: [] },
     buses: [
-      { name: "Reverb", volume: 0.8, fx: [newFx("reverb")].map((f) => ({ ...f, mix: 1 })) },
-      { name: "Delay", volume: 0.8, fx: [newFx("delay")].map((f) => ({ ...f, mix: 1 })) },
+      newBus("Reverb", [newFx("reverb")].map((f) => ({ ...f, mix: 1 }))),
+      newBus("Delay", [newFx("delay")].map((f) => ({ ...f, mix: 1 }))),
     ],
   };
+}
+
+// Would sending bus `from` into bus `to` make a loop? Follows `to`'s outputs to the end.
+export function loops(buses, from, to) {
+  let at = to, steps = 0;
+  while (steps++ <= buses.length) {
+    if (at === from) return true;
+    const o = buses[at] && buses[at].out;
+    if (!o || o === "m") return false;
+    at = +o.slice(1);
+  }
+  return true;
 }
 
 export function cleanMixer(m) {
   const d = defaultMixer();
   if (!m || typeof m !== "object") return d;
-  const bus = (b, def) => ({
-    name: String((b && b.name) || def.name),
-    volume: clamp(num(b && b.volume, def.volume), 0, 1),
-    fx: b && Array.isArray(b.fx) ? cleanFx(b.fx) : def.fx,
-  });
-  const mb = Array.isArray(m.buses) ? m.buses : [];
+  const mb = (Array.isArray(m.buses) ? m.buses : []).slice(0, MAX_BUSES);
+  const n = Math.max(2, mb.length);
+  const bus = (b, i) => {
+    const def = d.buses[i] || newBus("Insert " + (i + 1));
+    return {
+      name: String((b && b.name) || def.name).slice(0, 40),
+      volume: clamp(num(b && b.volume, def.volume), 0, 1),
+      pan: clamp(num(b && b.pan, 0), -1, 1),
+      mute: !!(b && b.mute),
+      out: cleanOut(b && b.out, n),
+      fx: b && Array.isArray(b.fx) ? cleanFx(b.fx) : def.fx,
+    };
+  };
+  const buses = Array.from({ length: n }, (_, i) => bus(mb[i], i));
+  // No loops: a bus whose output leads back to itself goes to the master.
+  buses.forEach((b, i) => { if (b.out !== "m" && (+b.out.slice(1) === i || loops(buses, i, +b.out.slice(1)))) b.out = "m"; });
   return {
     master: { volume: clamp(num(m.master && m.master.volume, 0.8), 0, 1), fx: cleanFx(m.master && m.master.fx) },
-    buses: [bus(mb[0], d.buses[0]), bus(mb[1], d.buses[1])],
+    buses,
   };
 }
 
 // Fill in whatever a song is missing, in place.
 export function ensureMix(song) {
-  for (const t of song.tracks) Object.assign(t, cleanTrackMix(t));
   song.mixer = cleanMixer(song.mixer);
+  for (const t of song.tracks) Object.assign(t, cleanTrackMix(t, song.mixer.buses.length));
   return song;
+}
+
+// A bus added at the end: it starts empty, at the master, and every track gets a send to it at 0.
+export function addBus(song, name) {
+  ensureMix(song);
+  if (song.mixer.buses.length >= MAX_BUSES) return null;
+  song.mixer.buses.push(newBus(name || "Insert " + (song.mixer.buses.length + 1)));
+  ensureMix(song);
+  return song.mixer.buses.length - 1;
+}
+
+// Take bus i out: what went into it goes to the master, later buses move down one.
+export function removeBus(song, i) {
+  ensureMix(song);
+  const buses = song.mixer.buses;
+  if (buses.length <= 2 || !buses[i]) return false;
+  const shift = (o) => (o === "m" ? "m" : +o.slice(1) === i ? "m" : +o.slice(1) > i ? "b" + (+o.slice(1) - 1) : o);
+  for (const t of song.tracks) { t.sends.splice(i, 1); t.out = shift(t.out); }
+  buses.splice(i, 1);
+  for (const b of buses) b.out = shift(b.out);
+  ensureMix(song);
+  return true;
 }
 
 export const trackGain = (t, anySolo) => ((t.mute || (anySolo && !t.solo)) ? 0 : num(t.volume, 0.8));

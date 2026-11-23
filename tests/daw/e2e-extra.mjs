@@ -11,7 +11,8 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
 
   await scenario("the DAW opens on the chord editor", async () => {
     await send("Page.navigate", { url: SITE + "/daw.html" });
-    await sleep(1300);
+    // Wait for the page itself rather than a fixed time: fonts and stylesheets can hold it up.
+    for (let i = 0; i < 50 && !(await js("!!window.jriterDaw")); i++) await sleep(100);
     need((await view()) === "chords", "opened on " + (await view()));
     need(await js(`!!document.querySelector("#cv-sym")`), "no chord editor on screen");
     await noSideways("the chord editor");
@@ -149,8 +150,11 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     await set('.mx-fader[data-id="t0"]', "0.3", "change");
     s = await song();
     need(Math.abs(s.tracks[0].volume - 0.3) < 0.01, "volume is " + s.tracks[0].volume);
-    await set('.mx-send[data-id="t0"][data-k="send0"]', "0.5", "input");
-    need(Math.abs((await song()).tracks[0].sends[0] - 0.5) < 0.01, "send did not change");
+    // Routing: track 1 picked, the arrow under Reverb (bus 0) sends there; the knob is its amount.
+    await tapEl('[data-route="b0"]');
+    await sleep(400);
+    need((await song()).tracks[0].sends[0] > 0, "the arrow did not send to Reverb");
+    need(await js(`!!document.querySelector('.mx-strip[data-id="b0"] .mx-knob[data-knob="send"]')`), "no send knob under Reverb");
     await tapEl("#play");
     await sleep(700);
     const lv = await js("window.jriterDaw.levels()");
@@ -227,7 +231,7 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     a = await js("window.jriterDaw.automation()");
     need(a[0].points.length === 1, "hold did not delete a point: " + JSON.stringify(a[0].points));
     const s = await song();
-    need(s.version === 9 && s.automation.length === 1, "saved version " + s.version);
+    need(s.version === 10 && s.automation.length === 1, "saved version " + s.version);
   });
   await scenario("the Euclid script turns a chord into three hits", async () => {
     await tapEl("#view-script");
@@ -287,7 +291,7 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     c = await js(`${API}.clips()`);
     need(c.length === 1 && c[0].start === 1, "at zoom 1 the clip should start on bar 1, got " + JSON.stringify(c));
     const t = (await song());
-    need(t.version === 9, "version " + t.version);
+    need(t.version === 10, "version " + t.version);
     await noSideways("song tab");
   });
   await scenario("one-shots: the Sampler tab has My one-shots, + Sample in the rack opens it, picking sampler on an empty track opens it", async () => {

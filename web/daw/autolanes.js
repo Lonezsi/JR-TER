@@ -1,6 +1,6 @@
-// autolanes.js: automation lanes on the Song tab. The model and maths are in automation.js.
+// autolanes.js: automation lanes on the Layout tab. The model and maths are in automation.js.
 //
-//   const lanes = mountLanes(el, api, { barPx, step, render })   barPx() and step() (beats, 0 = none) are asked every time: the Song tab zooms
+//   const lanes = mountLanes(el, api, { barPx, step, render })   barPx() and step() (beats, 0 = none) are asked every time: the Layout tab zooms
 //   lanes.button()      the "+ Automate" button (put it in a button line)
 //   lanes.menu(song)    the list of knobs, empty when closed
 //   lanes.html(song, bars)   the lanes, to go inside the song grid

@@ -5,7 +5,7 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 9; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples, 9 sample tempo and stretch; older files still open
+export const TEXT_VERSION = 10; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples, 9 sample tempo and stretch, 10 routing (any number of buses, out, a send per bus); older files still open
 
 import { cleanAutomation } from "./automation.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";
@@ -124,14 +124,16 @@ export function songToText(song) {
       "progression (symbols like Cmaj9 or G13/B, beats each, how to voice them); it is only a way to " +
       "write notes, so the notes are the music. scripts are note scripts (see web/daw/script.js for " +
       "the language): name, code, and the values of the sliders its params make. Mixer: each track has pan " +
-      "(-1..1), sends (how much goes to the Reverb and Delay buses, 0..1) and fx, its insert effects in order " +
+      "(-1..1), sends (one per bus, in bus order: how much goes to that bus, 0..1), out (where its fader goes: m for the " +
+      "master, b0 for the first bus, and so on) and fx, its insert effects in order " +
       "(eq, comp, dist, delay, reverb, each with its settings; on = false bypasses it). mixer holds the master " +
-      "(volume, fx; a limiter always follows) and the two send buses. A track with instrument sampler has a sample " +
+      "(volume, fx; a limiter always follows) and the buses (2 to 16; each has name, volume, pan, mute, out and fx; " +
+      "a bus may go out to another bus but never in a loop). A track with instrument sampler has a sample " +
       "from the library: src is where its audio comes from, start and end are seconds (end 0 = to the end), root is the " +
       "MIDI pitch that plays it as it is, slices are cut points in seconds (with cuts, root plays piece 1, root+1 piece 2, and so on). oneshot true means every note plays the whole sound, whatever the note length (a drum hit or an effect); src may be /api/samples/ID/audio, one of your own one-shots. " +
       "A clip with track instead of pattern is an audio clip: it plays that track's sample from offset bars in, for length bars. " +
       "automation is knobs that move over time: each lane has a target (t0.volume, t0.pan, t0.send0, t0.fx1.mix for the second effect of track 0, " +
-      "master.volume, master.fx0.low, bus0.volume) and points of { beat, value }, sorted by beat (4 beats a bar), the value in the knob's own range; " +
+      "master.volume, master.fx0.low, bus0.volume, bus2.pan) and points of { beat, value }, sorted by beat (4 beats a bar), the value in the knob's own range; " +
       "the value slides in a straight line between points and holds before the first and after the last.",
     bpm: song.bpm,
     bars: song.bars,
@@ -145,7 +147,7 @@ export function songToText(song) {
     scripts: (song.scripts ?? defaultScripts()).map((x) =>({ name: x.name, code: x.code, values: { ...x.values } })),
     tracks: song.tracks.map((t) => ({
       name: t.name, instrument: t.instrument, key: t.key ?? defaultKey(t.instrument), volume: t.volume ?? 0.8,
-      mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t),
+      mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t, cleanMixer(song.mixer).buses.length),
       ...(cleanSample(t.sample) ? { sample: cleanSample(t.sample) } : {}),
     })),
     patterns: withPatterns(song),
@@ -179,7 +181,7 @@ export function textToSong(text) {
         instrument,
         key: Math.min(127, Math.max(0, Math.round(num(t.key, defaultKey(instrument))))),
         volume: Math.min(1, Math.max(0, num(t.volume, 0.8))),
-        mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t),
+        mute: !!t.mute, solo: !!t.solo, ...cleanTrackMix(t, cleanMixer(j.mixer).buses.length),
         notes: [], steps: emptySteps(),
         ...(cleanSample(t.sample) ? { sample: cleanSample(t.sample) } : {}),
       };
