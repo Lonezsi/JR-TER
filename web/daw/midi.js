@@ -5,7 +5,7 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 8; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples; older files still open
+export const TEXT_VERSION = 9; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples, 9 sample tempo and stretch; older files still open
 
 import { cleanAutomation } from "./automation.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";

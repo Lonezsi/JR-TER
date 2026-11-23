@@ -12,7 +12,8 @@ import { mountSong } from "./songview.js";
 import { songNotes, songBars } from "./playlist.js";
 import { createMixer } from "./mixgraph.js";
 import { mountSampler } from "./samplerview.js";
-import { sliceFor, playSlice, songAudio, sampleEnd, chop, gateFor } from "./sampler.js";
+import { sliceFor, playSlice, songAudio, sampleEnd, chop, gateFor, clipPlay } from "./sampler.js";
+import { stretchBuffer } from "./stretch.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
 import { encodeWav, bounceSeconds } from "./bounce.js";
@@ -562,6 +563,26 @@ function bufferNow(src) {
   bufferOf(src).catch(() => {});
   return null;
 }
+// Sounds stretched to the song tempo for audio clips, made once per sound and ratio.
+const stretched = new Map();
+const stretchKey = (src, ratio) => src + "|" + ratio.toFixed(4);
+const stretchedNow = (src, ratio) => stretched.get(stretchKey(src, ratio)) || null;
+async function stretchedOf(src, ratio) {
+  const k = stretchKey(src, ratio);
+  if (!stretched.has(k)) stretched.set(k, stretchBuffer(ctx, await bufferOf(src), ratio));
+  return stretched.get(k);
+}
+// The stretched sounds the song's audio clips need that are not ready yet.
+function stretchJobs() {
+  const jobs = [];
+  if (!inSong()) return jobs;
+  for (const ev of songAudio(song)) {
+    const t = song.tracks[ev.track], p = t && t.sample ? clipPlay(t.sample, ev, song.bpm) : null;
+    if (p && p.ratio !== 1 && !stretched.has(stretchKey(t.sample.src, p.ratio))) jobs.push(() => stretchedOf(t.sample.src, p.ratio));
+  }
+  return jobs;
+}
+let playToken = 0;
 // One note on one track: a sampler plays its sound (chopped pieces play to their end, pitched
 // ones are gated by the note), every other instrument goes to the synth.
 function voice(t, n, time, len, dest) { voiceOn(ctx, synth, bufferNow, t, n, time, len, dest); }
@@ -586,6 +607,7 @@ async function bounce() {
     m.sync(song);
     await Promise.all(song.tracks.filter((t) => t.sample).map((t) => bufferOf(t.sample.src).catch(() => null)));
     const getBuf = (src) => (buffers.get(src) || {}).buf || null;
+    for (const j of stretchJobs()) await j().catch(() => null);
     const all = inSong() ? songNotes(song) : null;
     song.tracks.forEach((t, i) => {
       for (const n of all ? all[i] || [] : allNotes(t, song)) {
@@ -594,8 +616,9 @@ async function bounce() {
       }
     });
     if (inSong()) for (const ev of songAudio(song)) {
-      const t = song.tracks[ev.track], buf = t && t.sample ? getBuf(t.sample.src) : null;
-      if (buf && ev.start < beats) playSlice(off, buf, { from: t.sample.start + ev.offset * spb, to: sampleEnd(t.sample), rate: 1 }, ev.start * spb, ev.length * spb, 100, m.input(ev.track));
+      const t = song.tracks[ev.track], p = t && t.sample ? clipPlay(t.sample, ev, song.bpm) : null;
+      const buf = p ? (p.ratio === 1 ? getBuf(t.sample.src) : stretchedNow(t.sample.src, p.ratio)) : null;
+      if (buf && ev.start < beats) playSlice(off, buf, p, ev.start * spb, ev.length * spb, 100, m.input(ev.track));
     }
     if ((song.automation || []).length && typeof off.suspend === "function") {
       try {
@@ -680,6 +703,12 @@ function setMode(m) {
 }
 function play(from) {
   audio(); stop(true); syncGains();
+  const token = ++playToken, jobs = stretchJobs();
+  if (jobs.length) {
+    toast("Stretching audio to the tempo…");
+    setTimeout(() => Promise.all(jobs.map((j) => j().catch(() => null))).then(() => { if (token === playToken) play(from); }), 30);
+    return;
+  }
   songCache = inSong() ? songNotes(song) : null;
   audioCache = inSong() ? songAudio(song) : null;
   for (const t of song.tracks) if (t.sample) bufferOf(t.sample.src).catch(() => {}); // ready by the first note
@@ -691,6 +720,7 @@ function play(from) {
   navigator.wakeLock?.request("screen").then((l) => { wakeLock = l; }).catch(() => {});
 }
 function stop(quiet) {
+  if (!quiet) playToken++;
   clearInterval(timer); cancelAnimationFrame(raf);
   if (!quiet) {
     playing = false; renderBar(); draw(); rackUI.playhead(-1); songUI.playhead(-1);
@@ -721,8 +751,9 @@ function tick() {
     for (const ev of audioCache || []) {
       const abs = ev.start + k * len, t = song.tracks[ev.track];
       if (abs < scheduled || abs >= end || !t || !t.sample) continue;
-      const buf = bufferNow(t.sample.src);
-      if (buf) playSlice(ctx, buf, { from: t.sample.start + ev.offset * spb, to: sampleEnd(t.sample), rate: 1 }, t0 + abs * spb, ev.length * spb, 100, mix.input(ev.track));
+      const p = clipPlay(t.sample, ev, song.bpm);
+      const buf = p.ratio === 1 ? bufferNow(t.sample.src) : stretchedNow(t.sample.src, p.ratio);
+      if (buf) playSlice(ctx, buf, p, t0 + abs * spb, ev.length * spb, 100, mix.input(ev.track));
     }
   }
   scheduled = Math.max(scheduled, end);

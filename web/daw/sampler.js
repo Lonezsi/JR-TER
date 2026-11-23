@@ -8,13 +8,16 @@
 //   start    where playing begins, in seconds; end = where it stops (0 = the end of the sound)
 //   root     the MIDI pitch that plays it as it is (60 = middle C)
 //   slices   cut points in seconds, sorted, strictly between start and end
+//   bpm      the tempo the sound was played at (20..400), 0 = not set: audio clips then play it as it is
+//   warp     "time" (default): audio clips keep the pitch while stretching to the song tempo; "pitch": speed and pitch move together, like tape
 //   oneshot  true: every note plays the whole sound (start..end), however short the note; a hit, not a held key
 // No slices: any note plays start..end, sped up or slowed down by its distance from root.
 // With slices: root plays the first piece, root+1 the second, and so on, at normal speed.
 //
 // An audio clip is a playlist clip with a track instead of a pattern (see playlist.js):
 //   { track, lane, start, length, offset }, in bars. It plays that track's sample, from
-//   offset bars past the sample's start, at normal speed, for length bars.
+//   offset bars past the sample's start, for length bars. With sample.bpm set it plays at the song's
+//   tempo (see clipPlay); notes are not affected by the tempo.
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const num = (v, d) => (Number.isFinite(v) ? v : d);
@@ -33,6 +36,8 @@ export function cleanSample(x) {
   const s = {
     name: String(x.name ?? "Sample").slice(0, 80), src: x.src, seconds, start, end,
     root: clamp(Math.round(num(x.root, 60)), 0, 127), slices: [], oneshot: x.oneshot === true,
+    bpm: Number.isFinite(x.bpm) && x.bpm >= 20 && x.bpm <= 400 ? Math.round(x.bpm * 100) / 100 : 0,
+    warp: x.warp === "pitch" ? "pitch" : "time",
   };
   const hi = sampleEnd(s) || 1e6;
   const cuts = (Array.isArray(x.slices) ? x.slices : []).map(Number).filter((t) => Number.isFinite(t) && t > start && t < hi);
@@ -77,9 +82,33 @@ export function sliceFor(s, pitch) {
   return { from: bounds[k], to: bounds[k + 1], rate: 1 };
 }
 
+// How much faster than its own speed an audio clip plays at this song tempo.
+export function clipRate(s, songBpm) { return s.bpm > 0 && songBpm > 0 ? songBpm / s.bpm : 1; }
+
+// Guess the sound's tempo from its trim: whole bars, 70..180 BPM, nearest 120. 0 if nothing fits.
+export function guessBpm(s) {
+  const secs = sampleEnd(s) - s.start;
+  if (!(secs > 0)) return 0;
+  let best = 0;
+  for (let n = 1; n <= 64; n++) {
+    const b = (n * 240) / secs;
+    if (b >= 70 && b <= 180 && (!best || Math.abs(b - 120) < Math.abs(best - 120))) best = b;
+  }
+  return best ? Math.round(best * 100) / 100 : 0;
+}
+
+// How an audio clip event plays: { from, to, rate, ratio } in seconds. ratio != 1 means "use the
+// stretched buffer" (stretch.js): from/to are then positions in that buffer and rate is 1.
+export function clipPlay(s, ev, songBpm) {
+  const spb = 60 / songBpm, r = clipRate(s, songBpm), to = sampleEnd(s);
+  const from = s.start + ev.offset * spb * r;
+  if (s.bpm > 0 && s.warp !== "pitch" && Math.abs(r - 1) > 0.001) return { from: from / r, to: to / r, rate: 1, ratio: r };
+  return { from, to, rate: r, ratio: 1 };
+}
+
 // How many bars a fresh audio clip of this sample should fill.
 export function clipBars(s, bpm) {
-  const secs = Math.max(0, sampleEnd(s) - s.start);
+  const secs = Math.max(0, sampleEnd(s) - s.start) / clipRate(s, bpm);
   return Math.max(1, Math.ceil((secs * bpm) / 240));
 }
 

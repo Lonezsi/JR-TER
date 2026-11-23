@@ -7,7 +7,7 @@
 // The first option, My one-shots, is the library's own sounds (library.js mySamples): add files or a folder,
 // drop them on the tab, filter, hear, add as an instrument or a rack channel, delete (Undo brings it back).
 // Sounds come from library.js. Model and maths: sampler.js.
-import { chop, addSlice, removeSliceNear, sampleEnd, peaks } from "./sampler.js";
+import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate } from "./sampler.js";
 import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, isSound } from "./library.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -66,9 +66,12 @@ export function mountSampler(el, api) {
           `<button data-act="hear" data-tip="Hear the whole sound" aria-label="Hear the sound">▶</button>` +
           `<label>Root <input id="sp-root" type="number" min="0" max="127" step="1" value="${s.root}" aria-label="Root key"><output>${noteName(s.root)}</output></label>` +
           `<button data-act="oneshot" aria-pressed="${!!s.oneshot}" data-tip="One-shot: every note plays the whole sound. Off: a note stops it" aria-label="One-shot">One-shot</button>` +
+          `<label>Tempo <input id="sp-bpm" type="number" min="0" max="400" step="0.01" value="${s.bpm || ""}" placeholder="off" aria-label="Tempo of the sound in BPM"></label>` +
+          `<button data-act="guess" data-tip="Guess the tempo from the trim, as whole bars" aria-label="Guess the tempo">Guess</button>` +
+          `<button data-act="keep" aria-pressed="${s.warp !== "pitch"}"${s.bpm ? "" : " disabled"} data-tip="Keep the pitch when stretching to the song tempo. Off: speed and pitch change together, like tape" aria-label="Keep pitch">Keep pitch</button>` +
           `<button data-act="place" data-tip="Put it on the Song tab" aria-label="Place on the song">☰ Place</button></div>` +
         `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
-        `Drag the ends to trim. Hold to add or remove a cut.</div>`
+        `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>`
         : `<div class="sv-doc">Add a sound with + to get a sampler track. Select a sampler track to edit it here.</div>`);
     if (s) paint();
   }
@@ -200,6 +203,7 @@ export function mountSampler(el, api) {
       return load(v === "renders" || v === "oneshots" ? v : +v);
     }
     if (e.target.id === "sp-files" || e.target.id === "sp-dir") { const f = [...e.target.files]; e.target.value = ""; return bring(f); }
+    if (e.target.id === "sp-bpm") { const t = track(); if (t) { const v = +e.target.value; api.change(() => { t.sample.bpm = v >= 20 && v <= 400 ? Math.round(v * 100) / 100 : 0; }); } }
     if (e.target.id === "sp-root") { const t = track(); if (t) api.change(() => { t.sample.root = clamp(Math.round(+e.target.value) || 60, 0, 127); }); }
   });
   el.addEventListener("click", (e) => {
@@ -219,6 +223,8 @@ export function mountSampler(el, api) {
     if (b.dataset.act === "files") return el.querySelector("#sp-files").click();
     if (b.dataset.act === "folder") return el.querySelector("#sp-dir").click();
     if (b.dataset.act === "oneshot") { const t = track(); if (t) api.change(() => { t.sample.oneshot = !t.sample.oneshot; }); return; }
+    if (b.dataset.act === "guess") { const t = track(); if (!t) return; const g = guessBpm(t.sample); if (!g) return api.toast("Trim it to whole bars first."); return api.change(() => { t.sample.bpm = g; }); }
+    if (b.dataset.act === "keep") { const t = track(); if (t) api.change(() => { t.sample.warp = t.sample.warp === "pitch" ? "time" : "pitch"; }); return; }
     if (b.dataset.act === "open") return load(listed);
     if (!t) return;
     if (b.dataset.chop) api.change(() => chop(t.sample, +b.dataset.chop));

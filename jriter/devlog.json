@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.15.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "Loops follow the tempo",
+  "notes": [
+    "In the DAW Sampler, a sound can now have a Tempo (or press Guess, which reads it from the trim as whole bars). Its audio clips on the Song tab then play at the song tempo, so a 90 BPM loop sits in a 120 BPM song.",
+    "Keep pitch is on by default: the sound is stretched without changing its pitch. Turn it off for tape style, where speed and pitch move together. Notes you play from a sampler are not changed by the tempo.",
+    "Old projects sound the same until you give a sound a tempo. Stretching is done when you press Play or Bounce, so the first play of a long sound waits a moment. Clips you already placed keep their length."
+  ]
+ },
+ {
   "version": "4.14.0",
   "date": "2026-11-22",
   "name": "JR!TER",

@@ -180,6 +180,11 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     const sample = await js("window.jriterDaw.sample()");
     need(sample && sample.slices.length === 7, "slices: " + JSON.stringify(sample && sample.slices));
     await noSideways("sampler with a chopped sound");
+    await js(`(() => { const e = document.querySelector("#sp-bpm"); e.value = "96"; e.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    await tapEl('[data-act="keep"]');
+    const tempo = await js("window.jriterDaw.sample()");
+    need(tempo.bpm === 96 && tempo.warp === "pitch", "tempo: " + JSON.stringify(tempo));
+    await noSideways("sampler with a tempo");
     await tapEl('[data-act="place"]');
     need((await view()) === "song", "Place did not open the Song tab");
     await tapEl(".song .cv-line button[data-brush^='t']");
@@ -222,7 +227,7 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     a = await js("window.jriterDaw.automation()");
     need(a[0].points.length === 1, "hold did not delete a point: " + JSON.stringify(a[0].points));
     const s = await song();
-    need(s.version === 8 && s.automation.length === 1, "saved version " + s.version);
+    need(s.version === 9 && s.automation.length === 1, "saved version " + s.version);
   });
   await scenario("the Euclid script turns a chord into three hits", async () => {
     await tapEl("#view-script");
@@ -282,7 +287,7 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     c = await js(`${API}.clips()`);
     need(c.length === 1 && c[0].start === 1, "at zoom 1 the clip should start on bar 1, got " + JSON.stringify(c));
     const t = (await song());
-    need(t.version === 8, "version " + t.version);
+    need(t.version === 9, "version " + t.version);
     await noSideways("song tab");
   });
   await scenario("one-shots: the Sampler tab has My one-shots, + Sample in the rack opens it, picking sampler on an empty track opens it", async () => {

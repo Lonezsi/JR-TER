@@ -117,3 +117,32 @@ test("a one-shot plays the whole sound however short the note, a plain sample fo
   assert.equal(cleanSample({ ...base, oneshot: true }).oneshot, true);
   assert.equal(cleanSample({ ...base, oneshot: "yes" }).oneshot, false);
 });
+
+import { clipRate, guessBpm, clipPlay } from "../../web/daw/sampler.js";
+test("sample tempo: cleaned, rate, guess, play", () => {
+  assert.equal(smp().bpm, 0);
+  assert.equal(smp().warp, "time");
+  assert.equal(smp({ bpm: 90, warp: "pitch" }).warp, "pitch");
+  assert.equal(smp({ bpm: 5 }).bpm, 0);
+  assert.equal(smp({ bpm: 900 }).bpm, 0);
+  assert.equal(clipRate(smp(), 120), 1);
+  assert.equal(clipRate(smp({ bpm: 90 }), 120), 120 / 90);
+  assert.equal(guessBpm(smp({ seconds: 8 })), 120);
+  assert.equal(guessBpm(smp({ seconds: 0 })), 0);
+  assert.ok(Math.abs(guessBpm(smp({ seconds: 2.667 })) - 90) < 0.1);
+  // 8 s at 90 BPM is 3 bars of 2.667 s; at 120 it is 2.25 bars -> 3 rounded up
+  assert.equal(clipBars(smp({ bpm: 90 }), 120), 3);
+  assert.equal(clipBars(smp(), 120), 4);
+  const ev = { offset: 4, length: 8 };
+  assert.deepEqual(clipPlay(smp(), ev, 120), { from: 2, to: 8, rate: 1, ratio: 1 });
+  const tape = clipPlay(smp({ bpm: 60, warp: "pitch" }), ev, 120);
+  assert.equal(tape.rate, 2); assert.equal(tape.ratio, 1); assert.equal(tape.from, 4);
+  const keep = clipPlay(smp({ bpm: 60 }), ev, 120);
+  assert.equal(keep.rate, 1); assert.equal(keep.ratio, 2); assert.equal(keep.from, 2); assert.equal(keep.to, 4);
+});
+test("sample tempo survives save and load", () => {
+  const s = mk(); s.tracks[1].sample = smp({ bpm: 96, warp: "pitch" });
+  const back = textToSong(songToText(s));
+  assert.equal(back.tracks[1].sample.bpm, 96);
+  assert.equal(back.tracks[1].sample.warp, "pitch");
+});
