@@ -146,3 +146,20 @@ test("sample tempo survives save and load", () => {
   assert.equal(back.tracks[1].sample.bpm, 96);
   assert.equal(back.tracks[1].sample.warp, "pitch");
 });
+
+test("instrument settings: envelope, loop, cut itself, pitch and stretch are kept and clamped", async () => {
+  const { cleanSample: clean, sliceFor: slice, ENV } = await import("../../web/daw/sampler.js");
+  const s = clean({ src: "/x", seconds: 2, env: { a: 9, d: -1, s: 0.5 }, pitch: 40, stretch: 2, loop: true, cut: true });
+  assert.deepEqual(s.env, { a: ENV.a[1], d: 0, s: 0.5, r: ENV.r[2] });
+  assert.equal(s.pitch, 24);
+  assert.equal(s.stretch, 2);
+  assert.equal(s.loop, true);
+  assert.equal(s.cut, true);
+  assert.equal(clean({ src: "/x", oneshot: true, loop: true }).loop, false, "a one-shot does not loop");
+  const old = clean({ src: "/x", seconds: 1 });
+  assert.deepEqual([old.pitch, old.stretch, old.loop, old.cut, old.env.s], [0, 1, false, false, 1], "an old sound plays as it did");
+  // stretch: positions are in the stretched (twice as long) sound; pitch raises the rate
+  const p = slice({ ...s, start: 0.5, end: 1.5 }, 60 + 12);
+  assert.deepEqual([p.from, p.to], [1, 3]);
+  assert.ok(Math.abs(p.rate - 2 * Math.pow(2, 24 / 12)) < 1e-9);
+});

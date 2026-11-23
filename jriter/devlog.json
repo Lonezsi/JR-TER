@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.20.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "A sampler for every instrument",
+  "notes": [
+    "The sampler is a dialog now, for the instrument you picked: it opens when you add a sound, or from the 〰 button on a sampler track. Escape or a click outside closes it.",
+    "Each instrument has an envelope (attack, decay, sustain, release, drawn as you turn them), Loop for held notes, and Cut itself, so a new note stops the one still ringing.",
+    "Pitch it up or down in semitones, and Stretch it longer or shorter without changing its pitch. Resample renders the sound as you have set it into a new one-shot, in One-shots under Resampled, and the instrument plays that.",
+    "The Sampler tab is the Browser now: your sounds, MIDI files, renders and takes."
+  ]
+ },
+ {
   "version": "4.19.0",
   "date": "2026-11-23",
   "name": "JR!TER",

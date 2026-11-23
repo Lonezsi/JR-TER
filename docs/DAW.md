@@ -1,5 +1,12 @@
 # Where the DAW is going
 
+**The sampler dialog (4.20.0).** A sample carries `cut`, `loop`, `env` {a,d,s,r} (`ENV` in `sampler.js`),
+`pitch` (semitones) and `stretch` (0.25..4; positions are then in the stretched copy, made by `stretchedOf`
+in `daw.js`). `playSlice` takes `{ env, loop }` and returns a voice that `cutVoice` can stop. The editor is a
+dialog at the top of the page (`.ins-scrim`, in `samplerview.js`), opened by `samplerUI.edit()`; the tab is the
+Browser. `knob.js` is the one knob control (`knob()`, `wireKnobs()`). `resample` in `daw.js` renders the set
+sound offline and uploads it to One-shots/Resampled.
+
 **Routing, MIDI, the runway (4.19.0).** Song format v10: any number of buses (2..16, `addBus`, `removeBus`),
 a send per bus on every track, and `out` on tracks and buses (`m` or `b<i>`); `cleanMixer` sends a bus that
 would loop (`loops`) to the master. `mixgraph.js` builds buses on demand and rewires an output only when it

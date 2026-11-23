@@ -11,6 +11,11 @@
 //   bpm      the tempo the sound was played at (20..400), 0 = not set: audio clips then play it as it is
 //   warp     "time" (default): audio clips keep the pitch while stretching to the song tempo; "pitch": speed and pitch move together, like tape
 //   oneshot  true: every note plays the whole sound (start..end), however short the note; a hit, not a held key
+//   cut      true: a new note on this instrument stops the one still sounding ("cut itself")
+//   loop     true: a held note loops start..end (or its piece) until it is let go; not with one-shot
+//   env      { a, d, s, r }: attack, decay and release in seconds, sustain 0..1 (the level held after decay)
+//   pitch    semitones up or down (-24..24) on top of what the key plays
+//   stretch  how much longer it lasts, keeping its pitch (0.25..4, 1 = as recorded), done with stretch.js
 // No slices: any note plays start..end, sped up or slowed down by its distance from root.
 // With slices: root plays the first piece, root+1 the second, and so on, at normal speed.
 //
@@ -38,11 +43,23 @@ export function cleanSample(x) {
     root: clamp(Math.round(num(x.root, 60)), 0, 127), slices: [], oneshot: x.oneshot === true,
     bpm: Number.isFinite(x.bpm) && x.bpm >= 20 && x.bpm <= 400 ? Math.round(x.bpm * 100) / 100 : 0,
     warp: x.warp === "pitch" ? "pitch" : "time",
+    cut: x.cut === true, loop: x.loop === true && x.oneshot !== true,
+    env: cleanEnv(x.env),
+    pitch: clamp(Math.round(num(x.pitch, 0)), -24, 24),
+    stretch: Math.round(clamp(num(x.stretch, 1), 0.25, 4) * 100) / 100,
   };
   const hi = sampleEnd(s) || 1e6;
   const cuts = (Array.isArray(x.slices) ? x.slices : []).map(Number).filter((t) => Number.isFinite(t) && t > start && t < hi);
   s.slices = [...new Set(cuts.map((t) => Math.round(t * 1000) / 1000))].sort((a, b) => a - b);
   return s;
+}
+
+// The envelope every voice follows. The default is the sound as it is: in at once, held, a tiny release.
+export const ENV = { a: [0, 2, 0.002, "s"], d: [0, 2, 0, "s"], s: [0, 1, 1, ""], r: [0.005, 3, 0.01, "s"] };
+export function cleanEnv(e) {
+  const out = {};
+  for (const [k, [lo, hi, d]] of Object.entries(ENV)) out[k] = Math.round(clamp(num(e && e[k], d), lo, hi) * 1000) / 1000;
+  return out;
 }
 
 // n equal pieces of start..end. 1 (or less) clears the cuts.
@@ -73,13 +90,14 @@ export function removeSliceNear(s, t, tol) {
 }
 
 // What a note of this pitch plays: { from, to, rate } in seconds, or null for silence.
+// With stretch set, the positions are in the stretched sound (see voice in daw.js), which is that much longer.
 export function sliceFor(s, pitch) {
-  const end = sampleEnd(s);
+  const end = sampleEnd(s), st = s.stretch || 1, up = Math.pow(2, (s.pitch || 0) / 12);
   if (!(end > s.start)) return null;
-  if (!s.slices.length) return { from: s.start, to: end, rate: Math.pow(2, (pitch - s.root) / 12) };
+  if (!s.slices.length) return { from: s.start * st, to: end * st, rate: Math.pow(2, (pitch - s.root) / 12) * up };
   const bounds = [s.start, ...s.slices, end], k = pitch - s.root;
   if (k < 0 || k >= bounds.length - 1) return null;
-  return { from: bounds[k], to: bounds[k + 1], rate: 1 };
+  return { from: bounds[k] * st, to: bounds[k + 1] * st, rate: up };
 }
 
 // How much faster than its own speed an audio clip plays at this song tempo.
@@ -137,19 +155,46 @@ export function peaks(data, n) {
 
 // Play from..to of a decoded buffer at `time`, for at most gate seconds (0 = the whole piece).
 // Returns the source node, or null when there is nothing to play.
-export function playSlice(ctx, buffer, { from, to, rate }, time, gate, velocity, dest) {
+// One voice. opts: env {a,d,s,r} (default: as it is), loop (hold the note by looping from..to).
+// Returns the source, with ._gain on it so a later note can cut it (see cutVoice).
+export function playSlice(ctx, buffer, { from, to, rate }, time, gate, velocity, dest, opts = {}) {
   const dur = buffer.duration;
   from = clamp(from, 0, dur); to = clamp(to, from, dur);
-  const avail = (to - from) / rate, len = gate > 0 ? Math.min(avail, gate) : avail;
+  const avail = (to - from) / rate, loop = !!opts.loop && gate > 0;
+  const len = loop ? gate : gate > 0 ? Math.min(avail, gate) : avail;
   if (!(len > 0.002)) return null;
-  const vol = clamp((velocity || 100) / 127, 0.02, 1), fade = Math.min(0.01, len / 2);
+  const vol = clamp((velocity || 100) / 127, 0.02, 1);
+  const e = opts.env || ENV_DEFAULT;
+  const a = Math.min(e.a, len), d = Math.min(e.d, Math.max(0, len - a)), sus = vol * e.s;
+  // The release follows the note; a sound that ends by itself (to its end) only fades its last moment.
+  const rel = gate > 0 ? e.r : Math.min(0.01, len / 2);
   const src = ctx.createBufferSource();
   src.buffer = buffer; src.playbackRate.value = rate;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(vol, time);
-  g.gain.setValueAtTime(vol, time + len - fade);
-  g.gain.linearRampToValueAtTime(0.0001, time + len);
+  if (loop) { src.loop = true; src.loopStart = from; src.loopEnd = to; }
+  const g = ctx.createGain(), low = 0.0001, susLevel = Math.max(low, sus);
+  // Attack up to the velocity, decay down to sustain, hold while the note is down, then release.
+  const held = gate > 0 ? time + len : time + Math.max(a + d, len - rel);
+  g.gain.setValueAtTime(a > 0.0005 ? low : vol, time);
+  if (a > 0.0005) g.gain.linearRampToValueAtTime(vol, time + a);
+  if (d > 0.0005) g.gain.linearRampToValueAtTime(susLevel, time + a + d);
+  else if (e.s < 1) g.gain.setValueAtTime(susLevel, time + a);
+  // A note let go before its decay ends releases from about where it got to.
+  g.gain.setValueAtTime(held >= time + a + d ? susLevel : vol, held);
+  g.gain.linearRampToValueAtTime(low, held + rel);
   src.connect(g); g.connect(dest);
-  src.start(time, from, len * rate);
+  if (loop) src.start(time, from); else src.start(time, from, Math.min(avail, len + rel) * rate);
+  src.stop(held + rel + 0.02);
+  src._gain = g;
   return src;
+}
+const ENV_DEFAULT = { a: 0, d: 0, s: 1, r: 0.01 };
+
+// "Cut itself": stop a voice that is still sounding, quickly but without a click.
+export function cutVoice(src, time) {
+  if (!src || !src._gain) return;
+  try {
+    src._gain.gain.cancelScheduledValues(time);
+    src._gain.gain.setTargetAtTime(0, time, 0.006);
+    src.stop(time + 0.05);
+  } catch { /* already stopped */ }
 }
