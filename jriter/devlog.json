@@ -1,5 +1,18 @@
 [
  {
+  "version": "4.19.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "Mixer routing, MIDI in the browser, and room past the pattern",
+  "notes": [
+    "The Mixer is laid out like a desk: Master first, then a numbered insert per track, then the buses. Add as many buses as you like with + Insert. Pick a strip and click the arrow under another to send there (its knob sets how much), or double-click it to make it the main output. Routes that would go round in a loop are never offered.",
+    "Pan and sends are knobs: drag up or down, scroll, use the arrow keys, double-click to reset. Every bus has a meter, a pan and a mute now.",
+    "Your one-shots are back in their real folders, as deep as the pack has them, and the packs' MIDI files are in the browser too. Press Pattern on one for a new pattern from it, or drag it onto the roll or onto a pattern number in the Drumroll.",
+    "The roll goes two bars past the end of the pattern. Put a note there, or drag or stretch one into it, and the pattern grows to fit.",
+    "The Rack is called the Drumroll now, and the Song tab is the Layout."
+  ]
+ },
+ {
   "version": "4.18.0",
   "date": "2026-11-23",
   "name": "JR!TER",

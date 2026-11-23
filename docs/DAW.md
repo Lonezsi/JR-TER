@@ -1,5 +1,14 @@
 # Where the DAW is going
 
+**Routing, MIDI, the runway (4.19.0).** Song format v10: any number of buses (2..16, `addBus`, `removeBus`),
+a send per bus on every track, and `out` on tracks and buses (`m` or `b<i>`); `cleanMixer` sends a bus that
+would loop (`loops`) to the master. `mixgraph.js` builds buses on demand and rewires an output only when it
+changes. `mixerview.js`: Master, inserts, buses; the picked strip's routing arrows sit under every strip it
+can feed (click: send, double-click: main output), pan and sends are knobs. The browser lists MIDI files
+(`.mid`, kind `midi`, stored with the one-shots, both servers); `midiToPattern` in `daw.js` puts one into
+the open pattern, a dropped-on pattern number (`.rk-pats [data-pat]`) or a fresh pattern. The roll has a
+runway of two bars past the pattern (`roomLen`, `grow`). User-facing names: Rack is the Drumroll, Song the Layout.
+
 **JR!TER's controls and the browser (4.18.0).** `web/daw/ui.js` fits the app's own controls onto the plain
 HTML the views write: every `<select>` gets JR!TER's dropdown (the real select stays underneath, so `.value`
 and `change` work as before), number fields get a stepper instead of the browser's spinners, sliders get the

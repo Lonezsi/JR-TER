@@ -59,3 +59,16 @@ def test_somebody_elses_library_has_none_of_it(library):
     sid = _send(library, owner)[1]["sample"]["id"]
     assert friend.call("GET", "/api/samples")[1]["samples"] == []
     assert friend.call("GET", "/api/samples/%d/audio" % sid)[0] == 404
+
+
+def test_a_midi_file_is_kept_with_its_whole_folder_path(library):
+    """A pack's MIDI melodies live next to its hits, deep in folders: both are kept."""
+    owner, _ = _owner_and_friend(library)
+    deep = "Cymatics - Phoenix Rebirth / 1 Melody Loop Collection / Loop Stems & MIDI / Aphrodite - 136 BPM D# Min"
+    assert len(deep) > 80
+    status, made = _send(library, owner, "Aphrodite.mid", deep, body=b"MThd" + b"\x00" * 20)
+    assert status == 200, made
+    assert made["sample"]["ext"] == ".mid" and made["sample"]["folder"] == deep, made
+    sid = made["sample"]["id"]
+    status, moved = owner.call("PATCH", "/api/samples/%d" % sid, {"folder": deep + " / Moved"})
+    assert status == 200 and moved["sample"]["folder"] == deep + " / Moved"

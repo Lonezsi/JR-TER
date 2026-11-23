@@ -5,11 +5,14 @@
 //   mix.master()   a node that goes straight to the master (previews)
 //   mix.sync(song) make the graph match the song (cheap; call after any change)
 //   mix.cut()      silence hanging tails
-//   mix.levels()   { tracks: [dB...], master: dB } for the meters
+//   mix.levels()   { tracks: [dB...], buses: [dB...], master: dB } for the meters
 //
-// Track: input -> inserts -> pan -> fader -> meter -> master bus, and fader -> send gains -> buses.
-// Bus:   input -> inserts -> volume -> master bus.
+// Track: input -> inserts -> pan -> fader -> meter -> its out (the master or a bus), and
+//        fader -> one send gain per bus -> that bus.
+// Bus:   input -> inserts -> pan -> volume -> meter -> its out (the master or another bus), and
+//        a mute that is a gain at 0.
 // Master: bus -> inserts -> volume -> limiter -> meter -> speakers.
+// Outputs are rewired only when they change; mixer.js keeps buses from going round in a loop.
 import { FX, ensureMix, trackGain, impulse, distCurve, level, chainKey } from "./mixer.js";
 
 export function createMixer(ctx) {
@@ -103,22 +106,35 @@ export function createMixer(ctx) {
   masterVol.connect(limiter); limiter.connect(masterMeter); masterMeter.connect(ctx.destination);
   const direct = gain(1); direct.connect(bus);
 
-  // the two send buses
-  const buses = [0, 1].map(() => {
-    const inp = gain(1), vol = gain(0.8);
-    vol.connect(bus);
-    return { inp, vol, apply: chain(inp, vol) };
-  });
+  // The buses: as many as the song has, made when first needed.
+  const buses = [];
+  function addBus() {
+    const inp = gain(1), pan = ctx.createStereoPanner(), vol = gain(0.8), meter = analyser();
+    pan.connect(vol); vol.connect(meter);
+    const b = { inp, pan, vol, meter, out: null, apply: chain(inp, pan) };
+    buses.push(b);
+  }
+  const dest = (o) => (o && o !== "m" && buses[+o.slice(1)] ? buses[+o.slice(1)].inp : bus);
+  // Point a meter (the last node of a strip or a bus) at where it goes, if that changed.
+  function route(x, o) {
+    if (x.out === o) return;
+    try { x.meter.disconnect(); } catch { /* not connected yet */ }
+    x.meter.connect(dest(o));
+    x.out = o;
+  }
 
   const strips = [];
   function addStrip() {
     const inp = gain(1), pan = ctx.createStereoPanner(), fader = gain(0.8), meter = analyser();
-    const sends = [gain(0), gain(0)];
-    pan.connect(fader); fader.connect(meter); meter.connect(bus);
-    sends.forEach((s, i) => { fader.connect(s); s.connect(buses[i].inp); });
+    pan.connect(fader); fader.connect(meter);
     const head = gain(1); inp.connect(head);
-    const s = { inp, head, pan, fader, meter, sends, apply: chain(head, pan) };
+    const s = { inp, head, pan, fader, meter, sends: [], out: null, apply: chain(head, pan) };
     strips.push(s);
+  }
+  // A send per bus, from the strip's fader to that bus's input.
+  function sendsFor(s, n) {
+    while (s.sends.length < n) { const g = gain(0); s.fader.connect(g); g.connect(buses[s.sends.length].inp); s.sends.push(g); }
+    while (s.sends.length > n) s.sends.pop().disconnect();
   }
 
   return {
@@ -126,6 +142,10 @@ export function createMixer(ctx) {
     master: () => direct,
     sync(song) {
       ensureMix(song);
+      const nb = song.mixer.buses.length;
+      while (buses.length < nb) addBus();
+      // Fewer buses than before: the extra ones go quiet and are unhooked, everything is re-pointed below.
+      while (buses.length > nb) { const b = buses.pop(); for (const s of strips) if (s.sends.length > buses.length) s.sends.pop().disconnect(); b.inp.disconnect(); b.pan.disconnect(); b.vol.disconnect(); b.meter.disconnect(); for (const x of [...strips, ...buses]) if (x.out && x.out !== "m") x.out = null; }
       while (strips.length < song.tracks.length) addStrip();
       while (strips.length > song.tracks.length) { const s = strips.pop(); s.inp.disconnect(); s.head.disconnect(); s.pan.disconnect(); s.fader.disconnect(); s.meter.disconnect(); s.sends.forEach((g) => g.disconnect()); }
       const solo = song.tracks.some((t) => t.solo);
@@ -134,9 +154,17 @@ export function createMixer(ctx) {
         s.apply(t.fx);
         ease(s.pan.pan, t.pan);
         ease(s.fader.gain, trackGain(t, solo));
+        sendsFor(s, nb);
         t.sends.forEach((v, k) => ease(s.sends[k].gain, v));
+        route(s, t.out);
       });
-      song.mixer.buses.forEach((b, i) => { buses[i].apply(b.fx); ease(buses[i].vol.gain, b.volume); });
+      song.mixer.buses.forEach((b, i) => {
+        const x = buses[i];
+        x.apply(b.fx);
+        ease(x.pan.pan, b.pan);
+        ease(x.vol.gain, b.mute ? 0 : b.volume);
+        route(x, b.out);
+      });
       masterChain(song.mixer.master.fx);
       ease(masterVol.gain, song.mixer.master.volume);
     },
@@ -146,6 +174,6 @@ export function createMixer(ctx) {
         s.inp = gain(1); s.inp.connect(s.head);
       }
     },
-    levels: () => ({ tracks: strips.map((s) => peak(s.meter, buf)), master: peak(masterMeter, buf) }),
+    levels: () => ({ tracks: strips.map((s) => peak(s.meter, buf)), buses: buses.map((b) => peak(b.meter, buf)), master: peak(masterMeter, buf) }),
   };
 }

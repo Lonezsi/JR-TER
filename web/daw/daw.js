@@ -196,10 +196,10 @@ const HELP = [
   ["⤓", "Bounce: render the song to audio and save it as a new version of the library song (or a waiting render when opened without one). The project is kept with the version; More, Bounces opens it again.", "B"],
   ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
   ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
-  ["▦", "Rack: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
+  ["▦", "Drumroll: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
   ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays. Automate draws a knob's moves over time under the clips.", "Alt+5, S"],
   ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
-  ["〰", "Sampler: add a take, vocal or render from your library with +, drag its ends to trim, Chop cuts it into pieces that play up the keys. Place puts it on the Song tab as a clip.", "Alt+7"],
+  ["〰", "Sampler: add a take, vocal or render from your library with +, drag its ends to trim, Chop cuts it into pieces that play up the keys. Place puts it on the Layout tab as a clip.", "Alt+7"],
   ["▥", "On a computer the DAW is laid out like a studio: library on the left, mixer at the bottom. The Mixer and Sampler tabs show or hide them.", "Alt+6, Alt+7"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
@@ -273,6 +273,16 @@ const cv = $("roll"), g = cv.getContext("2d");
 let W = 0, H = 0;
 const pxBeat = () => 64 * zoom;
 const loopLen = () => song.bars * 4;
+/* Past the pattern's end the roll keeps going for two shaded bars: a note put there, or dragged or
+ * stretched into it, grows the pattern to the bar it ends in (up to 64), and the runway moves on. */
+const RUNWAY = 2, MOST_BARS = 64;
+const roomLen = () => Math.min(MOST_BARS, song.bars + RUNWAY) * 4;
+function grow(end) {
+  const need = clamp(Math.ceil(end / 4 - 1e-9), 1, MOST_BARS);
+  if (need <= song.bars) return false;
+  song.bars = need; renderBar();
+  return true;
+}
 const inSong = () => song.mode === "song" && (song.clips || []).length > 0;
 const playLen = () => (inSong() ? songBars(song) * 4 : loopLen());
 function range() {
@@ -290,7 +300,7 @@ function resize() {
 }
 function clampScroll() {
   const [lo, hi] = range();
-  scrollX = clamp(scrollX, 0, Math.max(0, loopLen() * pxBeat() - (W - GUTTER)));
+  scrollX = clamp(scrollX, 0, Math.max(0, roomLen() * pxBeat() - (W - GUTTER)));
   scrollY = clamp(scrollY, 0, Math.max(0, (hi - lo + 1) * ROW - H));
 }
 const cssv = (n, d) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
@@ -310,18 +320,24 @@ function draw() {
     if (black) { g.fillStyle = blk; g.fillRect(GUTTER, yy, W - GUTTER, ROW); }
     g.fillStyle = grid; g.fillRect(GUTTER, yy + ROW - 1, W - GUTTER, 1);
   }
-  const total = loopLen();
+  const total = loopLen(), room = roomLen();
   let ls = step() || autoStep(pb, 14, ROLL_STEPS); // grid lines at the snap, never closer than 6px
   while (ls * pb < 6) ls *= 2;
-  for (let i = 0; i * ls <= total + 1e-9; i++) {
+  for (let i = 0; i * ls <= room + 1e-9; i++) {
     const b = i * ls, xx = x(b);
     if (xx < GUTTER - 1 || xx > W) continue;
     const isBar = Math.abs(b / 4 - Math.round(b / 4)) < 1e-6, isBeat = Math.abs(b - Math.round(b)) < 1e-6;
     g.fillStyle = isBar ? bar : grid;
     g.fillRect(Math.round(xx), 0, 1, H);
-    if (isBar && b < total) { g.fillStyle = mute; g.fillText(String(b / 4 + 1), xx + 4, 8); }
+    if (isBar && b < room) { g.fillStyle = mute; g.fillText(String(b / 4 + 1), xx + 4, 8); }
   }
+  // The runway: shaded, with its edge marked, so it reads as "not in the pattern yet".
   g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(x(total), 0, W, H);
+  if (total < room && x(total) < W) {
+    g.fillStyle = acc; g.globalAlpha = 0.5; g.fillRect(Math.round(x(total)) - 1, 0, 2, H); g.globalAlpha = 1;
+    g.fillStyle = mute; g.fillText("+ place a note to grow the pattern", x(total) + 8, H - 10);
+  }
+  g.fillStyle = "rgba(0,0,0,0.45)"; g.fillRect(x(room), 0, W, H);
   song.tracks.forEach((t, ti) => {
     const here = ti === sel;
     for (const n of t.notes) {
@@ -383,9 +399,9 @@ function removeNote(n) {
 }
 function addNoteAt(c) {
   const start = Math.max(0, snapFloor(c.beat, step()));
-  if (start >= loopLen()) return null;
+  if (start >= roomLen()) return null;
   const n = { pitch: c.pitch, start, length: Math.max(lastLen, minLen()), velocity: 90 };
-  edit(() => { song.tracks[sel].notes.push(n); });
+  edit(() => { song.tracks[sel].notes.push(n); grow(n.start + n.length); });
   return n;
 }
 // The right end of a note resizes it, the rest moves it. The end is at most the last 40% of the
@@ -412,10 +428,11 @@ function mouseDown(e) {
   if (!n) {
     if (tool === "select") { selNote = null; draw(); return; }
     const start = Math.max(0, snapFloor(c.beat, step()));
-    if (start >= loopLen()) return;
+    if (start >= roomLen()) return;
     const before = snap();
     n = { pitch: c.pitch, start, length: Math.max(lastLen, minLen()), velocity: 90 };
     t.notes.push(n);
+    grow(n.start + n.length);
     selNote = n; preview(t, n);
     drag = { n, mode: "move", before, c0: c, start0: n.start };
   } else {
@@ -430,11 +447,12 @@ function dragTo(e) {
   if (drag.mode === "move") {
     const ns = Math.max(0, snapRound(drag.start0 + (c.beat - drag.c0.beat), step()));
     if (n.pitch !== c.pitch) preview(song.tracks[sel], { ...n, pitch: c.pitch });
-    n.start = Math.min(ns, loopLen() - minLen()); n.pitch = c.pitch;
+    n.start = Math.min(ns, roomLen() - minLen()); n.pitch = c.pitch;
   } else {
-    n.length = Math.max(minLen(), snapRound(c.beat - n.start, step()));
+    n.length = Math.max(minLen(), Math.min(snapRound(c.beat - n.start, step()), roomLen() - n.start));
     lastLen = n.length;
   }
+  grow(n.start + n.length);
   draw();
 }
 const endDrag = () => {
@@ -688,9 +706,9 @@ function addSampler(sound, opts = {}) {
     song.tracks.push({ name: sound.name, instrument: "sampler", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes: [], sample });
     sel = song.tracks.length - 1; selNote = null;
   });
-  if (rack) { setView("rack"); toast("Added " + sound.name + " to the rack. Tap steps to play it.", { label: "Undo", run: doUndo }); return loadDuration(sound); }
+  if (rack) { setView("rack"); toast("Added " + sound.name + " to the Drumroll. Tap steps to play it.", { label: "Undo", run: doUndo }); return loadDuration(sound); }
   loadDuration(sound);
-  toast("Added " + sound.name + ". Draw notes for it, or place it on the Song tab.", { label: "Undo", run: doUndo });
+  toast("Added " + sound.name + ". Draw notes for it, or place it on the Layout tab.", { label: "Undo", run: doUndo });
 }
 function loadDuration(sound) {
   bufferOf(sound.src).then((buf) => {
@@ -705,7 +723,7 @@ const curBeat = () => (ctx ? ((ctx.currentTime - t0) * song.bpm) / 60 : 0);
 function togglePlay() { if (playing) stop(); else play(0); }
 function setMode(m) {
   edit(() => { song.mode = m; });
-  if (m === "song" && !(song.clips || []).length) toast("Place a pattern on the Song tab first.");
+  if (m === "song" && !(song.clips || []).length) toast("Place a pattern on the Layout tab first.");
   if (playing) play(0);
 }
 function play(from) {
@@ -774,6 +792,50 @@ function frame() {
 }
 
 // ---- files ------------------------------------------------------------------------------
+// ---- MIDI files from the browser: into the pattern being edited, or one you drop them on -------------
+const MIDI_TYPE = "application/x-jriter-midi";
+const midiCache = new Map();
+async function midiNotes(src) {
+  if (!midiCache.has(src)) {
+    const r = await fetch(src, { credentials: "include" });
+    if (!r.ok) throw new Error("Could not fetch that MIDI file.");
+    const m = parseMidi(new Uint8Array(await r.arrayBuffer()));
+    midiCache.set(src, m.tracks.flatMap((t) => t.notes).sort((a, b) => a.start - b.start || a.pitch - b.pitch));
+  }
+  return midiCache.get(src).map((n) => ({ ...n }));
+}
+let stopMidi = null;
+async function hearMidi(sound) {
+  try {
+    if (stopMidi) { stopMidi(); stopMidi = null; }
+    const notes = (await midiNotes(sound.src)).filter((n) => n.start < 16);
+    if (!notes.length) return toast("That MIDI file has no notes.");
+    stopMidi = hear(notes, () => { stopMidi = null; });
+  } catch (e) { toast(e.message); }
+}
+// `pattern`: put it in that pattern; `fresh`: in a new one named after the file; neither: the open one.
+async function midiToPattern(sound, { pattern = null, fresh = false } = {}) {
+  let notes;
+  try { notes = await midiNotes(sound.src); } catch (e) { return toast(e.message); }
+  if (!notes.length) return toast("That MIDI file has no notes.");
+  edit(() => {
+    if (fresh) { addPattern(song, false); song.patterns[song.pattern].name = String(sound.name).slice(0, 40); }
+    else if (pattern !== null && pattern !== song.pattern) usePattern(song, pattern);
+    if (!song.tracks[sel]) { song.tracks.push({ name: "Track " + (song.tracks.length + 1), instrument: "piano", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes: [] }); sel = song.tracks.length - 1; }
+    const t = song.tracks[sel];
+    t.notes.push(...notes);
+    t.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+    grow(Math.max(...notes.map((n) => n.start + n.length)));
+    selNote = null;
+  });
+  scrollX = 0;
+  setView("roll");
+  const [lo, hi] = range(), top = Math.max(...notes.map((n) => n.pitch));
+  scrollY = Math.max(0, (hi - top) * ROW - 24); draw();
+  toast((fresh ? "New pattern " + song.patterns[song.pattern].name : sound.name + " went into " + (song.patterns[song.pattern] ? song.patterns[song.pattern].name : "the pattern")) + ", on " + song.tracks[sel].name + ".", { label: "Undo", run: doUndo });
+}
+const midiTarget = (e) => e.target.closest?.(".rk-pats [data-pat], #rollbox, .roll");
+
 async function openBytes(name, bytes) {
   try {
     let s;
@@ -795,9 +857,26 @@ $("file").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (f) openBytes(f.name, new Uint8Array(await f.arrayBuffer()));
 };
-addEventListener("dragover", (e) => { e.preventDefault(); document.body.classList.add("drop"); });
+addEventListener("dragover", (e) => {
+  if ([...(e.dataTransfer?.types || [])].includes(MIDI_TYPE)) {
+    document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over"));
+    const t = midiTarget(e);
+    if (t) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; t.classList.add("midi-over"); }
+    return;
+  }
+  e.preventDefault(); document.body.classList.add("drop");
+});
 addEventListener("dragleave", () => document.body.classList.remove("drop"));
+addEventListener("dragend", () => document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over")));
 addEventListener("drop", async (e) => {
+  if ([...(e.dataTransfer?.types || [])].includes(MIDI_TYPE)) {
+    e.preventDefault();
+    document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over"));
+    const t = midiTarget(e);
+    if (!t) return;
+    const pat = t.dataset && t.dataset.pat != null ? +t.dataset.pat : null;
+    return midiToPattern(JSON.parse(e.dataTransfer.getData(MIDI_TYPE)), { pattern: pat });
+  }
   e.preventDefault(); document.body.classList.remove("drop");
   const f = e.dataTransfer.files[0];
   if (f) openBytes(f.name, new Uint8Array(await f.arrayBuffer()));
@@ -830,7 +909,7 @@ addEventListener("keydown", (e) => {
 });
 
 // ---- views: Chords, Roll, Script --------------------------------------------------------
-const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Rack"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Song"], mixer: ["◫", "Mixer"], sampler: ["〰", "Sampler"] };
+const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Drumroll"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Layout"], mixer: ["◫", "Mixer"], sampler: ["〰", "Sampler"] };
 function renderViews() {
   $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => pickView(v); });
@@ -866,7 +945,7 @@ function setView(v) {
     return;
   }
   view = v;
-  if (v !== "sampler") pendingRack = false; // + Sample in the rack only lasts while you are picking the sound
+  if (v !== "sampler") pendingRack = false; // + Sample in the Drumroll only lasts while you are picking the sound
   $("main").dataset.view = v;
   document.body.dataset.view = v;
   for (const b of VIEWS) $("view-" + b)?.setAttribute("aria-selected", studio && DOCKED.includes(b) ? dockOpen(b) : b === v);
@@ -967,7 +1046,7 @@ const rackUI = mountRack($("rackview"), {
   song: () => song, change: edit, snap, pushUndo, save, selected: () => sel,
   select: (i) => { sel = i; selNote = null; renderTracks(); draw(); },
   addTrack, addDrums, usePattern: switchPattern, newPattern, removePattern: dropPattern,
-  addSample: () => { pendingRack = true; samplerUI.show("oneshots"); setView("sampler"); toast("Pick a sound: + Rack (or + Inst) adds it as a channel."); },
+  addSample: () => { pendingRack = true; samplerUI.show("oneshots"); setView("sampler"); toast("Pick a sound: Drum (or Inst) adds it as a channel."); },
   preview: (i, step) => { const t = song.tracks[i]; if (t) preview(t, { pitch: step.pitch, velocity: step.velocity }); },
 });
 
@@ -977,7 +1056,7 @@ const mixUI = mountMixer($("mixerview"), {
 });
 const samplerUI = mountSampler($("samplerview"), {
   song: () => song, selected: () => sel, change: edit, snap, pushUndo, save, toast, addSampler, placeOnSong,
-  buffer: bufferOf, hear: hearLibrary, audition, guest: shareId ? { songId, prefix: API } : null,
+  buffer: bufferOf, hear: hearLibrary, hearMidi, midiToPattern, audition, guest: shareId ? { songId, prefix: API } : null,
 });
 const songUI = mountSong($("songview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, setMode,
@@ -1027,7 +1106,7 @@ window.jriterDaw = {
 
 // ---- together: a project kept on the server, friends in it with you --------------------------------
 const esc = (t) => String(t).replace(/[&<>"]/g, "");
-const TABS = { chords: "the chords", rack: "the rack", roll: "the piano roll", script: "the script", song: "the song", mixer: "the mixer", sampler: "the sampler" };
+const TABS = { chords: "the chords", rack: "the drumroll", roll: "the piano roll", script: "the script", song: "the layout", mixer: "the mixer", sampler: "the sampler" };
 function showPeople(list) {
   const before = people.map((p) => String(p.id));
   people = list;

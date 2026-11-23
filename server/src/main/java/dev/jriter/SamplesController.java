@@ -23,11 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class SamplesController {
-    static final List<String> EXT = List.of(".wav", ".mp3", ".ogg", ".opus", ".flac", ".m4a", ".aiff", ".aif");
+    static final List<String> EXT = List.of(".wav", ".mp3", ".ogg", ".opus", ".flac", ".m4a", ".aiff", ".aif", ".mid", ".midi");
     static final Map<String, String> TYPES = Map.of(
             ".wav", "audio/wav", ".mp3", "audio/mpeg", ".ogg", "audio/ogg", ".opus", "audio/ogg",
-            ".flac", "audio/flac", ".m4a", "audio/mp4", ".aiff", "audio/aiff", ".aif", "audio/aiff");
+            ".flac", "audio/flac", ".m4a", "audio/mp4", ".aiff", "audio/aiff", ".aif", "audio/aiff",
+            ".mid", "audio/midi", ".midi", "audio/midi");
     static final long MOST = 50L * 1024 * 1024;
+    /** A folder is a path ("Pack / Kicks / Hard"), so it gets more room than a name. */
+    static final int FOLDER = 240;
 
     private final Library library;
     private final Blobs blobs;
@@ -93,7 +96,7 @@ public class SamplesController {
         } catch (NumberFormatException e) {
             throw new ApiError("X-Duration is seconds");
         }
-        String folder = clean(unquote(Api.header(req, "X-Folder")), 80);
+        String folder = clean(unquote(Api.header(req, "X-Folder")), FOLDER);
         String base = filename.replace('\\', '/');
         base = base.substring(base.lastIndexOf('/') + 1);
         base = base.substring(0, base.length() - Api.extOf(base).length());
@@ -139,7 +142,7 @@ public class SamplesController {
             String n = clean(body.get("name"), 80);
             fields.put("name", n.isEmpty() ? r.get("name") : n);
         }
-        if (body.containsKey("folder")) fields.put("folder", clean(body.get("folder"), 80));
+        if (body.containsKey("folder")) fields.put("folder", clean(body.get("folder"), FOLDER));
         if (!fields.isEmpty()) db.update("samples", Accounts.num(r.get("id")), fields);
         return Map.of("sample", out(row(db, id)));
     }

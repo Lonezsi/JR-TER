@@ -21,7 +21,7 @@ export function mountRack(el, api) {
     const pats = song.patterns || [];
     const k = song.pattern || 0;
     el.innerHTML =
-      `<div class="cv-title">Channel rack</div>` +
+      `<div class="cv-title">Drumroll</div>` +
       `<div class="cv-line rk-pats" role="group" aria-label="Patterns">` +
         pats.map((p, i) => `<button data-pat="${i}" aria-pressed="${i === k}" data-tip="${esc(p.name)}" aria-label="${esc(p.name)}">${i + 1}</button>`).join("") +
         `<button data-act="newpat" aria-label="New pattern" data-tip="New pattern">+ New</button>` +

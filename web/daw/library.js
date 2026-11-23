@@ -34,7 +34,7 @@ export async function waitingRenders() {
 
 export async function mySamples() {
   const j = await get("/api/samples");
-  return (j.samples || []).map((x) => ({ kind: "oneshot", id: x.id, name: x.name, folder: x.folder || "", src: `/api/samples/${x.id}/audio`, seconds: x.duration || 0 }));
+  return (j.samples || []).map((x) => ({ kind: /^\.midi?$/i.test(x.ext || "") ? "midi" : "oneshot", id: x.id, name: x.name, folder: x.folder || "", src: `/api/samples/${x.id}/audio`, seconds: x.duration || 0 }));
 }
 
 // How long a sound is, from its bytes. 0 when the browser cannot decode it (it is kept anyway).
@@ -48,7 +48,9 @@ async function lengthOf(bytes) {
 // The folder a file came from when a whole folder was picked or dropped: "Drums / Kicks".
 export const folderOf = (file) => String(file.webkitRelativePath || file._path || "").split("/").slice(0, -1).join(" / ");
 
-export const isSound = (file) => /\.(wav|mp3|ogg|opus|flac|m4a|aiff?)$/i.test(file.name) || /^audio\//.test(file.type);
+// Sounds, and MIDI files (a pack's melodies sit next to its hits; they drop into patterns).
+export const isSound = (file) => /\.(wav|mp3|ogg|opus|flac|m4a|aiff?|midi?)$/i.test(file.name) || /^audio\//.test(file.type);
+export const MIDI_TYPE = "application/x-jriter-midi";
 
 // Upload files one by one. Returns { added, skipped, failed } counts.
 export async function uploadSamples(files, onProgress) {

@@ -259,3 +259,76 @@ body:not(.studio) .sampler .sp-editor:has(.sp-wave) { padding-bottom: var(--d-s3
 /* The bar's sheets (More, help) open over the panes, never under them: every pane is its own
    layer now that it blurs what is behind it, so the bar has to say it is on top. */
 .bar { z-index: 20; }
+
+/* A MIDI file over something that takes it: the roll, or a pattern number in the Drumroll. */
+.midi-over { box-shadow: 0 0 0 2px var(--d-acc), 0 0 18px rgba(var(--accent-rgb, 250, 168, 184), 0.45) !important; }
+.sp-row.midi { cursor: grab; }
+.sp-row.midi .sp-ic { color: var(--accent-text); font-size: 12px; }
+
+/* ---- the mixer: strips like a desk's -------------------------------------------------------- */
+.mx-head { display: flex; align-items: center; gap: var(--d-s2); flex-wrap: wrap; }
+.mx-head .mx-hint { flex: 1; min-width: 12em; font-size: 11.5px; }
+.mx-strips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px var(--d-s2); align-items: stretch; }
+.mx-strip {
+  flex: none; width: 74px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 4px;
+  border: 0 !important; border-radius: 12px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.015));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 0 0 1px var(--line, rgb(255 255 255 / 0.09));
+  transition: box-shadow var(--d-fast), background var(--d-fast);
+}
+.mx-strip.master { background: linear-gradient(180deg, rgba(var(--accent-rgb, 250, 168, 184), 0.14), rgb(255 255 255 / 0.015)); }
+.mx-strip.bus { background: linear-gradient(180deg, rgb(150 200 255 / 0.08), rgb(255 255 255 / 0.015)); }
+.mx-strip.sel { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 0 2px var(--d-acc); }
+.mx-strip.dest { background-color: rgb(255 255 255 / 0.02); }
+.mx-name {
+  width: 100%; min-height: 0 !important; padding: 2px 4px; border: 0; background: transparent; box-shadow: none;
+  display: flex; flex-direction: column; align-items: center; gap: 0; transform: none !important;
+}
+.mx-name[aria-pressed="true"] { background: transparent; color: var(--d-fg); }
+.mx-num { font: 700 10px/1.2 var(--d-display, sans-serif); letter-spacing: 0.06em; color: var(--text-3, var(--d-mute)); }
+.mx-strip.sel .mx-num { color: var(--accent-text); }
+.mx-label { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; }
+.mx-mid { height: 132px !important; display: flex; gap: 4px; justify-content: center; }
+.mx-meter { width: 6px; height: 100%; border-radius: 3px; background: rgb(0 0 0 / 0.45); box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.6); position: relative; overflow: hidden; }
+.mx-meter i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: 3px; background: linear-gradient(to top, #6fe0a0 0%, #e8e070 70%, #ff7a7a 100%); background-size: 100% 132px; background-position: bottom; }
+.mx-db { font-size: 10px; color: var(--text-3, var(--d-mute)); font-variant-numeric: tabular-nums; }
+.mx-ms { display: flex; gap: 3px; }
+.mx-ms button { width: 24px; height: 20px; min-width: 24px !important; min-height: 20px !important; padding: 0; border-radius: 5px; font: 700 10px/1 var(--mono, monospace); }
+.mx-ms button[data-ms="mute"][aria-pressed="true"] { background: #e25d5d; color: #fff; border-color: transparent; box-shadow: 0 0 8px rgb(226 93 93 / 0.5); }
+.mx-ms button[data-ms="solo"][aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); border-color: transparent; }
+.mx-lim { font: 700 9px/20px var(--mono, monospace); color: var(--text-3, var(--d-mute)); letter-spacing: 0.08em; }
+.mx-out { font-size: 9.5px; color: var(--text-3, var(--d-mute)); max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-foot { min-height: 30px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.mx-route {
+  width: 26px; height: 18px; min-width: 26px !important; min-height: 18px !important; padding: 0; border-radius: 5px;
+  color: var(--text-3, var(--d-mute)); background: rgb(0 0 0 / 0.3); box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5);
+}
+.mx-route.on { color: var(--accent-hi, var(--d-acc)); background: var(--accent-soft); filter: drop-shadow(0 0 4px rgba(var(--accent-rgb, 250, 168, 184), 0.6)); }
+.mx-route.main { color: var(--d-acc-ink); background: var(--d-acc); }
+/* A knob: a pointer line that turns. */
+.mx-knob {
+  position: relative; width: 26px; height: 26px; flex: none; border-radius: 50%; cursor: ns-resize; touch-action: none; outline: none;
+  background: radial-gradient(circle at 35% 30%, #4b4e56, #1b1c21 70%);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.12), 0 0 0 1px rgb(0 0 0 / 0.5);
+}
+.mx-knob i { position: absolute; left: 50%; top: 3px; width: 2px; height: 8px; margin-left: -1px; border-radius: 2px; background: var(--accent-hi, var(--d-acc)); transform-origin: 50% 10px; transform: rotate(var(--turn, 0deg)); }
+.mx-knob:focus-visible { box-shadow: 0 0 0 2px var(--d-acc), 0 2px 4px rgb(0 0 0 / 0.55); }
+.mx-knob.blank { visibility: hidden; }
+.mx-foot .mx-knob { width: 20px; height: 20px; }
+.mx-foot .mx-knob i { height: 6px; transform-origin: 50% 7px; }
+.mx-side { display: flex; flex-direction: column; gap: var(--d-s3); min-width: 0; }
+.mx-who { gap: var(--d-s2); }
+.mx-who b { font-size: 13px; }
+.mx-who input[type="text"] { width: 12em; }
+.mx-adds button { font-size: 11.5px; }
+.mx-chain { display: flex; flex-direction: column; gap: 6px; }
+.mx-fx { border: 0 !important; border-radius: 12px; background: rgb(255 255 255 / 0.035); box-shadow: 0 0 0 1px var(--line, rgb(255 255 255 / 0.09)); padding: 8px 10px; gap: 6px; }
+.mx-slot { font: 700 10px/1 var(--d-display, sans-serif); color: var(--text-3, var(--d-mute)); }
+.mx-led { width: 12px !important; height: 12px !important; min-width: 12px !important; min-height: 12px !important; padding: 0; border-radius: 50%; border: 0; background: #3a3b40; box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.6); }
+.mx-led[aria-checked="true"] { background: #6fe0a0 !important; box-shadow: 0 0 8px rgb(111 224 160 / 0.7); }
+.mx-fxh button:not(.mx-led) { height: 22px; min-height: 22px !important; min-width: 22px !important; padding: 0 6px; font-size: 11px; }
+body.studio .mixer { grid-template-columns: auto minmax(260px, 1fr) !important; }
+body.studio .mixer > .mx-head { grid-column: 1 / -1; }
+body.studio .mixer .mx-strips { grid-row: auto !important; grid-column: 1; max-width: 62vw; }
+body.studio .mixer .mx-side { grid-column: 2; overflow-y: auto; }
+body.studio .mx-mid { height: 110px !important; }

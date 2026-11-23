@@ -32,12 +32,17 @@ SCHEMA = [
     "CREATE INDEX IF NOT EXISTS samples_folder ON samples(folder, name)",
 ]
 
-EXT = (".wav", ".mp3", ".ogg", ".opus", ".flac", ".m4a", ".aiff", ".aif")
+#: Sounds, and MIDI files: a pack's melodies live next to its hits, and the DAW drops them into patterns.
+EXT = (".wav", ".mp3", ".ogg", ".opus", ".flac", ".m4a", ".aiff", ".aif", ".mid", ".midi")
 TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".opus": "audio/ogg",
-         ".flac": "audio/flac", ".m4a": "audio/mp4", ".aiff": "audio/aiff", ".aif": "audio/aiff"}
+         ".flac": "audio/flac", ".m4a": "audio/mp4", ".aiff": "audio/aiff", ".aif": "audio/aiff",
+         ".mid": "audio/midi", ".midi": "audio/midi"}
 
 #: A one-shot is a hit, not a song. Fifty megabytes is minutes of WAV.
 MOST = 50 * 1024 * 1024
+
+#: A folder is a path ("Pack / Kicks / Hard"), so it gets more room than a name.
+FOLDER = 240
 
 
 def _row(sample_id):
@@ -86,7 +91,7 @@ def add_sample(req):
         duration = max(0.0, float(req.headers.get("X-Duration") or 0))
     except ValueError:
         raise Error("X-Duration is seconds")
-    folder = _clean(_header(req, "X-Folder"), 80)
+    folder = _clean(_header(req, "X-Folder"), FOLDER)
     name = _clean(os.path.splitext(os.path.basename(filename))[0], 80) or "Sound"
     digest, size, _ = blobs.put_stream(req.rfile, length)
     same = db.one("SELECT * FROM samples WHERE digest = ? AND name = ? AND folder = ?",
@@ -109,7 +114,7 @@ def change_sample(req):
     if "name" in body:
         fields["name"] = _clean(body["name"], 80) or row["name"]
     if "folder" in body:
-        fields["folder"] = _clean(body["folder"], 80)
+        fields["folder"] = _clean(body["folder"], FOLDER)
     if fields:
         db.update("samples", row["id"], fields)
     return {"sample": _out(_row(row["id"]))}

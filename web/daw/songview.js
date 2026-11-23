@@ -55,7 +55,7 @@ export function mountSong(el, api) {
         `</div>`;
     }
     el.innerHTML =
-      `<div class="cv-title">Song</div>` +
+      `<div class="cv-title">Layout</div>` +
       `<div class="cv-line" role="group" aria-label="What Play plays">` +
         `<button data-mode="pattern" aria-pressed="${song.mode !== "song"}" data-tip="Play loops the pattern you are editing">Pattern</button>` +
         `<button data-mode="song" aria-pressed="${song.mode === "song"}" data-tip="Play runs the clips below">Song</button>` +
@@ -65,7 +65,7 @@ export function mountSong(el, api) {
         samplers.map((i) => `<button data-brush="t${i}" aria-pressed="${brush === "t" + i}" data-tip="Audio: ${esc(song.tracks[i].name)}" aria-label="Paint audio ${esc(song.tracks[i].name)}">〰 ${esc(song.tracks[i].name)}</button>`).join("") +
       `</div>` +
       `<div class="cv-line sl-tools">` +
-        `<button data-act="edit" aria-label="Edit this pattern in the rack" data-tip="Edit this pattern in the rack"${sel ? "" : " disabled"}>Edit</button>` +
+        `<button data-act="edit" aria-label="Edit this pattern in the Drumroll" data-tip="Edit this pattern in the Drumroll"${sel ? "" : " disabled"}>Edit</button>` +
         `<button data-act="split" aria-label="Cut the clip in half" data-tip="Cut the clip in half"${sel && sel.length >= 2 / QB ? "" : " disabled"}>Split</button>` +
         `<button data-act="del" aria-label="Delete the clip" data-tip="Delete the clip"${sel ? "" : " disabled"}>Delete</button>` +
         `<span class="sl-sep"></span>${autoLanes.button()}` +
