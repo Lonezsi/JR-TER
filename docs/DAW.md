@@ -37,7 +37,12 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    root+1 piece 2, and so on (no cuts: every key plays it, pitched). Place puts it on the Song tab
    as an audio clip (a clip with `track` instead of `pattern`), through the track's mixer strip.
    Code: `web/daw/sampler.js` (model and maths, tested), `library.js` (asks `/api/songs`, versions,
-   vocals, renders), `samplerview.js`. Not yet: audio from your own computer, stretching clips to the tempo.
+   vocals, renders), `samplerview.js`. Stretching to the tempo came in 5d.
+5d. **Tempo. Done in 4.15.0.** A sampler sound can carry the tempo it was played at (`sample.bpm`, 20..400, 0 = off;
+   Tempo box in the Sampler, Guess reads it from the trim as whole bars) and `sample.warp`: `time` (Keep pitch, default) or
+   `pitch` (like tape). Audio clips on the Song tab then play at the song tempo; notes are not affected. `clipRate`, `guessBpm`,
+   `clipPlay` in `sampler.js`; `stretch.js` is a WSOLA time-stretch, run once per sound and ratio when you press Play or
+   Bounce (main thread). Existing clip lengths are not changed when you set a tempo; new clips use `clipBars`.
 6. **Automation and more script. Done in 4.10.0.** Automation lanes on the Song tab: "+ Automate" lists
    every knob (a track's volume, pan, sends and each insert effect setting, the master, the two buses);
    tap a lane to add a point, drag it, hold it to delete it, arrows on a focused point. Playback feeds the
@@ -62,7 +67,7 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    `web/daw/snap.js` (tested): a setting is Auto, a step or None; Auto picks the finest straight step that is still
    wide enough to hit, so it follows the zoom. It is a view setting kept in localStorage `jriter-daw-snap`
    (`roll` and `song`), not in the project. The Song tab zooms and clips sit on sixteenths of a bar (format v8).
-   Not yet: stretching audio clips to the tempo; a guest hears only their own one-shots.
+   Not yet: a guest hears only their own one-shots.
 8. **Together. Done in 4.12.0.** A song's project is stored on the server (`jriter/modules/daw.py`, Spring
    `DawController.java`, table `daw_projects` with a revision): `GET`/`PUT /api/songs/ID/daw` and
    `POST /api/songs/ID/daw/here` (who is in the project and their cursor, in memory, gone after 12 s).
@@ -73,5 +78,5 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    history and can be undone. The owner's More menu lists the song's shares and copies the link.
    Not yet: a cursor on the Song tab (the piano roll has one), a guest's sampler hears only the guest's own library.
 
-The project format is `jriter-daw` JSON (version 8; see `web/daw/midi.js` `songToText`). Old
+The project format is `jriter-daw` JSON (version 9; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.
