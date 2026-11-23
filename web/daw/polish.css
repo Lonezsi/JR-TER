@@ -365,7 +365,8 @@ body.studio .mx-mid { height: 110px !important; }
 .ins-k .mx-knob { width: 34px; height: 34px; }
 .ins-k .mx-knob i { height: 11px; transform-origin: 50% 14px; }
 .ins-k output { font-size: 10px; color: var(--text-3, var(--d-mute)); font-variant-numeric: tabular-nums; }
-.ins-adsr { flex: 1 1 120px; min-width: 120px; height: 52px; align-self: center; }
+.ins-adsr { flex: 1 1 120px; min-width: 120px; height: 52px; align-self: center; touch-action: none; cursor: grab; }
+.ins-adsr:active { cursor: grabbing; }
 .ins-foot { display: flex; align-items: center; gap: var(--d-s2); }
 .ins-done { background: var(--d-acc) !important; color: var(--d-acc-ink) !important; border-color: transparent !important; padding: 4px 18px; }
 .sp-open { width: 100%; justify-content: flex-start; gap: 8px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

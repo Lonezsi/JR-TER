@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.23.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "Shape the envelope by hand",
+  "notes": [
+    "In the sampler, drag the points on the envelope curve: the peak sets the attack, the next point the decay and sustain, the flat end the sustain, the last point the release.",
+    "The knobs follow, and one Undo puts the whole drag back."
+  ]
+ }, {
   "version": "4.22.0",
   "date": "2026-11-23",
   "name": "JR!TER",

@@ -118,7 +118,7 @@ export function mountSampler(el, api) {
           `<button data-act="resample" data-tip="Render the sound as you have set it into a new one-shot, and play that" aria-label="Resample">Resample</button></div></div>` +
         `<div class="ins-group ins-env"><span class="cv-title">Envelope</span><div class="ins-knobs">` +
           Object.keys(ENV).map((k) => `<label class="ins-k">${knob({ key: "env." + k, label: ENV_WORDS[k], value: s.env[k], lo: ENV[k][0], hi: ENV[k][1], home: ENV[k][2], words: k === "s" ? Math.round(s.env[k] * 100) + "%" : sec(s.env[k]) })}<span>${ENV_WORDS[k]}</span><output>${k === "s" ? Math.round(s.env[k] * 100) + "%" : sec(s.env[k])}</output></label>`).join("") +
-          `<canvas class="ins-adsr" id="ins-adsr" aria-hidden="true"></canvas></div></div>` +
+          `<canvas class="ins-adsr" id="ins-adsr" data-tip="Drag the points to shape the envelope" aria-hidden="true"></canvas></div></div>` +
       `</div>` +
       `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
         `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>` +
@@ -127,21 +127,64 @@ export function mountSampler(el, api) {
     paint(); adsr();
     if (keepFocus) modal.querySelector(`[data-knob="${keepFocus}"]`)?.focus();
   }
+  let envDrag = null; // { id, k, total, before }: a point on the drawn curve is being dragged
+  function envGeom(cv) {
+    const e = track().sample.env, r = cv.getBoundingClientRect(), pad = 6, hold = 0.5, W = r.width, H = r.height;
+    const own = e.a + e.d + hold + e.r, total = envDrag ? envDrag.total : own || 1;
+    const X = (sec) => pad + (sec / total) * (W - pad * 2), Y = (lv) => H - pad - lv * (H - pad * 2);
+    return { e, r, W, H, pad, hold, total, X, Y,
+      pts: { a: [X(e.a), Y(1)], d: [X(e.a + e.d), Y(e.s)], s: [X(e.a + e.d + hold), Y(e.s)], r: [X(own), Y(0)] } };
+  }
   function adsr() {
     const t = track(), cv = modal.querySelector("#ins-adsr");
     if (!t || !cv) return;
-    const e = t.sample.env, r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
-    if (r.width < 2) return requestAnimationFrame(adsr);
+    if (cv.getBoundingClientRect().width < 2) return requestAnimationFrame(adsr);
+    const { e, r, W, H, X, Y, pts, hold } = envGeom(cv), dpr = devicePixelRatio || 1;
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
     const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = r.width, H = r.height, pad = 4, hold = 0.5, total = e.a + e.d + hold + e.r || 1;
-    const X = (sec) => pad + (sec / total) * (W - pad * 2), Y = (lv) => H - pad - lv * (H - pad * 2);
     const acc = getComputedStyle(document.documentElement).getPropertyValue("--d-acc").trim() || "#FAA8B8";
     g.clearRect(0, 0, W, H);
-    g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(e.a), Y(1)); g.lineTo(X(e.a + e.d), Y(e.s)); g.lineTo(X(e.a + e.d + hold), Y(e.s)); g.lineTo(X(total), Y(0));
+    g.beginPath(); g.moveTo(X(0), Y(0));
+    for (const k of ["a", "d", "s", "r"]) g.lineTo(pts[k][0], pts[k][1]);
     g.strokeStyle = acc; g.lineWidth = 2; g.lineJoin = "round"; g.stroke();
     g.lineTo(X(0), Y(0)); g.globalAlpha = 0.15; g.fillStyle = acc; g.fill(); g.globalAlpha = 1;
+    g.fillStyle = acc;
+    for (const k of ["a", "d", "s", "r"]) { g.beginPath(); g.arc(pts[k][0], pts[k][1], envDrag && envDrag.k === k ? 4.5 : 3, 0, Math.PI * 2); g.fill(); }
   }
+  // Drag a point on the curve: the knobs stay as the keyboard way, this is the same four numbers.
+  const envWords = (k, v) => (k === "s" ? Math.round(v * 100) + "%" : sec(v));
+  function envMove(e) {
+    const cv = modal.querySelector("#ins-adsr"), t = track(); if (!cv || !t || !envDrag) return;
+    const { e: env, r, W, H, pad, hold, total } = envGeom(cv);
+    const s = (e.clientX - r.left - pad) / (W - pad * 2) * total, lv = clamp((H - pad - (e.clientY - r.top)) / (H - pad * 2), 0, 1);
+    const set = (k, v) => { env[k] = Math.round(clamp(v, ENV[k][0], ENV[k][1]) * 1000) / 1000; };
+    const k = envDrag.k;
+    if (k === "a") set("a", s);
+    else if (k === "d") { set("d", s - env.a); set("s", lv); }
+    else if (k === "s") set("s", lv);
+    else set("r", s - (env.a + env.d + hold));
+    for (const n of "adsr") { const o = modal.querySelector(`[data-knob="env.${n}"]`)?.closest(".ins-k")?.querySelector("output"); if (o) o.textContent = envWords(n, env[n]); }
+    adsr(); api.save();
+  }
+  modal.addEventListener("pointerdown", (e) => {
+    if (e.target.id !== "ins-adsr" || !track() || e.button > 0) return;
+    const cv = e.target, g = envGeom(cv), x = e.clientX - g.r.left, y = e.clientY - g.r.top;
+    let k = "a", best = Infinity;
+    for (const n of ["a", "d", "s", "r"]) { const d = Math.hypot(g.pts[n][0] - x, g.pts[n][1] - y); if (d < best) { best = d; k = n; } }
+    e.preventDefault();
+    envDrag = { id: e.pointerId, k, total: g.total, before: api.snap() };
+    try { cv.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
+    envMove(e);
+  });
+  modal.addEventListener("pointermove", (e) => { if (envDrag && e.pointerId === envDrag.id) envMove(e); });
+  const envEnd = (e) => {
+    if (!envDrag || e.pointerId !== envDrag.id) return;
+    const d = envDrag; envDrag = null;
+    if (api.snap() !== d.before) { api.pushUndo(d.before); api.save(); }
+    renderModal();
+  };
+  modal.addEventListener("pointerup", envEnd);
+  modal.addEventListener("pointercancel", envEnd);
   function openInstrument() { if (!track()) return; editingInstrument = true; renderModal(); modal.querySelector(".ins-modal")?.focus?.(); requestAnimationFrame(() => modal.querySelector('[data-act="close"]')?.focus()); }
   function closeInstrument() { if (!editingInstrument) return; editingInstrument = false; renderModal(); el.querySelector('[data-act="instrument"]')?.focus(); }
   // It never clings: Escape, or a press outside it, closes it.
