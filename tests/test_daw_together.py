@@ -9,10 +9,12 @@ def _project(bpm=120):
     return json.dumps({"format": "jriter-daw", "version": 7, "bpm": bpm, "tracks": []})
 
 
-def _setup(library):
+def _setup(library, with_share=False):
     owner, friend = _owner_and_friend(library)
     song = owner.call("POST", "/api/songs", {"title": "s"})[1]["song"]["id"]
     share = owner.call("POST", "/api/shares", {"song": song, "handle": "jozsef"})[1]["share"]
+    if with_share:
+        return owner, friend, song, share
     return owner, friend, song, "/api/shared/%d/on/songs/%d/daw" % (share, song)
 
 
@@ -48,3 +50,16 @@ def test_a_friend_edits_through_the_share_and_both_see_each_other(library):
 def test_somebody_without_a_share_cannot_reach_it(library):
     owner, friend, song, _ = _setup(library)
     assert friend.call("GET", "/api/shared/9999/on/songs/%d/daw" % song)[0] == 404
+
+
+def test_a_friend_hears_the_owners_one_shots_in_the_project_only(library):
+    from test_samples import _send
+    owner, friend, song, share = _setup(library, with_share=True)
+    a = _send(library, owner, "a.wav")[1]["sample"]["id"]
+    b = _send(library, owner, "b.wav")[1]["sample"]["id"]
+    project = {"format": "jriter-daw", "version": 9, "bpm": 120,
+               "tracks": [{"name": "k", "sample": {"name": "a", "src": "/api/samples/%d/audio" % a}}]}
+    owner.call("PUT", "/api/songs/%d/daw" % song, {"text": json.dumps(project), "base": 0})
+    door = "/api/shared/%d/on/samples/%%d/audio" % share
+    assert friend.call("GET", door % a)[0] == 200
+    assert friend.call("GET", door % b)[0] == 404

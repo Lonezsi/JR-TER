@@ -20,7 +20,7 @@ const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
 const QB = 16;         // clips sit on sixteenths of a bar
 
 export function mountSong(el, api) {
-  let brush = 0, selected = -1, drag = null, hold = 0, zoomS = 1;
+  let brush = 0, selected = -1, drag = null, hold = 0, zoomS = 1, others = [];
   const snapSet = loadSnap(localStorage);
   const barPx = () => BAR_PX * zoomS;
   // How far clips snap, in beats (0 = to the sixteenth of a bar, the grid clips live on).
@@ -74,6 +74,23 @@ export function mountSong(el, api) {
       `<div class="sl-scroll"><div class="sl-grid" style="--bar:${BP}px;width:${bars * BP}px">` +
         `<div class="sl-ruler">${ruler}</div>${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>` +
       `<div class="sv-doc">Tap a lane to place the pattern. Drag a clip to move it, drag its end to repeat it. Hold a clip to delete it. Automate draws a knob's moves over time: tap a lane to add a point, drag it, hold it to delete it.</div>`;
+    drawPeople();
+  }
+
+  // Friends working in the same song: a coloured line where their pointer is on this tab.
+  function drawPeople() {
+    el.querySelectorAll(".sl-who").forEach((n) => n.remove());
+    const grid = el.querySelector(".sl-grid");
+    if (!grid) return;
+    for (const p of others) {
+      const c = p.cursor || {};
+      if (c.tab !== "song" || typeof c.beat !== "number") continue;
+      const n = document.createElement("div");
+      n.className = "sl-who"; n.setAttribute("aria-hidden", "true");
+      n.style.setProperty("--hue", String(p.hue)); n.style.transform = `translateX(${(c.beat / 4) * barPx()}px)`;
+      const name = document.createElement("span"); name.textContent = p.name; n.append(name);
+      grid.append(n);
+    }
   }
 
   // Where the pointer is on the timeline, in bars (fractional).
@@ -103,6 +120,8 @@ export function mountSong(el, api) {
     clip.classList.add("sel");
   });
   el.addEventListener("pointermove", (e) => {
+    const g = e.target.closest && e.target.closest(".sl-grid");
+    if (g && api.cursor) api.cursor(Math.max(0, Math.round(barAt(e, g) * 16) / 4));
     if (!drag || e.pointerId !== drag.id) return;
     if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
     drag.moved = true; clearTimeout(hold);
@@ -228,5 +247,5 @@ export function mountSong(el, api) {
     snapSet.song = sel.value; saveSnap(localStorage, { song: snapSet.song });
     render();
   });
-  return { render, playhead, paintWith: (b) => { brush = b; render(); }, zoom: () => zoomS, setZoom: (z) => setZoomS(z), snap: () => ({ setting: snapSet.song, beats: step() }), setSnap: (v) => { snapSet.song = v; saveSnap(localStorage, { song: v }); render(); } };
+  return { render, playhead, people: (list) => { others = list || []; drawPeople(); }, paintWith: (b) => { brush = b; render(); }, zoom: () => zoomS, setZoom: (z) => setZoomS(z), snap: () => ({ setting: snapSet.song, beats: step() }), setSnap: (v) => { snapSet.song = v; saveSnap(localStorage, { song: v }); render(); } };
 }

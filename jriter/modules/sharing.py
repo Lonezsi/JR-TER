@@ -525,6 +525,8 @@ GUEST_MAY = {
     ("PATCH", "/api/vocals/<id>"): ("vocal", None),
     ("DELETE", "/api/vocals/<id>"): ("vocal", None),
     ("GET", "/api/vocals/<id>/audio"): ("vocal", None),
+    # One of the owner's one-shots, but only one the song's DAW project uses.
+    ("GET", "/api/samples/<id>/audio"): ("sample", None),
 }
 
 #: Who the guest is, while their request runs in the owner's library. who.must() answers
@@ -572,6 +574,9 @@ def _belongs(kind, ident, song_id):
     if kind == "song":
         return ident == song_id
     one = lambda sql: db.one(sql, (ident,))       # noqa: E731
+    if kind == "sample":
+        row = db.one("SELECT text FROM daw_projects WHERE song_id = ?", (song_id,))             if db.table_exists("daw_projects") else None
+        return bool(row) and ('"/api/samples/%d/audio"' % ident) in (row["text"] or "")
     if kind == "artwork":
         row = one("SELECT song_id FROM artwork WHERE id = ?")
     elif kind == "sheet":

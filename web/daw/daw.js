@@ -17,7 +17,7 @@ import { stretchBuffer } from "./stretch.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
 import { encodeWav, bounceSeconds } from "./bounce.js";
-import { startTogether, apiPrefix } from "./together.js";
+import { startTogether, apiPrefix, soundUrl } from "./together.js";
 import { ROLL_STEPS, stepFor, autoStep, snapFloor, snapRound, snapOptions, loadSnap, saveSnap } from "./snap.js";
 import { emptySteps, allNotes, usePattern, addPattern, removePattern, removeTrackEverywhere } from "./pattern.js";
 
@@ -548,7 +548,8 @@ function bufferOf(src) {
   let b = buffers.get(src);
   if (!b) {
     b = { buf: null, promise: null };
-    b.promise = fetch(src, { credentials: "include" })
+    const url = soundUrl(src, shareId);
+    b.promise = (url === null ? Promise.reject(new Error("That sound is not part of this share.")) : fetch(url, { credentials: "include" }))
       .then((r) => { if (!r.ok) throw new Error("The library said " + r.status + "."); return r.arrayBuffer(); })
       .then((a) => ctx.decodeAudioData(a))
       .then((x) => { b.buf = x; return x; })
@@ -937,12 +938,13 @@ const mixUI = mountMixer($("mixerview"), {
 });
 const samplerUI = mountSampler($("samplerview"), {
   song: () => song, selected: () => sel, change: edit, snap, pushUndo, save, toast, addSampler, placeOnSong,
-  buffer: bufferOf, hear: hearLibrary, audition,
+  buffer: bufferOf, hear: hearLibrary, audition, guest: shareId ? { songId, prefix: API } : null,
 });
 const songUI = mountSong($("songview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, setMode,
   editPattern: (k) => { switchPattern(k); setView("rack"); },
   editSample: (i) => { sel = i; selNote = null; renderTracks(); setView("sampler"); },
+  cursor: (b) => { myBeat = b; },
 });
 
 // ---- errors are shown, and the page can be scripted ----------------------------------------
@@ -994,6 +996,7 @@ function showPeople(list) {
   if (el) el.innerHTML = list.map((p) => { const tip = esc(p.name) + " is on " + (TABS[(p.cursor || {}).tab] || "the DAW"); return `<span class="badge" style="--hue:${p.hue}" data-tip="${tip}" title="${tip}">${esc(p.name).slice(0, 1).toUpperCase()}</span>`; }).join("");
   for (const p of list) if (!before.includes(String(p.id))) toast(p.name + " joined.");
   if (view === "roll" && list.length) draw();
+  songUI.people(list);
 }
 async function loadFriends() {
   const el = $("friends");

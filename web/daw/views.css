@@ -93,6 +93,8 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
 .sl-end { position: absolute; right: 0; top: 0; bottom: 0; width: 14px; cursor: ew-resize; background: #fff3; }
 .sl-head { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--d-acc); pointer-events: none; }
 .sl-head[hidden] { display: none; }
+.sl-who { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: hsl(var(--hue) 70% 60%); pointer-events: none; z-index: 2; }
+.sl-who span { position: absolute; left: 4px; top: 2px; font-size: 10px; white-space: nowrap; color: hsl(var(--hue) 70% 60%); }
 
 /* The mixer: a scrolling row of strips (inside its own box, never the page), then the effects. */
 .mx-strips { display: flex; gap: var(--d-s2); overflow-x: auto; padding-bottom: var(--d-s2); }

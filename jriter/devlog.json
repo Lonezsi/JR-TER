@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.16.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "See friends on the Song tab",
+  "notes": [
+    "A friend in your song's DAW now shows as a coloured line with their name on the Song tab, the way they already did in the piano roll.",
+    "A friend now hears the song's sampler sounds: its takes and vocals, and your one-shots that the song uses. Before, their DAW looked for those sounds in their own library.",
+    "A friend's Sampler offers this song's takes and vocals instead of their own library. Sounds from your other songs or waiting renders still don't play for a friend."
+  ]
+ },
+ {
   "version": "4.15.0",
   "date": "2026-11-23",
   "name": "JR!TER",

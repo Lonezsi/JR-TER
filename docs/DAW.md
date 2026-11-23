@@ -67,7 +67,7 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    `web/daw/snap.js` (tested): a setting is Auto, a step or None; Auto picks the finest straight step that is still
    wide enough to hit, so it follows the zoom. It is a view setting kept in localStorage `jriter-daw-snap`
    (`roll` and `song`), not in the project. The Song tab zooms and clips sit on sixteenths of a bar (format v8).
-   Not yet: a guest hears only their own one-shots.
+   A guest's access to one-shots: see 8b.
 8. **Together. Done in 4.12.0.** A song's project is stored on the server (`jriter/modules/daw.py`, Spring
    `DawController.java`, table `daw_projects` with a revision): `GET`/`PUT /api/songs/ID/daw` and
    `POST /api/songs/ID/daw/here` (who is in the project and their cursor, in memory, gone after 12 s).
@@ -76,7 +76,11 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    saves 400 ms after a change and polls once a second. A friend opens `/daw.html?song=ID&share=SHARE`, which
    goes through the share's own door (`/api/shared/SHARE/on/songs/ID/daw`); their saves are in the song's
    history and can be undone. The owner's More menu lists the song's shares and copies the link.
-   Not yet: a cursor on the Song tab (the piano roll has one), a guest's sampler hears only the guest's own library.
+   **8b, done in 4.16.0:** friends' cursors show on the Song tab too (`.sl-who` in `songview.js`, `people()`).
+   A guest fetches sampler sounds through the share's door (`soundUrl` in `together.js`; the project keeps the owner's
+   paths) and their Sampler lists only this song's takes and vocals. `GET /api/samples/ID/audio` is open to a guest
+   only for a one-shot the song's DAW project uses (`sharing.py` and `SharingController.java`, kind `sample`).
+   Not yet: a friend's own one-shots, and takes from the owner's other songs, in a shared song.
 
 The project format is `jriter-daw` JSON (version 9; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.

@@ -515,6 +515,8 @@ public class SharingController {
         {"PATCH", "/api/vocals/<id>", "vocal", null},
         {"DELETE", "/api/vocals/<id>", "vocal", null},
         {"GET", "/api/vocals/<id>/audio", "vocal", null},
+        // One of the owner's one-shots, but only one the song's DAW project uses.
+        {"GET", "/api/samples/<id>/audio", "sample", null},
     };
 
     /** The route entry and the value of its <id>, or null. */
@@ -538,6 +540,10 @@ public class SharingController {
     private static boolean belongs(Library.Db db, String kind, long ident, long songId) {
         if (kind.equals("song")) return ident == songId;
         Map<String, Object> row;
+        if (kind.equals("sample")) {
+            Map<String, Object> p = db.tableExists("daw_projects") ? db.one("SELECT text FROM daw_projects WHERE song_id = ?", songId) : null;
+            return p != null && String.valueOf(p.get("text")).contains("\"/api/samples/" + ident + "/audio\"");
+        }
         switch (kind) {
             case "artwork" -> row = db.one("SELECT song_id FROM artwork WHERE id = ?", ident);
             case "sheet" -> row = db.one("SELECT song_id FROM lyric_sheets WHERE id = ?", ident);

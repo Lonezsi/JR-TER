@@ -1,6 +1,7 @@
 // together.js: keep a song's DAW project on the server and in step with friends.
 //   const t = startTogether({ songId, shareId, getText, applyText, getCursor, onPeople, onStatus });
 //   t.saved()   call after every local change; the save goes out 400 ms later
+//   soundUrl(src, shareId)  where to fetch a sampler sound from (null: not open to a guest)
 //   apiPrefix(shareId)  the url prefix for this song's other routes: "/api" for the owner,
 //                       the share's own door for a guest
 // The server stores one text and a revision. A save names the revision it grew from; if
@@ -9,6 +10,14 @@
 import { mergeTexts } from "./merge.js";
 
 export function apiPrefix(shareId) { return shareId ? `/api/shared/${encodeURIComponent(shareId)}/on` : "/api"; }
+
+// Where a sampler sound is fetched from. The project keeps the owner's paths; a guest goes
+// through the share's own door, and gets null for a library sound the share does not open.
+export function soundUrl(src, shareId) {
+  if (!shareId || !/^\/api\//.test(src)) return src;
+  const m = /^\/api\/((?:versions|vocals|samples)\/\d+\/audio)$/.exec(src);
+  return m ? apiPrefix(shareId) + "/" + m[1] : null;
+}
 
 export function startTogether({ songId, shareId, getText, applyText, getCursor, onPeople, onStatus, onReady }) {
   const url = `${apiPrefix(shareId)}/songs/${encodeURIComponent(songId)}/daw`;
