@@ -1,0 +1,91 @@
+/* The DAW in JR!TER's own clothes, and the studio layout. Loaded after daw.css and views.css.
+
+   THE LOOK. The DAW used to carry a palette of its own (flat greys, the system font), so it
+   read as a different app opened from JR!TER. Here its tokens point at the shared glass
+   (/glass.css, which every site on the machine reads), with JR!TER's faces: Manrope for
+   words, Orbitron for the counter, the accent's soft light behind everything. The fallbacks
+   are the old values, so a DAW with no glass.css still has colours.
+
+   THE STUDIO. On a wide screen with a mouse (body.studio, set by daw.js) the editors share
+   the screen the way a desktop DAW lays them out: the toolbar along the top, the view in
+   the middle (the playlist by default), the Sampler docked at the left as the browser, the
+   Mixer docked along the bottom. The Sampler slides in from the left and the Mixer up from
+   the bottom, because that is where they live. A phone keeps one view at a time. */
+
+:root {
+  --d-bg: var(--bg, #0e0f12);
+  --d-fg: var(--text, #e8e8ec);
+  --d-mute: var(--text-2, #8d8f99);
+  --d-line: var(--glass-line, rgba(255, 255, 255, 0.13));
+  --d-panel: var(--glass, rgba(255, 255, 255, 0.05));
+  --d-sheet: var(--glass-2, #1c1d22);
+  --d-key: var(--hover, rgba(255, 255, 255, 0.04));
+  --d-acc: var(--accent, #FAA8B8);
+  --d-acc-ink: var(--text-on-accent, var(--accent-ink, #16080C));
+  --d-font: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --d-display: "Jriter Display", "Orbitron", "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--d-font);
+  background-color: var(--d-bg);
+  background-image: radial-gradient(58% 44% at 26% 12%, rgba(var(--accent-rgb, 250, 168, 184), 0.08), transparent 72%);
+  background-repeat: no-repeat; background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Panels are glass: the top edge catches the light, the shadow sets them off the room. */
+.bar, .tracks, .roll, .views,
+.chords, .scripts, .rack, .song, .mixer, .sampler {
+  background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-lg, 16px);
+  box-shadow: var(--edge-top, none), var(--glass-shadow, 0 12px 40px rgba(0, 0, 0, 0.35));
+}
+
+/* The view tabs are a pill row, as on the song page; the chosen one is a lifted pill, not a
+   block of accent. */
+.views { padding: 4px; border-radius: var(--r-pill, 999px); }
+.views button { border-radius: var(--r-pill, 999px); color: var(--d-mute); font-weight: 600; transition: background var(--fast, .15s), color var(--fast, .15s); }
+.views button:hover { color: var(--d-fg); border-color: transparent; background: var(--d-key); }
+.views button[aria-selected="true"], .views button[aria-pressed="true"] {
+  background: var(--d-sheet); color: var(--d-fg); box-shadow: var(--edge-top, none), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.views button[aria-pressed="true"] { color: var(--accent-hi, var(--d-acc)); }
+
+/* Buttons and fields: rounder and quieter, the accent kept for what is on. */
+button, select, input, textarea { border-radius: var(--r-sm, 9px); transition: border-color var(--fast, .15s), background var(--fast, .15s); }
+button:hover { border-color: var(--accent-line, var(--d-acc)); }
+button[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); border-color: transparent; box-shadow: 0 0 14px rgba(var(--accent-rgb, 250, 168, 184), 0.35); }
+
+/* The counter: bar and beat in the display face, minutes under it, on a little screen. */
+.lcd {
+  display: inline-flex; flex-direction: column; justify-content: center; align-items: flex-end;
+  min-width: 84px; height: 34px; padding: 0 10px; border-radius: var(--r-sm, 9px);
+  background: rgba(0, 0, 0, 0.5); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05);
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.lcd b { font: 700 14px/1 var(--d-display); letter-spacing: 0.06em; color: var(--accent-hi, var(--d-acc)); text-shadow: 0 0 8px rgba(var(--accent-rgb, 250, 168, 184), 0.5); }
+.lcd small { margin-top: 3px; font-size: 10px; color: var(--d-mute); }
+
+/* ---- the studio ------------------------------------------------------------------------ */
+body.studio .daw-main {
+  display: grid; gap: 0;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+/* Centre: the view. Tracks take their own column when the view has them (roll, script). */
+body.studio .daw-main > * { grid-row: 1; grid-column: 2 / 4; min-height: 0; }
+body.studio .daw-main > .tracks { grid-column: 2; margin-right: var(--d-s2); }
+body.studio .daw-main[data-view="roll"] > .roll,
+body.studio .daw-main[data-view="script"] > .scripts { grid-column: 3; }
+
+/* Left: the browser. */
+body.studio .daw-main > .sampler { grid-column: 1; width: 340px; margin-right: var(--d-s2); }
+body.studio.dock-sampler .daw-main > .sampler { display: flex; animation: from-left var(--med, .24s) var(--ease, ease-out); }
+
+/* Bottom: the mixer, across the whole width. */
+body.studio .daw-main > .mixer { grid-row: 2; grid-column: 1 / 4; max-height: 34vh; margin-top: var(--d-s2); }
+body.studio.dock-mixer .daw-main > .mixer { display: flex; animation: from-below var(--med, .24s) var(--ease, ease-out); }
+
+@keyframes from-left { from { opacity: 0; transform: translateX(-16px); } }
+@keyframes from-below { from { opacity: 0; transform: translateY(16px); } }
+@media (prefers-reduced-motion: reduce) { body.studio .daw-main > .sampler, body.studio .daw-main > .mixer { animation: none; } }
