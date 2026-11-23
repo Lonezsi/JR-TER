@@ -3,16 +3,16 @@
 .views button { flex: 1; border-color: transparent; background: transparent; }
 .views button[aria-selected="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
 
-.main[data-view="chords"] .tracks, .main[data-view="chords"] .roll, .main[data-view="chords"] .scripts, .main[data-view="chords"] .rack { display: none; }
-.main[data-view="rack"] .tracks, .main[data-view="rack"] .roll, .main[data-view="rack"] .chords, .main[data-view="rack"] .scripts { display: none; }
-.main[data-view="roll"] .chords, .main[data-view="roll"] .scripts, .main[data-view="roll"] .rack { display: none; }
-.main[data-view="script"] .roll, .main[data-view="script"] .chords, .main[data-view="script"] .rack { display: none; }
-.main:not([data-view="song"]) .song { display: none; }
+.daw-main[data-view="chords"] .tracks, .daw-main[data-view="chords"] .roll, .daw-main[data-view="chords"] .scripts, .daw-main[data-view="chords"] .rack { display: none; }
+.daw-main[data-view="rack"] .tracks, .daw-main[data-view="rack"] .roll, .daw-main[data-view="rack"] .chords, .daw-main[data-view="rack"] .scripts { display: none; }
+.daw-main[data-view="roll"] .chords, .daw-main[data-view="roll"] .scripts, .daw-main[data-view="roll"] .rack { display: none; }
+.daw-main[data-view="script"] .roll, .daw-main[data-view="script"] .chords, .daw-main[data-view="script"] .rack { display: none; }
+.daw-main:not([data-view="song"]) .song { display: none; }
 /* Mixer and Sampler sit beside <main>, not in it: one panel at a time on a phone, docked in the studio. */
 body:not(.studio):not([data-view="mixer"]) .mixer { display: none; }
 body:not(.studio):not([data-view="sampler"]) .sampler { display: none; }
-body:not(.studio)[data-view="mixer"] .main, body:not(.studio)[data-view="sampler"] .main { display: none; }
-.main[data-view="song"] .tracks, .main[data-view="song"] .roll, .main[data-view="song"] .chords, .main[data-view="song"] .scripts, .main[data-view="song"] .rack { display: none; }
+body:not(.studio)[data-view="mixer"] .daw-main, body:not(.studio)[data-view="sampler"] .daw-main { display: none; }
+.daw-main[data-view="song"] .tracks, .daw-main[data-view="song"] .roll, .daw-main[data-view="song"] .chords, .daw-main[data-view="song"] .scripts, .daw-main[data-view="song"] .rack { display: none; }
 
 .chords, .scripts, .rack, .song, .mixer, .sampler { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
   background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-lg, 18px); box-shadow: var(--edge-top, none); }
@@ -164,7 +164,7 @@ body.studio .bar { grid-area: bar; flex-wrap: wrap; }
 body.studio .bar > *, body.studio .more > * { flex: none; }
 body.studio .views { grid-area: views; justify-self: start; }
 body.studio .views button { flex: none; }
-body.studio .main { grid-area: main; min-width: 0; }
+body.studio .daw-main { grid-area: main; min-width: 0; }
 body.studio .sampler { grid-area: browser; display: flex; min-height: 0; }
 body.studio .mixer { grid-area: dock; display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; align-items: start; column-gap: var(--d-s3); min-height: 0; min-width: 0; }
 body.studio .mixer > .cv-title { display: none; }

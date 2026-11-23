@@ -1,0 +1,261 @@
+/* The DAW in JR!TER's material, on every screen size. Loaded LAST, after daw.css and views.css.
+
+   Everything here is a copy of a JR!TER recipe, not an imitation of one: the glass pane (a film
+   lighter at the top, the lens edge, a rim line), .field, the menu, the tooltip, the slider, the
+   scrollbars. ui.js puts the app's own dropdown, number stepper and tooltip on the DAW's plain
+   HTML; this is how they look. The glass needs something behind it to bend, so the page has a
+   ground: the accent, lit softly in two places, as the library's room is. */
+
+:root {
+  --accent-text: color-mix(in srgb, var(--accent, #FAA8B8) 42%, #fff);
+  --accent-soft: color-mix(in srgb, var(--accent, #FAA8B8) 16%, transparent);
+  --pressed: rgb(255 255 255 / 0.10);
+  --edge-line: linear-gradient(135deg, rgb(200 235 255 / 0.62) 0%, rgb(255 255 255 / 0.20) 14%,
+    rgb(255 255 255 / 0.04) 36%, rgb(255 255 255 / 0.04) 64%, rgb(255 205 170 / 0.26) 86%, rgb(255 175 135 / 0.50) 100%);
+  --pane-blur: blur(22px) saturate(160%);
+  --d-panel: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0)), rgb(255 255 255 / 0.045);
+  --tip-bg: rgb(24 25 29 / 0.96);
+}
+:root[data-theme="light"] {
+  --accent-text: color-mix(in srgb, var(--accent, #FAA8B8) 55%, #000);
+  --pressed: rgb(20 16 24 / 0.08);
+  --d-panel: linear-gradient(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.3)), rgb(255 255 255 / 0.4);
+  --tip-bg: rgb(252 251 252 / 0.97);
+}
+
+/* ---- the room ------------------------------------------------------------------------------- */
+body { background: var(--d-bg); isolation: isolate; }
+body::before {
+  content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 18% 8%, rgba(var(--accent-rgb, 250, 168, 184), 0.34), transparent 70%),
+    radial-gradient(38% 34% at 86% 92%, rgba(var(--accent-rgb, 250, 168, 184), 0.20), transparent 70%),
+    radial-gradient(60% 50% at 60% 40%, rgba(var(--accent-rgb, 250, 168, 184), 0.06), transparent 75%);
+  filter: blur(40px);
+}
+
+/* ---- panes ---------------------------------------------------------------------------------- */
+.bar, .tracks, .roll, .views, .chords, .scripts, .rack, .song, .mixer, .sampler {
+  position: relative; border: 0 !important;
+  background: var(--d-panel) !important;
+  -webkit-backdrop-filter: var(--pane-blur); backdrop-filter: var(--pane-blur);
+  box-shadow: var(--edge-top), var(--glass-shadow, 0 16px 44px rgba(0, 0, 0, 0.5)) !important;
+  border-radius: var(--r-xl, 22px);
+}
+/* The rim: a hair of light that is cooler top left and warmer bottom right, as JR!TER's panes. */
+.bar::after, .tracks::after, .views::after, .chords::after, .scripts::after, .rack::after, .song::after, .mixer::after, .sampler::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: var(--edge-line);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.55;
+}
+:root[data-theme="light"] .bar::after, :root[data-theme="light"] .views::after { opacity: 0.25; }
+
+/* Section titles: quiet, small and not shouting in capitals. */
+.cv-title { text-transform: none; letter-spacing: 0.01em; font: 700 12px/1.3 var(--d-font, "Manrope", sans-serif); color: var(--text-3, var(--d-mute)); }
+.sv-doc { color: var(--text-3, var(--d-mute)); }
+
+/* ---- the view tabs: a segmented pill, the chosen one a lifted film ------------------------- */
+.views { padding: 4px; border-radius: var(--r-pill, 999px); gap: 2px; }
+.views button {
+  border: 0 !important; background: transparent; color: var(--text-2, var(--d-mute)); font-weight: 600;
+  border-radius: var(--r-pill, 999px); box-shadow: none;
+}
+.views button:hover { background: var(--hover); color: var(--d-fg); }
+.views button[aria-selected="true"] {
+  background: var(--pressed) !important; color: var(--d-fg) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 2px 10px rgb(0 0 0 / 0.25);
+}
+
+/* ---- buttons: JR!TER's .btn ------------------------------------------------------------------ */
+button {
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.09)); background: var(--hover);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07); border-radius: var(--r-pill, 999px);
+  font-weight: 600; padding: 4px 12px;
+  transition: background var(--d-fast), border-color var(--d-fast), color var(--d-fast), transform var(--d-fast), box-shadow var(--d-fast);
+}
+button:hover { background: var(--pressed); border-color: var(--line-2, rgba(255, 255, 255, 0.16)); }
+button:active { transform: scale(0.97); }
+button:disabled { opacity: 0.45; pointer-events: none; }
+/* On: the accent as a tint, as JR!TER's toggles are. Steps in the rack stay a full fill below. */
+button[aria-pressed="true"] {
+  background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-line, color-mix(in srgb, var(--accent) 45%, transparent));
+}
+.rk-lane button[aria-pressed="true"], .rk-pats button[aria-pressed="true"], .cc[aria-pressed="true"], #play[aria-pressed="true"] {
+  background: var(--d-acc); color: var(--d-acc-ink); border-color: transparent;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 6px 18px -6px var(--accent-line, var(--d-acc));
+}
+.cc[aria-pressed="true"] small { color: var(--d-acc-ink); }
+
+/* ---- fields: JR!TER's .field ----------------------------------------------------------------- */
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, .dd {
+  background: rgb(0 0 0 / 0.28); border: 1px solid var(--line-2, rgba(255, 255, 255, 0.16));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.4); border-radius: var(--r-md, 12px); color: var(--d-fg);
+  min-height: 32px; padding: 4px 10px;
+}
+:root[data-theme="light"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), :root[data-theme="light"] textarea, :root[data-theme="light"] .dd { background: rgb(255 255 255 / 0.6); box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.08); }
+input:hover, textarea:hover, .dd:hover { border-color: color-mix(in srgb, var(--d-fg) 26%, transparent); }
+input:focus, textarea:focus, .dd:focus-visible, .dd[aria-expanded="true"] {
+  outline: none; border-color: var(--d-acc); box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 3px var(--accent-soft);
+}
+input::placeholder, textarea::placeholder { color: var(--text-3, var(--d-mute)); }
+input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) brightness(1.6); cursor: pointer; }
+
+/* The dropdown: the field, its value and a chevron. */
+select.dd-native { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none; overflow: hidden; clip-path: inset(50%); }
+.dd { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; font-weight: 600; min-width: 0; max-width: 100%; transform: none !important; }
+.dd .dd-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dd svg { flex: none; color: var(--text-3, var(--d-mute)); transition: transform var(--d-fast); }
+.dd:hover svg { color: var(--text-2, var(--d-fg)); }
+.dd[aria-expanded="true"] svg { transform: rotate(180deg); }
+.dd-menu {
+  position: fixed; z-index: 900; min-width: 180px; max-width: min(340px, 92vw); overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px; border-radius: var(--r-md, 12px); display: flex; flex-direction: column; gap: 1px;
+  background: var(--glass-2, rgb(24 25 29 / 0.92));
+  -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: var(--edge-top), var(--shadow-3, 0 18px 48px rgb(0 0 0 / 0.55));
+  animation: dd-pop 140ms var(--ease, ease-out) both; transform-origin: top left;
+}
+.dd-menu.up { transform-origin: bottom left; }
+@keyframes dd-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } }
+.dd-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 4px 12px 4px 8px;
+  border: 0; border-radius: 8px; background: none; box-shadow: none; text-align: left; justify-content: flex-start;
+  font-size: 12.5px; font-weight: 600; color: var(--d-fg);
+}
+.dd-item:hover, .dd-item:focus-visible { background: var(--pressed); outline: none; transform: none; }
+.dd-item:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-line, var(--d-acc)); }
+.dd-item[aria-selected="true"] { color: var(--accent-text); }
+.dd-mark { width: 14px; flex: none; text-align: center; font-size: 11px; }
+.dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Number fields: no browser spinners; two chevrons stacked inside the field's right edge. */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; padding-right: 22px !important; font-variant-numeric: tabular-nums; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.nf { position: relative; display: inline-flex; align-items: stretch; }
+.nf > input { width: 100%; }
+.nf-step { position: absolute; right: 3px; top: 3px; bottom: 3px; display: flex; flex-direction: column; width: 16px; }
+.nf-step button {
+  flex: 1; min-height: 0 !important; min-width: 0 !important; width: 16px; padding: 0; border: 0; border-radius: 4px;
+  background: transparent; box-shadow: none; color: var(--text-3, var(--d-mute)); opacity: 0; transition: opacity var(--d-fast), background var(--d-fast);
+}
+.nf:hover .nf-step button, .nf:focus-within .nf-step button { opacity: 1; }
+.nf-step button:hover { background: var(--pressed); color: var(--d-fg); transform: none; }
+.nf-step svg { width: 11px; height: 11px; }
+
+/* Sliders: JR!TER's .range, the part behind the thumb filled (--fill comes from ui.js). */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; background: transparent; height: 22px; min-height: 22px; cursor: pointer; margin: 0; padding: 0; border: 0; box-shadow: none; --fill: 50%;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 999px; background: linear-gradient(to right, var(--d-acc) var(--fill), var(--line-2, rgb(255 255 255 / 0.16)) var(--fill)); }
+input[type="range"]::-moz-range-track { height: 5px; border-radius: 999px; background: var(--line-2, rgb(255 255 255 / 0.16)); }
+input[type="range"]::-moz-range-progress { height: 5px; border-radius: 999px; background: var(--d-acc); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -5.5px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgb(0 0 0 / 0.5); transition: transform var(--d-fast); }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgb(0 0 0 / 0.5); }
+input[type="range"]:hover::-webkit-slider-thumb, input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+/* Vertical faders keep their orientation; only the track changes direction. */
+input[type="range"][orient="vertical"], input[type="range"].mx-fader { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 100%; min-height: 96px; }
+input[type="range"][orient="vertical"]::-webkit-slider-runnable-track, input[type="range"].mx-fader::-webkit-slider-runnable-track { width: 5px; height: 100%; background: linear-gradient(to top, var(--d-acc) var(--fill), var(--line-2, rgb(255 255 255 / 0.16)) var(--fill)); }
+input[type="range"][orient="vertical"]::-webkit-slider-thumb, input[type="range"].mx-fader::-webkit-slider-thumb { margin-top: 0; margin-left: -5.5px; }
+
+/* ---- tooltips: one, on glass, and readable ------------------------------------------------- */
+[data-tip]::after, [data-tip]:hover::after, [data-tip]:focus-visible::after { content: none !important; display: none !important; }
+.app-tip {
+  position: fixed; z-index: 950; pointer-events: none; max-width: min(320px, 80vw); padding: 6px 10px; border-radius: var(--r-sm, 9px);
+  font: 500 12px/1.35 var(--d-font, "Manrope", sans-serif); color: var(--d-fg);
+  background: var(--tip-bg); box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 0.45)), inset 0 0 0 1px var(--line-2, rgb(255 255 255 / 0.16));
+  opacity: 0; transform: translateY(3px); transition: opacity 120ms var(--ease, ease), transform 120ms var(--ease, ease);
+}
+.app-tip.below { transform: translateY(-3px); }
+.app-tip.on { opacity: 1; transform: none; }
+
+/* ---- scrollbars: thin, quiet, and inside the rounded box ----------------------------------- */
+* { scrollbar-width: thin; scrollbar-color: var(--line-2, rgb(255 255 255 / 0.16)) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-2, rgb(255 255 255 / 0.16)); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3, rgb(255 255 255 / 0.3)); background-clip: content-box; border: 3px solid transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* ---- the browser (Sampler) ------------------------------------------------------------------ */
+.sp-head { display: flex; align-items: center; gap: 4px; }
+.sp-head .cv-title { flex: 1; }
+.sp-tool { width: 30px; height: 30px; min-width: 30px !important; min-height: 30px !important; padding: 0; border-color: transparent; background: transparent; box-shadow: none; color: var(--text-2, var(--d-mute)); border-radius: 50%; }
+.sp-tool:hover { background: var(--hover); color: var(--d-fg); }
+.sp-q { width: 100%; }
+.sp-edit-doc { font-size: 11.5px; padding: 0 2px; }
+.sp-tree { display: flex; flex-direction: column; gap: 1px; min-height: 0; overflow-y: auto; flex: 1 1 auto; margin: 0 -6px; padding: 0 6px; }
+body:not(.studio) .sp-tree { max-height: 46vh; }
+.sp-dirrow { display: flex; align-items: center; border-radius: 8px; padding-left: calc(var(--depth, 0) * 14px); transition: background var(--d-fast), box-shadow var(--d-fast); }
+.sp-dir {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; min-height: 30px; padding: 0 8px 0 4px;
+  border: 0; background: transparent; box-shadow: none; border-radius: 8px; justify-content: flex-start; text-align: left; transform: none !important;
+  font-weight: 700; color: var(--d-fg);
+}
+.sp-dir:hover { background: var(--hover); }
+.sp-dirrow[style*="--depth:0"] .sp-dir, .sp-dirrow[style*="--depth: 0"] .sp-dir { font-size: 13px; }
+.sp-car { flex: none; width: 14px; height: 14px; display: grid; place-items: center; color: var(--text-3, var(--d-mute)); transition: transform var(--d-fast); }
+.sp-car::before { content: ""; width: 6px; height: 6px; border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: rotate(-45deg); margin-left: -2px; }
+.sp-dir[aria-expanded="true"] .sp-car { transform: rotate(90deg); }
+.sp-dname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-count { flex: none; font-size: 11px; font-weight: 600; color: var(--text-3, var(--d-mute)); font-variant-numeric: tabular-nums; }
+.sp-spin { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-2, rgb(255 255 255 / 0.2)); border-top-color: var(--d-acc); animation: sp-spin 0.8s linear infinite; }
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+.sp-row { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 4px 0 calc(var(--depth, 1) * 14px + 4px); border-radius: 8px; transition: background var(--d-fast); }
+.sp-row:hover, .sp-row:focus-within { background: var(--hover); }
+.sp-row .sp-ic { width: 14px; font-size: 10px; color: var(--text-3, var(--d-mute)); }
+.sp-row[draggable="true"] { cursor: grab; }
+.sp-row[draggable="true"] .sp-ic { font-size: 13px; }
+.sp-name {
+  flex: 1; min-width: 0; height: 26px; min-height: 26px !important; padding: 0 2px; border: 0; background: transparent; box-shadow: none;
+  justify-content: flex-start; font-weight: 500; font-size: 12.5px; color: var(--text-2, var(--d-fg)); transform: none !important;
+}
+.sp-name:hover { background: transparent; color: var(--d-fg); }
+.sp-len { font-size: 11px; color: var(--text-3, var(--d-mute)); font-variant-numeric: tabular-nums; }
+.sp-acts { display: inline-flex; gap: 2px; opacity: 0; transition: opacity var(--d-fast); }
+.sp-row:hover .sp-acts, .sp-row:focus-within .sp-acts, .sp-dirrow:hover .sp-acts, .sp-acts.on { opacity: 1; }
+.sp-acts button { height: 24px; min-height: 24px !important; min-width: 24px !important; padding: 0 8px; font-size: 11px; }
+.sp-acts button[data-del], .sp-acts button[data-deldir] { color: var(--bad, #ff8f8f); }
+.sp-note { padding: 4px 8px 4px calc(var(--depth, 1) * 14px + 22px); font-size: 12px; }
+.sp-renaming { display: flex; align-items: center; gap: 6px; padding-left: calc(var(--depth, 1) * 14px); }
+.sp-rename { flex: 1; min-width: 0; height: 28px; min-height: 28px !important; }
+.sp-dirrow.arrange { cursor: grab; }
+.sp-over { background: var(--accent-soft) !important; box-shadow: inset 0 0 0 1px var(--accent-line, var(--d-acc)); }
+.sp-moving { opacity: 0.4; }
+@media (hover: none) { .sp-acts { opacity: 1; } .sp-row { min-height: 40px; } .sp-dir { height: 40px; } }
+
+/* ---- toasts and help: the menu's glass --------------------------------------------------- */
+.toast, .help, .more {
+  border: 0 !important; background: var(--glass-2, rgb(24 25 29 / 0.92)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: var(--edge-top), var(--shadow-3, 0 18px 48px rgb(0 0 0 / 0.55)) !important; border-radius: var(--r-lg, 16px) !important;
+}
+
+/* ---- the phone ---------------------------------------------------------------------------- */
+@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
+  body { gap: 10px; }
+  .views { overflow-x: auto; scrollbar-width: none; flex: none; }
+  .views::-webkit-scrollbar { display: none; }
+  .views button { flex: 1 0 auto; flex-direction: column; gap: 1px; font-size: 11px; min-height: 44px; padding: 4px 8px; }
+  .bar { border-radius: var(--r-xl, 22px); padding: 6px; }
+  .transport button { border-radius: 14px; border: 0; background: transparent; box-shadow: none; }
+  .transport button:hover { background: var(--hover); }
+  .transport button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); box-shadow: none; }
+  .transport button[aria-pressed="true"] .lb { color: var(--accent-text); }
+  #play[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
+  .nf-step button { opacity: 1; }
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, .dd { min-height: 40px; font-size: 16px; }
+  .dd-item { min-height: 42px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .dd-menu, .app-tip, .sp-spin { animation: none; transition: none; } }
+
+/* On a phone the Sampler tab is about the sound you are editing: that comes first, the browser
+   under it. In the studio the browser is its own dock and leads. */
+.sampler .sp-editor { display: flex; flex-direction: column; gap: var(--d-s3); }
+body:not(.studio) .sampler .sp-editor { order: -1; }
+body:not(.studio) .sampler .sp-editor:has(.sp-wave) { padding-bottom: var(--d-s3); border-bottom: 1px solid var(--line, rgb(255 255 255 / 0.09)); }
+
+/* The bar's sheets (More, help) open over the panes, never under them: every pane is its own
+   layer now that it blurs what is behind it, so the bar has to say it is on top. */
+.bar { z-index: 20; }

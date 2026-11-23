@@ -69,5 +69,18 @@ export async function uploadSamples(files, onProgress) {
   return out;
 }
 
+// Rename a sound or move it to another folder ({ name } and/or { folder }, "Drums / Kicks" for nesting).
+export async function changeSample(id, fields) {
+  const r = await fetch("/api/samples/" + id, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) });
+  return r.ok;
+}
+// Run one call per sound, a few at a time, so a folder of a thousand moves in seconds, not minutes.
+export async function each(list, fn, onProgress) {
+  let done = 0, ok = 0, next = 0;
+  const lane = async () => { while (next < list.length) { const x = list[next++]; if (await fn(x).catch(() => false)) ok++; done++; if (onProgress) onProgress(done, list.length); } };
+  await Promise.all(Array.from({ length: Math.min(8, list.length) }, lane));
+  return ok;
+}
+
 export async function removeSample(id) { const r = await fetch("/api/samples/" + id, { method: "DELETE", credentials: "include" }); return r.ok; }
 export async function restoreSample(id) { const r = await fetch("/api/samples/" + id + "/restore", { method: "POST", credentials: "include" }); return r.ok; }

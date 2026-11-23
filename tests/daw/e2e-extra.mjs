@@ -296,8 +296,8 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     await sleep(100);
     await tapEl('[data-act="sample"]');
     need((await view()) === "sampler", "view is " + (await view()));
-    need(await js(`document.querySelector("#sp-from").options[0].value === "oneshots"`), "no My one-shots option");
-    await js(`(() => { const e = document.querySelector("#sp-from"); e.value = "oneshots"; e.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    need(await js(`!!document.querySelector('[data-dir="oneshots"]') && !!document.querySelector('[data-dir="samples"]')`), "the browser should have a One-shots and a Samples folder");
+    if (await js(`document.querySelector('[data-dir="oneshots"]').getAttribute("aria-expanded") !== "true"`)) await tapEl('[data-dir="oneshots"]');
     await sleep(300);
     need(await js(`!!document.querySelector('[data-act="files"]') && !!document.querySelector('[data-act="folder"]')`), "no Add files / Add a folder buttons");
     await noSideways("sampler, My one-shots");

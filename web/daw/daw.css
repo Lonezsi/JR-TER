@@ -39,7 +39,7 @@ body {
 .bar .sep { width: 1px; height: 20px; background: var(--d-line); margin: 0 var(--d-s1); }
 .bar label { display: inline-flex; align-items: center; gap: var(--d-s1); color: var(--d-mute); }
 .bar .name { font-family: "Jriter Display", "Orbitron", sans-serif; font-weight: 800; letter-spacing: .04em; margin-right: var(--d-s2); white-space: nowrap; }
-.main { flex: 1; min-height: 0; display: flex; gap: var(--d-s2); }
+.daw-main { flex: 1; min-height: 0; display: flex; gap: var(--d-s2); }
 .tracks { width: 248px; flex: none; overflow: auto; padding: var(--d-s2); display: flex; flex-direction: column; gap: var(--d-s2); }
 .roll { flex: 1; min-width: 0; position: relative; overflow: hidden; }
 canvas { width: 100%; height: 100%; display: block; outline: none; touch-action: none; -webkit-user-select: none; user-select: none; }
@@ -94,7 +94,7 @@ body.drop .roll { border-color: var(--d-acc); }
 /* Phones and small tablets. LAST on purpose. */
 @media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
   body { padding: var(--d-s2); padding-bottom: calc(var(--d-s2) + env(safe-area-inset-bottom)); }
-  .main { flex-direction: column; }
+  .daw-main { flex-direction: column; }
   .tracks { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; max-height: none; flex: none; }
   .track { min-width: 200px; }
   .bar { order: 3; flex-wrap: nowrap; justify-content: space-between; }

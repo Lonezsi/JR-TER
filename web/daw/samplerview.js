@@ -4,11 +4,14 @@
 //   api: song(), selected(), change(fn) (undoable edit), snap(), pushUndo(before), save(), toast(text),
 //        addSampler(sound), buffer(src) -> Promise<AudioBuffer>, hear(src) (play 4 s), audition(track, from, to),
 //        placeOnSong(track)
-// The first option, My one-shots, is the library's own sounds (library.js mySamples): add files or a folder,
-// drop them on the tab, filter, hear, add as an instrument or a rack channel, delete (Undo brings it back).
+// The sounds are a browser of folders, the way a desktop DAW lists them: two roots, One-shots (your own
+// sounds, library.js mySamples, in the folders they came in) and Samples (waiting renders, and each song's
+// takes and vocals). A folder opens with a click, its contents are fetched the first time, and the filter
+// searches everything that has been fetched. One-shots: add files or a folder, drop them on the tab, hear,
+// add as an instrument or a rack channel, delete (Undo brings it back).
 // Sounds come from library.js. Model and maths: sampler.js.
 import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate } from "./sampler.js";
-import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, isSound } from "./library.js";
+import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound } from "./library.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -16,51 +19,61 @@ const NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const noteName = (m) => NOTE[m % 12] + (Math.floor(m / 12) - 1);
 const mmss = (s) => (s > 0 ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : "");
 const ICON = { take: "♪", vocal: "🎙", render: "▣", oneshot: "◆" };
-const FROM = "jriter-daw-from";
-function remembered() { try { return localStorage.getItem(FROM) === "oneshots" ? "oneshots" : "renders"; } catch { return "renders"; } }
+const OPEN = "jriter-daw-open";
+function opened() { try { return new Set(JSON.parse(localStorage.getItem(OPEN) || "[\"oneshots\"]")); } catch { return new Set(["oneshots"]); } }
 
 export function mountSampler(el, api) {
   const guest = api.guest || null; // a friend in the owner's song: only that song's takes and vocals
-  let songs = guest ? [{ id: guest.songId, title: "This song" }] : null, listed = guest ? guest.songId : remembered(), sounds = null, problem = "", loading = false, query = "", busy = "";
+  let songs = guest ? [{ id: guest.songId, title: "This song" }] : null, problem = "", query = "", busy = "";
+  let shots = null;                 // My one-shots, once fetched
+  const kids = new Map();           // "renders" | song id -> its sounds, once fetched
+  const asking = new Set();         // what is being fetched right now
+  const open = opened();            // which folders are open, kept between visits
+  let items = [];                   // the rows drawn last, so a button's number finds its sound
+  let editing = false;              // the One-shots folders are being arranged: rename, move, delete
+  let renaming = null;              // "shot:Path/" of the folder whose name is a field, or "sound:ID"
+  let moving = null;                // what is being dragged in edit mode: { kind: "dir", path } | { kind: "sound", id }
   let drag = null, hold = 0;
   const wave = new Map(); // src -> peaks
 
   const track = () => { const t = api.song().tracks[api.selected()]; return t && t.sample ? t : null; };
+  const keep = () => { try { localStorage.setItem(OPEN, JSON.stringify([...open])); } catch { /* fine */ } };
+  const said = (e) => (e.message === "signin" ? "Sign in to JR!TER to use your library's sounds." : "Could not reach your library. " + (e.message || ""));
 
-  async function load(which) {
-    listed = which; sounds = null; problem = ""; loading = true; render();
+  // Fetch what an open folder needs, once. Each answer redraws only the list.
+  async function fetchFor(key) {
+    if (asking.has(key)) return;
+    asking.add(key); problem = "";
     try {
-      if (!songs) songs = await librarySongs();
-      sounds = guest ? await soundsOf(guest.songId, guest.prefix) : which === "oneshots" ? await mySamples() : which === "renders" ? await waitingRenders() : await soundsOf(which);
-    } catch (e) {
-      problem = e.message === "signin" ? "Sign in to JR!TER to use your library's sounds." : "Could not reach your library. " + (e.message || "");
-    }
-    loading = false; render();
+      if (key === "oneshots") shots = await mySamples();
+      else if (key === "samples") { if (!songs) songs = await librarySongs(); }
+      else if (key === "renders") kids.set("renders", await waitingRenders());
+      else if (key.startsWith("song:")) { const id = key.slice(5); kids.set(id, guest ? await soundsOf(guest.songId, guest.prefix) : await soundsOf(id)); }
+    } catch (e) { problem = said(e); }
+    asking.delete(key); list();
+  }
+  const fetched = (key) => key === "oneshots" ? shots !== null : key === "samples" ? songs !== null : key === "renders" ? kids.has("renders") : key.startsWith("song:") ? kids.has(key.slice(5)) : true;
+  function want() { for (const k of open) if (!fetched(k)) fetchFor(k); }
+  function load(which) { // older callers: open that folder and show it
+    if (which === "oneshots") { open.add("oneshots"); shots = null; }
+    else if (which === "renders") { open.add("samples"); open.add("renders"); kids.delete("renders"); }
+    keep(); want(); list();
   }
 
   function render() {
     const t = track(), s = t && t.sample;
-    const opts = (guest ? "" : `<option value="oneshots"${listed === "oneshots" ? " selected" : ""}>My one-shots</option><option value="renders"${listed === "renders" ? " selected" : ""}>Renders waiting</option>`) +
-      (songs || []).map((x) => `<option value="${x.id}"${String(x.id) === String(listed) ? " selected" : ""}>${esc(x.title)}</option>`).join("");
-    const mine = listed === "oneshots";
-    const rows = loading ? `<div class="sv-doc">Loading…</div>` : problem ? `<div class="cv-err">${esc(problem)}</div>` :
-      sounds === null ? `<div class="sv-doc"><button data-act="open">Show my library</button></div>` :
-      mine ? oneShotRows() :
-      !sounds.length ? `<div class="sv-doc">Nothing here yet.</div>` :
-      `<div class="sp-list">` + sounds.map((x, i) => `<div class="sp-row"><span class="sp-ic" aria-hidden="true">${ICON[x.kind] || "♪"}</span>` +
-        `<button class="sp-name" data-hear="${i}" data-tip="Hear it" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${mmss(x.seconds)}</span>` +
-        `<button data-add="${i}" data-tip="Add as a sampler track" aria-label="Add ${esc(x.name)} as a sampler track">+</button></div>`).join("") + `</div>`;
     el.innerHTML =
-      `<div class="cv-title">Sampler</div>` +
-      `<div class="cv-line"><label>From your library <select id="sp-from" aria-label="Library">${opts}</select></label>` +
-        (mine ? `<button data-act="files" data-tip="Add sound files from this device" aria-label="Add sound files">+ Add files</button>` +
-          `<button data-act="folder" data-tip="Add a whole folder of sounds" aria-label="Add a folder of sounds">+ Add a folder</button>` +
-          `<input id="sp-q" type="search" placeholder="Filter" aria-label="Filter sounds by name or folder" value="${esc(query)}">` +
-          `<input id="sp-files" type="file" multiple accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.opus,.m4a" hidden>` +
-          `<input id="sp-dir" type="file" webkitdirectory multiple hidden>` : "") + `</div>` +
-        (busy ? `<div class="sv-doc" role="status">${esc(busy)}</div>` : "") + `<div id="sp-listbox">${rows}</div>` +
+      `<div class="sp-head"><span class="cv-title">Browser</span>` +
+        (guest ? "" : `<button class="sp-tool" data-act="files" data-tip="Add sound files to your one-shots" aria-label="Add sound files">＋</button>` +
+          `<button class="sp-tool" data-act="folder" data-tip="Add a whole folder to your one-shots" aria-label="Add a folder of sounds">⊞</button>` +
+          `<button class="sp-tool" data-act="edit" aria-pressed="${editing}" data-tip="${editing ? "Done arranging" : "Arrange your one-shots: rename, move and delete folders and sounds"}" aria-label="Arrange one-shots">✎</button>`) + `</div>` +
+      (editing ? `<div class="sv-doc sp-edit-doc">Drag a sound or a folder onto a folder to move it, or onto One-shots to take it out to the top. ✎ renames: a name with " / " in it nests.</div>` : "") +
+      `<input id="sp-q" class="sp-q" type="search" placeholder="Search sounds" aria-label="Search sounds by name or folder" value="${esc(query)}">` +
+      `<input id="sp-files" type="file" multiple accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.opus,.m4a" hidden>` +
+      `<input id="sp-dir" type="file" webkitdirectory multiple hidden>` +
+      (busy ? `<div class="sv-doc" role="status">${esc(busy)}</div>` : "") + `<div id="sp-listbox" class="sp-tree" role="tree" aria-label="Sounds">${tree()}</div>` +
       (guest ? `<div class="sv-doc">You are in a friend's song: use its takes and vocals here. One-shots already in the song play for you too.</div>` : "") +
-      (s ? `<div class="cv-title">${esc(t.name)}: ${esc(s.name)}</div>` +
+      `<div class="sp-editor">` + (s ? `<div class="cv-title">${esc(t.name)}: ${esc(s.name)}</div>` +
         `<canvas class="sp-wave" id="sp-wave" tabindex="0" aria-label="Waveform of ${esc(s.name)}. Comma and period move the start, with Shift the end."></canvas>` +
         `<div class="cv-line" role="group" aria-label="Sampler tools">` +
           [4, 8, 16].map((n) => `<button data-chop="${n}" data-tip="Cut into ${n} equal pieces">Chop ${n}</button>`).join("") +
@@ -74,26 +87,135 @@ export function mountSampler(el, api) {
           `<button data-act="place" data-tip="Put it on the Song tab" aria-label="Place on the song">☰ Place</button></div>` +
         `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
         `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>`
-        : `<div class="sv-doc">Add a sound with + to get a sampler track. Select a sampler track to edit it here.</div>`);
+        : `<div class="sv-doc">Add a sound with Inst to get a sampler track. Select a sampler track to edit it here.</div>`) + `</div>`;
     if (s) paint();
   }
 
-  // My one-shots, grouped under their folders and cut down by the filter box.
-  function oneShotRows() {
-    const q = query.trim().toLowerCase();
-    const shown = sounds.map((x, i) => [x, i]).filter(([x]) => !q || (x.name + " " + x.folder).toLowerCase().includes(q));
-    if (!sounds.length) return `<div class="sv-doc">No one-shots yet. Add files or a folder, or drop them here.</div>`;
-    if (!shown.length) return `<div class="sv-doc">Nothing matches "${esc(query)}".</div>`;
-    let html = "", folder = null;
-    for (const [x, i] of shown) {
-      if (x.folder !== folder) { folder = x.folder; html += `<div class="sp-folder">${esc(folder || "No folder")}</div>`; }
-      html += `<div class="sp-row"><span class="sp-ic" aria-hidden="true">${ICON.oneshot}</span>` +
-        `<button class="sp-name" data-hear="${i}" data-tip="Hear it" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${mmss(x.seconds)}</span>` +
-        `<button data-add="${i}" data-tip="Add as a sampler instrument" aria-label="Add ${esc(x.name)} as an instrument">+ Inst</button>` +
-        `<button data-rack="${i}" data-tip="Add as a rack channel and open the rack" aria-label="Add ${esc(x.name)} to the rack">+ Rack</button>` +
-        `<button data-del="${i}" data-tip="Delete (Undo brings it back)" aria-label="Delete ${esc(x.name)}">×</button></div>`;
+  // ---- the tree ----------------------------------------------------------------------------
+  const q = () => query.trim().toLowerCase();
+  const hit = (x, where) => !q() || (x.name + " " + (x.folder || "") + " " + (where || "")).toLowerCase().includes(q());
+
+  function folderRow(key, name, depth, count, extra = "") {
+    const on = open.has(key) || (!!q() && key !== "samples" && key !== "oneshots" ? true : open.has(key));
+    const shot = key.startsWith("shot:"), arrange = editing && (shot || key === "oneshots");
+    if (renaming === key) {
+      return `<div class="sp-dir sp-renaming" style="--depth:${depth}"><span class="sp-car" aria-hidden="true"></span>` +
+        `<input class="sp-rename" data-rename="${esc(key)}" value="${esc(key.slice(5, -1).split("/").join(" / "))}" aria-label="Folder name; a / nests it"></div>`;
     }
-    return `<div class="sp-list">${html}</div>`;
+    return `<div class="sp-dirrow${arrange ? " arrange" : ""}" style="--depth:${depth}"${arrange ? ` data-drop="${esc(key)}"` : ""}${arrange && shot ? ` draggable="true" data-movedir="${esc(key)}"` : ""}>` +
+      `<button class="sp-dir" role="treeitem" aria-expanded="${on}" data-dir="${esc(key)}">` +
+      `<span class="sp-car" aria-hidden="true"></span><span class="sp-dname">${esc(name)}</span>` +
+      (count != null ? `<span class="sp-count">${count}</span>` : "") + (asking.has(key) ? `<span class="sp-spin" aria-label="Loading"></span>` : "") + `</button>` +
+      (arrange && shot ? `<span class="sp-acts on"><button data-renamedir="${esc(key)}" data-tip="Rename or move: a / nests it" aria-label="Rename the folder ${esc(name)}">✎</button>` +
+        `<button data-deldir="${esc(key)}" data-tip="Delete the folder and its sounds (Undo brings them back)" aria-label="Delete the folder ${esc(name)}">×</button></span>` : "") +
+      `</div>` + extra;
+  }
+  function soundRow(x, depth, mine) {
+    const i = items.push(x) - 1;
+    if (mine && renaming === "sound:" + x.id) {
+      return `<div class="sp-row sp-renaming" style="--depth:${depth}"><span class="sp-ic" aria-hidden="true">${ICON.oneshot}</span>` +
+        `<input class="sp-rename" data-renamesound="${i}" value="${esc(x.name)}" aria-label="Name of the sound"></div>`;
+    }
+    const arrange = mine && editing;
+    return `<div class="sp-row" role="treeitem" style="--depth:${depth}"${arrange ? ` draggable="true" data-movesound="${i}"` : ""}><span class="sp-ic" aria-hidden="true">${arrange ? "⠿" : ICON[x.kind] || "♪"}</span>` +
+      `<button class="sp-name" data-hear="${i}" data-tip="Hear it" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${mmss(x.seconds)}</span>` +
+      (arrange ? `<span class="sp-acts on"><button data-rename="${i}" data-tip="Rename" aria-label="Rename ${esc(x.name)}">✎</button>` +
+          `<button data-del="${i}" data-tip="Delete (Undo brings it back)" aria-label="Delete ${esc(x.name)}">×</button></span>`
+        : `<span class="sp-acts">` +
+          `<button data-add="${i}" data-tip="Add as a sampler instrument" aria-label="Add ${esc(x.name)} as an instrument">Inst</button>` +
+          (mine ? `<button data-rack="${i}" data-tip="Add as a rack channel" aria-label="Add ${esc(x.name)} to the rack">Rack</button>` : "") +
+          `</span>`) + `</div>`;
+  }
+
+  // ---- arranging the one-shots ------------------------------------------------------------------
+  const pathOf = (key) => key.slice(5, -1).split("/").join(" / ");          // "shot:A/B/" -> "A / B"
+  const inside = (folder, path) => folder === path || folder.startsWith(path + " / ");
+  const tidy = (t) => String(t || "").split("/").map((p) => p.trim()).filter(Boolean).join(" / ");
+  // Everything under `from` moves to `to` (a folder path, "" for the top), keeping what is below it.
+  async function moveFolder(from, to, says) {
+    const list = shots.filter((x) => inside(x.folder, from));
+    if (!list.length) return;
+    busy = says + "…"; render();
+    const ok = await each(list, (x) => changeSample(x.id, { folder: (to + x.folder.slice(from.length)).replace(/^ \/ /, "") }),
+      (n, of) => { const b = el.querySelector("[role=status]"); if (b) b.textContent = says + ": " + n + " of " + of; });
+    busy = "";
+    api.toast(ok === list.length ? says + "." : says + ", but " + (list.length - ok) + " would not move.");
+    shots = null; fetchFor("oneshots"); render();
+  }
+  async function deleteFolder(path) {
+    const list = shots.filter((x) => inside(x.folder, path));
+    busy = "Deleting " + path + "…"; render();
+    await each(list, (x) => removeSample(x.id));
+    busy = "";
+    api.toast("Deleted " + path + " (" + list.length + (list.length === 1 ? " sound" : " sounds") + ").", { label: "Undo", run: async () => { await each(list, (x) => restoreSample(x.id)); shots = null; fetchFor("oneshots"); } });
+    shots = null; fetchFor("oneshots"); render();
+  }
+  async function renameDone(input, keepIt) {
+    const was = renaming; renaming = null;
+    if (!keepIt || !was) return list();
+    if (was.startsWith("shot:")) {
+      const from = pathOf(was), to = tidy(input.value);
+      if (!to || to === from) return list();
+      if (inside(to, from)) { api.toast("A folder can't go inside itself."); return list(); }
+      return moveFolder(from, to, "Moved " + from + " to " + to);
+    }
+    const x = items[+input.dataset.renamesound], name = input.value.trim();
+    if (!x || !name || name === x.name) return list();
+    if (await changeSample(x.id, { name })) { x.name = name; api.toast("Renamed to " + name + "."); }
+    list();
+  }
+  // One-shots nest by their folder path, "Drums / Kicks" being two levels.
+  function shotTree() {
+    if (shots === null) return "";
+    const rows = shots.filter((x) => hit(x));
+    if (!shots.length) return `<div class="sv-doc sp-note" style="--depth:1">No one-shots yet. Add files or a folder, or drop them here.</div>`;
+    if (!rows.length) return `<div class="sv-doc sp-note" style="--depth:1">Nothing matches.</div>`;
+    const root = { dirs: new Map(), sounds: [], n: 0 };
+    for (const x of rows) {
+      let at = root; at.n++;
+      for (const part of (x.folder || "").split(" / ").filter(Boolean)) {
+        if (!at.dirs.has(part)) at.dirs.set(part, { dirs: new Map(), sounds: [], n: 0 });
+        at = at.dirs.get(part); at.n++;
+      }
+      at.sounds.push(x);
+    }
+    const walk = (node, path, depth) => {
+      let html = "";
+      for (const [name, sub] of [...node.dirs].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base", numeric: true }))) {
+        const key = "shot:" + path + name + "/";  // ends in / so a path is never a prefix of its neighbour's
+        const on = !!q() || open.has(key);
+        html += folderRow(key, name, depth, sub.n);
+        if (on) html += walk(sub, path + name + "/", depth + 1);
+      }
+      for (const x of node.sounds) html += soundRow(x, depth, true);
+      return html;
+    };
+    return walk(root, "", 1);
+  }
+  function sampleTree() {
+    if (songs === null) return "";
+    const branch = (key, name, list) => {
+      const on = open.has(key) || (!!q() && !!list);
+      let html = folderRow(key, name, 1, list ? list.filter((x) => hit(x, name)).length : null);
+      if (on && list) {
+        const rows = list.filter((x) => hit(x, name));
+        html += rows.length ? rows.map((x) => soundRow(x, 2, false)).join("") : `<div class="sv-doc sp-note" style="--depth:2">${q() ? "Nothing matches." : "Nothing here yet."}</div>`;
+      }
+      return html;
+    };
+    return (guest ? "" : branch("renders", "Renders waiting", kids.get("renders"))) +
+      songs.map((x) => branch("song:" + x.id, x.title, kids.get(String(x.id)))).join("");
+  }
+  function tree() {
+    items = [];
+    const sh = open.has("oneshots") || !!q(), sa = open.has("samples") || (!!q() && songs !== null);
+    return (problem ? `<div class="cv-err">${esc(problem)}</div>` : "") +
+      (guest ? "" : folderRow("oneshots", "One-shots", 0, shots ? shots.length : null) + (sh ? shotTree() : "")) +
+      folderRow("samples", "Samples", 0, songs ? songs.length + (guest ? 0 : 1) : null) + (sa ? sampleTree() : "");
+  }
+  function list() {
+    const box = el.querySelector("#sp-listbox");
+    if (box) box.innerHTML = tree(); else render();
   }
 
   async function bring(files) {
@@ -107,7 +229,6 @@ export function mountSampler(el, api) {
     } catch (e) {
       busy = ""; api.toast(e.message === "signin" ? "Sign in to JR!TER to keep your sounds." : "Could not add them. " + (e.message || ""));
     }
-    if (listed !== "oneshots") { listed = "oneshots"; try { localStorage.setItem(FROM, "oneshots"); } catch { /* fine */ } }
     load("oneshots");
   }
 
@@ -199,11 +320,6 @@ export function mountSampler(el, api) {
   });
 
   el.addEventListener("change", (e) => {
-    if (e.target.id === "sp-from") {
-      const v = e.target.value;
-      try { localStorage.setItem(FROM, v === "oneshots" ? "oneshots" : "renders"); } catch { /* fine */ }
-      return load(v === "renders" || v === "oneshots" ? v : +v);
-    }
     if (e.target.id === "sp-files" || e.target.id === "sp-dir") { const f = [...e.target.files]; e.target.value = ""; return bring(f); }
     if (e.target.id === "sp-bpm") { const t = track(); if (t) { const v = +e.target.value; api.change(() => { t.sample.bpm = v >= 20 && v <= 400 ? Math.round(v * 100) / 100 : 0; }); } }
     if (e.target.id === "sp-root") { const t = track(); if (t) api.change(() => { t.sample.root = clamp(Math.round(+e.target.value) || 60, 0, 127); }); }
@@ -212,11 +328,26 @@ export function mountSampler(el, api) {
     const b = e.target.closest("button");
     if (!b || b.disabled) return;
     const t = track();
-    if (b.dataset.hear != null) return api.hear(sounds[+b.dataset.hear].src);
-    if (b.dataset.add != null) return api.addSampler(sounds[+b.dataset.add]);
-    if (b.dataset.rack != null) return api.addSampler(sounds[+b.dataset.rack], { rack: true });
+    if (b.dataset.act === "edit") { editing = !editing; renaming = null; if (editing) { open.add("oneshots"); keep(); want(); } return render(); }
+    if (b.dataset.renamedir != null || b.dataset.rename != null) {
+      renaming = b.dataset.renamedir != null ? b.dataset.renamedir : "sound:" + items[+b.dataset.rename].id;
+      list();
+      const f = el.querySelector(".sp-rename"); if (f) { f.focus(); f.select(); }
+      return;
+    }
+    if (b.dataset.deldir != null) return deleteFolder(pathOf(b.dataset.deldir));
+    if (b.dataset.dir != null) {
+      const k = b.dataset.dir;
+      if (open.has(k)) open.delete(k); else open.add(k);
+      keep(); want(); list();
+      el.querySelector(`[data-dir="${CSS.escape(k)}"]`)?.focus();
+      return;
+    }
+    if (b.dataset.hear != null) return api.hear(items[+b.dataset.hear].src);
+    if (b.dataset.add != null) return api.addSampler(items[+b.dataset.add]);
+    if (b.dataset.rack != null) return api.addSampler(items[+b.dataset.rack], { rack: true });
     if (b.dataset.del != null) {
-      const x = sounds[+b.dataset.del];
+      const x = items[+b.dataset.del];
       return removeSample(x.id).then(() => {
         api.toast("Deleted " + x.name + ".", { label: "Undo", run: () => restoreSample(x.id).then(() => load("oneshots")) });
         load("oneshots");
@@ -227,7 +358,6 @@ export function mountSampler(el, api) {
     if (b.dataset.act === "oneshot") { const t = track(); if (t) api.change(() => { t.sample.oneshot = !t.sample.oneshot; }); return; }
     if (b.dataset.act === "guess") { const t = track(); if (!t) return; const g = guessBpm(t.sample); if (!g) return api.toast("Trim it to whole bars first."); return api.change(() => { t.sample.bpm = g; }); }
     if (b.dataset.act === "keep") { const t = track(); if (t) api.change(() => { t.sample.warp = t.sample.warp === "pitch" ? "time" : "pitch"; }); return; }
-    if (b.dataset.act === "open") return load(listed);
     if (!t) return;
     if (b.dataset.chop) api.change(() => chop(t.sample, +b.dataset.chop));
     else if (b.dataset.act === "clear") api.change(() => chop(t.sample, 1));
@@ -239,9 +369,50 @@ export function mountSampler(el, api) {
   el.addEventListener("input", (e) => {
     if (e.target.id !== "sp-q") return;
     query = e.target.value;
-    const box = el.querySelector("#sp-listbox");
-    if (box && sounds) box.innerHTML = oneShotRows();
+    // Searching looks in everything: fetch the roots it needs, then draw.
+    if (q()) { if (!guest && shots === null) fetchFor("oneshots"); if (songs === null) fetchFor("samples"); }
+    list();
   });
+  // Renaming in place: Enter keeps it, Escape or leaving the field without a change puts it back.
+  el.addEventListener("keydown", (e) => {
+    if (!e.target.classList?.contains("sp-rename")) return;
+    if (e.key === "Enter") { e.preventDefault(); renameDone(e.target, true); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); renameDone(e.target, false); }
+  });
+  el.addEventListener("focusout", (e) => { if (e.target.classList?.contains("sp-rename") && renaming) renameDone(e.target, true); });
+
+  // Arranging: a sound or a folder dragged onto a folder (or onto One-shots, the top) moves there.
+  el.addEventListener("dragstart", (e) => {
+    const s = e.target.closest?.("[data-movesound]"), d = e.target.closest?.("[data-movedir]");
+    if (!editing || (!s && !d)) return;
+    moving = s ? { kind: "sound", x: items[+s.dataset.movesound] } : { kind: "dir", path: pathOf(d.dataset.movedir) };
+    e.dataTransfer.setData("text/plain", s ? moving.x.name : moving.path);
+    e.dataTransfer.effectAllowed = "move";
+    (s || d).classList.add("sp-moving");
+  });
+  el.addEventListener("dragend", () => { moving = null; el.querySelectorAll(".sp-moving, .sp-over").forEach((n) => n.classList.remove("sp-moving", "sp-over")); });
+  el.addEventListener("dragover", (e) => {
+    const t = moving && e.target.closest?.("[data-drop]");
+    el.querySelectorAll(".sp-over").forEach((n) => n !== t && n.classList.remove("sp-over"));
+    if (!t) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "move"; t.classList.add("sp-over");
+  });
+  el.addEventListener("drop", (e) => {
+    const t = moving && e.target.closest?.("[data-drop]");
+    if (!t) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const m = moving; moving = null; t.classList.remove("sp-over");
+    const to = t.dataset.drop === "oneshots" ? "" : pathOf(t.dataset.drop);
+    if (m.kind === "sound") {
+      if (m.x.folder === to) return;
+      return changeSample(m.x.id, { folder: to }).then((ok) => { if (ok) { m.x.folder = to; api.toast("Moved " + m.x.name + (to ? " to " + to : " to the top") + "."); } list(); });
+    }
+    const leaf = m.path.split(" / ").pop(), dest = to ? to + " / " + leaf : leaf;
+    if (dest === m.path) return;
+    if (inside(to, m.path)) return api.toast("A folder can't go inside itself.");
+    moveFolder(m.path, dest, "Moved " + leaf + (to ? " into " + to : " to the top"));
+  }, true);
+
   // Drop sound files (or a folder) on the tab.
   el.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); });
   el.addEventListener("drop", async (e) => {
@@ -264,7 +435,7 @@ export function mountSampler(el, api) {
   });
 
   return {
-    render: () => { render(); if (sounds === null && !loading && !problem) load(listed); },
-    show: (which) => { listed = which; load(which); },
+    render: () => { render(); want(); },
+    show: (which) => load(which),
   };
 }
