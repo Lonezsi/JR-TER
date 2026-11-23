@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.21.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "Drag a number to change it",
+  "notes": [
+    "BPM, Bars, the sampler's Root and Tempo, and every other number field in the DAW change when you drag them up or down, like the knobs. Hold Shift to go finer.",
+    "A click without dragging still lets you type the number."
+  ]
+ },
+ {
   "version": "4.20.0",
   "date": "2026-11-23",
   "name": "JR!TER",

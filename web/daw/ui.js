@@ -4,7 +4,7 @@
 // listens for "change" keeps working and a script can still set them.
 //
 //   <select>               a field button and a glass menu (arrows, Home, End, Enter, Escape, typing a letter)
-//   <input type=number>    no browser spinners: a stepper of two chevrons, and the wheel steps it while focused
+//   <input type=number>    no browser spinners: a stepper of two chevrons, the wheel steps it while focused, drag it up or down (Shift: fine); a plain click types
 //   <input type=range>     the filled track (--fill), as the app's sliders draw it
 //   [data-tip]             one tooltip on glass, placed above or below and kept on screen; never on touch
 //
@@ -124,6 +124,32 @@ function step(input, dir) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
+// Drag a number field up or down to change it (Shift for fine), like the knobs; a click without a drag types.
+function dragNumber(input, wrap) {
+  input.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || input.disabled || input.readOnly || document.activeElement === input) return;
+    e.preventDefault();
+    try { input.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
+    const y0 = e.clientY, before = input.value, v0 = before === "" ? (+input.min || 0) : +input.value;
+    const lo = input.min === "" ? -Infinity : +input.min, hi = input.max === "" ? Infinity : +input.max, st = +input.step || 1;
+    const rate = isFinite(hi - lo) ? (hi - lo) / 200 : st / 4;
+    let dragged = false;
+    const move = (ev) => {
+      const dy = y0 - ev.clientY;
+      if (!dragged && Math.abs(dy) <= 4) return;
+      dragged = true; wrap.classList.add("nf-drag");
+      const v = +Math.min(hi, Math.max(lo, Math.round((v0 + dy * rate * (ev.shiftKey ? 0.1 : 1)) / st) * st)).toFixed(6);
+      if (String(v) !== input.value) { input.value = v; input.dispatchEvent(new Event("input", { bubbles: true })); }
+    };
+    const up = (ev) => {
+      input.removeEventListener("pointermove", move); input.removeEventListener("pointerup", up); input.removeEventListener("pointercancel", up);
+      wrap.classList.remove("nf-drag");
+      if (dragged) { if (input.value !== before) input.dispatchEvent(new Event("change", { bubbles: true })); }
+      else if (ev.type === "pointerup") { input.focus(); input.select(); }
+    };
+    input.addEventListener("pointermove", move); input.addEventListener("pointerup", up); input.addEventListener("pointercancel", up);
+  });
+}
 function fitNumber(input) {
   if (input._nf || input.closest(".nf")) return;
   const wrap = document.createElement("span");
@@ -136,6 +162,7 @@ function fitNumber(input) {
   s.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) step(input, +b.dataset.d); });
   wrap.append(s);
   input._nf = true;
+  dragNumber(input, wrap);
   input.addEventListener("wheel", (e) => { if (document.activeElement !== input) return; e.preventDefault(); step(input, e.deltaY < 0 ? 1 : -1); }, { passive: false });
 }
 
