@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.22.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "Effects you turn",
+  "notes": [
+    "Every effect setting in the mixer is a knob now: drag it up or down, use the wheel or the arrow keys, double-click to put it back.",
+    "Swing in the Drumroll is a knob too. Steps already change their velocity or pitch when you drag them."
+  ]
+ }, {
   "version": "4.21.0",
   "date": "2026-11-23",
   "name": "JR!TER",

@@ -7,12 +7,13 @@
 //                         from a bus, click makes it the bus's output (a bus feeds one place)
 //     double-click        make it the main output instead of the master
 //   A route that would go round in a loop is never offered. Beside the strips: the picked strip's output,
-//   its effects, + Insert (a new bus) and taking a bus out.
+//   its effects (each setting a knob), + Insert (a new bus) and taking a bus out.
 //
 //   mountMixer(el, api) -> { render, meters(levels | null) }
 //   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), sync(), toast(text, action),
 //        undo(), selected(), select(i)
 // Model and maths: mixer.js. The audio graph: mixgraph.js.
+import { knob as knobHtml, wireKnobs } from "./knob.js";
 import { FX, FX_TYPES, newFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops } from "./mixer.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -49,7 +50,7 @@ export function mountMixer(el, api) {
   const knob = (k, id, label, value, lo, hi, home, words) =>
     `<div class="mx-knob" role="slider" tabindex="0" data-knob="${k}" data-id="${id}" data-lo="${lo}" data-hi="${hi}" data-home="${home}"` +
     ` aria-label="${esc(label)}" aria-valuemin="${lo}" aria-valuemax="${hi}" aria-valuenow="${value}" aria-valuetext="${esc(words)}"` +
-    ` data-tip="${esc(label)}: ${esc(words)}. Drag up or down, double-click to reset" style="--turn:${((value - lo) / (hi - lo)) * 270 - 135}deg"><i></i></div>`;
+    ` data-tip="${esc(label)}: ${esc(words)}" style="--turn:${((value - lo) / (hi - lo)) * 270 - 135}deg"><i></i></div>`;
 
   function routeFoot(song, id, from) {
     if (!from || !canFeed(song, from.id, id)) return `<div class="mx-foot"></div>`;
@@ -93,8 +94,8 @@ export function mountMixer(el, api) {
       `<button data-fx="up" data-i="${i}" aria-label="Move earlier" data-tip="Move earlier"${i ? "" : " disabled"}>↑</button>` +
       `<button data-fx="down" data-i="${i}" aria-label="Move later" data-tip="Move later"${i < n - 1 ? "" : " disabled"}>↓</button>` +
       `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">✕</button></div>` +
-      Object.entries(spec.params).map(([k, [lo, hi, , unit]]) =>
-        `<label class="mx-p"><span>${k}</span><input type="range" class="mx-param" min="${lo}" max="${hi}" step="${(hi - lo) / 200}" value="${f[k]}" data-i="${i}" data-p="${k}" aria-label="${esc(spec.label + " " + k)}"><output>${fmt(f[k])}${unit}</output></label>`).join("") +
+      `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
+        `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${k}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
       `</div>`;
   }
 
@@ -138,14 +139,8 @@ export function mountMixer(el, api) {
     const t = e.target, song = api.song();
     if (!t.matches("input[type=range]")) return;
     begin();
-    if (t.dataset.p !== undefined) {
-      const f = picked(song).fx[+t.dataset.i];
-      f[t.dataset.p] = +t.value;
-      t.parentElement.querySelector("output").textContent = fmt(+t.value) + (FX[f.type].params[t.dataset.p][3] || "");
-    } else {
-      setValue(song, t.dataset.k, t.dataset.id, +t.value);
-      const d = t.closest(".mx-strip")?.querySelector(".mx-db"); if (d) d.textContent = db(+t.value);
-    }
+    setValue(song, t.dataset.k, t.dataset.id, +t.value);
+    const d = t.closest(".mx-strip")?.querySelector(".mx-db"); if (d) d.textContent = db(+t.value);
     api.sync(); api.save();
   });
   el.addEventListener("change", (e) => {
@@ -155,51 +150,29 @@ export function mountMixer(el, api) {
     if (t.id === "mx-bname") { const n = t.value.trim(); if (n) api.change(() => { picked(song).obj.name = n.slice(0, 40); }); }
   });
 
-  // A knob turns with a vertical drag (160px end to end), the wheel, or the arrow keys.
-  function turn(node, v) {
-    const lo = +node.dataset.lo, hi = +node.dataset.hi;
-    v = clamp(v, lo, hi);
-    setValue(api.song(), node.dataset.knob, node.dataset.id, v);
-    node.style.setProperty("--turn", ((v - lo) / (hi - lo)) * 270 - 135 + "deg");
-    node.setAttribute("aria-valuenow", v);
-    const words = node.dataset.knob === "pan" ? panWords(v) : db(v) + " dB";
-    node.setAttribute("aria-valuetext", words);
-    node.dataset.tip = node.getAttribute("aria-label") + ": " + words + ". Drag up or down, double-click to reset";
-    api.sync(); api.save();
-  }
-  el.addEventListener("pointerdown", (e) => {
-    const k = e.target.closest(".mx-knob[data-knob]");
-    if (!k || e.button !== 0) return;
-    e.preventDefault(); k.focus();
-    try { k.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
-    const y0 = e.clientY, v0 = +k.getAttribute("aria-valuenow"), span = +k.dataset.hi - +k.dataset.lo;
-    begin();
-    const move = (ev) => turn(k, v0 + ((y0 - ev.clientY) / 160) * span * (ev.shiftKey ? 0.2 : 1));
-    const up = () => { k.removeEventListener("pointermove", move); k.removeEventListener("pointerup", up); k.removeEventListener("pointercancel", up); end(); };
-    k.addEventListener("pointermove", move); k.addEventListener("pointerup", up); k.addEventListener("pointercancel", up);
-  });
-  el.addEventListener("wheel", (e) => {
-    const k = e.target.closest(".mx-knob[data-knob]");
-    if (!k) return;
-    e.preventDefault(); begin();
-    turn(k, +k.getAttribute("aria-valuenow") + (e.deltaY < 0 ? 1 : -1) * (+k.dataset.hi - +k.dataset.lo) / 50);
-    clearTimeout(k._t); k._t = setTimeout(end, 400);
-  }, { passive: false });
-  el.addEventListener("keydown", (e) => {
-    const k = e.target.closest(".mx-knob[data-knob]");
-    if (!k) return;
-    const span = +k.dataset.hi - +k.dataset.lo, v = +k.getAttribute("aria-valuenow");
-    const by = { ArrowUp: span / 50, ArrowRight: span / 50, ArrowDown: -span / 50, ArrowLeft: -span / 50, PageUp: span / 8, PageDown: -span / 8 }[e.key];
-    if (e.key === "Home") { e.preventDefault(); begin(); turn(k, +k.dataset.home); return end(); }
-    if (by === undefined) return;
-    e.preventDefault(); begin(); turn(k, v + by); end();
+  // Every knob (strip pan, sends, effect settings) is knob.js: drag, wheel, arrows, double-click for home.
+  wireKnobs(el, {
+    begin, end,
+    turn: (key, v, node) => {
+      const song = api.song();
+      let words;
+      if (key.startsWith("fx.")) {
+        const [, i, p] = key.split(".");
+        const f = picked(song).fx[+i]; if (!f) return;
+        f[p] = v; words = fmt(v) + (FX[f.type].params[p][3] || "");
+        const out = node.parentElement.querySelector("output"); if (out) out.textContent = words;
+      } else {
+        setValue(song, key, node.dataset.id, v);
+        words = key === "pan" ? panWords(v) : db(v) + " dB";
+      }
+      api.sync(); api.save();
+      return words;
+    },
   });
 
   // ---- clicks ------------------------------------------------------------------------------------
   let routeTimer = 0;
   el.addEventListener("dblclick", (e) => {
-    const k = e.target.closest(".mx-knob[data-knob]");
-    if (k) { begin(); turn(k, +k.dataset.home); return end(); }
     const r = e.target.closest("[data-route]");
     if (!r) return;
     clearTimeout(routeTimer);

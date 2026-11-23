@@ -31,7 +31,7 @@ export function wireKnobs(root, { turn, begin = () => {}, end = () => {} }) {
   const span = (n) => +n.dataset.hi - +n.dataset.lo;
   root.addEventListener("pointerdown", (e) => {
     const k = e.target.closest?.(".mx-knob[data-knob]");
-    if (!k || !root.contains(k) || e.button !== 0 || k.closest("[data-mixer]")) return;
+    if (!k || !root.contains(k) || e.button !== 0) return;
     e.preventDefault(); k.focus();
     try { k.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
     const y0 = e.clientY, v0 = +k.getAttribute("aria-valuenow");
@@ -42,14 +42,14 @@ export function wireKnobs(root, { turn, begin = () => {}, end = () => {} }) {
   });
   root.addEventListener("wheel", (e) => {
     const k = e.target.closest?.(".mx-knob[data-knob]");
-    if (!k || k.closest("[data-mixer]")) return;
+    if (!k) return;
     e.preventDefault(); begin();
     set(k, +k.getAttribute("aria-valuenow") + (e.deltaY < 0 ? 1 : -1) * (+k.dataset.step || span(k) / 50));
     clearTimeout(k._t); k._t = setTimeout(end, 400);
   }, { passive: false });
   root.addEventListener("keydown", (e) => {
     const k = e.target.closest?.(".mx-knob[data-knob]");
-    if (!k || k.closest("[data-mixer]")) return;
+    if (!k) return;
     const small = +k.dataset.step || span(k) / 50;
     const by = { ArrowUp: small, ArrowRight: small, ArrowDown: -small, ArrowLeft: -small, PageUp: span(k) / 8, PageDown: -span(k) / 8 }[e.key];
     if (e.key === "Home") { e.preventDefault(); begin(); set(k, +k.dataset.home); end(); return; }
@@ -58,7 +58,7 @@ export function wireKnobs(root, { turn, begin = () => {}, end = () => {} }) {
   });
   root.addEventListener("dblclick", (e) => {
     const k = e.target.closest?.(".mx-knob[data-knob]");
-    if (!k || k.closest("[data-mixer]")) return;
+    if (!k) return;
     begin(); set(k, +k.dataset.home); end();
   });
 }

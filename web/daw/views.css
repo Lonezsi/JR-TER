@@ -117,9 +117,11 @@ body:not([data-view="roll"]) #tool-draw, body:not([data-view="roll"]) #tool-eras
 .mx-fxh { display: flex; gap: var(--d-s1); align-items: center; }
 .mx-gap { flex: 1; }
 .mx-fxh button[aria-checked="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
-.mx-p { display: grid; grid-template-columns: 5.5em 1fr 4.5em; gap: var(--d-s2); align-items: center; color: var(--d-mute); }
-.mx-p output { text-align: right; color: var(--d-fg); }
-.mx-param { min-width: 0; width: 100%; }
+.mx-params { display: flex; flex-wrap: wrap; gap: var(--d-s3); }
+.mx-p { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 48px; font-size: 10.5px; color: var(--d-mute); }
+.mx-p .mx-knob { width: 30px; height: 30px; }
+.mx-p .mx-knob i { height: 10px; transform-origin: 50% 12px; }
+.mx-p output { font-size: 10px; color: var(--d-fg); font-variant-numeric: tabular-nums; }
 /* The sampler: the library's sounds, then the waveform of the selected sampler track. */
 .sampler .cv-line button[aria-pressed="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
 .sp-list { display: flex; flex-direction: column; gap: var(--d-s1); max-height: 220px; overflow-y: auto; }
