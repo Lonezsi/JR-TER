@@ -14,6 +14,8 @@
  *   arrange.move(id, index, quiet) / .duplicate / .remove / .resize(id, edge, beats)
  *   arrange.renamePart / .setLyricsFor / .partForSheet
  *   arrange.select(clipId | null)                the chosen block (reactive state.selected)
+ *   arrange.insert(partId, index)                a section from the browser, dropped in
+ *   mix / arrange.setMix(patch)                  the lane's mixer channel: volume, pan, mute, solo
  *   arrange.start/.stop/.seek/.finished/.resync  transport (the player drives these)
  *   loadShapes()                                 /api/arrangements/shapes for list pictures
  *   tempoFromTaps(timesMs)                       bpm from tap timestamps, or null
@@ -38,7 +40,7 @@ import { beats as beatsApi, type BeatRead } from "./beats";
 import { wave, type Peaks } from "./waveform";
 import { get, api, uFor, attempt, u, guest, ApiError } from "../api";
 import { emit } from "../bus";
-import { clamp } from "../util";
+import { clamp, store } from "../util";
 import { setArranger, type Arranger } from "../player.svelte";
 
 export interface Part {
@@ -108,6 +110,17 @@ export const state: ArrangeState = $state({
   selected: null, playingPart: null,
 });
 
+/* The arrangement lane's mixer channel. It belongs to this browser and not to the song,
+ * like the volume knob: two people listening to one song may want it louder or not. Solo
+ * means "only the soloed lanes": with one lane it changes nothing, and it is here so the
+ * channel works the same way when there are more. */
+export interface Mix { volume: number; pan: number; mute: boolean; solo: boolean }
+const UNITY: Mix = { volume: 1, pan: 0, mute: false, solo: false };
+export const mix: Mix = $state({ ...UNITY });
+let lane: { gain: GainNode; pan: StereoPannerNode } | null = null;
+const mixKey = () => `jriter.mix.${state.songId}`;
+const heard = () => (mix.mute ? 0 : mix.volume);
+
 export interface VersionRef { id: number | string; size?: number }
 
 const buffers = new Map<number | string, AudioBuffer>();           // version id -> decoded
@@ -137,6 +150,7 @@ function fill(a: Arrangement) {
   state.clips = a.clips || [];
   state.lyrics = a.lyrics || {};
   state.loaded = true;
+  Object.assign(mix, UNITY, store.get(mixKey(), {}));
   if (state.selected && !state.clips.some((c) => c.id === state.selected)) state.selected = null;
 }
 
@@ -168,6 +182,10 @@ function stopSources() {
     try { source.disconnect(); } catch { /* already gone */ }
   }
   sources = [];
+  if (lane) {
+    try { lane.gain.disconnect(); lane.pan.disconnect(); } catch { /* already gone */ }
+    lane = null;
+  }
 }
 
 /* Put every clip on the schedule, starting from `from` seconds into the timeline. */
@@ -179,6 +197,13 @@ function schedule(from: number): boolean {
 
   const inputs = (["A", "B"] as const).map((slot) => engine.inputOf(slot)).filter((n): n is GainNode => !!n);
   if (!inputs.length) return false;
+
+  // Every clip goes through the lane's channel, so a fader moves while it plays.
+  lane = { gain: ctx.createGain(), pan: ctx.createStereoPanner() };
+  lane.gain.gain.value = heard();
+  lane.pan.pan.value = mix.pan;
+  lane.gain.connect(lane.pan);
+  for (const input of inputs) lane.pan.connect(input);
 
   // A small lead so the first clip is scheduled rather than started late.
   const begin = ctx.currentTime + 0.06;
@@ -196,7 +221,7 @@ function schedule(from: number): boolean {
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    for (const input of inputs) source.connect(input);
+    source.connect(lane.gain);
     // Never ask for more than the file holds: a clip that runs off the end simply stops,
     // which is honest, rather than throwing and killing the whole run.
     const playable = Math.min(length, Math.max(0, buffer.duration - sourceStart));
@@ -471,6 +496,31 @@ export const arrange = {
   },
 
   // ── editing ────────────────────────────────────────────────────────────────
+
+  /** Move the lane's faders. Live while it plays, with a few ms of ramp so it never clicks. */
+  setMix(patch: Partial<Mix>) {
+    Object.assign(mix, patch);
+    mix.volume = clamp(mix.volume, 0, 1.5);
+    mix.pan = clamp(mix.pan, -1, 1);
+    store.set(mixKey(), { ...mix });
+    const ctx = engine.context();
+    if (lane && ctx) {
+      lane.gain.gain.setTargetAtTime(heard(), ctx.currentTime, 0.015);
+      lane.pan.pan.setTargetAtTime(mix.pan, ctx.currentTime, 0.015);
+    }
+  },
+
+  /** A section from the browser, put into the order at `index` whole and untrimmed. */
+  insert(partId: string, index: number): Clip | null {
+    const part = state.parts.find((p) => p.id === partId);
+    if (!part) return null;
+    const clip: Clip = { id: nextId("c", state.clips), part: part.id, from: part.from, beats: part.beats };
+    const at = clamp(index, 0, state.clips.length);
+    state.clips.splice(at, 0, clip);
+    arrange.touch();
+    arrange.resync();
+    return state.clips[at];
+  },
 
   select(clipId: string | null) {
     state.selected = clipId && state.clips.some((c) => c.id === clipId) ? clipId : null;

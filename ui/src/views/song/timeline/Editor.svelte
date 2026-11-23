@@ -1,4 +1,7 @@
-<!-- The arrangement editor: one track of sections laid end to end, every edge on a beat.
+<!-- The arrangement editor, laid out like a DAW: the transport, tempo and snap along the top,
+     a browser of sections and takes at the left, the playlist with its bar ruler in the
+     middle, and the mixer sliding up from the bottom. One lane of sections laid end to end,
+     every edge on the snap.
      The moves are the ones the job needs:
 
        drag the middle     put this section somewhere else in the order
@@ -12,14 +15,16 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Icon from "$ui/Icon.svelte";
-  import { arrange, state as A, tempoFromTaps, type Clip } from "$lib/audio/arrange.svelte";
+  import { arrange, state as A, mix, tempoFromTaps, type Clip } from "$lib/audio/arrange.svelte";
   import { UNSURE } from "$lib/audio/beats";
-  import { player, now } from "$lib/player.svelte";
+  import { player, now, toggle, seekTo } from "$lib/player.svelte";
   import { contextMenu, showMenu, type MenuItem } from "$lib/menu.svelte";
   import { toast } from "$lib/toast.svelte";
   import { clamp, store, time } from "$lib/util";
   import { useSong } from "../song.svelte";
   import ClipWave from "./ClipWave.svelte";
+  import Browser, { PART } from "./Browser.svelte";
+  import Mixer from "./Mixer.svelte";
   import type { Source } from "./sample";
   import {
     history, rowsOf, setTempo, setOffset, setArranged, resetToRecorded, removeClip, duplicateClip,
@@ -43,7 +48,7 @@
   /* How wide a beat is on screen at rest. Zoom 1 fits the recorded song to the strip (and
    * never narrower than this), so a short song and a long one both start out readable. */
   const BASE = 9;
-  const GAP = 2;
+  const GAP = 0;                  // clips butt up against each other, so the ruler is the truth
   const LEAST = 14;
   const EDGE = 6;
   /* The band at each end of the strip where holding a block pans it, and how fast. Forty is
@@ -56,6 +61,13 @@
   const THUMB_LEAST = 44;
 
   let zoom = $state(clamp(store.get("jriter.timeline.zoom", 1), 0.3, 6));
+  /* What an edge snaps to while it is trimmed: a beat, or a whole bar. */
+  let snap = $state<"beat" | "bar">(store.get<string>("jriter.timeline.snap", "beat") === "bar" ? "bar" : "beat");
+  const snapTo = (to: "beat" | "bar") => { snap = to; store.set("jriter.timeline.snap", to); };
+  let showBrowser = $state(store.get("jriter.timeline.browser", true));
+  let showMixer = $state(store.get("jriter.timeline.mixer", false));
+  const flipBrowser = () => { showBrowser = !showBrowser; store.set("jriter.timeline.browser", showBrowser); };
+  const flipMixer = () => { showMixer = !showMixer; store.set("jriter.timeline.mixer", showMixer); };
   const zoomTo = (z: number) => { zoom = clamp(z, 0.3, 6); store.set("jriter.timeline.zoom", zoom); };
 
   let root: HTMLDivElement;
@@ -251,7 +263,8 @@
     if (!g) return;
     const clip = A.clips.find((c) => c.id === g.id);
     if (!clip) return;
-    const steps = Math.round(dx / ppb);
+    const unit = snap === "bar" ? A.perBar : 1;
+    const steps = Math.round(dx / (ppb * unit)) * unit;
     let wanted = g.edge === "start" ? g.startBeats - steps : g.startBeats + steps;
     // The start cannot go earlier than the beginning of the render, nor the end past its end.
     if (g.edge === "start") wanted = Math.min(wanted, g.startBeats + g.startFrom);
@@ -445,6 +458,78 @@
     ], { anchor });
   }
 
+  // ── the ruler and the transport ────────────────────────────────────────────
+  /* Bar numbers on the ruler, thinned out when a bar is too narrow to carry its own. */
+  const ruler = $derived.by(() => {
+    const barPx = ppb * A.perBar;
+    const every = barPx >= 28 ? 1 : barPx >= 14 ? 2 : barPx >= 7 ? 4 : 8;
+    const count = Math.ceil(trackW / Math.max(1, barPx));
+    const marks: { n: number; x: number }[] = [];
+    for (let b = 0; b <= count; b += every) marks.push({ n: b + 1, x: b * barPx });
+    return marks;
+  });
+
+  /** The time under a point of the strip, on the axis the player is on. */
+  function timeAt(x: number): number {
+    const rows = arrange.laid();
+    for (let i = 0; i < layout.length; i++) {
+      const box = layout[i], row = rows[i];
+      if (!row) break;
+      if (x < box.left + box.width || i === layout.length - 1) {
+        const t = clamp((x - box.left) / Math.max(1, box.width), 0, 1) * row.seconds;
+        return (asArranged ? row.at : row.sourceAt) + t;
+      }
+    }
+    return 0;
+  }
+  function rulerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    void playFrom(song, timeAt(onStrip(e.clientX)));
+  }
+
+  async function playPause() {
+    if (song.here) await toggle();
+    else void playFrom(song, 0);
+  }
+  async function stopAll() {
+    if (song.here && player.playing) await toggle();
+    if (song.here) seekTo(0);
+  }
+  /* The counter: bar and beat, then minutes and seconds, like the one on a desk. */
+  const where = $derived.by(() => {
+    const t = song.here ? player.position : 0;
+    const into = asArranged ? t : t - A.offset;
+    const b = Math.max(0, Math.floor(into / beat));
+    return { bar: Math.floor(b / A.perBar) + 1, beat: (b % A.perBar) + 1, clock: time(Math.max(0, t)) };
+  });
+
+  // ── a section dropped in from the browser ──────────────────────────────────
+  let dropAt = $state<number | null>(null);
+  let dropIndex = 0;
+  function indexAt(x: number): number {
+    let k = 0;
+    for (const b of layout) if (b.left + b.width / 2 < x) k++;
+    return k;
+  }
+  function dragOver(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes(PART)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    const k = indexAt(onStrip(e.clientX));
+    const last = layout[layout.length - 1];
+    dropAt = k < layout.length ? layout[k].left : last ? last.left + last.width : 0;
+    dropIndex = k;
+  }
+  function drop(e: DragEvent) {
+    const id = e.dataTransfer?.getData(PART);
+    dropAt = null;
+    if (!id) return;
+    e.preventDefault();
+    history.mark();
+    const clip = arrange.insert(id, dropIndex);
+    if (clip) focusClip(clip.id);
+  }
+
   // ── the header ─────────────────────────────────────────────────────────────
   let taps: number[] = [];
   let tapCount = $state(0);
@@ -481,8 +566,19 @@
 
 <div class="editor" bind:this={root}>
   <div class="head">
+    <div class="group transport" role="group" aria-label="Transport">
+      <button class="icon-btn sm" class:on={song.here && player.playing} aria-label={song.here && player.playing ? "Pause" : "Play"}
+              title={song.here && player.playing ? "Pause" : "Play"} onclick={playPause}>
+        <Icon name={song.here && player.playing ? "pause" : "play"} size={16} /></button>
+      <button class="icon-btn sm" aria-label="Stop" title="Stop and go back to the start" onclick={stopAll}><Icon name="stop" size={15} /></button>
+    </div>
+
+    <div class="lcd num" role="timer" aria-label="Position: bar {where.bar}, beat {where.beat}, {where.clock}">
+      <b>{String(where.bar).padStart(3, "0")}<i>:</i>{where.beat}</b>
+      <span>{where.clock}</span>
+    </div>
+
     <div class="group" role="group" aria-label="Tempo">
-      <span class="faint lbl">Tempo</span>
       <label class="bpm">
         <input class="field sm num" type="number" min="20" max="400" step="0.1" aria-label="Beats per minute"
                value={Math.round(A.bpm * 10) / 10}
@@ -515,11 +611,18 @@
       <button class="icon-btn sm" aria-label="Nudge the grid 10 ms later" title="10 ms later" onclick={() => setOffset(A.offset + 0.01)} disabled={!A.clips.length}><Icon name="chev-right" size={15} /></button>
     </div>
 
+    <div class="snap" role="radiogroup" aria-label="Snap edges to">
+      <button role="radio" aria-checked={snap === "beat"} class:on={snap === "beat"} title="Edges snap to the beat" onclick={() => snapTo("beat")}>Beat</button>
+      <button role="radio" aria-checked={snap === "bar"} class:on={snap === "bar"} title="Edges snap to whole bars" onclick={() => snapTo("bar")}>Bar</button>
+    </div>
+
     <span class="grow spacer"></span>
 
-    <!-- Undo, zoom, and the two big resets behind ⋯: one tidy row on every width. -->
+    <!-- Panels, undo, zoom, and the two big resets behind ⋯: one tidy row on every width. -->
     <div class="group tail" role="group" aria-label="Arrangement">
       {#if laying !== null}<span class="faint small num">Listening…</span>{/if}
+      <button class="icon-btn sm" class:on={showBrowser} aria-pressed={showBrowser} aria-label="Browser" title="Show the browser of sections and takes" onclick={flipBrowser}><Icon name="sidebar" size={16} /></button>
+      <button class="icon-btn sm" class:on={showMixer} aria-pressed={showMixer} aria-label="Mixer" title="Show the mixer" onclick={flipMixer}><Icon name="eq" size={16} /></button>
       <button class="icon-btn sm" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.canUndo} onclick={() => history.undo()}><Icon name="undo" size={16} /></button>
       <button class="icon-btn sm" aria-label="Zoom out" title="Zoom out" onclick={() => zoomTo(zoom / 1.35)}><Icon name="zoom-out" size={16} /></button>
       <button class="icon-btn sm" aria-label="Zoom in" title="Zoom in" onclick={() => zoomTo(zoom * 1.35)}><Icon name="zoom-in" size={16} /></button>
@@ -540,10 +643,26 @@
       </button>
     </div>
   {:else}
+   <div class="desk" class:browsing={showBrowser}>
+    {#if showBrowser}<Browser onadded={(id) => focusClip(id)} />{/if}
+    <div class="playlist">
+    <div class="lanehead" aria-hidden="true">
+      <span class="rulerpad"></span>
+      <div class="lane-name" class:muted={mix.mute}>
+        <i class="lane-dot"></i><span class="truncate">Arrangement</span>
+      </div>
+    </div>
     <div class="scroll" bind:this={scroller} bind:clientWidth={avail}
          onscroll={(e) => (scrollLeft = e.currentTarget.scrollLeft)}>
-      <div class="track" bind:this={track} style:width="{trackW}px">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="ruler" style:width="{trackW}px" onpointerdown={rulerDown} title="Click to play from here">
+        {#each ruler as m (m.n)}<span class="tick num" style:transform="translate3d({m.x}px,0,0)">{m.n}</span>{/each}
+      </div>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="track" bind:this={track} style:width="{trackW}px"
+           ondragover={dragOver} ondragleave={() => (dropAt = null)} ondrop={drop}>
         <div class="bars" style:background-image={bars.image} style:background-size={bars.size}></div>
+        {#if dropAt !== null}<div class="drop-mark" style:transform="translate3d({dropAt}px,0,0)" aria-hidden="true"></div>{/if}
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <div class="clips" class:moving role="listbox" aria-label="Sections, in the order they play"
              aria-orientation="horizontal" tabindex="-1" onkeydown={keydown}>
@@ -595,6 +714,8 @@
         {/if}
       </div>
     </div>
+    </div>
+   </div>
 
     <!-- The way along a long arrangement, as a real control. -->
     {#if over > 1}
@@ -619,6 +740,10 @@
       </div>
     {/if}
 
+    <div class="tray" class:open={showMixer} inert={!showMixer}>
+      <div class="tray-in">{#if showMixer}<Mixer />{/if}</div>
+    </div>
+
     <div class="foot small faint">
       <span class="num">{A.clips.length} part{A.clips.length === 1 ? "" : "s"} &middot; {Math.round(arrange.totalBeats() / A.perBar)} bars &middot; {time(arrange.duration())}</span>
       {#if newer && builtFrom}
@@ -627,7 +752,7 @@
         </span>
       {/if}
       <span class="grow"></span>
-      <span class="keys">drag to move &middot; edges to trim &middot; double click to repeat &middot; <kbd>Alt</kbd>+<kbd>&larr;</kbd><kbd>&rarr;</kbd> trim a beat</span>
+      <span class="keys">drag sections in from the browser &middot; drag to move &middot; edges to trim &middot; double click to repeat &middot; <kbd>Alt</kbd>+<kbd>&larr;</kbd><kbd>&rarr;</kbd> trim a beat</span>
     </div>
   {/if}
 
@@ -667,10 +792,54 @@
 
   .empty { padding: var(--s6) var(--s4); }
 
+  /* The transport and the counter: the counter is a little screen, as on a desk. */
+  .transport :global(.icon-btn.on) { color: var(--accent-hi); }
+  .lcd {
+    display: flex; align-items: baseline; gap: var(--s2); height: 30px; padding: 0 var(--s3); border-radius: var(--r-sm);
+    background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05);
+    font-family: var(--mono); line-height: 30px; color: var(--accent-text); white-space: nowrap;
+  }
+  .lcd b { font-size: 15px; font-weight: 600; color: var(--accent-hi); text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .lcd b i { font-style: normal; opacity: 0.55; }
+  .lcd span { font-size: 11px; opacity: 0.8; }
+  .snap { display: inline-flex; padding: 2px; border-radius: var(--r-pill); background: rgba(0, 0, 0, 0.3); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }
+  .snap button { height: 24px; padding: 0 10px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600; color: var(--text-3); transition: background var(--fast), color var(--fast); }
+  .snap button:hover { color: var(--text); }
+  .snap button.on { background: var(--glass-2); color: var(--text); box-shadow: var(--edge-top); }
+  .tail :global(.icon-btn.on) { color: var(--accent-text); background: var(--hover); }
+
+  /* The desk: the browser on the left, the playlist taking the rest. */
+  .desk { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); min-width: 0; align-items: stretch; }
+  .desk.browsing { grid-template-columns: 190px minmax(0, 1fr); }
+  /* The browser is as tall as the playlist beside it and scrolls inside that. */
+  .desk.browsing > :global(.browser) { contain: size; min-height: 120px; }
+  :global(html[data-narrow]) .desk.browsing { grid-template-columns: minmax(0, 1fr); }
+  .playlist { display: grid; grid-template-columns: 124px minmax(0, 1fr); min-width: 0; border-radius: var(--r-md); overflow: hidden; box-shadow: 0 0 0 1px var(--glass-line); }
+  :global(html[data-narrow]) .playlist { grid-template-columns: minmax(0, 1fr); }
+  :global(html[data-narrow]) .lanehead { display: none; }
+  .lanehead { display: flex; flex-direction: column; background: rgba(255, 255, 255, 0.03); box-shadow: inset -1px 0 0 var(--glass-line); }
+  .rulerpad { height: 22px; flex: none; box-shadow: inset 0 -1px 0 var(--glass-line); }
+  .lane-name { flex: 1; display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s2); font-size: var(--t-sm); font-weight: 600; color: var(--text-2); min-width: 0; transition: opacity var(--fast); }
+  .lane-name.muted { opacity: 0.45; }
+  .lane-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .ruler {
+    position: relative; height: 22px; min-width: 100%; cursor: pointer; user-select: none;
+    background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 -1px 0 var(--glass-line);
+  }
+  .tick { position: absolute; left: 0; top: 0; height: 100%; padding-left: 4px; font-size: 10.5px; line-height: 22px; color: var(--text-3); border-left: 1px solid var(--line-2); pointer-events: none; }
+  .drop-mark { position: absolute; top: 4px; bottom: 4px; left: -1px; width: 3px; border-radius: 2px; background: var(--accent-hi); box-shadow: 0 0 10px var(--accent); z-index: 6; pointer-events: none; }
+
+  /* The mixer slides up out of the bottom edge. */
+  .tray { display: grid; grid-template-rows: 0fr; opacity: 0; transform: translateY(10px); transition: grid-template-rows var(--sheet), opacity var(--fast), transform var(--sheet); }
+  .tray.open { grid-template-rows: 1fr; opacity: 1; transform: none; }
+  .tray-in { overflow: hidden; min-height: 0; }
+  @media (prefers-reduced-motion: reduce) { .tray { transition: none; transform: none; } }
+
+
   /* No native bar: there is a real one under the strip. */
   .scroll {
     position: relative; width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden;
-    border-radius: var(--r-md); background: rgba(0, 0, 0, 0.26); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.26); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
     overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
   .scroll::-webkit-scrollbar { display: none; height: 0; }
