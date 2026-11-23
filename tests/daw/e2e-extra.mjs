@@ -178,6 +178,14 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     await sleep(300);
     need(await js(`!document.querySelector(".ins-scrim").hidden`), "the sampler dialog did not open");
     await noSideways("sampler");
+    await sleep(300);
+    const env0 = (await js("window.jriterDaw.sample()")).env;
+    const cv = await rect("#ins-adsr");
+    const tot = env0.a + env0.d + 0.5 + env0.r, px = cv.l + 6 + (cv.w - 12) * ((env0.a + env0.d + 0.5) / tot);
+    await dragAt({ x: px, y: cv.t + 6 + (cv.h - 12) * (1 - env0.s) }, { x: px, y: cv.t + cv.h * 0.7 });
+    const env1 = (await js("window.jriterDaw.sample()")).env;
+    need(env1.s < env0.s - 0.2, "dragging the sustain point did not lower it: " + JSON.stringify(env1));
+    need(Math.abs((await js(`+document.querySelector('[data-knob="env.s"]').getAttribute("aria-valuenow")`)) - env1.s) < 0.01, "the Sustain knob did not follow");
     let s = await song();
     need(s.tracks.length === before + 1 && s.tracks[before].instrument === "sampler", "no sampler track");
     await sleep(500);
