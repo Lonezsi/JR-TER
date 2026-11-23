@@ -1,5 +1,5 @@
 /* The three views (Chords, Roll, Script) and the two editors. Loaded after daw.css. */
-.views { display: flex; gap: var(--d-s1); padding: var(--d-s1); background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
+.views { display: flex; gap: var(--d-s1); padding: var(--d-s1); background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-lg, 18px); box-shadow: var(--edge-top, none); }
 .views button { flex: 1; border-color: transparent; background: transparent; }
 .views button[aria-selected="true"] { background: var(--d-acc); color: var(--d-acc-ink); }
 
@@ -8,14 +8,14 @@
 .main[data-view="roll"] .chords, .main[data-view="roll"] .scripts, .main[data-view="roll"] .rack { display: none; }
 .main[data-view="script"] .roll, .main[data-view="script"] .chords, .main[data-view="script"] .rack { display: none; }
 .main:not([data-view="song"]) .song { display: none; }
-.main:not([data-view="mixer"]) .mixer { display: none; }
-.main:not([data-view="sampler"]) .sampler { display: none; }
-.main[data-view="sampler"] .tracks, .main[data-view="sampler"] .roll, .main[data-view="sampler"] .chords, .main[data-view="sampler"] .scripts, .main[data-view="sampler"] .rack { display: none; }
-.main[data-view="mixer"] .tracks, .main[data-view="mixer"] .roll, .main[data-view="mixer"] .chords, .main[data-view="mixer"] .scripts, .main[data-view="mixer"] .rack { display: none; }
+/* Mixer and Sampler sit beside <main>, not in it: one panel at a time on a phone, docked in the studio. */
+body:not(.studio):not([data-view="mixer"]) .mixer { display: none; }
+body:not(.studio):not([data-view="sampler"]) .sampler { display: none; }
+body:not(.studio)[data-view="mixer"] .main, body:not(.studio)[data-view="sampler"] .main { display: none; }
 .main[data-view="song"] .tracks, .main[data-view="song"] .roll, .main[data-view="song"] .chords, .main[data-view="song"] .scripts, .main[data-view="song"] .rack { display: none; }
 
 .chords, .scripts, .rack, .song, .mixer, .sampler { flex: 1; min-width: 0; overflow: auto; padding: var(--d-s3); display: flex; flex-direction: column; gap: var(--d-s3);
-  background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-md, 13px); }
+  background: var(--d-panel); border: 1px solid var(--d-line); border-radius: var(--r-lg, 18px); box-shadow: var(--edge-top, none); }
 .cv-line { display: flex; flex-wrap: wrap; gap: var(--d-s2); align-items: center; }
 .cv-line label { display: inline-flex; gap: var(--d-s1); align-items: center; color: var(--d-mute); }
 .cv-title { color: var(--d-mute); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
@@ -155,3 +155,25 @@ body.offline .people::after { content: "offline"; color: var(--d-mute); font-siz
 .sp-folder { margin-top: var(--d-s2); color: var(--d-mute); font-size: 11px; }
 .cv-line input[type="search"] { flex: 1; min-width: 8ch; }
 .sp-list .sp-row button[data-add], .sp-list .sp-row button[data-rack] { font-size: 11px; }
+
+/* The studio (wide window, mouse): toolbar on top, library left, the editor in the middle, mixer at the bottom.
+   LAST on purpose: it decides over the phone-first rules above. daw.js turns on body.studio. */
+body.studio { display: grid; grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) minmax(160px, 34vh);
+  grid-template-areas: "bar bar" "views views" "browser main" "browser dock"; }
+body.studio .bar { grid-area: bar; flex-wrap: wrap; }
+body.studio .bar > *, body.studio .more > * { flex: none; }
+body.studio .views { grid-area: views; justify-self: start; }
+body.studio .views button { flex: none; }
+body.studio .main { grid-area: main; min-width: 0; }
+body.studio .sampler { grid-area: browser; display: flex; min-height: 0; }
+body.studio .mixer { grid-area: dock; display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; align-items: start; column-gap: var(--d-s3); min-height: 0; min-width: 0; }
+body.studio .mixer > .cv-title { display: none; }
+body.studio .mixer .mx-strips { grid-row: 1 / span 4; max-width: 60vw; }
+body.studio .mixer > :not(.mx-strips) { grid-column: 2; }
+body.studio .mx-mid { height: 96px; }
+body.studio .sp-list { max-height: none; }
+body.studio.nobrowser { grid-template-columns: 0 minmax(0, 1fr); }
+body.studio.nobrowser .sampler { display: none; }
+body.studio.nodock { grid-template-rows: auto auto minmax(0, 1fr) 0; }
+body.studio.nodock .mixer { display: none; }
+body.studio.nobrowser, body.studio.nodock { column-gap: 0; }

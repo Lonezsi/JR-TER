@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.17.0",
+  "date": "2026-11-23",
+  "name": "JR!TER",
+  "title": "The DAW looks like JR!TER",
+  "notes": [
+    "The DAW now wears JR!TER's glass, type and light mode, and follows the light or dark choice in Settings.",
+    "On a computer it is laid out like a studio: toolbar on top, your library (the Sampler) on the left, the Song playlist in the middle, the mixer along the bottom.",
+    "The Mixer and Sampler tabs show or hide those side panels (Alt+6 and Alt+7 too).",
+    "Phones are unchanged: one panel at a time with the bottom bar."
+  ]
+ },
+ {
   "version": "4.16.0",
   "date": "2026-11-23",
   "name": "JR!TER",
