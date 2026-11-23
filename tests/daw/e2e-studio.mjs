@@ -120,7 +120,9 @@ try {
   await send("Runtime.enable"); await send("Page.enable"); await send("Log.enable");
   await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: SITE + "/daw.html" });
-  await sleep(1500);
+  // Wait for the page itself rather than a fixed time: fonts and stylesheets can hold it up.
+  for (let i = 0; i < 60 && !(await js("!!window.jriterDaw").catch(() => false)); i++) await sleep(100);
+  await sleep(300);
   console.log("media:", JSON.stringify(await js(`({ w: innerWidth, hover: matchMedia("(hover: hover)").matches, fine: matchMedia("(pointer: fine)").matches, coarse: matchMedia("(pointer: coarse)").matches })`)));
   await js(`document.getElementById("helpbox").hidden = true`);
 

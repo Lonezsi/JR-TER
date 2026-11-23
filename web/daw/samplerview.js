@@ -10,7 +10,8 @@
 // searches everything that has been fetched. One-shots: add files or a folder, drop them on the tab, hear,
 // add as an instrument or a rack channel, delete (Undo brings it back).
 // Sounds come from library.js. Model and maths: sampler.js.
-import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate } from "./sampler.js";
+import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate, ENV } from "./sampler.js";
+import { knob, wireKnobs } from "./knob.js";
 import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound, MIDI_TYPE } from "./library.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -23,6 +24,14 @@ const OPEN = "jriter-daw-open";
 function opened() { try { return new Set(JSON.parse(localStorage.getItem(OPEN) || "[\"oneshots\"]")); } catch { return new Set(["oneshots"]); } }
 
 export function mountSampler(el, api) {
+  /* The instrument editor is a dialog over everything (it is about the selected instrument, not about
+   * browsing), so it lives at the top of the page: a pane that blurs what is behind it would trap a
+   * fixed child inside itself. The same handlers listen on the browser and on the dialog. */
+  const modal = document.createElement("div");
+  modal.className = "ins-scrim"; modal.hidden = true;
+  document.body.append(modal);
+  let editingInstrument = false;
+  const on = (type, fn, opts) => { el.addEventListener(type, fn, opts); modal.addEventListener(type, fn, opts); };
   const guest = api.guest || null; // a friend in the owner's song: only that song's takes and vocals
   let songs = guest ? [{ id: guest.songId, title: "This song" }] : null, problem = "", query = "", busy = "";
   let shots = null;                 // My one-shots, once fetched
@@ -73,23 +82,97 @@ export function mountSampler(el, api) {
       `<input id="sp-dir" type="file" webkitdirectory multiple hidden>` +
       (busy ? `<div class="sv-doc" role="status">${esc(busy)}</div>` : "") + `<div id="sp-listbox" class="sp-tree" role="tree" aria-label="Sounds">${tree()}</div>` +
       (guest ? `<div class="sv-doc">You are in a friend's song: use its takes and vocals here. One-shots already in the song play for you too.</div>` : "") +
-      `<div class="sp-editor">` + (s ? `<div class="cv-title">${esc(t.name)}: ${esc(s.name)}</div>` +
-        `<canvas class="sp-wave" id="sp-wave" tabindex="0" aria-label="Waveform of ${esc(s.name)}. Comma and period move the start, with Shift the end."></canvas>` +
-        `<div class="cv-line" role="group" aria-label="Sampler tools">` +
-          [4, 8, 16].map((n) => `<button data-chop="${n}" data-tip="Cut into ${n} equal pieces">Chop ${n}</button>`).join("") +
-          `<button data-act="clear" data-tip="Remove every cut"${s.slices.length ? "" : " disabled"}>Clear cuts</button>` +
-          `<button data-act="hear" data-tip="Hear the whole sound" aria-label="Hear the sound">▶</button>` +
-          `<label>Root <input id="sp-root" type="number" min="0" max="127" step="1" value="${s.root}" aria-label="Root key"><output>${noteName(s.root)}</output></label>` +
-          `<button data-act="oneshot" aria-pressed="${!!s.oneshot}" data-tip="One-shot: every note plays the whole sound. Off: a note stops it" aria-label="One-shot">One-shot</button>` +
-          `<label>Tempo <input id="sp-bpm" type="number" min="0" max="400" step="0.01" value="${s.bpm || ""}" placeholder="off" aria-label="Tempo of the sound in BPM"></label>` +
-          `<button data-act="guess" data-tip="Guess the tempo from the trim, as whole bars" aria-label="Guess the tempo">Guess</button>` +
-          `<button data-act="keep" aria-pressed="${s.warp !== "pitch"}"${s.bpm ? "" : " disabled"} data-tip="Keep the pitch when stretching to the song tempo. Off: speed and pitch change together, like tape" aria-label="Keep pitch">Keep pitch</button>` +
-          `<button data-act="place" data-tip="Put it on the Layout tab" aria-label="Place on the song">☰ Place</button></div>` +
-        `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
-        `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>`
-        : `<div class="sv-doc">Add a sound with Inst to get a sampler track. Select a sampler track to edit it here.</div>`) + `</div>`;
-    if (s) paint();
+      (s ? `<button class="sp-open" data-act="instrument" data-tip="Open ${esc(t.name)}'s sampler">〰 ${esc(t.name)}: ${esc(s.name)}</button>`
+        : `<div class="sv-doc">Inst puts a sound on a sampler track; its sampler opens over everything.</div>`);
+    renderModal();
   }
+
+  // ---- the instrument: a dialog with the sound, its trim and cuts, and how it plays --------------------
+  const ENV_WORDS = { a: "Attack", d: "Decay", s: "Sustain", r: "Release" };
+  const sec = (v) => (v < 1 ? Math.round(v * 1000) + " ms" : v.toFixed(2) + " s");
+  function renderModal() {
+    const t = track(), s = t && t.sample;
+    if (!editingInstrument || !s) { modal.hidden = true; modal.innerHTML = ""; return; }
+    const keepFocus = modal.contains(document.activeElement) && document.activeElement.dataset.knob;
+    modal.hidden = false;
+    modal.innerHTML = `<section class="ins-modal" role="dialog" aria-modal="true" aria-label="Sampler: ${esc(t.name)}">` +
+      `<header class="ins-head"><span class="ins-kind">Sampler</span><b>${esc(t.name)}</b><span class="faint">${esc(s.name)}</span><span class="mx-gap"></span>` +
+        `<button data-act="hear" data-tip="Hear the whole sound" aria-label="Hear the sound">▶</button>` +
+        `<button data-act="close" data-tip="Close (Escape)" aria-label="Close">✕</button></header>` +
+      `<canvas class="sp-wave" id="sp-wave" tabindex="0" aria-label="Waveform of ${esc(s.name)}. Comma and period move the start, with Shift the end."></canvas>` +
+      `<div class="cv-line" role="group" aria-label="Cuts and keys">` +
+        [4, 8, 16].map((n) => `<button data-chop="${n}" data-tip="Cut into ${n} equal pieces">Chop ${n}</button>`).join("") +
+        `<button data-act="clear" data-tip="Remove every cut"${s.slices.length ? "" : " disabled"}>Clear cuts</button>` +
+        `<label>Root <input id="sp-root" type="number" min="0" max="127" step="1" value="${s.root}" aria-label="Root key"><output>${noteName(s.root)}</output></label>` +
+        `<label>Tempo <input id="sp-bpm" type="number" min="0" max="400" step="0.01" value="${s.bpm || ""}" placeholder="off" aria-label="Tempo of the sound in BPM"></label>` +
+        `<button data-act="guess" data-tip="Guess the tempo from the trim, as whole bars" aria-label="Guess the tempo">Guess</button>` +
+        `<button data-act="keep" aria-pressed="${s.warp !== "pitch"}"${s.bpm ? "" : " disabled"} data-tip="Keep the pitch when audio clips stretch to the song tempo. Off: like tape" aria-label="Keep pitch">Keep pitch</button></div>` +
+      `<div class="ins-grid">` +
+        `<div class="ins-group"><span class="cv-title">Playing</span><div class="ins-switches">` +
+          `<button data-act="oneshot" aria-pressed="${!!s.oneshot}" data-tip="Every note plays the whole sound, however short" aria-label="One-shot">One-shot</button>` +
+          `<button data-act="loop" aria-pressed="${!!s.loop}"${s.oneshot ? " disabled" : ""} data-tip="A held note loops the sound until you let go" aria-label="Loop">Loop</button>` +
+          `<button data-act="cut" aria-pressed="${!!s.cut}" data-tip="A new note stops the one still sounding" aria-label="Cut itself">Cut itself</button></div></div>` +
+        `<div class="ins-group"><span class="cv-title">Pitch and time</span><div class="ins-knobs">` +
+          `<label class="ins-k">${knob({ key: "pitch", label: "Pitch", value: s.pitch, lo: -24, hi: 24, home: 0, step: 1, words: (s.pitch > 0 ? "+" : "") + s.pitch + " st" })}<span>Pitch</span><output>${(s.pitch > 0 ? "+" : "") + s.pitch} st</output></label>` +
+          `<label class="ins-k">${knob({ key: "stretch", label: "Stretch", value: s.stretch, lo: 0.25, hi: 4, home: 1, step: 0.05, words: s.stretch.toFixed(2) + "x" })}<span>Stretch</span><output>${s.stretch.toFixed(2)}x</output></label>` +
+          `<button data-act="resample" data-tip="Render the sound as you have set it into a new one-shot, and play that" aria-label="Resample">Resample</button></div></div>` +
+        `<div class="ins-group ins-env"><span class="cv-title">Envelope</span><div class="ins-knobs">` +
+          Object.keys(ENV).map((k) => `<label class="ins-k">${knob({ key: "env." + k, label: ENV_WORDS[k], value: s.env[k], lo: ENV[k][0], hi: ENV[k][1], home: ENV[k][2], words: k === "s" ? Math.round(s.env[k] * 100) + "%" : sec(s.env[k]) })}<span>${ENV_WORDS[k]}</span><output>${k === "s" ? Math.round(s.env[k] * 100) + "%" : sec(s.env[k])}</output></label>`).join("") +
+          `<canvas class="ins-adsr" id="ins-adsr" aria-hidden="true"></canvas></div></div>` +
+      `</div>` +
+      `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
+        `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>` +
+      `<footer class="ins-foot"><button data-act="place" data-tip="Put it on the Layout tab as an audio clip" aria-label="Place on the layout">☰ Place on the Layout</button><span class="mx-gap"></span><button data-act="close" class="ins-done">Done</button></footer>` +
+      `</section>`;
+    paint(); adsr();
+    if (keepFocus) modal.querySelector(`[data-knob="${keepFocus}"]`)?.focus();
+  }
+  function adsr() {
+    const t = track(), cv = modal.querySelector("#ins-adsr");
+    if (!t || !cv) return;
+    const e = t.sample.env, r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    if (r.width < 2) return requestAnimationFrame(adsr);
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = r.width, H = r.height, pad = 4, hold = 0.5, total = e.a + e.d + hold + e.r || 1;
+    const X = (sec) => pad + (sec / total) * (W - pad * 2), Y = (lv) => H - pad - lv * (H - pad * 2);
+    const acc = getComputedStyle(document.documentElement).getPropertyValue("--d-acc").trim() || "#FAA8B8";
+    g.clearRect(0, 0, W, H);
+    g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(e.a), Y(1)); g.lineTo(X(e.a + e.d), Y(e.s)); g.lineTo(X(e.a + e.d + hold), Y(e.s)); g.lineTo(X(total), Y(0));
+    g.strokeStyle = acc; g.lineWidth = 2; g.lineJoin = "round"; g.stroke();
+    g.lineTo(X(0), Y(0)); g.globalAlpha = 0.15; g.fillStyle = acc; g.fill(); g.globalAlpha = 1;
+  }
+  function openInstrument() { if (!track()) return; editingInstrument = true; renderModal(); modal.querySelector(".ins-modal")?.focus?.(); requestAnimationFrame(() => modal.querySelector('[data-act="close"]')?.focus()); }
+  function closeInstrument() { if (!editingInstrument) return; editingInstrument = false; renderModal(); el.querySelector('[data-act="instrument"]')?.focus(); }
+  // It never clings: Escape, or a press outside it, closes it.
+  modal.addEventListener("pointerdown", (e) => { if (e.target === modal) closeInstrument(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && editingInstrument && !e.defaultPrevented) { e.preventDefault(); closeInstrument(); } });
+
+  // Turning a knob changes the instrument as it plays; one undo step per turn.
+  let before = null;
+  wireKnobs(modal, {
+    begin: () => { if (before === null) before = api.snap(); },
+    end: () => {
+      if (before === null) return;
+      const t = track();
+      if (api.snap() !== before) { api.pushUndo(before); api.save(); }
+      before = null;
+      if (t && (t.sample.stretch || 1) !== 1) api.prepare(t);   // make the stretched copy now, not at Play
+    },
+    turn: (key, v, node) => {
+      const t = track(); if (!t) return;
+      const s = t.sample;
+      let words;
+      if (key === "pitch") { s.pitch = v; words = (v > 0 ? "+" : "") + v + " st"; }
+      else if (key === "stretch") { s.stretch = v; words = v.toFixed(2) + "x"; }
+      else if (key.startsWith("env.")) { const k = key.slice(4); s.env[k] = v; words = k === "s" ? Math.round(v * 100) + "%" : sec(v); adsr(); }
+      const out = node.closest(".ins-k")?.querySelector("output"); if (out && words) out.textContent = words;
+      api.save();
+      return words;
+    },
+  });
+
+
 
   // ---- the tree ----------------------------------------------------------------------------
   const q = () => query.trim().toLowerCase();
@@ -235,13 +318,13 @@ export function mountSampler(el, api) {
   }
 
   async function paint() {
-    const t = track(), cv = el.querySelector("#sp-wave");
+    const t = track(), cv = modal.querySelector("#sp-wave");
     if (!t || !cv) return;
     const s = t.sample, r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
     if (r.width < 2) return requestAnimationFrame(paint);
     cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
     const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0);
-    const W = r.width, H = r.height, css = getComputedStyle(el);
+    const W = r.width, H = r.height, css = getComputedStyle(document.documentElement);
     const fg = css.getPropertyValue("--d-fg").trim() || "#ddd", acc = css.getPropertyValue("--d-acc").trim() || "#7af", mute = css.getPropertyValue("--d-mute").trim() || "#888";
     const bars = Math.max(8, Math.floor(W / 3));
     let p = wave.get(s.src);
@@ -273,7 +356,7 @@ export function mountSampler(el, api) {
 
   const secAt = (e, cv) => { const r = cv.getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width, 0, 1) * (track()?.sample.seconds || 0); };
 
-  el.addEventListener("pointerdown", (e) => {
+  on("pointerdown", (e) => {
     const cv = e.target.closest("#sp-wave"), t = track();
     if (!cv || !t || !t.sample.seconds) return;
     const s = t.sample, sec = secAt(e, cv), tol = (14 / cv.getBoundingClientRect().width) * s.seconds;
@@ -287,7 +370,7 @@ export function mountSampler(el, api) {
       api.change(() => { if (!removeSliceNear(s, d.sec, d.tol)) addSlice(s, d.sec); });
     }, 460);
   });
-  el.addEventListener("pointermove", (e) => {
+  on("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     if (!drag.moved && Math.abs(e.clientX - drag.x0) < 6) return;
     drag.moved = true; clearTimeout(hold);
@@ -305,10 +388,10 @@ export function mountSampler(el, api) {
     if (d.moved && api.snap() !== d.before) { api.pushUndo(d.before); api.save(); render(); }
     else if (!d.moved && t) api.audition(t, d.sec, sampleEnd(t.sample)); // a tap plays from that point
   };
-  el.addEventListener("pointerup", finish);
-  el.addEventListener("pointercancel", finish);
+  on("pointerup", finish);
+  on("pointercancel", finish);
 
-  el.addEventListener("keydown", (e) => {
+  on("keydown", (e) => {
     const t = track();
     if (!t || !e.target.closest("#sp-wave") || (e.key !== "," && e.key !== ".")) return;
     e.preventDefault();
@@ -318,15 +401,15 @@ export function mountSampler(el, api) {
       else s.start = clamp(s.start + d, 0, sampleEnd(s) - 0.01);
       s.slices = s.slices.filter((c) => c > s.start && c < sampleEnd(s));
     });
-    el.querySelector("#sp-wave")?.focus();
+    modal.querySelector("#sp-wave")?.focus();
   });
 
-  el.addEventListener("change", (e) => {
+  on("change", (e) => {
     if (e.target.id === "sp-files" || e.target.id === "sp-dir") { const f = [...e.target.files]; e.target.value = ""; return bring(f); }
     if (e.target.id === "sp-bpm") { const t = track(); if (t) { const v = +e.target.value; api.change(() => { t.sample.bpm = v >= 20 && v <= 400 ? Math.round(v * 100) / 100 : 0; }); } }
     if (e.target.id === "sp-root") { const t = track(); if (t) api.change(() => { t.sample.root = clamp(Math.round(+e.target.value) || 60, 0, 127); }); }
   });
-  el.addEventListener("click", (e) => {
+  on("click", (e) => {
     const b = e.target.closest("button");
     if (!b || b.disabled) return;
     const t = track();
@@ -358,18 +441,23 @@ export function mountSampler(el, api) {
     }
     if (b.dataset.act === "files") return el.querySelector("#sp-files").click();
     if (b.dataset.act === "folder") return el.querySelector("#sp-dir").click();
-    if (b.dataset.act === "oneshot") { const t = track(); if (t) api.change(() => { t.sample.oneshot = !t.sample.oneshot; }); return; }
+    if (b.dataset.act === "oneshot") { const t = track(); if (t) api.change(() => { t.sample.oneshot = !t.sample.oneshot; if (t.sample.oneshot) t.sample.loop = false; }); return; }
+    if (b.dataset.act === "loop") { const t = track(); if (t) api.change(() => { t.sample.loop = !t.sample.loop; }); return; }
+    if (b.dataset.act === "cut") { const t = track(); if (t) api.change(() => { t.sample.cut = !t.sample.cut; }); return; }
+    if (b.dataset.act === "instrument") return openInstrument();
+    if (b.dataset.act === "close") return closeInstrument();
+    if (b.dataset.act === "resample") { const t = track(); if (!t) return; b.disabled = true; b.textContent = "Resampling…"; return api.resample(api.selected()).finally(() => { shots = null; want(); render(); }); }
     if (b.dataset.act === "guess") { const t = track(); if (!t) return; const g = guessBpm(t.sample); if (!g) return api.toast("Trim it to whole bars first."); return api.change(() => { t.sample.bpm = g; }); }
     if (b.dataset.act === "keep") { const t = track(); if (t) api.change(() => { t.sample.warp = t.sample.warp === "pitch" ? "time" : "pitch"; }); return; }
     if (!t) return;
     if (b.dataset.chop) api.change(() => chop(t.sample, +b.dataset.chop));
     else if (b.dataset.act === "clear") api.change(() => chop(t.sample, 1));
     else if (b.dataset.act === "hear") api.audition(t, t.sample.start, sampleEnd(t.sample));
-    else if (b.dataset.act === "place") api.placeOnSong(api.selected());
+    else if (b.dataset.act === "place") { editingInstrument = false; renderModal(); api.placeOnSong(api.selected()); }
   });
 
   // The filter changes only the list, so the box keeps focus while you type.
-  el.addEventListener("input", (e) => {
+  on("input", (e) => {
     if (e.target.id !== "sp-q") return;
     query = e.target.value;
     // Searching looks in everything: fetch the roots it needs, then draw.
@@ -377,16 +465,16 @@ export function mountSampler(el, api) {
     list();
   });
   // Renaming in place: Enter keeps it, Escape or leaving the field without a change puts it back.
-  el.addEventListener("keydown", (e) => {
+  on("keydown", (e) => {
     if (!e.target.classList?.contains("sp-rename")) return;
     if (e.key === "Enter") { e.preventDefault(); renameDone(e.target, true); }
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); renameDone(e.target, false); }
   });
-  el.addEventListener("focusout", (e) => { if (e.target.classList?.contains("sp-rename") && renaming) renameDone(e.target, true); });
+  on("focusout", (e) => { if (e.target.classList?.contains("sp-rename") && renaming) renameDone(e.target, true); });
 
   // Arranging: a sound or a folder dragged onto a folder (or onto One-shots, the top) moves there.
   // A MIDI file is dragged out to the roll or a pattern; daw.js takes the drop.
-  el.addEventListener("dragstart", (e) => {
+  on("dragstart", (e) => {
     const m = !editing && e.target.closest?.("[data-midi]");
     if (!m) return;
     const x = items[+m.dataset.midi];
@@ -394,7 +482,7 @@ export function mountSampler(el, api) {
     e.dataTransfer.setData("text/plain", x.name);
     e.dataTransfer.effectAllowed = "copy";
   });
-  el.addEventListener("dragstart", (e) => {
+  on("dragstart", (e) => {
     const s = e.target.closest?.("[data-movesound]"), d = e.target.closest?.("[data-movedir]");
     if (!editing || (!s && !d)) return;
     moving = s ? { kind: "sound", x: items[+s.dataset.movesound] } : { kind: "dir", path: pathOf(d.dataset.movedir) };
@@ -402,14 +490,14 @@ export function mountSampler(el, api) {
     e.dataTransfer.effectAllowed = "move";
     (s || d).classList.add("sp-moving");
   });
-  el.addEventListener("dragend", () => { moving = null; el.querySelectorAll(".sp-moving, .sp-over").forEach((n) => n.classList.remove("sp-moving", "sp-over")); });
-  el.addEventListener("dragover", (e) => {
+  on("dragend", () => { moving = null; el.querySelectorAll(".sp-moving, .sp-over").forEach((n) => n.classList.remove("sp-moving", "sp-over")); });
+  on("dragover", (e) => {
     const t = moving && e.target.closest?.("[data-drop]");
     el.querySelectorAll(".sp-over").forEach((n) => n !== t && n.classList.remove("sp-over"));
     if (!t) return;
     e.preventDefault(); e.dataTransfer.dropEffect = "move"; t.classList.add("sp-over");
   });
-  el.addEventListener("drop", (e) => {
+  on("drop", (e) => {
     const t = moving && e.target.closest?.("[data-drop]");
     if (!t) return;
     e.preventDefault(); e.stopImmediatePropagation();
@@ -426,8 +514,8 @@ export function mountSampler(el, api) {
   }, true);
 
   // Drop sound files (or a folder) on the tab.
-  el.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); });
-  el.addEventListener("drop", async (e) => {
+  on("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); });
+  on("drop", async (e) => {
     const items = [...(e.dataTransfer?.items || [])];
     if (!items.length && !(e.dataTransfer?.files || []).length) return;
     e.preventDefault();
@@ -449,5 +537,8 @@ export function mountSampler(el, api) {
   return {
     render: () => { render(); want(); },
     show: (which) => load(which),
+    edit: () => openInstrument(),
+    refresh: () => renderModal(),
+    close: () => closeInstrument(),
   };
 }

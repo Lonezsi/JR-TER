@@ -332,3 +332,44 @@ body.studio .mixer > .mx-head { grid-column: 1 / -1; }
 body.studio .mixer .mx-strips { grid-row: auto !important; grid-column: 1; max-width: 62vw; }
 body.studio .mixer .mx-side { grid-column: 2; overflow-y: auto; }
 body.studio .mx-mid { height: 110px !important; }
+
+/* ---- the sampler: a dialog over everything, for the selected instrument --------------------- */
+.ins-scrim {
+  position: fixed; inset: 0; z-index: 800; display: grid; place-items: center; padding: 16px;
+  background: rgb(0 0 0 / 0.42); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: ins-fade 160ms var(--ease, ease-out) both;
+}
+.ins-scrim[hidden] { display: none; }
+@keyframes ins-fade { from { opacity: 0; } }
+.ins-modal {
+  width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; outline: none;
+  display: flex; flex-direction: column; gap: var(--d-s3); padding: var(--d-s4);
+  border-radius: var(--r-xl, 22px); background: var(--glass-2, rgb(24 25 29 / 0.94));
+  -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: var(--edge-top), var(--shadow-3, 0 24px 64px rgb(0 0 0 / 0.6));
+  animation: ins-pop 180ms var(--ease, ease-out) both;
+}
+@keyframes ins-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+.ins-head { display: flex; align-items: center; gap: var(--d-s2); min-width: 0; }
+.ins-head b { font: 800 15px/1.2 var(--d-display, sans-serif); letter-spacing: 0.03em; }
+.ins-head .faint { color: var(--text-3, var(--d-mute)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ins-kind { font: 700 10px/1 var(--d-display, sans-serif); letter-spacing: 0.1em; color: var(--accent-text); padding: 4px 8px; border-radius: 999px; background: var(--accent-soft); }
+.ins-modal .sp-wave { height: 140px; border: 0; background: rgb(0 0 0 / 0.3); box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.5); border-radius: 12px; }
+.ins-grid { display: grid; grid-template-columns: auto auto 1fr; gap: var(--d-s3); }
+.ins-group { display: flex; flex-direction: column; gap: var(--d-s2); padding: var(--d-s3); border-radius: 14px; background: rgb(255 255 255 / 0.035); box-shadow: 0 0 0 1px var(--line, rgb(255 255 255 / 0.09)); min-width: 0; }
+.ins-switches { display: flex; flex-direction: column; gap: 6px; }
+.ins-knobs { display: flex; align-items: flex-start; gap: var(--d-s3); flex-wrap: wrap; }
+.ins-k { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; color: var(--text-2, var(--d-mute)); min-width: 48px; }
+.ins-k .mx-knob { width: 34px; height: 34px; }
+.ins-k .mx-knob i { height: 11px; transform-origin: 50% 14px; }
+.ins-k output { font-size: 10px; color: var(--text-3, var(--d-mute)); font-variant-numeric: tabular-nums; }
+.ins-adsr { flex: 1 1 120px; min-width: 120px; height: 52px; align-self: center; }
+.ins-foot { display: flex; align-items: center; gap: var(--d-s2); }
+.ins-done { background: var(--d-acc) !important; color: var(--d-acc-ink) !important; border-color: transparent !important; padding: 4px 18px; }
+.sp-open { width: 100%; justify-content: flex-start; gap: 8px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px), (pointer: coarse) and (max-width: 900px) {
+  .ins-scrim { padding: 8px; align-items: end; }
+  .ins-modal { padding: var(--d-s3); border-radius: 20px; max-height: calc(100dvh - 16px); }
+  .ins-grid { grid-template-columns: 1fr; }
+  .ins-switches { flex-direction: row; flex-wrap: wrap; }
+}

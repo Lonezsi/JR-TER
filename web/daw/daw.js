@@ -12,7 +12,7 @@ import { mountSong } from "./songview.js";
 import { songNotes, songBars } from "./playlist.js";
 import { createMixer } from "./mixgraph.js";
 import { mountSampler } from "./samplerview.js";
-import { sliceFor, playSlice, songAudio, sampleEnd, chop, gateFor, clipPlay } from "./sampler.js";
+import { sliceFor, playSlice, cutVoice, songAudio, sampleEnd, chop, gateFor, clipPlay, cleanSample } from "./sampler.js";
 import { stretchBuffer } from "./stretch.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
@@ -199,7 +199,7 @@ const HELP = [
   ["▦", "Drumroll: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
   ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays. Automate draws a knob's moves over time under the clips.", "Alt+5, S"],
   ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
-  ["〰", "Sampler: add a take, vocal or render from your library with +, drag its ends to trim, Chop cuts it into pieces that play up the keys. Place puts it on the Layout tab as a clip.", "Alt+7"],
+  ["〰", "Browser: your one-shots, MIDI files, renders and takes in folders. Inst makes a sampler instrument and opens its sampler (also the 〰 on a sampler track): trim, chop, envelope, loop, cut itself, pitch, stretch, resample. Drag a MIDI onto the roll or a pattern number.", "Alt+7"],
   ["▥", "On a computer the DAW is laid out like a studio: library on the left, mixer at the bottom. The Mixer and Sampler tabs show or hide them.", "Alt+6, Alt+7"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
@@ -240,7 +240,7 @@ function renderTracks() {
     el.className = "track" + (i === sel ? " sel" : "");
     el.innerHTML = `<div class="row"><input type="text" aria-label="Track name"><button data-a="del" data-tip="Delete track" aria-label="Delete track">×</button></div>
       <div class="row"><select aria-label="Instrument">${[...INSTRUMENTS, "sampler"].map((n) => `<option${n === t.instrument ? " selected" : ""}>${n}</option>`).join("")}</select>
-      <button data-a="mute" data-tip="Mute" aria-label="Mute" aria-pressed="${!!t.mute}">M</button>
+      ${t.sample ? `<button data-a="ins" data-tip="Open its sampler" aria-label="Open the sampler">〰</button>` : ""}<button data-a="mute" data-tip="Mute" aria-label="Mute" aria-pressed="${!!t.mute}">M</button>
       <button data-a="solo" data-tip="Solo" aria-label="Solo" aria-pressed="${!!t.solo}">S</button></div>
       <div class="row"><input type="range" min="0" max="1" step="0.01" aria-label="Volume" value="${t.volume}"></div>`;
     const name = el.querySelector("input[type=text]");
@@ -249,8 +249,9 @@ function renderTracks() {
     name.onchange = () => { const b = snap(); pushUndo(b); };
     el.querySelector("select").onchange = (e) => {
       edit(() => { t.instrument = e.target.value; });
-      if (t.instrument === "sampler" && !t.sample) { sel = i; samplerUI.show("oneshots"); setView("sampler"); toast("Pick a sound for this track: + Inst puts it here."); }
+      if (t.instrument === "sampler" && !t.sample) { sel = i; samplerUI.show("oneshots"); setView("sampler"); toast("Pick a sound for this track: Inst puts it here."); }
     };
+    el.querySelector("[data-a=ins]")?.addEventListener("click", () => { sel = i; selNote = null; renderTracks(); samplerUI.edit(); });
     el.querySelector("[data-a=mute]").onclick = () => edit(() => { t.mute = !t.mute; });
     el.querySelector("[data-a=solo]").onclick = () => edit(() => { t.solo = !t.solo; });
     el.querySelector("[data-a=del]").onclick = (e) => { e.stopPropagation(); removeTrack(i); };
@@ -600,6 +601,8 @@ async function stretchedOf(src, ratio) {
 // The stretched sounds the song's audio clips need that are not ready yet.
 function stretchJobs() {
   const jobs = [];
+  // Instruments with a stretch play the stretched copy of their sound.
+  for (const t of song.tracks) if (t.sample && (t.sample.stretch || 1) !== 1 && !stretched.has(stretchKey(t.sample.src, 1 / t.sample.stretch))) jobs.push(() => stretchedOf(t.sample.src, 1 / t.sample.stretch));
   if (!inSong()) return jobs;
   for (const ev of songAudio(song)) {
     const t = song.tracks[ev.track], p = t && t.sample ? clipPlay(t.sample, ev, song.bpm) : null;
@@ -611,10 +614,16 @@ let playToken = 0;
 // One note on one track: a sampler plays its sound (chopped pieces play to their end, pitched
 // ones are gated by the note), every other instrument goes to the synth.
 function voice(t, n, time, len, dest) { voiceOn(ctx, synth, bufferNow, t, n, time, len, dest); }
+const sounding = new WeakMap(); // track -> its last voice, for "cut itself"
+// The buffer a sampler plays: the sound itself, or its stretched copy when stretch is set.
+const sampleBuf = (getBuf, s) => ((s.stretch || 1) !== 1 ? stretchedNow(s.src, 1 / s.stretch) : getBuf(s.src));
 function voiceOn(c, syn, getBuf, t, n, time, len, dest) {
   if (t.instrument === "sampler" && t.sample) {
-    const buf = getBuf(t.sample.src), sl = sliceFor(t.sample, n.pitch);
-    if (buf && sl) playSlice(c, buf, sl, time, gateFor(t.sample, len), n.velocity, dest);
+    const s = t.sample, buf = sampleBuf(getBuf, s), sl = sliceFor(s, n.pitch);
+    if (!buf || !sl) return;
+    if (s.cut) cutVoice(sounding.get(t), time);
+    const v = playSlice(c, buf, sl, time, gateFor(s, len), n.velocity, dest, { env: s.env, loop: s.loop });
+    if (v) sounding.set(t, v);
     return;
   }
   if (t.instrument === "sampler") return; // no sound picked yet: nothing to play
@@ -698,7 +707,7 @@ function audition(t, from, to) {
 let pendingRack = false; // set by + Sample in the rack: the next sound added becomes a rack channel
 function addSampler(sound, opts = {}) {
   const rack = !!opts.rack || pendingRack, one = sound.kind === "oneshot";
-  const sample = { name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [], oneshot: one };
+  const sample = cleanSample({ name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [], oneshot: one });
   const empty = song.tracks[sel] && song.tracks[sel].instrument === "sampler" && !song.tracks[sel].sample;
   pendingRack = false;
   edit(() => {
@@ -708,7 +717,41 @@ function addSampler(sound, opts = {}) {
   });
   if (rack) { setView("rack"); toast("Added " + sound.name + " to the Drumroll. Tap steps to play it.", { label: "Undo", run: doUndo }); return loadDuration(sound); }
   loadDuration(sound);
+  samplerUI.edit();
   toast("Added " + sound.name + ". Draw notes for it, or place it on the Layout tab.", { label: "Undo", run: doUndo });
+}
+
+// Resample: render the instrument's sound as it is set (trim, pitch, stretch, envelope) into a new one-shot,
+// in your One-shots under Resampled, and make the instrument play that. Undo puts the old one back.
+async function resample(i) {
+  const t = song.tracks[i];
+  if (!t || !t.sample) return;
+  const s = t.sample, st = s.stretch || 1, rate = Math.pow(2, (s.pitch || 0) / 12);
+  try {
+    await bufferOf(s.src);
+    const buf = st !== 1 ? await stretchedOf(s.src, 1 / st) : bufferNow(s.src);
+    if (!buf) throw new Error("Could not read the sound.");
+    const from = s.start * st, to = (sampleEnd(s) || buf.duration / st) * st, len = (to - from) / rate;
+    const sr = 44100, secs = len + (s.env ? s.env.r : 0.01) + 0.05;
+    const off = new OfflineAudioContext(2, Math.ceil(secs * sr), sr);
+    playSlice(off, buf, { from, to, rate }, 0, len, 127, off.destination, { env: s.env });
+    const out = await off.startRendering();
+    const bytes = encodeWav([out.getChannelData(0), out.getChannelData(1)], sr);
+    const name = (s.name + " resampled").slice(0, 80);
+    const r = await fetch("/api/samples", { method: "POST", credentials: "include", body: bytes, headers: {
+      "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(name + ".wav"), "X-Folder": "Resampled", "X-Duration": String(out.duration) } });
+    if (r.status === 401 || r.status === 403) throw new Error("Sign in to JR!TER to keep a resampled sound.");
+    if (!r.ok) throw new Error("The library would not take the resampled sound.");
+    const j = await r.json();
+    edit(() => {
+      t.sample = cleanSample({
+        ...s, name, src: `/api/samples/${j.sample.id}/audio`, seconds: out.duration, start: 0, end: 0,
+        slices: s.slices.map((c) => ((c - s.start) * st) / rate).filter((c) => c > 0 && c < len),
+        pitch: 0, stretch: 1, env: null, bpm: s.bpm ? Math.round(((s.bpm * rate) / st) * 100) / 100 : 0,
+      });
+    });
+    toast("Resampled into " + name + ", in One-shots under Resampled.", { label: "Undo", run: doUndo });
+  } catch (e) { toast(e.message || "Could not resample."); }
 }
 function loadDuration(sound) {
   bufferOf(sound.src).then((buf) => {
@@ -909,7 +952,7 @@ addEventListener("keydown", (e) => {
 });
 
 // ---- views: Chords, Roll, Script --------------------------------------------------------
-const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Drumroll"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Layout"], mixer: ["◫", "Mixer"], sampler: ["〰", "Sampler"] };
+const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Drumroll"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Layout"], mixer: ["◫", "Mixer"], sampler: ["〰", "Browser"] };
 function renderViews() {
   $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => pickView(v); });
@@ -959,6 +1002,7 @@ function refreshView() {
   else if (view === "song") songUI.render();
   else if (view === "mixer") mixUI.render();
   else if (view === "sampler") samplerUI.render();
+  samplerUI.refresh(); // the instrument dialog follows every change, wherever it was made
   if (studio) { // the docked panels stay current, but never under a hand that is typing in them
     const typing = (id) => $(id).contains(document.activeElement);
     if (view !== "mixer" && dockOpen("mixer") && !typing("mixerview")) mixUI.render();
@@ -1056,7 +1100,8 @@ const mixUI = mountMixer($("mixerview"), {
 });
 const samplerUI = mountSampler($("samplerview"), {
   song: () => song, selected: () => sel, change: edit, snap, pushUndo, save, toast, addSampler, placeOnSong,
-  buffer: bufferOf, hear: hearLibrary, hearMidi, midiToPattern, audition, guest: shareId ? { songId, prefix: API } : null,
+  buffer: bufferOf, hear: hearLibrary, hearMidi, midiToPattern, audition, resample,
+  prepare: (t) => stretchedOf(t.sample.src, 1 / (t.sample.stretch || 1)).catch(() => null), guest: shareId ? { songId, prefix: API } : null,
 });
 const songUI = mountSong($("songview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, setMode,
@@ -1106,7 +1151,7 @@ window.jriterDaw = {
 
 // ---- together: a project kept on the server, friends in it with you --------------------------------
 const esc = (t) => String(t).replace(/[&<>"]/g, "");
-const TABS = { chords: "the chords", rack: "the drumroll", roll: "the piano roll", script: "the script", song: "the layout", mixer: "the mixer", sampler: "the sampler" };
+const TABS = { chords: "the chords", rack: "the drumroll", roll: "the piano roll", script: "the script", song: "the layout", mixer: "the mixer", sampler: "the browser" };
 function showPeople(list) {
   const before = people.map((p) => String(p.id));
   people = list;

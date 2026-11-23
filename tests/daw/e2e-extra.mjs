@@ -174,8 +174,9 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     const src = "data:audio/wav;base64," + pcm.toString("base64");
     const before = (await song()).tracks.length;
     await js(`window.jriterDaw.addSampler(${JSON.stringify({ name: "Tone", src, seconds: 1, kind: "take" })})`);
-    await tapEl("#view-sampler");
-    need((await view()) === "sampler", "view is " + (await view()));
+    // Adding a sound opens its sampler: a dialog over everything, for the selected instrument.
+    await sleep(300);
+    need(await js(`!document.querySelector(".ins-scrim").hidden`), "the sampler dialog did not open");
     await noSideways("sampler");
     let s = await song();
     need(s.tracks.length === before + 1 && s.tracks[before].instrument === "sampler", "no sampler track");
