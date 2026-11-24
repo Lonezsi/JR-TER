@@ -8,6 +8,7 @@
 //
 // Tap a lane to add a point. Drag a point to move it (it stays between its neighbours). Hold a point
 // to delete it. With the keyboard on a point: arrows move it (Shift = a bar sideways), Delete removes it.
+import { icon } from "./icons.js";
 import { targets, targetSpec, addPoint, removePoint } from "./automation.js";
 import { snapRound } from "./snap.js";
 
@@ -33,7 +34,7 @@ export function mountLanes(el, api, { barPx, step, render }) {
   function laneHtml(song, lane, li, width) {
     const spec = targetSpec(song, lane.target);
     if (!spec) return "";
-    return `<div class="al-head"><span>${esc(spec.label)}</span><button data-al="del" data-l="${li}" aria-label="Remove the lane ${esc(spec.label)}" data-tip="Remove this lane">✕</button></div>` +
+    return `<div class="al-head"><span>${esc(spec.label)}</span><button data-al="del" data-l="${li}" aria-label="Remove the lane ${esc(spec.label)}" data-tip="Remove this lane">${icon("close")}</button></div>` +
       `<div class="al-lane" data-l="${li}" style="width:${width}px">` +
       `<svg width="${width}" height="${H}" aria-hidden="true"><polyline points="${line(lane, spec, width)}" /></svg>` +
       lane.points.map((p, i) => `<button class="al-pt" data-l="${li}" data-i="${i}" style="left:${xOf(p.beat)}px;top:${yOf(spec, p.value)}px" aria-label="${esc(spec.label)}, bar ${(p.beat / 4 + 1).toFixed(2)}, value ${fmt(p.value)}"></button>`).join("") +
@@ -41,7 +42,7 @@ export function mountLanes(el, api, { barPx, step, render }) {
   }
 
   const html = (song, bars) => (song.automation || []).map((l, i) => laneHtml(song, l, i, bars * barPx())).join("");
-  const button = () => `<button data-al="open" aria-expanded="${open}" aria-label="Automate a knob" data-tip="Automate a knob over time">+ Automate</button>`;
+  const button = () => `<button data-al="open" aria-expanded="${open}" aria-label="Automate a knob" data-tip="Automate a knob over time">${icon("plus")}Automate</button>`;
   function menu(song) {
     if (!open) return "";
     const used = new Set((song.automation || []).map((l) => l.target));

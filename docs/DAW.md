@@ -27,8 +27,10 @@ runway of two bars past the pattern (`roomLen`, `grow`). User-facing names: Rack
 **JR!TER's controls and the browser (4.18.0).** `web/daw/ui.js` fits the app's own controls onto the plain
 HTML the views write: every `<select>` gets JR!TER's dropdown (the real select stays underneath, so `.value`
 and `change` work as before), number fields get a stepper instead of the browser's spinners, sliders get the
-filled track (`--fill`), and `[data-tip]` gets one readable tooltip. `web/daw/polish.css` (loaded last) is the
-look: JR!TER's glass panes over an accent-lit ground, `.field`, the menu, the scrollbars, on every screen size.
+filled track (`--fill`), and `[data-tip]` gets one readable tooltip. Since 4.28.0 `web/daw/daw.css` is the
+one stylesheet (it replaced daw.css + views.css + polish.css): one glass layer for the room's panels, flat rows
+inside them, the accent only for what is on or playing. Icons come from `web/daw/icons.js` (JR!TER's own
+paths), never text symbols.
 The Sampler is a tree (`samplerview.js`): One-shots (folders split on " / ") and Samples (waiting renders,
 then each song). The pencil arranges one-shots: rename, drag to move, delete a folder (`changeSample` and
 `each` in `library.js`; `PATCH /api/samples/ID` with `name`/`folder`).

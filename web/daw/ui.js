@@ -1,3 +1,4 @@
+import { icon } from "./icons.js";
 // ui.js: JR!TER's own controls on the DAW's plain HTML. The views write <select>, <input type=number>,
 // <input type=range> and data-tip into innerHTML; this fits each of them with the app's own control as it
 // appears, and leaves the real element underneath doing the work, so every handler that reads .value or
@@ -54,7 +55,7 @@ function openMenu(select) {
     it.type = "button"; it.className = "dd-item"; it.setAttribute("role", "option");
     it.setAttribute("aria-selected", i === select.selectedIndex);
     it.disabled = o.disabled; it.tabIndex = -1;
-    it.innerHTML = `<span class="dd-mark" aria-hidden="true">${i === select.selectedIndex ? "✓" : ""}</span><span class="dd-label"></span>`;
+    it.innerHTML = `<span class="dd-mark" aria-hidden="true">${i === select.selectedIndex ? icon("check", 14) : ""}</span><span class="dd-label"></span>`;
     it.querySelector(".dd-label").textContent = o.textContent;
     it.addEventListener("click", () => choose(i));
     box.append(it);

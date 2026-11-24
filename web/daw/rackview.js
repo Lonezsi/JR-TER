@@ -4,6 +4,7 @@
 //   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), selected(), select(i),
 //        addTrack(), addDrums(), addSample(), preview(trackIndex, step), usePattern(k), newPattern(dup), removePattern()
 // Swing is a knob (knob.js). Tap a step to turn it on or off. Drag a lit step up or down: velocity (or pitch in the Pitch lane).
+import { icon } from "./icons.js";
 import { STEPS } from "./pattern.js";
 import { knob, wireKnobs } from "./knob.js";
 
@@ -22,21 +23,20 @@ export function mountRack(el, api) {
     const pats = song.patterns || [];
     const k = song.pattern || 0;
     el.innerHTML =
-      `<div class="cv-title">Drumroll</div>` +
-      `<div class="cv-line rk-pats" role="group" aria-label="Patterns">` +
+            `<div class="cv-line rk-pats" role="group" aria-label="Patterns">` +
         pats.map((p, i) => `<button data-pat="${i}" aria-pressed="${i === k}" data-tip="${esc(p.name)}" aria-label="${esc(p.name)}">${i + 1}</button>`).join("") +
-        `<button data-act="newpat" aria-label="New pattern" data-tip="New pattern">+ New</button>` +
+        `<button data-act="newpat" aria-label="New pattern" data-tip="New pattern">${icon("plus")}New</button>` +
         `<button data-act="duppat" aria-label="Duplicate this pattern" data-tip="Duplicate this pattern">Duplicate</button>` +
         `<button data-act="delpat" aria-label="Delete this pattern" data-tip="Delete this pattern"${pats.length < 2 ? " disabled" : ""}>Delete</button>` +
       `</div>` +
       `<div class="cv-line"><label>Name <input id="rk-name" type="text" value="${esc((pats[k] && pats[k].name) || "Pattern 1")}"></label>` +
         `<label class="ins-k">${knob({ key: "swing", label: "Swing", value: Math.round((song.swing || 0) * 100), lo: 0, hi: 100, home: 0, step: 1, words: Math.round((song.swing || 0) * 100) + "%" })}<span>Swing</span><output>${Math.round((song.swing || 0) * 100)}%</output></label></div>` +
       `<div class="cv-line rk-lane" role="group" aria-label="What a drag changes">` +
-        `<button data-lane="velocity" aria-pressed="${lane === "velocity"}">Velocity</button>` +
-        `<button data-lane="pitch" aria-pressed="${lane === "pitch"}">Pitch</button>` +
-        `<button data-act="chan" aria-label="New channel" data-tip="New channel">+ Channel</button>` +
-        `<button data-act="drums" aria-label="Add kick, snare and hat with a beat" data-tip="Add kick, snare and hat with a beat">+ Drums</button>` +
-        `<button data-act="sample" aria-label="Add one of your own one-shots as a channel" data-tip="Add one of your own one-shots as a channel">+ Sample</button></div>` +
+        `<button data-lane="velocity" aria-pressed="${lane === "velocity"}" data-tip="Drag a lit step up or down to set how hard it hits">Velocity</button>` +
+        `<button data-lane="pitch" aria-pressed="${lane === "pitch"}" data-tip="Drag a lit step up or down to set its note">Pitch</button>` +
+        `<button data-act="chan" aria-label="New channel" data-tip="New channel">${icon("plus")}Channel</button>` +
+        `<button data-act="drums" aria-label="Add kick, snare and hat with a beat" data-tip="Add kick, snare and hat with a beat">${icon("plus")}Drums</button>` +
+        `<button data-act="sample" aria-label="Add one of your own one-shots as a channel" data-tip="Add one of your own one-shots as a channel">${icon("plus")}Sample</button></div>` +
       `<div class="rk-rows">` +
       song.tracks.map((t, ti) => {
         const steps = (t.steps || []);
@@ -48,8 +48,7 @@ export function mountRack(el, api) {
             (s && lane === "pitch" ? `<span>${noteName(s.pitch)}</span>` : "") + `</button>`;
         }
         return `<div class="rk-row${ti === api.selected() ? " sel" : ""}"><button class="rk-name" data-pick="${ti}" aria-pressed="${ti === api.selected()}">${esc(t.name)}</button><div class="rk-steps">${cells}</div></div>`;
-      }).join("") + `</div>` +
-      `<div class="sv-doc">Tap a step to light it. Drag a lit step up or down to change its ${lane}. Arrow up and down do the same on a focused step.</div>`;
+      }).join("") + `</div>`;
   }
 
   function toggle(ti, i) {

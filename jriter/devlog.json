@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.28.0",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "A calmer, slimmer DAW",
+  "notes": [
+    "The DAW uses JR!TER's own icons instead of text symbols, and its toolbar fits on one row: what plays, then the song's settings. Opening and saving files are under More.",
+    "Pink is kept for what is on or playing: Play, the playhead, lit steps and what you picked. Everything else is quieter.",
+    "Panels are flat inside, with no boxes in boxes, and every button in a row is the same height.",
+    "The mixer is slimmer: narrow strips with a line between them, thin faders and small labels.",
+    "The help lines under each panel moved into tooltips and the ? sheet."
+  ]
+ }, {
   "version": "4.27.0",
   "date": "2026-11-24",
   "name": "JR!TER",

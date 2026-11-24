@@ -10,6 +10,7 @@
 // searches everything that has been fetched. One-shots: add files or a folder, drop them on the tab, hear,
 // add as an instrument or a rack channel, delete (Undo brings it back).
 // Sounds come from library.js. Model and maths: sampler.js.
+import { icon } from "./icons.js";
 import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate, ENV } from "./sampler.js";
 import { knob, wireKnobs } from "./knob.js";
 import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound, MIDI_TYPE, SOUND_TYPE } from "./library.js";
@@ -19,7 +20,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const noteName = (m) => NOTE[m % 12] + (Math.floor(m / 12) - 1);
 const mmss = (s) => (s > 0 ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : "");
-const ICON = { take: "♪", vocal: "🎙", render: "▣", oneshot: "◆", midi: "♫" };
+const ICON = { take: "songs", vocal: "mic", render: "album", oneshot: "wave", midi: "roll" };
 const OPEN = "jriter-daw-open";
 function opened() { try { return new Set(JSON.parse(localStorage.getItem(OPEN) || "[\"oneshots\"]")); } catch { return new Set(["oneshots"]); } }
 
@@ -73,17 +74,17 @@ export function mountSampler(el, api) {
     const t = track(), s = t && t.sample;
     el.innerHTML =
       `<div class="sp-head"><span class="cv-title">Browser</span>` +
-        (guest ? "" : `<button class="sp-tool" data-act="files" data-tip="Add sound files to your one-shots" aria-label="Add sound files">＋</button>` +
-          `<button class="sp-tool" data-act="folder" data-tip="Add a whole folder to your one-shots" aria-label="Add a folder of sounds">⊞</button>` +
-          `<button class="sp-tool" data-act="edit" aria-pressed="${editing}" data-tip="${editing ? "Done arranging" : "Arrange your one-shots: rename, move and delete folders and sounds"}" aria-label="Arrange one-shots">✎</button>`) + `</div>` +
-      (editing ? `<div class="sv-doc sp-edit-doc">Drag a sound or a folder onto a folder to move it, or onto One-shots to take it out to the top. ✎ renames: a name with " / " in it nests.</div>` : "") +
+        (guest ? "" : `<button class="sp-tool" data-act="files" data-tip="Add sound files to your one-shots" aria-label="Add sound files">${icon("plus")}</button>` +
+          `<button class="sp-tool" data-act="folder" data-tip="Add a whole folder to your one-shots" aria-label="Add a folder of sounds">${icon("folder-plus")}</button>` +
+          `<button class="sp-tool" data-act="edit" aria-pressed="${editing}" data-tip="${editing ? "Done arranging" : "Arrange your one-shots: rename, move and delete folders and sounds"}" aria-label="Arrange one-shots">${icon("edit")}</button>`) + `</div>` +
+      (editing ? `<div class="sv-doc sp-edit-doc">Drag a sound or folder onto another folder to move it, or onto One-shots to bring it to the top. A / in a new name nests it.</div>` : "") +
       `<input id="sp-q" class="sp-q" type="search" placeholder="Search sounds" aria-label="Search sounds by name or folder" value="${esc(query)}">` +
       `<input id="sp-files" type="file" multiple accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.opus,.m4a" hidden>` +
       `<input id="sp-dir" type="file" webkitdirectory multiple hidden>` +
       (busy ? `<div class="sv-doc" role="status">${esc(busy)}</div>` : "") + `<div id="sp-listbox" class="sp-tree" role="tree" aria-label="Sounds">${tree()}</div>` +
       (guest ? `<div class="sv-doc">You are in a friend's song: use its takes and vocals here. One-shots already in the song play for you too.</div>` : "") +
-      (s ? `<button class="sp-open" data-act="instrument" data-tip="Open ${esc(t.name)}'s sampler">〰 ${esc(t.name)}: ${esc(s.name)}</button>`
-        : `<div class="sv-doc">Inst puts a sound on a sampler track, or drag it onto the Drumroll, a track or the Layout; its sampler opens over everything.</div>`);
+      (s ? `<button class="sp-open" data-act="instrument" data-tip="Open ${esc(t.name)}'s sampler">${icon("wave")}<span>${esc(t.name)}: ${esc(s.name)}</span></button>`
+        : "");
     renderModal();
   }
 
@@ -97,8 +98,8 @@ export function mountSampler(el, api) {
     modal.hidden = false;
     modal.innerHTML = `<section class="ins-modal" role="dialog" aria-modal="true" aria-label="Sampler: ${esc(t.name)}">` +
       `<header class="ins-head"><span class="ins-kind">Sampler</span><b>${esc(t.name)}</b><span class="faint">${esc(s.name)}</span><span class="mx-gap"></span>` +
-        `<button data-act="hear" data-tip="Hear the whole sound" aria-label="Hear the sound">▶</button>` +
-        `<button data-act="close" data-tip="Close (Escape)" aria-label="Close">✕</button></header>` +
+        `<button data-act="hear" data-tip="Hear the whole sound" aria-label="Hear the sound">${icon("play")}</button>` +
+        `<button data-act="close" data-tip="Close (Escape)" aria-label="Close">${icon("close")}</button></header>` +
       `<canvas class="sp-wave" id="sp-wave" tabindex="0" aria-label="Waveform of ${esc(s.name)}. Comma and period move the start, with Shift the end."></canvas>` +
       `<div class="cv-line" role="group" aria-label="Cuts and keys">` +
         [4, 8, 16].map((n) => `<button data-chop="${n}" data-tip="Cut into ${n} equal pieces">Chop ${n}</button>`).join("") +
@@ -122,7 +123,7 @@ export function mountSampler(el, api) {
       `</div>` +
       `<div class="sv-doc">${s.oneshot ? "One-shot: every hit plays the whole sound. " : ""}${s.slices.length ? `Chopped in ${s.slices.length + 1}: ${noteName(s.root)} plays piece 1, ${noteName(s.root + 1)} piece 2, and so on. ` : `Every key plays it, ${noteName(s.root)} at its own speed. `}` +
         `${s.bpm ? `Audio clips play it at the song's ${api.song().bpm} BPM (x${clipRate(s, api.song().bpm).toFixed(2)}, ${s.warp === "pitch" ? "like tape" : "keeping pitch"}). ` : ""}Drag the ends to trim. Hold to add or remove a cut.</div>` +
-      `<footer class="ins-foot"><button data-act="place" data-tip="Put it on the Layout tab as an audio clip" aria-label="Place on the layout">☰ Place on the Layout</button><span class="mx-gap"></span><button data-act="close" class="ins-done">Done</button></footer>` +
+      `<footer class="ins-foot"><button data-act="place" data-tip="Put it on the Layout tab as an audio clip" aria-label="Place on the layout">${icon("timeline")}Place on the Layout</button><span class="mx-gap"></span><button data-act="close" class="ins-done">Done</button></footer>` +
       `</section>`;
     paint(); adsr();
     if (keepFocus) modal.querySelector(`[data-knob="${keepFocus}"]`)?.focus();
@@ -232,22 +233,22 @@ export function mountSampler(el, api) {
       `<button class="sp-dir" role="treeitem" aria-expanded="${on}" data-dir="${esc(key)}">` +
       `<span class="sp-car" aria-hidden="true"></span><span class="sp-dname">${esc(name)}</span>` +
       (count != null ? `<span class="sp-count">${count}</span>` : "") + (asking.has(key) ? `<span class="sp-spin" aria-label="Loading"></span>` : "") + `</button>` +
-      (arrange && shot ? `<span class="sp-acts on"><button data-renamedir="${esc(key)}" data-tip="Rename or move: a / nests it" aria-label="Rename the folder ${esc(name)}">✎</button>` +
-        `<button data-deldir="${esc(key)}" data-tip="Delete the folder and its sounds (Undo brings them back)" aria-label="Delete the folder ${esc(name)}">×</button></span>` : "") +
+      (arrange && shot ? `<span class="sp-acts on"><button data-renamedir="${esc(key)}" data-tip="Rename or move: a / nests it" aria-label="Rename the folder ${esc(name)}">${icon("edit", 14)}</button>` +
+        `<button data-deldir="${esc(key)}" data-tip="Delete the folder and its sounds (Undo brings them back)" aria-label="Delete the folder ${esc(name)}">${icon("trash", 14)}</button></span>` : "") +
       `</div>` + extra;
   }
   function soundRow(x, depth, mine) {
     const i = items.push(x) - 1;
     if (mine && renaming === "sound:" + x.id) {
-      return `<div class="sp-row sp-renaming" style="--depth:${depth}"><span class="sp-ic" aria-hidden="true">${ICON.oneshot}</span>` +
+      return `<div class="sp-row sp-renaming" style="--depth:${depth}"><span class="sp-ic" aria-hidden="true">${icon(ICON.oneshot, 14)}</span>` +
         `<input class="sp-rename" data-renamesound="${i}" value="${esc(x.name)}" aria-label="Name of the sound"></div>`;
     }
     const arrange = mine && editing, midi = x.kind === "midi";
     const drag = arrange ? ` draggable="true" data-movesound="${i}"` : midi ? ` draggable="true" data-midi="${i}"` : ` draggable="true" data-sound="${i}"`;
-    return `<div class="sp-row${midi ? " midi" : ""}" role="treeitem" style="--depth:${depth}"${drag}><span class="sp-ic" aria-hidden="true">${arrange ? "⠿" : ICON[x.kind] || "♪"}</span>` +
+    return `<div class="sp-row${midi ? " midi" : ""}" role="treeitem" style="--depth:${depth}"${drag}><span class="sp-ic" aria-hidden="true">${icon(arrange ? "drag" : ICON[x.kind] || "songs", 14)}</span>` +
       `<button class="sp-name" data-hear="${i}" data-tip="${midi ? "Hear it. Drag it onto the roll or a pattern number" : arrange ? "Hear it" : "Hear it. Drag it onto the Drumroll, a track or the Layout"}" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${midi ? "MIDI" : mmss(x.seconds)}</span>` +
-      (arrange ? `<span class="sp-acts on"><button data-rename="${i}" data-tip="Rename" aria-label="Rename ${esc(x.name)}">✎</button>` +
-          `<button data-del="${i}" data-tip="Delete (Undo brings it back)" aria-label="Delete ${esc(x.name)}">×</button></span>`
+      (arrange ? `<span class="sp-acts on"><button data-rename="${i}" data-tip="Rename" aria-label="Rename ${esc(x.name)}">${icon("edit", 14)}</button>` +
+          `<button data-del="${i}" data-tip="Delete (Undo brings it back)" aria-label="Delete ${esc(x.name)}">${icon("trash", 14)}</button></span>`
         : midi ? `<span class="sp-acts"><button data-topat="${i}" data-tip="A new pattern with these notes, on the selected track" aria-label="Make a pattern from ${esc(x.name)}">Pattern</button></span>`
         : `<span class="sp-acts">` +
           `<button data-add="${i}" data-tip="Add as a sampler instrument" aria-label="Add ${esc(x.name)} as an instrument">Inst</button>` +

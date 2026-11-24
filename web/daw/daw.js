@@ -1,5 +1,6 @@
 // daw.js: the DAW page. Tracks on the left, a piano roll on the right, a bar on top.
 // The song is plain data (see midi.js); everything here edits that object and redraws.
+import { icon } from "./icons.js";
 import { parseMidi, writeMidi, songToText, textToSong, midiToSong } from "./midi.js";
 import { classify } from "./gestures.js";
 import { createSynth, instrumentFor, INSTRUMENTS } from "./synth.js";
@@ -103,18 +104,21 @@ function toast(text, action) {
 }
 
 // ---- the top bar ------------------------------------------------------------------------
-const ICONS = { play: "▶", stop: "■", loop: "↻", open: "↑", mid: "♪", json: "{ }", add: "+", undo: "↶" };
-function btn(id, icon, tip, pressed, label) {
-  const inner = label ? `<span class="ic">${icon}</span><span class="lb">${label}</span>` : icon;
+function btn(id, ic, tip, pressed, label) {
+  const inner = icon(ic) + (label ? `<span class="lb">${label}</span>` : "");
   return `<button id="${id}" data-tip="${tip}" aria-label="${tip}"${pressed === undefined ? "" : ` aria-pressed="${pressed}"`}>${inner}</button>`;
 }
 function renderBar() {
   const bar = $("bar");
   if (bar.dataset.built) {
-    $("play").querySelector(".ic").textContent = playing ? ICONS.stop : ICONS.play;
-    $("play").querySelector(".lb").textContent = playing ? "Stop" : "Play";
-    $("play").setAttribute("aria-label", playing ? "Stop" : "Play");
-    $("play").dataset.tip = playing ? "Stop (Space)" : "Play (Space)";
+    const p = $("play"), state = playing ? "stop" : "play";
+    if (p.dataset.state !== state) {
+      p.dataset.state = state;
+      p.querySelector(".ic").outerHTML = icon(state);
+      p.querySelector(".lb").textContent = playing ? "Stop" : "Play";
+      p.setAttribute("aria-label", playing ? "Stop" : "Play");
+      p.dataset.tip = playing ? "Stop (Space)" : "Play (Space)";
+    }
     $("loop").setAttribute("aria-pressed", looping);
     $("mode").setAttribute("aria-pressed", song.mode === "song");
     for (const t of ["draw", "erase", "select"]) $("tool-" + t).setAttribute("aria-pressed", tool === t);
@@ -123,23 +127,26 @@ function renderBar() {
     return;
   }
   bar.dataset.built = "1";
-  bar.innerHTML = `<div class="transport">` + btn("home", "⌂", "Back to the library", undefined, "Library") +
-    btn("play", ICONS.play, "Play (Space)", undefined, "Play") + btn("loop", ICONS.loop, "Loop (L)", looping, "Loop") + btn("mode", "☰", "Play the whole song, or just this pattern (S)", song.mode === "song", "Song") +
+  // Three groups: what plays (transport, tools), the song's settings, and the file actions,
+  // which sit behind More on every screen (a sheet on a phone, a menu in the studio).
+  bar.innerHTML = `<div class="transport">` + btn("home", "library", "Back to the library", undefined, "Library") +
+    btn("play", "play", "Play (Space)", undefined, "Play") + btn("loop", "repeat", "Loop (L)", looping, "Loop") +
+    btn("mode", "timeline", "Play the whole song, not just the pattern (S)", song.mode === "song", "Song") +
     `<span class="sep"></span>` +
-    btn("tool-draw", "✎", "Draw notes (P)", true, "Draw") + btn("tool-erase", "⌫", "Erase notes (E)", false, "Erase") +
-    btn("tool-select", "⌖", "Select only (V)", false, "Select") +
-    btn("help", "?", "How it works (?)", false, "Help") + btn("more", "⋯", "More", false, "More") + `<span class="people" id="people"></span></div><div class="more" id="morebox"><span class="name">JR!TER DAW</span>` +
-    `<label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
+    btn("tool-draw", "edit", "Draw notes (P)", true, "Draw") + btn("tool-erase", "eraser", "Erase notes (E)", false, "Erase") +
+    btn("tool-select", "pointer", "Select notes (V)", false, "Select") +
+    btn("help", "help", "How it works (?)", false, "Help") + btn("more", "more", "More", false, "More") + `<span class="people" id="people"></span></div>` +
+    `<div class="more" id="morebox"><span class="name" id="songname">JR!TER DAW</span>` +
+    `<div class="grp set"><label>BPM <input id="bpm" type="number" min="20" max="300" step="1"></label>` +
     `<label>Bars <input id="bars" type="number" min="1" max="64" step="1"></label>` +
     `<label>Pattern <select id="pat" aria-label="Pattern"></select></label>` +
-    `<label>Snap <select id="snap" aria-label="Snap"></select></label>` +
-    `<span class="sep"></span>` +
-    btn("add", ICONS.add, "New track (N)") + btn("undo", ICONS.undo, "Undo (Ctrl+Z)") +
-    `<span class="sep"></span>` +
-    btn("open", ICONS.open, "Open a .mid or .json song") + btn("savemid", ICONS.mid, "Save as .mid") +
-    btn("savejson", ICONS.json, "Save as .json text") +
-    btn("bounce", "⤓", "Bounce to audio: a new version of the song (B)") +
-    (songId && !shareId ? `<span class="sep"></span><span class="friends" id="friends"></span><span class="friends" id="bounces"></span>` : "") + `</div>`;
+    `<label>Snap <select id="snap" aria-label="Snap"></select></label></div>` +
+    `<div class="grp acts">` + btn("add", "plus", "New track (N)") + btn("undo", "undo", "Undo (Ctrl+Z)") +
+    btn("bounce", "album", "Bounce: render to audio as a new version of the song (B)") + `</div>` +
+    `<div class="grp files">` + btn("open", "upload", "Open a .mid or .json song", undefined, "Open a song file") +
+    btn("savemid", "download", "Save as .mid", undefined, "Save as .mid") +
+    btn("savejson", "doc", "Save as .json text", undefined, "Save as .json") +
+    (songId && !shareId ? `<span class="friends" id="friends"></span><span class="friends" id="bounces"></span>` : "") + `</div></div>`;
   if (songId && !shareId) { loadFriends(); loadBounces(); }
   for (const t of ["draw", "erase", "select"]) $("tool-" + t).onclick = () => setTool(t);
   $("more").onclick = () => setMore(!bar.classList.contains("open"));
@@ -176,6 +183,10 @@ function setMore(open) {
   $("more").setAttribute("aria-pressed", open);
   if (open) setHelp(false);
 }
+// More closes when you click anywhere else (a dropdown it opened counts as inside).
+addEventListener("pointerdown", (e) => {
+  if ($("bar").classList.contains("open") && !e.target.closest("#morebox, #more, .dd-menu")) setMore(false);
+}, true); // capture: the roll and the lanes stop their own pointer events
 
 // The Snap box says what Auto is right now, and keeps up with the zoom.
 function showSnap() {
@@ -185,29 +196,28 @@ function showSnap() {
 
 // ---- the help sheet: one list, so the words live in one place ------------------------------
 const HELP = [
-  ["＋", "Tap an empty square to add a note.", "click"],
-  ["↔", "Drag a note to move it. Drag its right end to make it longer.", "drag"],
-  ["⌫", "Hold a note to delete it. Undo brings it back.", "right-click, or Delete"],
-  ["⋮", "Snap follows the zoom: zoom in and notes snap finer. Pick a fixed one under More, Snap.", "More"],
-  ["✥", "Drag empty space to scroll. Pinch with two fingers to zoom.", "wheel; Ctrl+wheel; + and -"],
-  ["♪", "Tap a key on the left to hear it.", "click"],
-  ["✎", "Draw adds notes, Erase removes them, Select only picks them.", "P, E, V"],
-  ["▶", "Play runs the loop. Loop turns repeating on and off.", "Space, L"],
-  ["⋯", "More: tempo, bars, new track, open and save .mid or .json.", "N, Ctrl+Z"],
-  ["⤓", "Bounce: render the song to audio and save it as a new version of the library song (or a waiting render when opened without one). The project is kept with the version; More, Bounces opens it again.", "B"],
-  ["▤", "Tracks are the cards above the roll: tap one to edit it. M mutes, S solos.", "J, K"],
-  ["♫", "Chords: pick a root and a type, or type a progression. Arrows and drops change the voicing. To MIDI makes notes, one way.", "Alt+1"],
-  ["▦", "Drumroll: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
-  ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays. Automate draws a knob's moves over time under the clips.", "Alt+5, S"],
-  ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
-  ["〰", "Browser: your one-shots, MIDI files, renders and takes in folders. Inst makes a sampler instrument and opens its sampler (also the 〰 on a sampler track): trim, chop, envelope, loop, cut itself, pitch, stretch, resample. Drag a sound onto the Drumroll, a track or the Layout; drag a MIDI onto the roll or a pattern number.", "Alt+7"],
-  ["▥", "On a computer the DAW is laid out like a studio: library on the left, mixer at the bottom. The Mixer and Sampler tabs show or hide them.", "Alt+6, Alt+7"],
-  ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
+  ["plus", "Tap an empty square to add a note.", "click"],
+  ["drag", "Drag a note to move it, or its right end to make it longer.", "drag"],
+  ["eraser", "Hold a note to delete it. Undo brings it back.", "right-click or Delete"],
+  ["grid", "Snap follows the zoom: zoom in and notes snap finer. Snap in the bar fixes it.", "Snap"],
+  ["zoom-in", "Drag empty space to scroll. Pinch to zoom.", "wheel, Ctrl+wheel, + and -"],
+  ["songs", "Tap a key on the left to hear it.", "click"],
+  ["edit", "Draw adds notes, Erase removes them, Select only picks them.", "P, E, V"],
+  ["play", "Play runs the loop. Loop turns repeating on and off.", "Space, L"],
+  ["more", "More opens and saves .mid and .json files, and the projects your bounces kept.", ""],
+  ["album", "Bounce renders the song to audio and saves it as a new version. The project is kept with it.", "B"],
+  ["sidebar", "Tracks sit next to the roll. Pick one to edit it. M mutes, S solos.", "J, K, N"],
+  ["songs", "Chords: pick a root and a type, or type a progression. To MIDI writes the notes into the song.", "Alt+1"],
+  ["grid", "Drumroll: tap a step to light it, drag it up or down for its velocity or pitch. Swing loosens the groove.", "Alt+2, [ and ]"],
+  ["timeline", "Layout: tap a lane to place a pattern. Drag a clip to move it, drag its end to repeat it, hold it to delete it. Automate draws a knob's moves under the clips.", "Alt+5, S"],
+  ["eq", "Mixer: pick a strip, then click the arrow under another to send there. Double-click makes it the main output. The master ends in a limiter.", "Alt+6"],
+  ["folder", "Browser: your one-shots, MIDI files, renders and takes. Drag a sound onto the Drumroll, a track or the Layout, a MIDI file onto the roll. Inst opens a sound in its own sampler.", "Alt+7"],
+  ["code", "Script: pick one, set its sliders, run it on the track. Humanize and arpeggios come with it; edit them or write your own.", "Alt+4"],
 ];
 function renderHelp() {
   const box = $("helpbox");
-  box.innerHTML = `<div class="helphead"><strong>How it works<small id="verstamp"></small></strong><button id="helpx" aria-label="Close help">×</button></div>` +
-    HELP.map(([ic, text, desk]) => `<div class="helprow"><span class="ic">${ic}</span><span>${text} <span class="desk">(${desk})</span></span></div>`).join("");
+  box.innerHTML = `<div class="helphead"><strong>How it works</strong><small id="verstamp"></small><button id="helpx" aria-label="Close help" data-tip="Close">${icon("close")}</button></div>` +
+    HELP.map(([ic, text, keys]) => `<div class="helprow">${icon(ic)}<span>${text}${keys ? ` <span class="desk">${keys}</span>` : ""}</span></div>`).join("");
   $("helpx").onclick = () => setHelp(false);
 }
 function setHelp(open) {
@@ -239,9 +249,9 @@ function renderTracks() {
   song.tracks.forEach((t, i) => {
     const el = document.createElement("div");
     el.className = "track" + (i === sel ? " sel" : "");
-    el.innerHTML = `<div class="row"><input type="text" aria-label="Track name"><button data-a="del" data-tip="Delete track" aria-label="Delete track">×</button></div>
+    el.innerHTML = `<div class="row"><input type="text" aria-label="Track name"><button data-a="del" data-tip="Delete track" aria-label="Delete track">${icon("trash")}</button></div>
       <div class="row"><select aria-label="Instrument">${[...INSTRUMENTS, "sampler"].map((n) => `<option${n === t.instrument ? " selected" : ""}>${n}</option>`).join("")}</select>
-      ${t.sample ? `<button data-a="ins" data-tip="Open its sampler" aria-label="Open the sampler">〰</button>` : ""}<button data-a="mute" data-tip="Mute" aria-label="Mute" aria-pressed="${!!t.mute}">M</button>
+      ${t.sample ? `<button data-a="ins" data-tip="Open its sampler" aria-label="Open the sampler">${icon("wave")}</button>` : ""}<button data-a="mute" data-tip="Mute" aria-label="Mute" aria-pressed="${!!t.mute}">M</button>
       <button data-a="solo" data-tip="Solo" aria-label="Solo" aria-pressed="${!!t.solo}">S</button></div>
       <div class="row"><input type="range" min="0" max="1" step="0.01" aria-label="Volume" value="${t.volume}"></div>`;
     const name = el.querySelector("input[type=text]");
@@ -1009,9 +1019,9 @@ addEventListener("keydown", (e) => {
 });
 
 // ---- views: Chords, Roll, Script --------------------------------------------------------
-const VIEW_LABELS = { chords: ["♫", "Chords"], rack: ["▦", "Drumroll"], roll: ["▤", "Roll"], script: ["ƒ", "Script"], song: ["☰", "Layout"], mixer: ["◫", "Mixer"], sampler: ["〰", "Browser"] };
+const VIEW_LABELS = { chords: ["songs", "Chords"], rack: ["grid", "Drumroll"], roll: ["roll", "Roll"], script: ["code", "Script"], song: ["timeline", "Layout"], mixer: ["eq", "Mixer"], sampler: ["folder", "Browser"] };
 function renderViews() {
-  $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${VIEW_LABELS[v][0]} ${VIEW_LABELS[v][1]}</button>`).join("");
+  $("views").innerHTML = VIEWS.map((v, i) => `<button role="tab" id="view-${v}" data-tip="${VIEW_LABELS[v][1]} (Alt+${i + 1})" aria-selected="${v === view}">${icon(VIEW_LABELS[v][0])}<span>${VIEW_LABELS[v][1]}</span></button>`).join("");
   VIEWS.forEach((v) => { $("view-" + v).onclick = () => pickView(v); });
 }
 // A tab press: in the studio the Mixer and Sampler tabs show or hide their docked panel.
@@ -1284,8 +1294,8 @@ try {
   if (first) scrollY = Math.max(0, (hi - first.pitch) * ROW - H / 2);
   draw();
 }
-fetch("/api/state").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.version) $("verstamp").textContent = " · DAW " + j.version; }).catch(() => {});
-if (songId) fetch(API + "/songs/" + encodeURIComponent(songId), { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((j) => { const n = document.querySelector("#morebox .name"); if (j && j.song && n) n.textContent = "DAW · " + j.song.title; }).catch(() => {});
+fetch("/api/state").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.version) $("verstamp").textContent = "JR!TER " + j.version; }).catch(() => {});
+if (songId) fetch(API + "/songs/" + encodeURIComponent(songId), { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((j) => { const n = document.querySelector("#morebox .name"); if (j && j.song && n) { n.textContent = j.song.title; n.dataset.tip = "DAW: " + j.song.title; } }).catch(() => {});
 if (songId && versionId && !together) openAsked();
 const src = new URLSearchParams(location.search).get("src");
 if (src) {

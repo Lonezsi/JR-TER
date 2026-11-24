@@ -4,6 +4,7 @@
 //   mountChords(el, api)
 //   api: song(), change(fn) (an undoable edit), undo(), sound(pitches), hear(notes) -> stop(),
 //        toMidi(notes, target), toast(text, action)
+import { icon } from "./icons.js";
 import { parseChord, voiceProgression, progressionToNotes, progressionFromText, progressionToText, ROOT_NAMES } from "./chords.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -56,10 +57,10 @@ export function mountChords(el, api) {
       `<div class="cv-title">Progression</div>` +
       `<div class="cv-strip" id="cv-strip" role="list">` +
         p.chords.map((x, i) => `<button class="cc" role="listitem" data-act="pick" data-i="${i}" aria-pressed="${i === si}"><b>${esc(x.symbol)}</b><small>${x.beats ?? 4} beats</small></button>`).join("") +
-        `<button class="cc" data-act="add" aria-label="Add a chord"><b>+</b><small>add</small></button>` +
+        `<button class="cc add" data-act="add" aria-label="Add a chord" data-tip="Add a chord">${icon("plus")}</button>` +
       `</div>` +
       `<div class="cv-line"><input id="cv-text" type="text" spellcheck="false" aria-label="Progression as text" value="${esc(progressionToText(p.chords))}">` +
-        `<button data-act="left" aria-label="Move chord earlier">◀</button><button data-act="right" aria-label="Move chord later">▶</button></div>` +
+        `<button data-act="left" aria-label="Move chord earlier" data-tip="Move the chord earlier">${icon("chev-left")}</button><button data-act="right" aria-label="Move chord later" data-tip="Move the chord later">${icon("chev-right")}</button></div>` +
       `<div class="cv-err" role="alert"></div>` +
       `<div class="cv-edit">` +
         `<div class="cv-line"><label>Chord <input id="cv-sym" class="cv-sym" type="text" spellcheck="false" value="${esc(c.symbol)}"></label>` +
@@ -78,14 +79,13 @@ export function mountChords(el, api) {
       `<div class="cv-line"><button data-act="lead" aria-pressed="${!!p.voiceLead}">Voice leading</button>` +
         `<label>Strum <input id="cv-strum" type="number" min="0" max="80" step="5" value="${p.strumMs ?? 0}"> ms</label>` +
         `<label>Velocity <input id="cv-vel" type="number" min="1" max="127" value="${p.velocity ?? 90}"></label></div>` +
-      `<div class="cv-line"><button data-act="hear" aria-pressed="${!!stopHear}">${stopHear ? "■ Stop" : "▶ Hear it"}</button>` +
+      `<div class="cv-line"><button data-act="hear" aria-pressed="${!!stopHear}">${stopHear ? icon("stop") + "Stop" : icon("play") + "Hear it"}</button>` +
         `<select id="cv-target" aria-label="Where the notes go"><option value="new">New track “Chords”</option><option value="selected">The selected track</option></select>` +
-        `<button data-act="midi" id="cv-midi"><b>To MIDI</b></button></div>` +
-      `<div class="sv-doc">To MIDI writes the notes into the song and switches to the roll. It is one way: the notes are plain notes afterwards, and this progression stays here for next time.</div>`;
+        `<button data-act="midi" id="cv-midi" class="primary" data-tip="Write the notes into the song and open the roll. One way: they are plain notes afterwards, and the progression stays here">To MIDI</button></div>`;
     drawKeys(voiced ? voiced.pitches : []);
   }
   function step(label, act, value) {
-    return `<span class="cv-step">${label} <button data-act="${act}-" aria-label="${label} down">−</button><output>${esc(value)}</output><button data-act="${act}+" aria-label="${label} up">+</button></span>`;
+    return `<span class="cv-step">${label} <button data-act="${act}-" aria-label="${label} down">${icon("minus", 14)}</button><output>${esc(value)}</output><button data-act="${act}+" aria-label="${label} up">${icon("plus", 14)}</button></span>`;
   }
 
   // ---- the little keyboard --------------------------------------------------------------
