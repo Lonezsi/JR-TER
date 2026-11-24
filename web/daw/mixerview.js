@@ -7,14 +7,14 @@
 //                         from a bus, click makes it the bus's output (a bus feeds one place)
 //     double-click        make it the main output instead of the master
 //   A route that would go round in a loop is never offered. Beside the strips: the picked strip's output,
-//   its effects (each setting a knob), + Insert (a new bus) and taking a bus out.
+//   its effects (each setting a knob; drag an effect's grip, or press the arrows on it, to reorder), + Insert (a new bus) and taking a bus out.
 //
 //   mountMixer(el, api) -> { render, meters(levels | null) }
 //   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), sync(), toast(text, action),
 //        undo(), selected(), select(i)
 // Model and maths: mixer.js. The audio graph: mixgraph.js.
 import { knob as knobHtml, wireKnobs } from "./knob.js";
-import { FX, FX_TYPES, newFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops } from "./mixer.js";
+import { FX, FX_TYPES, newFx, moveFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops } from "./mixer.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(2));
@@ -89,10 +89,9 @@ export function mountMixer(el, api) {
   function fxCard(f, i, n) {
     const spec = FX[f.type];
     return `<div class="mx-fx${f.on ? "" : " off"}" data-i="${i}">` +
-      `<div class="mx-fxh"><button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="On or off"></button>` +
+      `<div class="mx-fxh"><button class="mx-grip" data-grip="${i}" aria-label="Move ${spec.label}, slot ${i + 1} of ${n}. Drag, or use the up and down arrows" data-tip="Drag to reorder">⋮⋮</button>` +
+      `<button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="On or off"></button>` +
       `<span class="mx-slot">${i + 1}</span><b>${spec.label}</b><span class="mx-gap"></span>` +
-      `<button data-fx="up" data-i="${i}" aria-label="Move earlier" data-tip="Move earlier"${i ? "" : " disabled"}>↑</button>` +
-      `<button data-fx="down" data-i="${i}" aria-label="Move later" data-tip="Move later"${i < n - 1 ? "" : " disabled"}>↓</button>` +
       `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">✕</button></div>` +
       `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
         `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${k}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
@@ -212,9 +211,64 @@ export function mountMixer(el, api) {
     if (!b || b.disabled) return;
     const list = picked(song).fx, i = +b.dataset.i, a = b.dataset.fx;
     if (a === "toggle") api.change(() => { list[i].on = !list[i].on; });
-    else if (a === "up") api.change(() => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; });
-    else if (a === "down") api.change(() => { [list[i + 1], list[i]] = [list[i], list[i + 1]]; });
     else if (a === "del") { api.change(() => { list.splice(i, 1); }); api.toast("Effect removed.", { label: "Undo", run: api.undo }); }
+  });
+
+  // ---- reorder effects: drag the grip (mouse or touch), or press the arrow keys on it -------------
+  let drag = null, justDragged = false;
+  const cards = () => [...el.querySelectorAll(".mx-fx")];
+  const clearDrop = () => cards().forEach((c) => c.classList.remove("drag", "drop-before", "drop-after"));
+  function dragTarget(y) {
+    let best = drag.i, bd = Infinity;
+    cards().forEach((c, j) => {
+      const r = c.getBoundingClientRect(), d = Math.abs(y - (j === drag.i ? drag.cy : r.top + r.height / 2));
+      if (d < bd) { bd = d; best = j; }
+    });
+    return best;
+  }
+  el.addEventListener("pointerdown", (e) => {
+    const g = e.target.closest("[data-grip]");
+    if (!g || (e.button !== undefined && e.button > 0)) return;
+    const card = g.closest(".mx-fx"), r = card.getBoundingClientRect();
+    drag = { i: +g.dataset.grip, card, g, x0: e.clientX, y0: e.clientY, cy: r.top + r.height / 2, id: e.pointerId, moved: false, to: +g.dataset.grip };
+    try { g.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
+    e.preventDefault();
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true;
+    drag.card.classList.add("drag");
+    drag.card.style.transform = `translate(${dx}px, ${dy}px)`;
+    drag.to = dragTarget(drag.cy + dy);
+    cards().forEach((c, j) => {
+      c.classList.toggle("drop-before", j === drag.to && drag.to < drag.i);
+      c.classList.toggle("drop-after", j === drag.to && drag.to > drag.i);
+    });
+  });
+  const endDrag = (e, cancel) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null;
+    clearDrop(); d.card.style.transform = "";
+    if (!d.moved) return;
+    justDragged = true; setTimeout(() => { justDragged = false; }, 0);
+    if (cancel || !d.card.isConnected || d.to === d.i) return;
+    api.change(() => { moveFx(picked(api.song()).fx, d.i, d.to); });
+  };
+  el.addEventListener("pointerup", (e) => endDrag(e, false));
+  el.addEventListener("pointercancel", (e) => endDrag(e, true));
+  el.addEventListener("click", (e) => { if (justDragged && e.target.closest("[data-grip]")) e.stopPropagation(); }, true);
+  el.addEventListener("keydown", (e) => {
+    const g = e.target.closest?.("[data-grip]");
+    if (!g) return;
+    const dir = e.key === "ArrowUp" || e.key === "k" ? -1 : e.key === "ArrowDown" || e.key === "j" ? 1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const i = +g.dataset.grip, list = picked(api.song()).fx, to = i + dir;
+    if (to < 0 || to >= list.length) return;
+    api.change(() => { moveFx(list, i, to); });
+    el.querySelector(`[data-grip="${to}"]`)?.focus();
   });
 
   function meters(levels) {

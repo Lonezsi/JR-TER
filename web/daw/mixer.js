@@ -38,6 +38,14 @@ export function newFx(type) {
   return fx;
 }
 
+// Move the effect at `from` to `to` in place (`to` is clamped); returns the list.
+export function moveFx(list, from, to) {
+  to = Math.max(0, Math.min(list.length - 1, to));
+  if (from === to || from < 0 || from >= list.length) return list;
+  list.splice(to, 0, list.splice(from, 1)[0]);
+  return list;
+}
+
 export function cleanFx(list) {
   if (!Array.isArray(list)) return [];
   const out = [];

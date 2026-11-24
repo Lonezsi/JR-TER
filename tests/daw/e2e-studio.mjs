@@ -178,6 +178,28 @@ try {
     need((await js(`!!document.querySelector('#rackview .mx-knob[data-knob="swing"]')`)), "no Swing knob");
     await js(`window.jriterDaw.setView("song")`); await sleep(150);
   });
+  await scenario("effect slots reorder by dragging the grip, by the arrow keys, and one Undo puts it back", async () => {
+    await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(150);
+    await js(`document.querySelector('#mixerview [data-add="eq"]').click()`); await sleep(300);
+    await js(`document.querySelector('#mixerview [data-add="delay"]').click()`); await sleep(300);
+    const order = () => js(`window.jriterDaw.song().tracks[0].fx.map((f) => f.type).join()`);
+    need((await order()) === "eq,delay", "start order " + (await order()));
+    need(!(await js(`!!document.querySelector('#mixerview [data-fx="up"]')`)), "up/down buttons are still there");
+    const info = await js(`document.querySelector("#mixerview .mx-chain")?.innerHTML.slice(0, 300)`); const a = await rect(`#mixerview [data-grip="0"]`), b = await rect("#mixerview .mx-chain > .mx-fx:nth-child(2)"); need(a && b, "fx=" + (await order()) + " adds=" + (await js(`[...document.querySelectorAll("#mixerview [data-add]")].map((x) => x.dataset.add + (x.disabled ? "!" : "")).join()`)));
+    const m = (type, y, buttons) => send("Input.dispatchMouseEvent", { type, x: a.x, y, button: "left", buttons, clickCount: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: a.x, y: a.y });
+    await m("mousePressed", a.y, 1);
+    const ty = b.y + 10;
+    for (let i = 1; i <= 8; i++) { await sleep(16); await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: a.x, y: a.y + ((ty - a.y) * i) / 8, button: "left", buttons: 1 }); }
+    await m("mouseReleased", ty, 0); await sleep(200);
+    need((await order()) === "delay,eq", "after drag " + (await order()));
+    await click("#undo"); await sleep(150);
+    need((await order()) === "eq,delay", "undo gave " + (await order()));
+    await js(`document.querySelector('#mixerview [data-grip="0"]').focus(); document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }))`); await sleep(150);
+    need((await order()) === "delay,eq", "arrow gave " + (await order()));
+    need((await js(`document.activeElement.dataset.grip`)) === "1", "focus did not follow the move");
+  });
   await scenario("the Sampler tab hides and shows the left dock; setView('sampler') only reveals it", async () => {
     await click("#view-sampler");
     need(!(await vis("#samplerview")), "library still shown");
