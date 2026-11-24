@@ -76,8 +76,10 @@ Windows credential store.
    test passes and every library reads the same (task 12).
 4. New look finished in `ui/` (task 11).
 5. `desktop/` replaces `client/` (task 10).
-6. Switch the host: the "JRITER Server" task runs `hostsetup\Start-JriterJar.ps1` (the jar on 7900); `server.py` kept as the
-   way back until it hasn't been needed for a month (task 13).
+6. Switch the host: in an elevated PowerShell run `C:\JR-TER\hostsetup\Switch-JriterServer.ps1 -To jar`
+   (the "JRITER Server" task then runs `Start-JriterJar.ps1`, the jar on 7900; the task is saved first and it
+   goes back to Python by itself if the jar does not answer). The way back is `-To python`; `server.py` is
+   kept until it hasn't been needed for a month (task 13).
 
 ## Progress
 

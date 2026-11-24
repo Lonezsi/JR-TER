@@ -37,3 +37,6 @@ server/target/
 desktop/target/
 
 server/run/
+
+# Saved copies of the host's scheduled task, made by Switch-JriterServer.ps1.
+hostsetup/task-backup/

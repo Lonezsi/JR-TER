@@ -2,8 +2,8 @@
 #
 # The jar's twin of Start-Jriter.ps1, which starts the Python server. Run it on the same
 # repeating schedule: on a run where the library answers it does nothing, on a run where it
-# does not it starts one. NOT installed anywhere yet: switching the "JRITER Server" task over
-# is the owner's step (docs/REWORK.md, step 6). Keep Start-Jriter.ps1 as the way back.
+# does not it starts one. Switching the "JRITER Server" task over is the owner's step:
+# hostsetup\Switch-JriterServer.ps1 -To jar (docs/REWORK.md, step 6). Keep Start-Jriter.ps1 as the way back.
 #
 # HOW AN UPDATE LANDS. The updater (Updater.java) pulls, rebuilds server\target\jriter.jar with
 # Maven, and ends the process. This script then starts again, and before it does it copies
