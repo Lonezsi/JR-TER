@@ -64,6 +64,7 @@ public final class Config {
         return this;
     }
     public String flPath() { return node.path("fl_path").asText(""); }
+    public String plugalyzer() { return node.path("plugalyzer").asText(""); }
     public String renderFormat() { return node.path("render_format").asText("wav"); }
     public String renderOut() { return node.path("render_out").asText(""); }
     public boolean autoNewSongs() { return node.path("auto_new_songs").asBoolean(false); }

@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.29.0",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "Play a part through a real VST",
+  "notes": [
+    "jriter-cli vst render PLUGIN song.mid plays a MIDI part (or audio) through a VST installed on your PC and puts the result in Renders.",
+    "In the DAW: More, Save as .mid, run the command, then drag the render from the Browser onto the Layout.",
+    "It uses the free Plugalyzer host: jriter-cli vst path tells the app where it is, and jriter-cli vst list shows your installed VSTs.",
+    "Only tried with a stand-in host so far, so a real plugin on your PC is the true test."
+  ]
+ }, {
   "version": "4.28.0",
   "date": "2026-11-24",
   "name": "JR!TER",

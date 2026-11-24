@@ -19,6 +19,8 @@ jriter-cli scan | push [--yes] | watch [--once]
 jriter-cli push-file FILE | push-folder FOLDER
 jriter-cli render X.flp|FOLDER              FL Studio renders, the audio goes to Renders
 jriter-cli plugins X.flp|FOLDER [--json] [--vst-folder DIR]    which VSTs and FL plugins a project uses, VSTs not installed here marked
+jriter-cli vst list|path EXE                 VSTs installed here; where Plugalyzer is
+jriter-cli vst render PLUGIN IN.mid|IN.wav [--out F] [--tail S] [--param N:V] [--no-send]   play it through a real VST (Plugalyzer), result goes to Renders
 jriter-cli release ALBUM_ID [--folder DIR]   Claude Code on a RouteNote release card from /release.html (docs/ROUTENOTE.md)
 jriter-cli url jriter://release/ID           the same, from the link; `shell install` registers it
 jriter-cli flpath "C:\...\FL64.exe"

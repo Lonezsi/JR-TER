@@ -120,6 +120,7 @@ public final class Main {
                 }
                 case "render": return render(cfg, a, out);
                 case "plugins": return plugins(cfg, a, out);
+                case "vst": return vst(cfg, a, out, VstHost.processRunner());
                 case "url": {
                     var id = a.isEmpty() ? Optional.<String>empty() : Release.parseUrl(a.get(0));
                     if (id.isEmpty()) { out.println("Not a JR!TER link I know: expected jriter://release/ID"); return 2; }
@@ -224,6 +225,78 @@ public final class Main {
         return done == 0 && !failed.isEmpty() ? 1 : 0;
     }
 
+    static int vst(Config cfg, List<String> a, java.io.PrintStream out, VstHost.Runner runner) throws IOException, InterruptedException {
+        String sub = a.isEmpty() ? "" : a.remove(0);
+        switch (sub) {
+            case "list": {
+                List<Path> found = VstHost.installed(VstFolders.defaults(cfg));
+                if (found.isEmpty()) out.println("No VST plugins found in the usual folders (add more with vst_folders in client.json).");
+                for (Path p : found) out.println(p.getFileName() + "    " + p);
+                return 0;
+            }
+            case "path": {
+                if (a.isEmpty()) { out.println("Usage: jriter-cli vst path \"C:\\...\\plugalyzer.exe\""); return 2; }
+                cfg.set("plugalyzer", a.get(0)).save();
+                out.println("VST host set to " + a.get(0));
+                return 0;
+            }
+            case "render": {
+                boolean noSend = a.remove("--no-send");
+                String outOpt = opt(a, "--out"), tailOpt = opt(a, "--tail"), midiOpt = opt(a, "--midi");
+                List<String> params = new ArrayList<>();
+                String pv;
+                while ((pv = opt(a, "--param")) != null) params.add(pv);
+                if (a.size() < 2 && !(a.size() == 1 && midiOpt != null)) {
+                    out.println("Usage: jriter-cli vst render PLUGIN IN.mid|IN.wav [--midi X.mid] [--out FILE] [--tail S] [--param NAME:VALUE]... [--no-send]");
+                    return 2;
+                }
+                double tail = 2;
+                try { if (tailOpt != null) tail = Double.parseDouble(tailOpt); }
+                catch (NumberFormatException e) { out.println("--tail wants a number of seconds."); return 2; }
+                Optional<Path> exe = VstHost.findPlugalyzer(cfg);
+                if (exe.isEmpty()) {
+                    out.println("The VST host Plugalyzer was not found. Get it from " + VstHost.DOWNLOAD
+                            + "\nthen tell me where it is:\n    jriter-cli vst path \"C:\\...\\plugalyzer.exe\"");
+                    return 1;
+                }
+                List<Path> dirs = VstFolders.defaults(cfg);
+                Optional<Path> plugin = VstHost.resolve(a.get(0), dirs);
+                if (plugin.isEmpty()) { out.println("No VST called \"" + a.get(0) + "\" here. `jriter-cli vst list` shows what is installed."); return 1; }
+                Path in = a.size() > 1 ? Path.of(a.get(1)).toAbsolutePath() : null;
+                Path wav = null, mid = midiOpt == null ? null : Path.of(midiOpt).toAbsolutePath();
+                if (in != null) {
+                    String n = in.getFileName().toString().toLowerCase();
+                    if (n.endsWith(".mid") || n.endsWith(".midi")) mid = in; else wav = in;
+                }
+                for (Path p : new Path[] { wav, mid })
+                    if (p != null && !Files.isRegularFile(p)) { out.println("There is no file at " + p); return 1; }
+                Path first = wav != null ? wav : mid;
+                String stem = first.getFileName().toString().replaceAll("\\.[^.]*$", "");
+                String pname = plugin.get().getFileName().toString().replaceAll("\\.[^.]*$", "");
+                Path dest = outOpt != null ? Path.of(outOpt).toAbsolutePath() : first.resolveSibling(stem + " - " + pname + ".wav");
+                out.println("Playing through " + pname + " with " + exe.get().getFileName() + " ...");
+                Path made;
+                try { made = VstHost.render(runner, exe.get(), plugin.get(), wav, mid, dest, tail, params); }
+                catch (IOException e) { out.println(e.getMessage()); return 1; }
+                out.println("Wrote " + made);
+                if (noSend) return 0;
+                String name = pname;
+                String ext = plugin.get().getFileName().toString().toLowerCase().endsWith(".vst3") ? "vst3" : "vst2";
+                var pl = List.of(new FlProject.Plugin(ext, name, "", plugin.get().toString(), 1));
+                double now = System.currentTimeMillis() / 1000.0;
+                try {
+                    boolean added = Send.render(new Library(cfg.server(), cfg.token()), made, now, now, false,
+                            Send.pluginsHeader(pl, VstFolders.scan(dirs)));
+                    out.println(made.getFileName() + (added ? " is waiting in Renders; the DAW's Browser has it under Renders." : " was already there."));
+                } catch (RuntimeException e) { out.println("Could not send it: " + e.getMessage()); return 1; }
+                return 0;
+            }
+            default:
+                out.println("Usage:\n  jriter-cli vst list\n  jriter-cli vst path PLUGALYZER.EXE\n  jriter-cli vst render PLUGIN IN.mid|IN.wav [--midi X.mid] [--out FILE] [--tail S] [--param NAME:VALUE]... [--no-send]");
+                return 2;
+        }
+    }
+
     static int plugins(Config cfg, List<String> a, java.io.PrintStream out) {
         boolean json = a.remove("--json");
         List<Path> vstDirs = new java.util.ArrayList<>();
@@ -302,6 +375,9 @@ public final class Main {
                   jriter-cli push-folder FOLDER [--yes]
                   jriter-cli render FLP_OR_FOLDER   render with FL Studio, send to Renders
                   jriter-cli plugins FLP_OR_FOLDER [--json] [--vst-folder DIR]   plugins a project uses, missing ones marked
+                  jriter-cli vst list           VST plugins installed on this PC
+                  jriter-cli vst path PLUGALYZER.EXE   where the VST host is
+                  jriter-cli vst render PLUGIN IN.mid|IN.wav [--out FILE] [--tail S] [--param N:V] [--no-send]   play it through a real VST, send to Renders
                   jriter-cli release ALBUM_ID [--folder DIR]   start Claude Code on a downloaded RouteNote release card
                   jriter-cli url jriter://release/ID           the same, from the link on the release page
                   jriter-cli flpath FL64.EXE
