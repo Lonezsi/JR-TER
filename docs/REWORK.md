@@ -1,0 +1,107 @@
+# The JR!TER rework: the shape
+
+Decided 2026-11-21 (Wh;le, from the card on Invent;ry). This is the plan the rework tasks
+follow. Change it here if the plan changes, so the plan and the work don't drift apart.
+
+## What it becomes
+
+One server and one desktop app, with nothing in Python:
+
+| part      | now                                  | after                                          |
+|-----------|--------------------------------------|------------------------------------------------|
+| server    | Python stdlib, `server.py`, `jriter/` | Spring Boot 3, Java 21, one jar, `server/`     |
+| interface | vanilla JS in `web/js`, Svelte 5 in `ui/` on the owner's PC | the Svelte 5 + TypeScript rebuild, `ui/` |
+| PC side   | `client/*.py` (watcher, FL renders, agent token) | a Java 21 desktop app, `desktop/`, packaged with jpackage |
+| data      | SQLite per account + blobs on disk   | the **same files**, unchanged                  |
+
+### Server: Spring Boot, but not JQZZ's database
+
+Like JQZZ: Spring Boot, a Maven build, `mvn spring-boot:run` in dev, one jar on the host.
+Unlike JQZZ: no JPA and no H2. The server opens the SQLite files JR!TER already keeps
+(sqlite-jdbc + `JdbcTemplate`, the same tables and columns as `jriter/db.py` makes today) and
+the same blob folder. That gives three things for free:
+
+- every library comes over intact, because nothing moves (task 12 becomes "prove it");
+- the old Python server stays a way back: stop the jar, start `server.py`, same data (task 13);
+- the plain-text library file (`docs/library-format.md`, `library.json` v2) stays the export
+  and import, byte for byte.
+
+Schema changes wait until the Python server is retired, so the way back keeps working.
+
+The API keeps its paths and JSON shapes, so the interface doesn't care which server answers.
+Port one module at a time, in this order: accounts/auth (with the Foyer sign-in through
+`http://127.0.0.1:7000/api/account`), songs, versions, blobs, renders, lyrics, albums,
+playlists, sharing, search (the query language), the grave, the timetable, then the rest.
+Each module is done when the existing Python tests for it pass against the Spring server
+over HTTP. Keep the security fixes already made (owner-only host import, last
+X-Forwarded-For from loopback only, the sign-in limit).
+
+### Interface: keep the Svelte rebuild
+
+The Svelte 5 rebuild is the new interface. It doesn't switch to React to match JQZZ: what
+JQZZ and JR!TER share is the backend style and the look, not the UI framework, and the
+rebuild is already under way. Spring serves the built files the same way `server.py` does.
+
+Our web style means Foyer's glass and spacing: read `../foyer/shared/glass.css` and
+`glass-defs.html` off disk as today, never a copy. The CD cases, stickers, stacks, grave,
+undo, j/k, search language, light mode and guest library all come along; nothing the
+4.x line shipped is dropped.
+
+First step, before anything else: the rebuild is only on the owner's PC. It gets committed
+to this repo as `ui/` so the rest of the rework can see it.
+
+### Desktop app: Java (changed from Tauri, 2026-11-21)
+
+The plan said Tauri. The build machine has no Rust or MSVC and little free disk, and the Spring server
+already needs JDK 21 and Maven, so the app is plain Java 21 with a tray, packaged by jpackage (desktop/,
+built by desktop\build.ps1). The window is still the library in a Chromium --app window; the
+Svelte UI shows there once it is served. The token stays in client.json for now.
+
+(Original text, kept for the record:)
+
+#### Tauri
+
+A real PC app replaces `client/jriter_client.py`, `jriter_app.py`, `jriter_shell.py` and
+`flrender.py`: a tray app that watches the song folders, picks up FL Studio renders and
+uploads them, and holds the agent token. Tauri 2, because it reuses the Svelte interface
+(the app is JR!TER in a window plus the watcher) and makes a small Windows installer. The
+Rust side stays small: folder watching, starting FL Studio's render, the token in the
+Windows credential store.
+
+## Order
+
+1. Commit the Svelte rebuild (`ui/`) from the owner's PC.
+2. `server/`: Spring skeleton serving `web/` and the API module by module (task 9).
+3. Run it beside the Python server on another port against a copy of the data, until every
+   test passes and every library reads the same (task 12).
+4. New look finished in `ui/` (task 11).
+5. `desktop/` replaces `client/` (task 10).
+6. Switch the host: the "JRITER Server" task runs `hostsetup\Start-JriterJar.ps1` (the jar on 7900); `server.py` kept as the
+   way back until it hasn't been needed for a month (task 13).
+
+## Progress
+
+Task 9 (the Spring server), slice by slice. Each slice is done when `tools/parity_door.py`-style
+checks and the matching Python tests agree.
+
+- [x] 9a: skeleton, static serving, `/api/health`, the door: accounts, sessions, invites,
+  machine tokens, the guess limit, the Foyer sign-in (`server/`, `tools/parity_door.py`)
+- [x] 9b: songs, versions, blobs, renders (`Library`, `Blobs`, `AudioMeta`, three controllers; `tools/parity_library.py`)
+- [x] 9c: lyrics, arrange, artwork, vocals, albums, playlists (six controllers, `tools/parity_media.py`; grave, guest and search hooks wait for 9d)
+- [x] 9d: sharing, search, the grave, the timetable. Grave, search and timetable (`tools/parity_grave_search.py`;
+  deletes in every controller bury first, Python and Spring restore each other's graves); sound presets and sharing (shares, link invitations,
+  the guest proxy by forward, guest edits and undo, guests in vocals; `tools/parity_sharing.py`)
+- [x] 9e: export, sync, appearance, devlog, updater, youtube. Devlog (entries in `jriter/devlog.json`, read by both servers), appearance and export/import/erase done (`tools/parity_export.py`).
+  Sync and the updater done too (9e2): `SyncController` (watched folders, scan, stock, import, sample upload; `tools/parity_sync.py`)
+  and `Updater` (check, apply, now, restart, the 15-minute auto update when `JRITER_WATCHDOG=1`). Unlike Python, a pull that changed
+  `server/` rebuilds the jar with Maven (`JRITER_MVN` overrides the command) and only a good build restarts; a failed build keeps the old jar running.
+  `hostsetup/Start-JriterJar.ps1` is the launcher for the jar: it runs a copy in `server/run/` so Maven can rewrite `target/`, keeping the
+  old one as `jriter.prev.jar`.
+  YouTube done too (9e3): posts, the account file, both Google sign-ins, the mix, the upload job (resumable, with retries) and the pinned ffmpeg fetch (`Video`, `YouTube`, `YouTubeController`; `tools/parity_youtube.py`, `YouTubeUploadTest` against a local stand-in). The checks never reach Google; a real upload through Spring is untested.
+- [x] 10: desktop/ (Java app: tray, watcher, FL renders, right-click menu; 	ools/check_desktop.py). client/ kept until used on the PC.
+- [x] 12: `tools/check_libraries.py` copies the host's data and compares all 4 real libraries through Spring and Python
+  (60 files hashed, every answer equal, both servers' export v2 identical). Nothing left unported (2026-11-21).
+  Rerun it before the switch (task 13).
+- [x] 9 done 2026-11-24: check_libraries.py clean again after 4.12-4.25 (the updater follows a `live-*` checkout and
+  `/api/state` lists the daw and samples modules, 4.25.1).
+- Live 4.3.0 (never committed before) is on `main` (backend) and branch `live-4.3.0` (with the built UI bundle).

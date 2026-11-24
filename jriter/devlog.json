@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.25.1",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "The new server follows the live branch",
+  "notes": [
+    "The Spring server's updater now follows the live branch the host runs, like the Python one, so it keeps updating once the switch happens.",
+    "The Spring server now lists the DAW and Sampler modules and counts their projects and one-shots, so it answers /api/state exactly like the Python one."
+  ]
+ }, {
   "version": "4.25.0",
   "date": "2026-11-24",
   "name": "JR!TER",
