@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.24.0",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "Drag a sound where you want it",
+  "notes": [
+    "Drag a sound from the Browser onto the Drumroll to add it as a channel, onto a track to make that track play it, or onto the Layout to place it as an audio clip where you let go.",
+    "Inst and Drum still work, and one Undo takes a drop back."
+  ]
+ }, {
   "version": "4.23.0",
   "date": "2026-11-23",
   "name": "JR!TER",

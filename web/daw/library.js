@@ -51,6 +51,7 @@ export const folderOf = (file) => String(file.webkitRelativePath || file._path |
 // Sounds, and MIDI files (a pack's melodies sit next to its hits; they drop into patterns).
 export const isSound = (file) => /\.(wav|mp3|ogg|opus|flac|m4a|aiff?|midi?)$/i.test(file.name) || /^audio\//.test(file.type);
 export const MIDI_TYPE = "application/x-jriter-midi";
+export const SOUND_TYPE = "application/x-jriter-sound"; // a Browser sound dragged to the Drumroll, a track or the Layout
 
 // Upload files one by one. Returns { added, skipped, failed } counts.
 export async function uploadSamples(files, onProgress) {

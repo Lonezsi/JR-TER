@@ -185,6 +185,37 @@ try {
     need(await vis("#samplerview"), "library not revealed");
     need((await js(`document.body.dataset.view`)) === "song", "centre view changed");
   });
+  await scenario("a sound dragged from the Browser lands on the Drumroll, a track and the Layout", async () => {
+    const TONE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+    const drop = (sel, fx = 0.5, fy = 0.5) => js(`(() => {
+      const el = document.querySelector(${JSON.stringify(sel)}), r = el.getBoundingClientRect();
+      const dt = new DataTransfer();
+      dt.setData("application/x-jriter-sound", JSON.stringify({ name: "Kick", src: ${JSON.stringify(TONE)}, seconds: 0.1, kind: "oneshot" }));
+      const o = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + r.width * ${fx}, clientY: r.top + r.height * ${fy} };
+      el.dispatchEvent(new DragEvent("dragover", o)); el.dispatchEvent(new DragEvent("drop", o));
+    })()`);
+    const D = "window.jriterDaw";
+    await js(`${D}.load(JSON.stringify(${D}.song()))`);
+    let n = (await js(`${D}.song()`)).tracks.length;
+    await js(`${D}.setView("rack")`); await sleep(200);
+    await drop("#rackview .rk-rows");
+    let s = await js(`${D}.song()`);
+    need(s.tracks.length === n + 1 && s.tracks[n].instrument === "sampler" && s.tracks[n].sample.src === TONE, "Drumroll drop: " + JSON.stringify(s.tracks.map((t) => t.instrument)));
+    n = s.tracks.length;
+    await drop("#tracks .track");
+    s = await js(`${D}.song()`);
+    need(s.tracks.length === n && s.tracks[0].instrument === "sampler" && s.tracks[0].sample.src === TONE, "track drop: " + s.tracks[0].instrument);
+    await js(`${D}.setView("song")`); await sleep(200);
+    const lane = await rect('#songview .sl-lane[data-lane="1"]');
+    const bar = await js(`parseFloat(getComputedStyle(document.querySelector("#songview .sl-grid")).getPropertyValue("--bar"))`);
+    const gl = (await rect("#songview .sl-grid")).l;
+    await drop('#songview .sl-lane[data-lane="1"]', (gl + 2.5 * bar - lane.l) / lane.w, 0.5);
+    const clips = await js(`${D}.clips()`), last = clips[clips.length - 1];
+    s = await js(`${D}.song()`);
+    need(s.tracks.length === n + 1 && last && last.track === s.tracks.length - 1 && last.lane === 1 && Math.floor(last.start) === 2, "Layout drop: " + JSON.stringify(last));
+    await click("#undo"); await sleep(150);
+    need((await js(`${D}.song()`)).tracks.length === n && (await js(`${D}.clips()`)).length === clips.length - 1, "one Undo should take the Layout drop back");
+  });
   await scenario("the roll still draws when picked, and takes the room the docks leave", async () => {
     await click("#view-roll");
     const r = await rect("#rollbox");

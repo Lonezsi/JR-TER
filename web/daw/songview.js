@@ -147,12 +147,19 @@ export function mountSong(el, api) {
   el.addEventListener("pointerup", finish);
   el.addEventListener("pointercancel", finish);
 
+  // Where a pointer is on the grid: its lane, and the bar it snaps down to.
+  function spotAt(e) {
+    const grid = el.querySelector(".sl-grid");
+    if (!grid) return null;
+    const at = barAt(e, grid), sb = step() / 4;
+    return { lane: laneAt(e, grid), bar: Math.max(0, sb > 0 ? snapFloor(at, sb) : Math.floor(at * QB) / QB) };
+  }
+
   el.addEventListener("click", (e) => {
     const cell = e.target.closest(".sl-cell");
     if (cell) {
       // The cell is a whole bar; the tap lands somewhere in it, and snaps to the grid.
-      const grid = el.querySelector(".sl-grid"), at = barAt(e, grid), sb = step() / 4;
-      const song = api.song(), lane = +cell.dataset.lane, bar = Math.max(0, sb > 0 ? snapFloor(at, sb) : Math.floor(at * QB) / QB);
+      const song = api.song(), lane = +cell.dataset.lane, bar = spotAt(e).bar;
       api.change(() => {
         if (typeof brush === "string") { const t = +brush.slice(1); selected = addAudioClip(song, t, lane, bar, clipBars(song.tracks[t].sample, song.bpm)); }
         else selected = addClip(song, brush, lane, bar);
@@ -247,5 +254,5 @@ export function mountSong(el, api) {
     snapSet.song = sel.value; saveSnap(localStorage, { song: snapSet.song });
     render();
   });
-  return { render, playhead, people: (list) => { others = list || []; drawPeople(); }, paintWith: (b) => { brush = b; render(); }, zoom: () => zoomS, setZoom: (z) => setZoomS(z), snap: () => ({ setting: snapSet.song, beats: step() }), setSnap: (v) => { snapSet.song = v; saveSnap(localStorage, { song: v }); render(); } };
+  return { render, playhead, spotAt, people: (list) => { others = list || []; drawPeople(); }, paintWith: (b) => { brush = b; render(); }, zoom: () => zoomS, setZoom: (z) => setZoomS(z), snap: () => ({ setting: snapSet.song, beats: step() }), setSnap: (v) => { snapSet.song = v; saveSnap(localStorage, { song: v }); render(); } };
 }
