@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.26.0",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "See what plugins a song used",
+  "notes": [
+    "A song whose FL render sent a plugin list now has a Plugins tab, also in the command palette.",
+    "It lists the VSTs and FL plugins per version, with how often each is used.",
+    "Plugins that were not installed on the PC that rendered it are marked missing here."
+  ]
+ }, {
   "version": "4.25.2",
   "date": "2026-11-24",
   "name": "JR!TER",

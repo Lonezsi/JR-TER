@@ -1,0 +1,14 @@
+/* Plugins page: only what release.css lacks. */
+.chips { display: flex; flex-wrap: wrap; gap: var(--r-s2); }
+.chips button {
+  font: inherit; color: var(--r-fg); background: var(--r-panel); border: 1px solid var(--r-line);
+  border-radius: 999px; padding: var(--r-s1) var(--r-s3); cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.chips button[aria-pressed="true"] { border-color: var(--r-acc); background: var(--r-acc); color: var(--r-acc-ink); }
+.tag { font-size: 11px; padding: 1px var(--r-s2); border-radius: 999px; border: 1px solid var(--r-line); color: var(--r-mute); }
+.tag.warn { color: var(--r-warn); border-color: var(--r-warn); }
+.uses { color: var(--r-mute); }
+.tracks .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.back { color: var(--r-mute); text-decoration: none; }
+@media (prefers-reduced-motion: reduce) { .chips button { transition: none; } }
