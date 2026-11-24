@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.25.2",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "One command to switch the host",
+  "notes": [
+    "The host can switch to the Spring server with one command, and back with one: hostsetup/Switch-JriterServer.ps1 -To jar or -To python.",
+    "It saves the scheduled task first and goes back to Python by itself if the new server does not answer."
+  ]
+ }, {
   "version": "4.25.1",
   "date": "2026-11-24",
   "name": "JR!TER",

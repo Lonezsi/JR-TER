@@ -36,6 +36,18 @@ public class DawController {
         this.accounts = accounts;
     }
 
+    /** Refuse anything that is not a DAW project of a sane size (versions use it too). */
+    static void checkText(Object t) {
+        if (!(t instanceof String text) || text.length() > MAX_TEXT) throw new ApiError("That project is too big.", 413);
+        try {
+            JsonNode parsed = JSON.readTree(text);
+            if (parsed == null || !parsed.isObject() || !parsed.path("tracks").isArray())
+                throw new ApiError("That is not a DAW project.");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new ApiError("That is not a DAW project.");
+        }
+    }
+
     private static Map<String, Object> project(Library.Db db, Object songId) {
         Map<String, Object> row = db.one("SELECT text, rev FROM daw_projects WHERE song_id = ?", songId);
         Map<String, Object> out = new LinkedHashMap<>();
@@ -100,14 +112,8 @@ public class DawController {
         Map<String, Object> body = Body.json(req);
         Object t = body.get("text");
         if (t == null) throw new ApiError("text is needed");
-        if (!(t instanceof String text) || text.length() > MAX_TEXT) throw new ApiError("That project is too big.", 413);
-        try {
-            JsonNode parsed = JSON.readTree(text);
-            if (parsed == null || !parsed.isObject() || !parsed.path("tracks").isArray())
-                throw new ApiError("That is not a DAW project.");
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new ApiError("That is not a DAW project.");
-        }
+        checkText(t);
+        String text = (String) t;
         long base = 0;
         if (body.get("base") instanceof Number n) base = n.longValue();
         long me = Api.actor(req);

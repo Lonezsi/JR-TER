@@ -173,6 +173,7 @@ public class Library {
         {"renders", "trouble", "TEXT NOT NULL DEFAULT ''"},
         {"renders", "plugins", "TEXT NOT NULL DEFAULT ''"},
         {"versions", "plugins", "TEXT NOT NULL DEFAULT ''"},
+        {"versions", "daw", "TEXT NOT NULL DEFAULT ''"},
         {"vocal_takes", "fx", "INTEGER NOT NULL DEFAULT 1"},
         {"albums", "opened", "INTEGER NOT NULL DEFAULT 0"},
         {"albums", "stickers", "TEXT NOT NULL DEFAULT ''"},
