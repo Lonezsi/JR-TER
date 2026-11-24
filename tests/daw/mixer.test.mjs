@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, addBus, removeBus, loops, MAX_BUSES } from "../../web/daw/mixer.js";
+import { newFx, moveFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, addBus, removeBus, loops, MAX_BUSES } from "../../web/daw/mixer.js";
 import { songToText, textToSong } from "../../web/daw/midi.js";
 
 const seeded = () => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); };
@@ -119,4 +119,11 @@ test("the text format keeps the mixer; a version 4 file opens with defaults", ()
   assert.equal(old.tracks[0].pan, 0);
   assert.deepEqual(old.tracks[0].fx, []);
   assert.deepEqual(old.mixer, defaultMixer());
+});
+
+test("moveFx reorders in place, clamps, and ignores a bad index", () => {
+  assert.deepEqual(moveFx(["a", "b", "c"], 0, 2), ["b", "c", "a"]);
+  assert.deepEqual(moveFx(["a", "b", "c"], 2, 0), ["c", "a", "b"]);
+  assert.deepEqual(moveFx(["a", "b", "c"], 0, 9), ["b", "c", "a"]);
+  assert.deepEqual(moveFx(["a", "b", "c"], 7, 0), ["a", "b", "c"]);
 });

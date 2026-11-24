@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.25.0",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "Drag effects into order",
+  "notes": [
+    "In the mixer, drag an effect by its grip to move it up or down the chain; a line shows where it lands.",
+    "The grip also answers the up and down arrow keys, and one Undo puts a move back."
+  ]
+ }, {
   "version": "4.24.0",
   "date": "2026-11-24",
   "name": "JR!TER",
