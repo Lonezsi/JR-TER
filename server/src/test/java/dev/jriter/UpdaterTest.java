@@ -17,6 +17,15 @@ class UpdaterTest {
     }
 
     @Test
+    void followsTheLiveBranch() {
+        assertEquals("live-4.3.0", Updater.pickBranch(null, "live-4.3.0"));
+        assertEquals("main", Updater.pickBranch("", "main"));
+        assertEquals("main", Updater.pickBranch(null, "feature-x"));
+        assertEquals("main", Updater.pickBranch("main", "live-4.3.0"));
+        assertEquals("main", Updater.pickBranch(null, null));
+    }
+
+    @Test
     void webAndDevlogDoNot() {
         assertFalse(Updater.needsRebuild(List.of("web/js/app.js", "jriter/devlog.json", "docs/REWORK.md")));
         assertFalse(Updater.needsRebuild(List.of()));

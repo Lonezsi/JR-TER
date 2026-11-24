@@ -60,7 +60,18 @@ public class Updater {
 
     String repoName() { return env("JRITER_REPO", "Lonezsi/JR-TER"); }
 
-    String branch() { return env("JRITER_BRANCH", "main"); }
+    /** JRITER_BRANCH if set; else the checkout's branch when it is live-*; else main. Same rule as updater.py _branch(). */
+    static String pickBranch(String fromEnv, String onBranch) {
+        if (fromEnv != null && !fromEnv.isBlank()) return fromEnv.trim();
+        String here = onBranch == null ? "" : onBranch.strip();
+        return here.startsWith("live-") ? here : "main";
+    }
+
+    String branch() {
+        String fromEnv = System.getenv("JRITER_BRANCH");
+        if (fromEnv != null && !fromEnv.isBlank()) return fromEnv.trim();
+        return pickBranch(null, git("rev-parse", "--abbrev-ref", "HEAD")[0]);
+    }
 
     private static String env(String name, String def) {
         String v = System.getenv(name);

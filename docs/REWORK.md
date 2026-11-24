@@ -102,4 +102,6 @@ checks and the matching Python tests agree.
 - [x] 12: `tools/check_libraries.py` copies the host's data and compares all 4 real libraries through Spring and Python
   (60 files hashed, every answer equal, both servers' export v2 identical). Nothing left unported (2026-11-21).
   Rerun it before the switch (task 13).
+- [x] 9 done 2026-11-24: check_libraries.py clean again after 4.12-4.25 (the updater follows a `live-*` checkout and
+  `/api/state` lists the daw and samples modules, 4.25.1).
 - Live 4.3.0 (never committed before) is on `main` (backend) and branch `live-4.3.0` (with the built UI bundle).

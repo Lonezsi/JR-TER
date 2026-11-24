@@ -25,7 +25,7 @@ public class CoreController {
     static final List<String> EFFECT_KINDS = List.of("eq", "comp", "drive", "delay", "reverb", "width", "gain", "limiter");
     /** config.MODULES, sorted. */
     static final List<String> MODULES = List.of("albums", "appearance", "arrange", "artwork", "auth", "core",
-            "devlog", "export", "grave", "lyrics", "orarend", "playlists", "renders", "search", "sharing", "songs",
+            "daw", "devlog", "export", "grave", "lyrics", "orarend", "playlists", "renders", "samples", "search", "sharing", "songs",
             "sound", "sync", "updater", "versions", "vocals", "youtube");
     private static final long STARTED = System.currentTimeMillis();
 
@@ -231,7 +231,9 @@ public class CoreController {
         s.put("auth", () -> m("protected", accounts.count() > 0 || auth.hasPassword(),
                 "accounts", accounts.count(), "is_owner", actor == Accounts.OWNER,
                 "who", accounts.pub(accounts.byId(actor))));
-        s.put("export", () -> m("tables", ExportController.TAKEN.size()));
+        s.put("daw", () -> m("projects", n(db.one("SELECT COUNT(*) AS n FROM daw_projects"), "n")));
+        s.put("samples", () -> m("samples", n(db.one("SELECT COUNT(*) AS n FROM samples WHERE deleted_at = 0"), "n")));
+        s.put("export", () -> m("tables",ExportController.TAKEN.size()));
         s.put("grave", () -> m("count", db.tableExists("grave") ? n(db.one("SELECT COUNT(*) AS n FROM grave"), "n") : 0,
                 "keep_days", Grave.KEEP_DAYS));
         s.put("lyrics", () -> m("alternatives", n(db.one("SELECT COUNT(*) AS n FROM lyric_sheets"), "n")));
