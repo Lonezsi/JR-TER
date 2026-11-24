@@ -78,8 +78,9 @@ def test_the_notice_names_every_place_the_code_can_reach(request):
     notice = _read("legal.html")
     found = {}
     for here, dirs, names in os.walk(ROOT):
+        # Dot folders are local build output and tool state (.build-song, .claude), never shipped.
         dirs[:] = [d for d in dirs
-                   if d not in (".git", "__pycache__", "tests", "hostsetup", "node_modules")]
+                   if not d.startswith(".") and d not in ("__pycache__", "tests", "hostsetup", "node_modules")]
         for name in names:
             if os.path.splitext(name)[1] not in (".py", ".js", ".html", ".css"):
                 continue

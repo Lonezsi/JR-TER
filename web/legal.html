@@ -310,6 +310,12 @@ body { padding: var(--s6) var(--s5) 20vh; }
     thumbnail, fetched from YouTube's image server when you open that panel.
   </li>
   <li>
+    <strong>yt3.ggpht.com and googleusercontent.com.</strong> When you have connected a
+    YouTube channel, its picture is fetched once by this server from Google's image servers
+    and kept here, so your browser never goes there for it. Only the server's address
+    reaches Google, not yours.
+  </li>
+  <li>
     <strong>accounts.google.com.</strong> Only when you press Sign in with Google to
     connect an account. Your browser goes to Google's own sign in page, you choose an
     account there, and Google sends you back here. Nothing about your library goes with
@@ -329,14 +335,6 @@ body { padding: var(--s6) var(--s5) 20vh; }
     <strong>github.com and api.github.com.</strong> Only when you ask JR!TER to fetch
     ffmpeg, which it needs to turn a mix into a video. It downloads one pinned build and
     checks it against a digest written into the source before unpacking it.
-  </li>
-  <li>
-    <strong>A plugin's own site.</strong> Only when you add a Plugin effect in the DAW
-    mixer, type its address and press Allow for that site. Your browser then fetches the
-    plugin's code from there, so that site sees your address and browser, and the plugin
-    runs in the page with your sign in. Nothing loads from a site you have not allowed,
-    the list of allowed sites stays in your own browser, and a plugin on this server
-    needs no Allow.
   </li>
 </ul>
 
