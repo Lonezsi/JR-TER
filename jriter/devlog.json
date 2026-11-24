@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.27.0",
+  "date": "2026-11-24",
+  "name": "JR!TER",
+  "title": "Plugins in the mixer",
+  "notes": [
+    "The DAW mixer has a new + Plugin effect that loads a Web Audio Module (the web's version of a VST) from an address you type.",
+    "A plugin is someone else's code, so it only loads after you press Allow for its site, once per browser. Shared songs keep their plugins off until you allow them.",
+    "Open shows the plugin's own window; closing it keeps its settings in the song. Bounce waits for plugins and tells you if one was left out.",
+    "Real VST files still need a native host, so they are not loaded; this is the browser's way in."
+  ]
+ }, {
   "version": "4.26.0",
   "date": "2026-11-24",
   "name": "JR!TER",

@@ -13,6 +13,7 @@
 // The master ends in a fixed limiter that is not saved.
 // An effect is { type, on, ...settings }. Types and their settings are in FX below:
 // [min, max, default, unit].  Unknown types are dropped, numbers are clamped.
+// The "wam" type is a plugin: { url, name, state } (state is the plugin's own saved settings, at most 64 KB of JSON).
 // Old song files (v1-v4) have none of this and open with defaults.
 
 export const MAX_FX = 8;
@@ -24,8 +25,13 @@ export const FX = {
   dist:   { label: "Drive",  params: { drive: [0, 1, 0.4, ""], mix: [0, 1, 1, ""] } },
   delay:  { label: "Delay",  params: { time: [0.05, 1.5, 0.375, "s"], feedback: [0, 0.9, 0.35, ""], mix: [0, 1, 0.3, ""] } },
   reverb: { label: "Reverb", params: { size: [0.3, 6, 2, "s"], mix: [0, 1, 0.3, ""] } },
+  // A Web Audio Module (WAM 2) plugin loaded from an address: { url, name, state }. No knobs here; the plugin has its own window.
+  wam:    { label: "Plugin", params: {} },
 };
-export const FX_TYPES = ["eq", "comp", "dist", "delay", "reverb"];
+export const FX_TYPES = ["eq", "comp", "dist", "delay", "reverb", "wam"];
+export const WAM_STATE_MAX = 65536;
+// A plugin address: https, or a path on this server. Anything else is dropped.
+export const wamUrl = (u) => (typeof u === "string" && u.length <= 500 && /^(https:\/\/[^\s]+|\/(?!\/)[^\s]*)$/.test(u) ? u : "");
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const num = (v, d) => (Number.isFinite(v) ? v : d);
@@ -35,6 +41,7 @@ export function newFx(type) {
   if (!spec) throw new Error("Unknown effect " + type);
   const fx = { type, on: true };
   for (const [k, [, , d]] of Object.entries(spec.params)) fx[k] = d;
+  if (type === "wam") Object.assign(fx, { url: "", name: "", state: null });
   return fx;
 }
 
@@ -53,6 +60,13 @@ export function cleanFx(list) {
     if (!x || !FX[x.type] || out.length >= MAX_FX) continue;
     const fx = { type: x.type, on: x.on !== false };
     for (const [k, [lo, hi, d]] of Object.entries(FX[x.type].params)) fx[k] = clamp(num(x[k], d), lo, hi);
+    if (x.type === "wam") {
+      fx.url = wamUrl(x.url);
+      fx.name = typeof x.name === "string" ? x.name.slice(0, 80) : "";
+      let st = null;
+      try { st = x.state != null && JSON.stringify(x.state).length <= WAM_STATE_MAX ? JSON.parse(JSON.stringify(x.state)) : null; } catch { st = null; }
+      fx.state = st;
+    }
     out.push(fx);
   }
   return out;
@@ -182,4 +196,6 @@ export function level(samples) {
   return p <= 0.001 ? -60 : Math.max(-60, 20 * Math.log10(p));
 }
 
-export const chainKey = (fx) => fx.map((f) => f.type + (f.on ? "1" : "0")).join(",");
+export const chainKey = (fx) => fx.map((f) => f.type + (f.on ? "1" : "0") + (f.type === "wam" ? "@" + f.url : "")).join(",");
+// Where a plugin address comes from: "" for this server, else its origin (what the person allows).
+export const pluginOrigin = (u) => (/^https:\/\//.test(u || "") ? new URL(u).origin : "");

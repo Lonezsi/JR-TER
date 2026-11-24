@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newFx, moveFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, addBus, removeBus, loops, MAX_BUSES } from "../../web/daw/mixer.js";
+import { newFx, moveFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, WAM_STATE_MAX, pluginOrigin, addBus, removeBus, loops, MAX_BUSES } from "../../web/daw/mixer.js";
 import { songToText, textToSong } from "../../web/daw/midi.js";
 
 const seeded = () => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); };
@@ -126,4 +126,41 @@ test("moveFx reorders in place, clamps, and ignores a bad index", () => {
   assert.deepEqual(moveFx(["a", "b", "c"], 2, 0), ["c", "a", "b"]);
   assert.deepEqual(moveFx(["a", "b", "c"], 0, 9), ["b", "c", "a"]);
   assert.deepEqual(moveFx(["a", "b", "c"], 7, 0), ["a", "b", "c"]);
+});
+
+test("a plugin effect has an address, a name and a saved state", () => {
+  const f = newFx("wam");
+  assert.deepEqual([f.type, f.on, f.url, f.name, f.state], ["wam", true, "", "", null]);
+});
+
+test("cleanFx keeps https and same-server plugin addresses and drops the rest", () => {
+  const out = cleanFx([
+    { type: "wam", url: "https://plugins.example/x.js", name: "X", state: { a: 1 } },
+    { type: "wam", url: "/daw/vendor/wam/test-gain.js" },
+    { type: "wam", url: "http://plugins.example/x.js" },
+    { type: "wam", url: "javascript:alert(1)" },
+    { type: "wam", url: "//evil.example/x.js" },
+    { type: "wam", url: "https://a.example/" + "x".repeat(600) },
+  ]);
+  assert.deepEqual(out.map((f) => f.url), ["https://plugins.example/x.js", "/daw/vendor/wam/test-gain.js", "", "", "", ""]);
+  assert.deepEqual(out[0].state, { a: 1 });
+  assert.equal(out[1].state, null);
+});
+
+test("a plugin's saved state is dropped when it is too big", () => {
+  const [f] = cleanFx([{ type: "wam", url: "/p.js", state: { blob: "x".repeat(WAM_STATE_MAX) } }]);
+  assert.equal(f.state, null);
+});
+
+test("chainKey changes when a plugin's address does, and pluginOrigin says whose it is", () => {
+  const a = [{ type: "wam", on: true, url: "/a.js" }], b = [{ type: "wam", on: true, url: "/b.js" }];
+  assert.notEqual(chainKey(a), chainKey(b));
+  assert.equal(pluginOrigin("https://plugins.example/x/y.js"), "https://plugins.example");
+  assert.equal(pluginOrigin("/a.js"), "");
+});
+
+test("plugins survive the song text round trip", () => {
+  const song = textToSong(songToText({ ...textToSong(JSON.stringify({ format: "jriter-daw", version: 1, bpm: 120, bars: 1, tracks: [{ name: "T", instrument: "piano", notes: [], fx: [{ type: "wam", url: "https://p.example/x.js", name: "X", state: { k: [1, 2] } }] }] })) }));
+  const f = song.tracks[0].fx[0];
+  assert.deepEqual([f.type, f.url, f.name, f.state], ["wam", "https://p.example/x.js", "X", { k: [1, 2] }]);
 });

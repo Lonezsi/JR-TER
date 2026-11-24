@@ -200,6 +200,32 @@ try {
     need((await order()) === "delay,eq", "arrow gave " + (await order()));
     need((await js(`document.activeElement.dataset.grip`)) === "1", "focus did not follow the move");
   });
+  await scenario("a Plugin effect loads a WAM plugin from an address, opens its window, and keeps its state", async () => {
+    await fresh(); await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`document.querySelector('#mixerview [data-add="wam"]').click()`); await sleep(300);
+    need(await vis("#mixerview .mx-wurl"), "no address box on a Plugin effect: " + (await js(`document.querySelector("#mixerview .mx-chain")?.innerHTML.slice(0,400) + " wurl=" + JSON.stringify(document.querySelector("#mixerview .mx-wurl")?.getBoundingClientRect()) + " fx=" + JSON.stringify(window.jriterDaw.song().tracks[0].fx.map((f) => f.type)) + " sel=" + document.querySelectorAll("#mixerview .mx-fx").length + " adds=" + [...document.querySelectorAll("#mixerview [data-add]")].map((x) => x.dataset.add).join()`)));
+    await js(`(() => { const i = document.querySelector("#mixerview .mx-wurl"); i.value = "/daw/vendor/wam/test-gain.js"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    for (let i = 0; i < 120 && !(await vis('#mixerview [data-fx="open"]')); i++) await sleep(100);
+    need(await vis('#mixerview [data-fx="open"]'), "the plugin did not load: " + (await js(`document.querySelector("#mixerview .mx-wst")?.textContent + " " + JSON.stringify(window.jriterDaw.plugins())`)));
+    await click('#mixerview [data-fx="open"]'); await sleep(200);
+    need(await vis("#test-plugin-gui"), "the plugin window did not show its own controls");
+    await js(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`); await sleep(300);
+    need(!(await vis("#test-plugin-gui")), "Escape did not close the plugin window");
+    const fx = await js(`JSON.stringify(window.jriterDaw.song().tracks[0].fx)`);
+    need(/"state":\{"gain":0\.5\}/.test(fx), "the plugin state was not kept in the song: " + fx);
+    await js(`window.jriterDaw.setView("song")`);
+  });
+  await scenario("a Plugin address on another site is blocked until Allow, and nothing is loaded from it", async () => {
+    await fresh(); await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`document.querySelector('#mixerview [data-add="wam"]').click()`); await sleep(300);
+    await js(`(() => { const i = document.querySelector("#mixerview .mx-wurl"); i.value = "https://plugins.example.invalid/x.js"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`); await sleep(300);
+    need(await vis('#mixerview [data-fx="allow"]'), "no Allow button for a site that was not allowed");
+    need(!(await vis('#mixerview [data-fx="open"]')), "a blocked plugin offers Open");
+    need(/Not allowed/.test(await js(`document.querySelector("#mixerview .mx-wst")?.textContent`)), "status does not say it is blocked");
+    await js(`(() => { const i = document.querySelector("#mixerview .mx-wurl"); i.value = "javascript:alert(1)"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`); await sleep(200);
+    need((await js(`JSON.stringify(window.jriterDaw.song().tracks[0].fx)`)).indexOf("javascript") < 0, "a javascript: address was kept");
+    await js(`window.jriterDaw.setView("song")`); await sleep(100);
+  });
   await scenario("the Sampler tab hides and shows the left dock; setView('sampler') only reveals it", async () => {
     await click("#view-sampler");
     need(!(await vis("#samplerview")), "library still shown");

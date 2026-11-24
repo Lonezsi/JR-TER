@@ -331,10 +331,12 @@ body { padding: var(--s6) var(--s5) 20vh; }
     checks it against a digest written into the source before unpacking it.
   </li>
   <li>
-    <strong>raw.githubusercontent.com and tailscale.com.</strong> Named on the "Run your own"
-    page, as an install line you copy and a link you can follow. JR!TER never loads either
-    itself; your browser only goes there if you click the link, and the install line only
-    runs where you paste it.
+    <strong>A plugin's own site.</strong> Only when you add a Plugin effect in the DAW
+    mixer, type its address and press Allow for that site. Your browser then fetches the
+    plugin's code from there, so that site sees your address and browser, and the plugin
+    runs in the page with your sign in. Nothing loads from a site you have not allowed,
+    the list of allowed sites stays in your own browser, and a plugin on this server
+    needs no Allow.
   </li>
 </ul>
 

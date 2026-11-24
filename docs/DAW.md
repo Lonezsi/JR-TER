@@ -7,6 +7,14 @@ dialog at the top of the page (`.ins-scrim`, in `samplerview.js`), opened by `sa
 Browser. `knob.js` is the one knob control (`knob()`, `wireKnobs()`). `resample` in `daw.js` renders the set
 sound offline and uploads it to One-shots/Resampled.
 
+**Plugins (4.27.0).** A Plugin effect (`wam`, in `FX_TYPES`) loads a Web Audio Module (WAM 2) from an address:
+`{ url, name, state }` in the effect chain, `url` https or a path on this server (`wamUrl`), `state` the plugin's own
+settings (at most 64 KB). `wamhost.js` loads it (host SDK vendored in `web/daw/vendor/wam/`) only for a site the
+person pressed Allow for in this browser; `mixgraph.js` passes sound straight through until it is loaded, and
+`mix.ready()` / `mix.plugins()` say how it went. The mixer card shows the address, a status, Allow and Open (the
+plugin's own window, the same kind of dialog as the sampler); Bounce waits for plugins and says if one was left out.
+Tests: `tests/daw/mixer.test.mjs`, and `e2e-studio.mjs` with `web/daw/vendor/wam/test-gain.js`. See docs/VST.md.
+
 **Routing, MIDI, the runway (4.19.0).** Song format v10: any number of buses (2..16, `addBus`, `removeBus`),
 a send per bus on every track, and `out` on tracks and buses (`m` or `b<i>`); `cleanMixer` sends a bus that
 would loop (`loops`) to the master. `mixgraph.js` builds buses on demand and rewires an output only when it

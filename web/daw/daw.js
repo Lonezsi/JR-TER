@@ -561,6 +561,8 @@ function audio() {
   mix = createMixer(ctx);
 }
 function syncGains() {
+  // A song with a plugin starts the audio engine early (suspended until a press) so the plugin can load and show its window.
+  if (!ctx && ((song.mixer && song.mixer.master.fx) || []).concat(...song.tracks.map((t) => t.fx || []), ...((song.mixer && song.mixer.buses) || []).map((b) => b.fx || [])).some((f) => f.type === "wam" && f.url)) audio();
   if (!ctx) return;
   mix.sync(song);
 
@@ -640,6 +642,9 @@ async function bounce() {
     const off = new OfflineAudioContext(2, Math.ceil(secs * 44100), 44100);
     const syn = createSynth(off), m = createMixer(off);
     m.sync(song);
+    await m.ready();
+    const lacking = m.plugins().filter((p) => p.status !== "on");
+    if (lacking.length) toast("Bouncing without " + lacking.map((p) => p.fx.name || p.fx.url || "a plugin").join(", ") + " (not allowed here, or it would not load).");
     await Promise.all(song.tracks.filter((t) => t.sample).map((t) => bufferOf(t.sample.src).catch(() => null)));
     const getBuf = (src) => (buffers.get(src) || {}).buf || null;
     for (const j of stretchJobs()) await j().catch(() => null);
@@ -1149,6 +1154,7 @@ const rackUI = mountRack($("rackview"), {
 const mixUI = mountMixer($("mixerview"), {
   song: () => song, change: edit, snap, pushUndo, save, toast, undo: doUndo, sync: syncGains, selected: () => sel,
   select: (i) => { sel = i; selNote = null; renderTracks(); },
+  plugins: () => (mix ? mix.plugins() : []), pluginsReady: () => (mix ? mix.ready() : Promise.resolve()),
 });
 const samplerUI = mountSampler($("samplerview"), {
   song: () => song, selected: () => sel, change: edit, snap, pushUndo, save, toast, addSampler, placeOnSong,
@@ -1169,6 +1175,7 @@ const songUI = mountSong($("songview"), {
 addEventListener("error", (e) => toast("Something went wrong: " + (e.message || "unknown error")));
 addEventListener("unhandledrejection", (e) => toast("Something went wrong: " + ((e.reason && e.reason.message) || e.reason)));
 window.jriterDaw = {
+  plugins: () => (mix ? mix.plugins().map((p) => ({ url: p.fx.url, status: p.status, error: p.error })) : null),
   song: () => { const j = JSON.parse(songToText(song)); j.tracks.forEach((t, i) => { t.notes = song.tracks[i].notes.map((n) => ({ ...n })); t.steps = JSON.parse(JSON.stringify(song.tracks[i].steps)); }); return j; },
   pattern: () => song.pattern,
   mode: () => song.mode,

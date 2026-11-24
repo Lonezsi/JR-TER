@@ -5,6 +5,8 @@
 //   mix.master()   a node that goes straight to the master (previews)
 //   mix.sync(song) make the graph match the song (cheap; call after any change)
 //   mix.cut()      silence hanging tails
+//   mix.ready()    a promise that settles when every plugin that is loading has loaded or failed
+//   mix.plugins()  [{ fx, status: "loading"|"on"|"blocked"|"failed", error, inst }] for the plugin effects now in the graph
 //   mix.levels()   { tracks: [dB...], buses: [dB...], master: dB } for the meters
 //
 // Track: input -> inserts -> pan -> fader -> meter -> its out (the master or a bus), and
@@ -14,6 +16,7 @@
 // Master: bus -> inserts -> volume -> limiter -> meter -> speakers.
 // Outputs are rewired only when they change; mixer.js keeps buses from going round in a loop.
 import { FX, ensureMix, trackGain, impulse, distCurve, level, chainKey } from "./mixer.js";
+import { allowed, loadPlugin } from "./wamhost.js";
 
 export function createMixer(ctx) {
   const gain = (v = 1) => { const g = ctx.createGain(); g.gain.value = v; return g; };
@@ -27,7 +30,31 @@ export function createMixer(ctx) {
     inp.connect(dry); dry.connect(out); wetOut.connect(wet); wet.connect(out);
     return { out, mix: (m) => { ease(dry.gain, 1 - m / 2); ease(wet.gain, m); } };
   }
+  // Plugins (WAM): sound passes straight through until the plugin has loaded, and for good if it is
+  // blocked (its site not allowed here) or fails. `live` holds one status per plugin in the graph.
+  const live = new Set(), pending = new Set();
+  function plugin(fx) {
+    const inp = gain(1), out = gain(1);
+    inp.connect(out);
+    const st = { fx, status: "blocked", error: "", inst: null };
+    live.add(st);
+    if (fx.url && allowed(fx.url)) {
+      st.status = "loading";
+      const job = loadPlugin(ctx, fx.url, fx.state).then((inst) => {
+        if (!live.has(st)) { inst.destroy(); return; } // taken out while loading
+        st.inst = inst; st.status = "on";
+        inp.disconnect(); inp.connect(inst.node); inst.node.connect(out);
+      }, (e) => { st.status = "failed"; st.error = (e && e.message) || "The plugin would not load."; })
+        .finally(() => pending.delete(job));
+      pending.add(job);
+    }
+    return { in: inp, out, set: () => {}, destroy: () => {
+      live.delete(st);
+      if (st.inst) { try { st.inst.node.disconnect(); } catch { /* gone */ } st.inst.destroy(); st.inst = null; }
+    } };
+  }
   function build(fx) {
+    if (fx.type === "wam") return plugin(fx);
     if (fx.type === "eq") {
       const lo = ctx.createBiquadFilter(), mid = ctx.createBiquadFilter(), hi = ctx.createBiquadFilter();
       lo.type = "lowshelf"; lo.frequency.value = 200;
@@ -76,18 +103,18 @@ export function createMixer(ctx) {
     let key = null, nodes = [];
     head.connect(tail);
     return (fxList) => {
-      const live = fxList.filter((f) => f.on);
+      const liveFx = fxList.filter((f) => f.on);
       const k = chainKey(fxList);
       if (k !== key) {
         key = k;
         head.disconnect();
-        for (const n of nodes) { try { n.out.disconnect(); } catch { /* already free */ } }
-        nodes = live.map(build);
+        for (const n of nodes) { try { n.out.disconnect(); } catch { /* already free */ } if (n.destroy) n.destroy(); }
+        nodes = liveFx.map(build);
         let prev = head;
         for (const n of nodes) { prev.connect(n.in); prev = n.out; }
         prev.connect(tail);
       }
-      live.forEach((f, i) => nodes[i].set(f));
+      liveFx.forEach((f, i) => nodes[i].set(f));
     };
   }
 
@@ -174,6 +201,8 @@ export function createMixer(ctx) {
         s.inp = gain(1); s.inp.connect(s.head);
       }
     },
+    ready: () => Promise.allSettled([...pending]),
+    plugins: () => [...live].map((x) => ({ ...x })),
     levels: () => ({ tracks: strips.map((s) => peak(s.meter, buf)), buses: buses.map((b) => peak(b.meter, buf)), master: peak(masterMeter, buf) }),
   };
 }
