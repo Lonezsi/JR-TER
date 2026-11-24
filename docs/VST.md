@@ -20,6 +20,12 @@ So VST support in JR!TER comes in steps, each useful alone.
    "missing here" (JSON: `installed`), matching by path, file name or plugin name
    (`VstFolders.java`). The web page from step 2 shows it. Original idea: compare a project's VSTs with the ones installed on this PC (the
    desktop app can look in the usual VST folders) and show "missing here".
-4. **Play in the DAW tab.** The page from task 23 (`/daw.html`, code in `web/daw/`; it becomes a song tab once `ui/` lands) plays MIDI with browser instruments (Web Audio
-   Modules are the web's version of plugins). Hosting real VSTs needs a native host inside the
-   desktop app. Only worth it if the browser instruments are not enough.
+4. **Play in the DAW. Done in the browser (4.27.0).** Real VSTs need a native host, but the web has its own
+   plugin format, Web Audio Modules (WAM 2). In the DAW mixer, `+ Plugin` adds an insert that loads one from an
+   address (https, or a path on this server). The first time, press **Allow** for the site: nothing loads from a
+   site you have not allowed, because a plugin is someone else's code running in the page (the allow-list lives in
+   your browser's localStorage, `jriter.daw.plugins.allowed`, not in the song). **Open** shows the plugin's own
+   window; closing it saves the plugin's settings in the song (`state`, up to 64 KB). Bounce waits for plugins to
+   load and says if one was left out. Code: `web/daw/wamhost.js`, `mixgraph.js`, `mixerview.js`; the WAM host SDK is
+   vendored in `web/daw/vendor/wam/` (see its README). Not tried against a real WAM plugin yet, only a stand-in
+   (`test-gain.js`). Hosting actual VST files is still only a native-host idea, worth it only if WAM is not enough.

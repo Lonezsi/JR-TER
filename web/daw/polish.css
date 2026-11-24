@@ -382,3 +382,12 @@ body.studio .mx-mid { height: 110px !important; }
   .ins-grid { grid-template-columns: 1fr; }
   .ins-switches { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* A Plugin effect in the mixer: address, status, and its buttons. */
+.mx-wam { display: flex; flex-direction: column; gap: var(--d-s2); min-width: 0; }
+.mx-wurl { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12px; }
+.mx-wrow { display: flex; align-items: center; gap: var(--d-s2); min-width: 0; }
+.mx-wst { font-size: 11px; color: var(--text-3, var(--d-mute)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mx-wst[data-st="on"] { color: var(--text-2, inherit); }
+.mx-wst[data-st="failed"] { color: var(--danger, #ff8a8a); }
+.mx-wgui { min-height: 80px; overflow: auto; }

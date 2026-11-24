@@ -330,6 +330,14 @@ body { padding: var(--s6) var(--s5) 20vh; }
     ffmpeg, which it needs to turn a mix into a video. It downloads one pinned build and
     checks it against a digest written into the source before unpacking it.
   </li>
+  <li>
+    <strong>A plugin's own site.</strong> Only when you add a Plugin effect in the DAW
+    mixer, type its address and press Allow for that site. Your browser then fetches the
+    plugin's code from there, so that site sees your address and browser, and the plugin
+    runs in the page with your sign in. Nothing loads from a site you have not allowed,
+    the list of allowed sites stays in your own browser, and a plugin on this server
+    needs no Allow.
+  </li>
 </ul>
 
 <h3>Your data, as two buttons</h3>

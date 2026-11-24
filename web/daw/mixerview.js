@@ -10,11 +10,14 @@
 //   its effects (each setting a knob; drag an effect's grip, or press the arrows on it, to reorder), + Insert (a new bus) and taking a bus out.
 //
 //   mountMixer(el, api) -> { render, meters(levels | null) }
-//   api: song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), sync(), toast(text, action),
+//   A Plugin effect is a Web Audio Module (wamhost.js): type its address, press Allow once for its site,
+//   Open shows its own window (its settings are kept in the song when you close it).
+//   api: plugins() (the graph's plugin statuses, [] before the first sound), pluginsReady() (a promise), song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), sync(), toast(text, action),
 //        undo(), selected(), select(i)
 // Model and maths: mixer.js. The audio graph: mixgraph.js.
 import { knob as knobHtml, wireKnobs } from "./knob.js";
-import { FX, FX_TYPES, newFx, moveFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops } from "./mixer.js";
+import { FX, FX_TYPES, newFx, moveFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops, wamUrl, pluginOrigin, WAM_STATE_MAX } from "./mixer.js";
+import { allowed, allow } from "./wamhost.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(2));
@@ -23,6 +26,7 @@ const db = (v) => (v <= 0.0005 ? "-∞" : (20 * Math.log10(v) >= 0 ? "+" : "") +
 const panWords = (p) => (Math.abs(p) < 0.01 ? "C" : Math.round(Math.abs(p) * 100) + (p < 0 ? "L" : "R"));
 
 export function mountMixer(el, api) {
+  let pluginTries = 0;
   let pick = "t0"; // "t<i>", "b<i>" or "m"
 
   // What an id points at: { kind, i, obj, label, fx }
@@ -86,6 +90,18 @@ export function mountMixer(el, api) {
       `</div>`;
   }
 
+  const stateWords = { loading: "Loading…", on: "Loaded", blocked: "Not allowed here yet", failed: "Would not load" };
+  const entry = (f) => { const l = api.plugins(); return l.find((p) => p.fx === f) || l.find((p) => p.fx.url === f.url); };
+  const statusOf = (f) => { const x = entry(f); return x || { status: !f.url ? "empty" : allowed(f.url) ? "loading" : "blocked", error: "" }; };
+  function wamBody(f, i) {
+    const st = statusOf(f), blocked = f.url && !allowed(f.url), host = pluginOrigin(f.url).replace("https://", "");
+    return `<div class="mx-wam">` +
+      `<input type="text" class="mx-wurl" data-wurl="${i}" value="${esc(f.url)}" placeholder="https://… plugin address" spellcheck="false" aria-label="Plugin address, slot ${i + 1}">` +
+      `<div class="mx-wrow"><span class="mx-wst" data-st="${st.status}">${esc(f.name && st.status === "on" ? f.name : st.status === "empty" ? "No address yet" : stateWords[st.status] || "")}${st.error ? ": " + esc(st.error) : ""}</span><span class="mx-gap"></span>` +
+      (blocked ? `<button data-fx="allow" data-i="${i}" data-tip="Let this browser load plugins from ${esc(host)}" aria-label="Allow plugins from ${esc(host)}">Allow ${esc(host)}</button>` : "") +
+      (st.status === "on" ? `<button data-fx="open" data-i="${i}" data-tip="Open the plugin" aria-label="Open the plugin">Open</button>` : "") +
+      `</div></div>`;
+  }
   function fxCard(f, i, n) {
     const spec = FX[f.type];
     return `<div class="mx-fx${f.on ? "" : " off"}" data-i="${i}">` +
@@ -93,6 +109,7 @@ export function mountMixer(el, api) {
       `<button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="On or off"></button>` +
       `<span class="mx-slot">${i + 1}</span><b>${spec.label}</b><span class="mx-gap"></span>` +
       `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">✕</button></div>` +
+      (f.type === "wam" ? wamBody(f, i) : "") +
       `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
         `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${k}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
       `</div>`;
@@ -120,6 +137,16 @@ export function mountMixer(el, api) {
         `<div class="cv-line mx-adds">` + FX_TYPES.map((k) => `<button data-add="${k}" data-tip="Add ${FX[k].label}" aria-label="Add ${FX[k].label}"${w.fx.length >= MAX_FX ? " disabled" : ""}>+ ${FX[k].label}</button>`).join("") + `</div>` +
         `<div class="mx-chain">${w.fx.length ? w.fx.map((f, i) => fxCard(f, i, w.fx.length)).join("") : `<div class="sv-doc">No effects on ${esc(w.label)}. Add one above; they run top to bottom.</div>`}</div>` +
       `</div>`;
+    // A plugin that may still be loading (its status is not known yet, or is "loading"): look again soon, and draw it
+    // when it has loaded or failed. A few tries at most, so a plugin that never settles cannot make this loop.
+    const wait = w.fx.some((f) => f.type === "wam" && f.url && allowed(f.url) && (entry(f) || { status: "loading" }).status === "loading");
+    if (!wait) pluginTries = 0;
+    else if (pluginTries < 40) {
+      pluginTries++;
+      Promise.race([api.pluginsReady(), new Promise((r) => setTimeout(r, 250))]).then(() => {
+        if (el.isConnected && !win && !document.activeElement?.classList?.contains("mx-wurl")) render();
+      });
+    }
   }
 
   // ---- sliders and knobs: one undo step per gesture ----------------------------------------------
@@ -146,6 +173,12 @@ export function mountMixer(el, api) {
     const t = e.target, song = api.song();
     if (t.matches("input[type=range]")) return end();
     if (t.id === "mx-out") return api.change(() => { picked(song).obj.out = t.value; ensureMix(song); });
+    if (t.dataset.wurl !== undefined) {
+      const i = +t.dataset.wurl, u = t.value.trim(), ok = wamUrl(u);
+      if (u && !ok) { api.toast("A plugin address starts with https:// (or is a path on this server)."); return render(); }
+      t.blur(); // the docked mixer is not redrawn under a hand that is typing in it
+      return api.change(() => { const f = picked(song).fx[i]; if (f) { f.url = ok; f.name = ""; f.state = null; } });
+    }
     if (t.id === "mx-bname") { const n = t.value.trim(); if (n) api.change(() => { picked(song).obj.name = n.slice(0, 40); }); }
   });
 
@@ -211,6 +244,8 @@ export function mountMixer(el, api) {
     if (!b || b.disabled) return;
     const list = picked(song).fx, i = +b.dataset.i, a = b.dataset.fx;
     if (a === "toggle") api.change(() => { list[i].on = !list[i].on; });
+    else if (a === "allow") { allow(list[i].url); api.sync(); render(); }
+    else if (a === "open") openPlugin(list[i]);
     else if (a === "del") { api.change(() => { list.splice(i, 1); }); api.toast("Effect removed.", { label: "Undo", run: api.undo }); }
   });
 
@@ -270,6 +305,39 @@ export function mountMixer(el, api) {
     api.change(() => { moveFx(list, i, to); });
     el.querySelector(`[data-grip="${to}"]`)?.focus();
   });
+
+  // ---- a plugin's own window: the same kind of dialog as the sampler; Escape or a press outside closes it ----
+  let win = null; // { fx, inst, scrim }
+  async function openPlugin(f) {
+    const st = entry(f);
+    if (!st || !st.inst || win) return;
+    const scrim = document.createElement("div");
+    scrim.className = "ins-scrim";
+    scrim.innerHTML = `<section class="ins-modal" role="dialog" aria-modal="true" aria-label="Plugin: ${esc(st.inst.name)}" tabindex="-1">` +
+      `<header class="ins-head"><span class="ins-kind">Plugin</span><b>${esc(st.inst.name)}</b><span class="mx-gap"></span>` +
+      `<button data-act="close" data-tip="Close (Escape)" aria-label="Close">✕</button></header><div class="mx-wgui"></div></section>`;
+    document.body.append(scrim);
+    win = { fx: f, inst: st.inst, scrim };
+    scrim.addEventListener("pointerdown", (e) => { if (e.target === scrim) closePlugin(); });
+    scrim.querySelector('[data-act="close"]').addEventListener("click", closePlugin);
+    const host = scrim.querySelector(".mx-wgui");
+    try {
+      const gui = await st.inst.gui();
+      if (gui) host.append(gui); else host.textContent = "This plugin has no window of its own.";
+    } catch (e) { host.textContent = "The plugin's window would not open: " + ((e && e.message) || "unknown error"); }
+    scrim.querySelector('[data-act="close"]').focus();
+  }
+  async function closePlugin() {
+    if (!win) return;
+    const { fx, inst, scrim } = win; win = null;
+    scrim.remove();
+    let state = null;
+    try { state = await inst.getState(); } catch { /* keeps the old settings */ }
+    if (state == null) return render();
+    if (JSON.stringify(state).length > WAM_STATE_MAX) { api.toast("This plugin's settings are too big to keep in the song."); return render(); }
+    api.change(() => { fx.state = JSON.parse(JSON.stringify(state)); });
+  }
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && win && !e.defaultPrevented) { e.preventDefault(); closePlugin(); } });
 
   function meters(levels) {
     const bar = (id, d) => { const i = el.querySelector(`.mx-strip[data-id="${id}"] .mx-meter i`); if (i) i.style.height = Math.round(Math.max(0, (d + 60) / 60) * 100) + "%"; };
