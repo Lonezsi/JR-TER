@@ -15,6 +15,7 @@
 //   api: plugins() (the graph's plugin statuses, [] before the first sound), pluginsReady() (a promise), song(), change(fn) (undoable edit), snap(), pushUndo(before), save(), sync(), toast(text, action),
 //        undo(), selected(), select(i)
 // Model and maths: mixer.js. The audio graph: mixgraph.js.
+import { icon } from "./icons.js";
 import { knob as knobHtml, wireKnobs } from "./knob.js";
 import { FX, FX_TYPES, newFx, moveFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops, wamUrl, pluginOrigin, WAM_STATE_MAX } from "./mixer.js";
 import { allowed, allow } from "./wamhost.js";
@@ -84,8 +85,8 @@ export function mountMixer(el, api) {
       (isT ? `<div class="mx-ms"><button data-ms="mute" data-id="${id}" aria-pressed="${!!o.mute}" aria-label="Mute" data-tip="Mute">M</button>` +
           `<button data-ms="solo" data-id="${id}" aria-pressed="${!!o.solo}" aria-label="Solo" data-tip="Solo">S</button></div>`
         : isB ? `<div class="mx-ms"><button data-ms="mute" data-id="${id}" aria-pressed="${!!o.mute}" aria-label="Mute" data-tip="Mute">M</button></div>`
-        : `<div class="mx-ms"><span class="mx-lim" data-tip="A limiter ends the master, so the sum never clips">LIM</span></div>`) +
-      (isT || isB ? `<span class="mx-out" aria-hidden="true">${feeds ? "→ " + esc(feeds.label) : "→ Master"}</span>` : `<span class="mx-out" aria-hidden="true">Out</span>`) +
+        : `<div class="mx-ms"><span class="mx-lim" data-tip="A limiter ends the master, so the sum never clips">Limiter</span></div>`) +
+      `<span class="mx-out" aria-hidden="true">${feeds ? "→ " + esc(feeds.label) : ""}</span>` +
       routeFoot(song, id, from) +
       `</div>`;
   }
@@ -105,10 +106,10 @@ export function mountMixer(el, api) {
   function fxCard(f, i, n) {
     const spec = FX[f.type];
     return `<div class="mx-fx${f.on ? "" : " off"}" data-i="${i}">` +
-      `<div class="mx-fxh"><button class="mx-grip" data-grip="${i}" aria-label="Move ${spec.label}, slot ${i + 1} of ${n}. Drag, or use the up and down arrows" data-tip="Drag to reorder">⋮⋮</button>` +
+      `<div class="mx-fxh"><button class="mx-grip" data-grip="${i}" aria-label="Move ${spec.label}, slot ${i + 1} of ${n}. Drag, or use the up and down arrows" data-tip="Drag to reorder">${icon("drag", 14)}</button>` +
       `<button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="On or off"></button>` +
       `<span class="mx-slot">${i + 1}</span><b>${spec.label}</b><span class="mx-gap"></span>` +
-      `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">✕</button></div>` +
+      `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">${icon("close", 14)}</button></div>` +
       (f.type === "wam" ? wamBody(f, i) : "") +
       `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
         `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${k}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
@@ -121,8 +122,8 @@ export function mountMixer(el, api) {
     const nt = song.tracks.length;
     const outs = `<option value="m">Master</option>` + m.buses.map((b, i) => (canFeed(song, pick, "b" + i) ? `<option value="b${i}">${esc(b.name)}</option>` : "")).join("");
     el.innerHTML =
-      `<div class="mx-head"><span class="cv-title">Mixer</span><span class="sv-doc mx-hint">Pick a strip; click an arrow under another to send there, double-click to make it the main output.</span>` +
-        `<button data-act="bus" data-tip="Add an insert (a bus) to group or send to"${m.buses.length >= MAX_BUSES ? " disabled" : ""}>+ Insert</button></div>` +
+      `<div class="mx-head"><span class="cv-title">Mixer</span><span class="mx-gap"></span>` +
+        `<button data-act="bus" data-tip="Add an insert (a bus) to group tracks or send to"${m.buses.length >= MAX_BUSES ? " disabled" : ""}>${icon("plus")}Insert</button></div>` +
       `<div class="mx-strips">` +
         strip(song, "m", "M", who(song, "m"), from) +
         song.tracks.map((tr, i) => strip(song, "t" + i, i + 1, who(song, "t" + i), from)).join("") +
@@ -134,8 +135,8 @@ export function mountMixer(el, api) {
           (w.kind === "b" ? `<input id="mx-bname" type="text" value="${esc(w.label)}" aria-label="Name of this insert">` +
             `<button data-act="delbus" data-tip="Take this insert out; what went into it goes to the master"${m.buses.length <= 2 ? " disabled" : ""}>Remove</button>` : "") +
         `</div>` +
-        `<div class="cv-line mx-adds">` + FX_TYPES.map((k) => `<button data-add="${k}" data-tip="Add ${FX[k].label}" aria-label="Add ${FX[k].label}"${w.fx.length >= MAX_FX ? " disabled" : ""}>+ ${FX[k].label}</button>`).join("") + `</div>` +
-        `<div class="mx-chain">${w.fx.length ? w.fx.map((f, i) => fxCard(f, i, w.fx.length)).join("") : `<div class="sv-doc">No effects on ${esc(w.label)}. Add one above; they run top to bottom.</div>`}</div>` +
+        `<div class="cv-line mx-adds">` + FX_TYPES.map((k) => `<button data-add="${k}" data-tip="Add ${FX[k].label}" aria-label="Add ${FX[k].label}"${w.fx.length >= MAX_FX ? " disabled" : ""}>${icon("plus", 14)}${FX[k].label}</button>`).join("") + `</div>` +
+        `<div class="mx-chain">${w.fx.length ? w.fx.map((f, i) => fxCard(f, i, w.fx.length)).join("") : `<div class="sv-doc">No effects on ${esc(w.label)} yet. They run top to bottom.</div>`}</div>` +
       `</div>`;
     // A plugin that may still be loading (its status is not known yet, or is "loading"): look again soon, and draw it
     // when it has loaded or failed. A few tries at most, so a plugin that never settles cannot make this loop.
@@ -315,7 +316,7 @@ export function mountMixer(el, api) {
     scrim.className = "ins-scrim";
     scrim.innerHTML = `<section class="ins-modal" role="dialog" aria-modal="true" aria-label="Plugin: ${esc(st.inst.name)}" tabindex="-1">` +
       `<header class="ins-head"><span class="ins-kind">Plugin</span><b>${esc(st.inst.name)}</b><span class="mx-gap"></span>` +
-      `<button data-act="close" data-tip="Close (Escape)" aria-label="Close">✕</button></header><div class="mx-wgui"></div></section>`;
+      `<button data-act="close" data-tip="Close (Escape)" aria-label="Close">${icon("close")}</button></header><div class="mx-wgui"></div></section>`;
     document.body.append(scrim);
     win = { fx: f, inst: st.inst, scrim };
     scrim.addEventListener("pointerdown", (e) => { if (e.target === scrim) closePlugin(); });

@@ -2,6 +2,7 @@
 //
 //   mountScripts(el, api)
 //   api: song(), change(fn), undo(), runOn(code, values) -> { ok, message }, trackName()
+import { icon } from "./icons.js";
 import { parseScript, ScriptError } from "./script.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -18,7 +19,7 @@ export function mountScripts(el, api) {
 
   function render(message = "") {
     const s = cur();
-    if (!s) { el.innerHTML = `<div class="cv-line"><button data-act="new">+ New script</button></div>`; return; }
+    if (!s) { el.innerHTML = `<div class="cv-line"><button data-act="new">${icon("plus")}New script</button></div>`; return; }
     const { params, error } = paramsOf(s.code);
     el.innerHTML =
       `<div class="cv-title">Script for “${esc(api.trackName())}”</div>` +
@@ -29,7 +30,7 @@ export function mountScripts(el, api) {
         const v = Number.isFinite(s.values[p.name]) ? s.values[p.name] : p.value;
         return `<div class="sv-param"><span>${esc(p.name)}</span><input type="range" data-param="${esc(p.name)}" min="${p.min}" max="${p.max}" step="${p.max - p.min > 20 ? 1 : 0.1}" value="${v}" aria-label="${esc(p.name)}"><output>${v}</output></div>`;
       }).join("") +
-      `<div class="cv-line"><button data-act="run" id="sv-run"><b>Run on the track</b></button><span class="sv-doc">One undo takes it back.</span></div>` +
+      `<div class="cv-line"><button data-act="run" id="sv-run" class="primary" data-tip="One undo takes it back">Run on the track</button></div>` +
       `<div class="cv-err" role="alert">${esc(message || error)}</div>` +
       `<textarea class="sv-code" id="sv-code" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Script code">${esc(s.code)}</textarea>` +
       `<div class="sv-doc">Lines under <code>each note:</code> run once per note; under <code>each chord:</code> once per chord. ` +

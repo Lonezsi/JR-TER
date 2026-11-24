@@ -9,7 +9,7 @@
          /daw/sampler.js (sounds from the library as instruments and audio clips, no DOM), /daw/library.js (asks the library what it has), /daw/samplerview.js (the Sampler tab),
          /daw/mixer.js (mixer model and maths, no DOM), /daw/mixgraph.js (the mixer as Web Audio), /daw/mixerview.js (the Mixer tab),
          /daw/synth.js (Web Audio instruments), /daw/gestures.js (touch), /daw/chordview.js and
-         /daw/scriptview.js (the two editors), /daw/daw.js (the page), /daw/daw.css, /daw/views.css.
+         /daw/scriptview.js (the two editors), /daw/daw.js (the page), /daw/icons.js (the one icon set), /daw/daw.css (the one stylesheet).
   On a wide desktop window the page is a studio: toolbar on top, the Sampler (library) docked left, the Mixer docked at the bottom.
   For the song tab in the Svelte ui/: import midi.js and synth.js as they are, and load a
   song's MIDI with  /daw.html?src=URL  or parseMidi(arrayBuffer).
@@ -34,8 +34,6 @@
 </script>
 <link rel="stylesheet" href="/glass.css">
 <link rel="stylesheet" href="/daw/daw.css">
-<link rel="stylesheet" href="/daw/views.css">
-<link rel="stylesheet" href="/daw/polish.css">
 </head>
 <body>
 <nav class="views" id="views" role="tablist" aria-label="DAW views"></nav>

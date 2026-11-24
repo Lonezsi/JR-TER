@@ -6,6 +6,7 @@
 // The brush is a pattern number, or "t3": an audio clip of track 3's sample (sampler.js).
 // Tap an empty cell to place the pattern you paint with. Drag a clip to move it, drag its end to
 // repeat it, hold it to delete it. Model and maths: playlist.js.
+import { icon } from "./icons.js";
 import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, MAX_LANES, MAX_BARS } from "./playlist.js";
 
 import { clipBars } from "./sampler.js";
@@ -49,31 +50,29 @@ export function mountSong(el, api) {
         clips.map((c, i) => c.lane !== l ? "" :
           (c.track != null
             ? `<button class="sl-clip audio${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BP}px;width:${c.length * BP}px;--h:${(c.track * 67 + 200) % 360}" aria-label="${esc((song.tracks[c.track] || {}).name)}, audio, bar ${c.start + 1}, ${c.length} bars">` +
-              `<span class="sl-lbl">〰 ${esc((song.tracks[c.track] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`
+              `<span class="sl-lbl">${icon("wave", 12)}${esc((song.tracks[c.track] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`
             : `<button class="sl-clip${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BP}px;width:${c.length * BP}px;--h:${(c.pattern * 67) % 360}" aria-label="${esc((pats[c.pattern] || {}).name)}, bar ${c.start + 1}, ${c.length} bars">` +
               `<span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`)).join("") +
         `</div>`;
     }
     el.innerHTML =
-      `<div class="cv-title">Layout</div>` +
-      `<div class="cv-line" role="group" aria-label="What Play plays">` +
+            `<div class="cv-line" role="group" aria-label="What Play plays">` +
         `<button data-mode="pattern" aria-pressed="${song.mode !== "song"}" data-tip="Play loops the pattern you are editing">Pattern</button>` +
         `<button data-mode="song" aria-pressed="${song.mode === "song"}" data-tip="Play runs the clips below">Song</button>` +
         `<span class="sl-sep"></span>` +
         `<span class="sl-paint">Paint with</span>` +
         pats.map((p, i) => `<button data-brush="${i}" aria-pressed="${i === brush}" data-tip="${esc(p.name)}" aria-label="Paint ${esc(p.name)}">${i + 1}</button>`).join("") +
-        samplers.map((i) => `<button data-brush="t${i}" aria-pressed="${brush === "t" + i}" data-tip="Audio: ${esc(song.tracks[i].name)}" aria-label="Paint audio ${esc(song.tracks[i].name)}">〰 ${esc(song.tracks[i].name)}</button>`).join("") +
+        samplers.map((i) => `<button data-brush="t${i}" aria-pressed="${brush === "t" + i}" data-tip="Audio: ${esc(song.tracks[i].name)}" aria-label="Paint audio ${esc(song.tracks[i].name)}">${icon("wave")}${esc(song.tracks[i].name)}</button>`).join("") +
       `</div>` +
       `<div class="cv-line sl-tools">` +
         `<button data-act="edit" aria-label="Edit this pattern in the Drumroll" data-tip="Edit this pattern in the Drumroll"${sel ? "" : " disabled"}>Edit</button>` +
         `<button data-act="split" aria-label="Cut the clip in half" data-tip="Cut the clip in half"${sel && sel.length >= 2 / QB ? "" : " disabled"}>Split</button>` +
         `<button data-act="del" aria-label="Delete the clip" data-tip="Delete the clip"${sel ? "" : " disabled"}>Delete</button>` +
         `<span class="sl-sep"></span>${autoLanes.button()}` +
-        `<span class="sl-sep"></span><button data-act="zoomout" aria-label="Zoom out" data-tip="Zoom out (Ctrl+wheel, or pinch)">−</button><button data-act="zoomin" aria-label="Zoom in" data-tip="Zoom in (Ctrl+wheel, or pinch)">+</button>` +
+        `<span class="sl-sep"></span><button data-act="zoomout" aria-label="Zoom out" data-tip="Zoom out (Ctrl+wheel, or pinch)">${icon("zoom-out")}</button><button data-act="zoomin" aria-label="Zoom in" data-tip="Zoom in (Ctrl+wheel, or pinch)">${icon("zoom-in")}</button>` +
         `<label>Snap <select data-snap aria-label="Snap">${snapOptions(SONG_STEPS, snapSet.song, step())}</select></label></div>` + autoLanes.menu(song) +
       `<div class="sl-scroll"><div class="sl-grid" style="--bar:${BP}px;width:${bars * BP}px">` +
-        `<div class="sl-ruler">${ruler}</div>${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>` +
-      `<div class="sv-doc">Tap a lane to place the pattern. Drag a clip to move it, drag its end to repeat it. Hold a clip to delete it. Automate draws a knob's moves over time: tap a lane to add a point, drag it, hold it to delete it.</div>`;
+        `<div class="sl-ruler">${ruler}</div>${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>`;
     drawPeople();
   }
 
