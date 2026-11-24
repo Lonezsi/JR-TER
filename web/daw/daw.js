@@ -9,10 +9,11 @@ import { DEFAULT_PROGRESSION } from "./chords.js";
 import { run as runScript, defaultScripts } from "./script.js";
 import { mountRack } from "./rackview.js";
 import { mountSong } from "./songview.js";
-import { songNotes, songBars } from "./playlist.js";
+import { songNotes, songBars, addAudioClip } from "./playlist.js";
+import { SOUND_TYPE } from "./library.js";
 import { createMixer } from "./mixgraph.js";
 import { mountSampler } from "./samplerview.js";
-import { sliceFor, playSlice, cutVoice, songAudio, sampleEnd, chop, gateFor, clipPlay, cleanSample } from "./sampler.js";
+import { sliceFor, playSlice, cutVoice, songAudio, sampleEnd, chop, gateFor, clipPlay, cleanSample, clipBars } from "./sampler.js";
 import { stretchBuffer } from "./stretch.js";
 import { mountMixer } from "./mixerview.js";
 import { automated, addPoint as autoAdd } from "./automation.js";
@@ -199,7 +200,7 @@ const HELP = [
   ["▦", "Drumroll: tap steps to light them, drag one up or down for its velocity or pitch. Patterns 1, 2, 3 at the top; Swing loosens the groove.", "Alt+2, [ and ]"],
   ["☰", "Song: tap a lane to place a pattern, drag to move, drag the end to repeat, hold to delete. Song or Pattern decides what Play plays. Automate draws a knob's moves over time under the clips.", "Alt+5, S"],
   ["◫", "Mixer: a strip per track with pan, sends and effects; the master has a limiter. Meters move while playing.", "Alt+6"],
-  ["〰", "Browser: your one-shots, MIDI files, renders and takes in folders. Inst makes a sampler instrument and opens its sampler (also the 〰 on a sampler track): trim, chop, envelope, loop, cut itself, pitch, stretch, resample. Drag a MIDI onto the roll or a pattern number.", "Alt+7"],
+  ["〰", "Browser: your one-shots, MIDI files, renders and takes in folders. Inst makes a sampler instrument and opens its sampler (also the 〰 on a sampler track): trim, chop, envelope, loop, cut itself, pitch, stretch, resample. Drag a sound onto the Drumroll, a track or the Layout; drag a MIDI onto the roll or a pattern number.", "Alt+7"],
   ["▥", "On a computer the DAW is laid out like a studio: library on the left, mixer at the bottom. The Mixer and Sampler tabs show or hide them.", "Alt+6, Alt+7"],
   ["ƒ", "Script: pick one, set its sliders, Run on the track. Humanize and arpeggios come with it; edit or write your own.", "Alt+4"],
 ];
@@ -704,10 +705,12 @@ function audition(t, from, to) {
     lastAudition = playSlice(ctx, buf, { from, to, rate: 1 }, ctx.currentTime + 0.02, 0, 100, mix.input(i));
   }).catch(() => {});
 }
+const sampleOf = (sound) => cleanSample({ name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [], oneshot: sound.kind === "oneshot" });
+const samplerTrack = (sound) => ({ name: sound.name, instrument: "sampler", key: 60, steps: emptySteps(), volume: 0.8, mute: false, solo: false, notes: [], sample: sampleOf(sound) });
 let pendingRack = false; // set by + Sample in the rack: the next sound added becomes a rack channel
 function addSampler(sound, opts = {}) {
-  const rack = !!opts.rack || pendingRack, one = sound.kind === "oneshot";
-  const sample = cleanSample({ name: sound.name, src: sound.src, seconds: sound.seconds || 0, start: 0, end: 0, root: 60, slices: [], oneshot: one });
+  const rack = !!opts.rack || pendingRack;
+  const sample = sampleOf(sound);
   const empty = song.tracks[sel] && song.tracks[sel].instrument === "sampler" && !song.tracks[sel].sample;
   pendingRack = false;
   edit(() => {
@@ -877,6 +880,42 @@ async function midiToPattern(sound, { pattern = null, fresh = false } = {}) {
   scrollY = Math.max(0, (hi - top) * ROW - 24); draw();
   toast((fresh ? "New pattern " + song.patterns[song.pattern].name : sound.name + " went into " + (song.patterns[song.pattern] ? song.patterns[song.pattern].name : "the pattern")) + ", on " + song.tracks[sel].name + ".", { label: "Undo", run: doUndo });
 }
+// A Browser sound dropped on the Drumroll (a channel), a track (it plays the sound) or the Layout (an audio clip).
+function soundTarget(e) {
+  const t = e.target.closest?.bind(e.target);
+  if (!t) return null;
+  const pick = t("#rackview .rk-name[data-pick]");
+  if (pick) return { kind: "track", i: +pick.dataset.pick, el: pick };
+  const row = t("#tracks .track");
+  if (row) return { kind: "track", i: [...$("tracks").children].indexOf(row), el: row };
+  const rack = t("#rackview") || t("#view-rack");
+  if (rack) return { kind: "rack", el: rack };
+  const grid = t("#songview .sl-grid");
+  if (grid) return { kind: "song", el: grid };
+  return null;
+}
+function dropSound(sound, where, e) {
+  const undo = { label: "Undo", run: doUndo };
+  if (where.kind === "rack") return addSampler(sound, { rack: true });
+  if (where.kind === "track") {
+    const t = song.tracks[where.i];
+    if (!t) return;
+    edit(() => {
+      if (!t.sample || t.name === t.sample.name || /^Track d+$/.test(t.name)) t.name = sound.name;
+      t.instrument = "sampler"; t.sample = sampleOf(sound); sel = where.i; selNote = null;
+    });
+    loadDuration(sound);
+    return toast("Put " + sound.name + " on " + t.name + ".", undo);
+  }
+  const p = songUI.spotAt(e);
+  if (!p) return;
+  edit(() => {
+    song.tracks.push(samplerTrack(sound)); sel = song.tracks.length - 1; selNote = null;
+    addAudioClip(song, sel, p.lane, p.bar, clipBars(song.tracks[sel].sample, song.bpm));
+  });
+  loadDuration(sound);
+  toast("Placed " + sound.name + " on the Layout at bar " + (Math.floor(p.bar) + 1) + ".", undo);
+}
 const midiTarget = (e) => e.target.closest?.(".rk-pats [data-pat], #rollbox, .roll");
 
 async function openBytes(name, bytes) {
@@ -901,6 +940,12 @@ $("file").onchange = async (e) => {
   if (f) openBytes(f.name, new Uint8Array(await f.arrayBuffer()));
 };
 addEventListener("dragover", (e) => {
+  if ([...(e.dataTransfer?.types || [])].includes(SOUND_TYPE)) {
+    document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over"));
+    const t = soundTarget(e);
+    if (t) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; t.el.classList.add("midi-over"); }
+    return;
+  }
   if ([...(e.dataTransfer?.types || [])].includes(MIDI_TYPE)) {
     document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over"));
     const t = midiTarget(e);
@@ -912,6 +957,13 @@ addEventListener("dragover", (e) => {
 addEventListener("dragleave", () => document.body.classList.remove("drop"));
 addEventListener("dragend", () => document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over")));
 addEventListener("drop", async (e) => {
+  if ([...(e.dataTransfer?.types || [])].includes(SOUND_TYPE)) {
+    e.preventDefault();
+    document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over"));
+    const t = soundTarget(e);
+    if (t) dropSound(JSON.parse(e.dataTransfer.getData(SOUND_TYPE)), t, e);
+    return;
+  }
   if ([...(e.dataTransfer?.types || [])].includes(MIDI_TYPE)) {
     e.preventDefault();
     document.querySelectorAll(".midi-over").forEach((n) => n.classList.remove("midi-over"));

@@ -12,7 +12,7 @@
 // Sounds come from library.js. Model and maths: sampler.js.
 import { chop, addSlice, removeSliceNear, sampleEnd, peaks, guessBpm, clipRate, ENV } from "./sampler.js";
 import { knob, wireKnobs } from "./knob.js";
-import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound, MIDI_TYPE } from "./library.js";
+import { librarySongs, soundsOf, waitingRenders, mySamples, uploadSamples, removeSample, restoreSample, changeSample, each, isSound, MIDI_TYPE, SOUND_TYPE } from "./library.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -83,7 +83,7 @@ export function mountSampler(el, api) {
       (busy ? `<div class="sv-doc" role="status">${esc(busy)}</div>` : "") + `<div id="sp-listbox" class="sp-tree" role="tree" aria-label="Sounds">${tree()}</div>` +
       (guest ? `<div class="sv-doc">You are in a friend's song: use its takes and vocals here. One-shots already in the song play for you too.</div>` : "") +
       (s ? `<button class="sp-open" data-act="instrument" data-tip="Open ${esc(t.name)}'s sampler">〰 ${esc(t.name)}: ${esc(s.name)}</button>`
-        : `<div class="sv-doc">Inst puts a sound on a sampler track; its sampler opens over everything.</div>`);
+        : `<div class="sv-doc">Inst puts a sound on a sampler track, or drag it onto the Drumroll, a track or the Layout; its sampler opens over everything.</div>`);
     renderModal();
   }
 
@@ -243,9 +243,9 @@ export function mountSampler(el, api) {
         `<input class="sp-rename" data-renamesound="${i}" value="${esc(x.name)}" aria-label="Name of the sound"></div>`;
     }
     const arrange = mine && editing, midi = x.kind === "midi";
-    const drag = arrange ? ` draggable="true" data-movesound="${i}"` : midi ? ` draggable="true" data-midi="${i}"` : "";
+    const drag = arrange ? ` draggable="true" data-movesound="${i}"` : midi ? ` draggable="true" data-midi="${i}"` : ` draggable="true" data-sound="${i}"`;
     return `<div class="sp-row${midi ? " midi" : ""}" role="treeitem" style="--depth:${depth}"${drag}><span class="sp-ic" aria-hidden="true">${arrange ? "⠿" : ICON[x.kind] || "♪"}</span>` +
-      `<button class="sp-name" data-hear="${i}" data-tip="${midi ? "Hear it. Drag it onto the roll or a pattern number" : "Hear it"}" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${midi ? "MIDI" : mmss(x.seconds)}</span>` +
+      `<button class="sp-name" data-hear="${i}" data-tip="${midi ? "Hear it. Drag it onto the roll or a pattern number" : arrange ? "Hear it" : "Hear it. Drag it onto the Drumroll, a track or the Layout"}" aria-label="Hear ${esc(x.name)}">${esc(x.name)}</button><span class="sp-len">${midi ? "MIDI" : mmss(x.seconds)}</span>` +
       (arrange ? `<span class="sp-acts on"><button data-rename="${i}" data-tip="Rename" aria-label="Rename ${esc(x.name)}">✎</button>` +
           `<button data-del="${i}" data-tip="Delete (Undo brings it back)" aria-label="Delete ${esc(x.name)}">×</button></span>`
         : midi ? `<span class="sp-acts"><button data-topat="${i}" data-tip="A new pattern with these notes, on the selected track" aria-label="Make a pattern from ${esc(x.name)}">Pattern</button></span>`
@@ -518,10 +518,11 @@ export function mountSampler(el, api) {
   // Arranging: a sound or a folder dragged onto a folder (or onto One-shots, the top) moves there.
   // A MIDI file is dragged out to the roll or a pattern; daw.js takes the drop.
   on("dragstart", (e) => {
-    const m = !editing && e.target.closest?.("[data-midi]");
-    if (!m) return;
-    const x = items[+m.dataset.midi];
-    e.dataTransfer.setData(MIDI_TYPE, JSON.stringify({ name: x.name, src: x.src }));
+    const m = !editing && e.target.closest?.("[data-midi]"), s = !editing && e.target.closest?.("[data-sound]");
+    if (!m && !s) return;
+    const x = items[+(m || s).dataset[m ? "midi" : "sound"]];
+    if (m) e.dataTransfer.setData(MIDI_TYPE, JSON.stringify({ name: x.name, src: x.src }));
+    else e.dataTransfer.setData(SOUND_TYPE, JSON.stringify({ name: x.name, src: x.src, seconds: x.seconds || 0, kind: x.kind }));
     e.dataTransfer.setData("text/plain", x.name);
     e.dataTransfer.effectAllowed = "copy";
   });
