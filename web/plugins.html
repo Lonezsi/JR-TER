@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  JR!TER plugins page: which plugins a song's FL renders used.
+  What it is: one page, plain ES modules, no build step, no dependencies.
+  Files: /plugins/list.js (pure helpers), /plugins/plugins.js (the page), /plugins/plugins.css.
+  Use: /plugins.html?song=ID[&version=VID]. Each version from an FL render carries a plugin list
+  (sent by jriter-cli render, see docs/VST.md). "missing here" marks plugins not installed on the
+  PC that rendered it. It becomes a box on the song once the Svelte ui/ source is committed.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plugins · JR!TER</title>
+<link rel="stylesheet" href="/glass.css">
+<link rel="stylesheet" href="/release/release.css">
+<link rel="stylesheet" href="/plugins/plugins.css">
+</head>
+<body>
+<main class="wrap" id="app"><p class="mute">Loading…</p></main>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script type="module" src="/plugins/plugins.js"></script>
+</body>
+</html>
