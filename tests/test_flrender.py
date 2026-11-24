@@ -28,6 +28,18 @@ def stub(tmp_path, body, name="fakefl.py"):
     return script
 
 
+def _ascii_path(p):
+    """cmd.exe reads a .cmd in the console's code page, so a non-ASCII path (C:\\Users\\Józsi)
+    breaks unless the code page is UTF-8. The 8.3 short name is plain ASCII."""
+    p = str(p)
+    if os.name != "nt" or p.isascii():
+        return p
+    import ctypes
+    buf = ctypes.create_unicode_buffer(1024)
+    n = ctypes.windll.kernel32.GetShortPathNameW(p, buf, len(buf))
+    return buf.value if 0 < n < len(buf) else p
+
+
 def runner(script):
     """flrender runs [exe, args...]; a python script needs the interpreter in front.
 
@@ -35,7 +47,7 @@ def runner(script):
     rather than replaced by the test.
     """
     launcher = script.with_suffix(".cmd")
-    launcher.write_text('@echo off\r\n"%s" "%s" %%*\r\n' % (sys.executable, script),
+    launcher.write_text('@echo off\r\n"%s" "%s" %%*\r\n' % (_ascii_path(sys.executable), _ascii_path(script)),
                         encoding="utf-8")
     return str(launcher)
 
