@@ -180,6 +180,65 @@ try {
     need((await js(`!!document.querySelector('#rackview .mx-knob[data-knob="swing"]')`)), "no Swing knob");
     await js(`window.jriterDaw.setView("song")`); await sleep(150);
   });
+  await scenario("the EQ draws its curve: press adds a band, drag moves it, wheel sets Q, double-click removes, keys work", async () => {
+    await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(150);
+    await js(`document.querySelector('#mixerview [data-add="eq"]').click()`); await sleep(300);
+    const bands = () => js(`window.jriterDaw.song().tracks[0].fx.find((f) => f.type === "eq").bands`);
+    const cv = "#mixerview canvas[data-eq]";
+    need(await vis(cv), "no EQ canvas");
+    need((await js(`document.querySelectorAll("#mixerview .mx-band").length`)) === 0, "a band row shows with nothing picked");
+    let r = await rect(cv);
+    const mouse = (type, x, y, extra = {}) => send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1, ...extra });
+    const x0 = r.l + r.w * 0.5, y0 = r.t + r.h * 0.5;
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0, y: y0 });
+    await mouse("mousePressed", x0, y0);
+    for (let i = 1; i <= 6; i++) { await sleep(16); await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0 + 20 * i, y: y0 - 4 * i, button: "left", buttons: 1 }); }
+    await mouse("mouseReleased", x0 + 120, y0 - 24); await sleep(250);
+    let b = await bands();
+    need(b.length === 1, "press made " + b.length + " bands");
+    r = await rect(cv);
+    const want = 20 * Math.pow(1100, (x0 + 120 - r.l) / r.w);
+    need(Math.abs(Math.log2(b[0].freq / want)) < 0.1, "freq " + b[0].freq + " is not near " + Math.round(want));
+    need(b[0].gain > 0, "gain " + b[0].gain + " should be a boost (dragged up)");
+    need((await js(`document.querySelectorAll("#mixerview .mx-band").length`)) === 1, "the picked band's row is missing");
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "the picked band should show 3 knobs");
+    const q0 = b[0].q;
+    const bx = r.l + r.w * Math.log10(b[0].freq / 20) / Math.log10(1100), by = r.t + r.h / 2 - (b[0].gain / 18) * (r.h / 2 - 12);
+    await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: bx, y: by, deltaX: 0, deltaY: -200 }); await sleep(700);
+    b = await bands(); need(b[0].q > q0, "wheel up should tighten Q: " + q0 + " -> " + b[0].q);
+    // keys on the focused curve do not reach the DAW's own shortcuts
+    await js(`document.querySelector(${JSON.stringify(cv)}).focus()`);
+    const key = async (k, code) => { await send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code, ...(k === "Enter" ? { text: "\r" } : {}), windowsVirtualKeyCode: code === "ArrowRight" ? 39 : code === "ArrowLeft" ? 37 : code === "Enter" ? 13 : code === "Delete" ? 46 : 0 }); await send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code }); await sleep(150); };
+    const f0 = (await bands())[0].freq;
+    await key("ArrowRight", "ArrowRight");
+    b = await bands(); need(b[0].freq > f0, "ArrowRight did not raise the frequency");
+    need(!(await js(`document.getElementById("helpbox") && !document.getElementById("helpbox").hidden`)), "a DAW shortcut fired");
+    await key("Enter", "Enter");
+    b = await bands(); need(b.length === 1, "Enter with a band picked should not add one (got " + b.length + ")");
+    // double-click on the node removes it; Undo brings it back
+    r = await rect(cv);
+    const nx = r.l + r.w * Math.log10(b[0].freq / 20) / Math.log10(1100), ny = r.t + r.h / 2 - (b[0].gain / 18) * (r.h / 2 - 12);
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: nx, y: ny });
+    for (const n of [1, 2]) { await mouse("mousePressed", nx, ny, { clickCount: n }); await mouse("mouseReleased", nx, ny, { clickCount: n }); }
+    await sleep(250);
+    need((await bands()).length === 0, "double-click did not remove the band (" + (await bands()).length + ")");
+    await click("#undo"); await sleep(200);
+    need((await bands()).length === 1, "Undo did not bring the band back");
+    // Delete on the focused curve, then Enter adds one
+    await js(`document.querySelector(${JSON.stringify(cv)}).focus()`);
+    await key("ArrowLeft", "ArrowLeft");   // nothing picked: the first arrow picks the lowest band
+    await key("Delete", "Delete");
+    need((await bands()).length === 0, "Delete did not remove the picked band");
+    await js(`document.querySelector(${JSON.stringify(cv)}).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`); await sleep(200);
+    need((await bands()).length === 1, "Enter did not add a band");
+    await js(`document.querySelector('#mixerview [data-fx="band-add"]').click()`); await sleep(200);
+    need((await bands()).length === 2, "the plus button did not add a band");
+    await shot("rack4-eq-dark.png");
+    await js(`document.documentElement.setAttribute("data-theme", "light")`); await sleep(200);
+    await shot("rack4-eq-light.png");
+    await js(`document.documentElement.removeAttribute("data-theme")`);
+  });
   await scenario("an old 3-band EQ, as bands, sounds the same as the old filters", async () => {
     const diff = await js(`(async () => {
       const { buildUnit } = await import("/daw/rack.js"); const { cleanFx } = await import("/daw/mixer.js");

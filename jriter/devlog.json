@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.32.0",
+  "date": "2026-11-25",
+  "name": "JR!TER",
+  "title": "Shape the EQ on its curve",
+  "notes": [
+    "The DAW mixer's EQ draws its real curve. Press on it to add a band, drag a band to move it, roll the wheel over it for width (Q), double-click it to remove it.",
+    "The keys work on the curve too: Enter adds a band, the arrows move the picked one, + and - change its width, Delete removes it.",
+    "Only the band you picked shows its knobs, so the EQ card is slimmer."
+  ]
+ }, {
   "version": "4.31.0",
   "date": "2026-11-25",
   "name": "JR!TER",
