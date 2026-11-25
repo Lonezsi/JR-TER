@@ -23,7 +23,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class Door extends OncePerRequestFilter {
     public static final String WHO = "jriter.who";
-    static final Set<String> OPEN_PAGES = Set.of("/login", "/legal", "/jriter.css", "/favicon.ico");
+    /** The same list as OPEN_PAGES in jriter/http.py. /glass.css is the shared look: without it the sign-in
+     *  page (and every page, for anyone not signed in yet) draws with no glass at all. */
+    static final Set<String> OPEN_PAGES = Set.of("/login", "/legal", "/jriter.css", "/glass.css", "/favicon.ico");
     static final Set<String> OPEN_API = Set.of("/api/auth/state", "/api/auth/login", "/api/auth/setup",
             "/api/health", "/api/auth/signup", "/api/appearance/font");
     static final String[] OPEN_API_UNDER = {"/api/shares/invitation/"};

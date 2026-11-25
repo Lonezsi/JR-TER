@@ -46,6 +46,19 @@ class DoorTest {
     }
 
     @Test
+    void theOpenPagesAreTheSameAsPythons() throws Exception {
+        // A page open in one server and shut in the other draws differently depending on which one runs:
+        // /glass.css was shut here, so the sign-in page lost its glass on the jar.
+        String py = Files.readString(Path.of("..", "jriter", "http.py"));
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("OPEN_PAGES = \\{([^}]*)\\}").matcher(py);
+        assertTrue(m.find(), "jriter/http.py has no OPEN_PAGES");
+        java.util.Set<String> python = new java.util.TreeSet<>();
+        for (String s : m.group(1).split(",")) python.add(s.trim().replace("\"", ""));
+        assertEquals(python, new java.util.TreeSet<>(Door.OPEN_PAGES));
+        assertTrue(Door.isOpen("/glass.css"));
+    }
+
+    @Test
     void shapeTurnsIdsIntoPlaceholders() {
         assertEquals("/api/songs/<id>/versions", Auth.shape("/api/songs/12/versions"));
         assertEquals("/api/songs", Auth.shape("/api/songs"));
