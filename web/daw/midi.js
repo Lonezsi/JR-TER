@@ -126,7 +126,7 @@ export function songToText(song) {
       "the language): name, code, and the values of the sliders its params make. Mixer: each track has pan " +
       "(-1..1), sends (one per bus, in bus order: how much goes to that bus, 0..1), out (where its fader goes: m for the " +
       "master, b0 for the first bus, and so on) and fx, its insert effects in order " +
-      "(eq, comp, dist, delay, reverb, each with its settings; on = false bypasses it; eq has bands instead, up to 24 of { id, type, freq in Hz, gain in dB, q, on }, the same as a song's Sound tab). mixer holds the master " +
+      "(eq, comp, dist, delay, reverb, limiter (threshold, ceiling in dB, attack, release in ms), each with its settings; on = false bypasses it; eq has bands instead, up to 24 of { id, type, freq in Hz, gain in dB, q, on }, the same as a song's Sound tab). mixer holds the master " +
       "(volume, fx; a limiter always follows) and the buses (2 to 16; each has name, volume, pan, mute, out and fx; " +
       "a bus may go out to another bus but never in a loop). A track with instrument sampler has a sample " +
       "from the library: src is where its audio comes from, start and end are seconds (end 0 = to the end), root is the " +

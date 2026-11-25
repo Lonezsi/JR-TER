@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.31.0",
+  "date": "2026-11-25",
+  "name": "JR!TER",
+  "title": "A limiter in the mixer",
+  "notes": [
+    "The mixer has a Limiter effect for any track, insert or the master: threshold, ceiling, attack and release, the same limiter as a song's Sound tab.",
+    "The master's own limiter is now built by that same code and sounds the same as before."
+  ]
+ }, {
   "version": "4.30.0",
   "date": "2026-11-25",
   "name": "JR!TER",

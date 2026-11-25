@@ -10,7 +10,8 @@
 //   mixer = { master: { volume, fx }, buses: [ {name, volume, pan, mute, out, fx, sends}, ... ] }
 // with 2..MAX_BUSES buses (the first two start as Reverb and Delay). A bus's sends feed later buses
 // only through `out`; a route that would make a loop (bus 1 into 2 into 1) goes to the master instead.
-// The master ends in a fixed limiter that is not saved.
+// The master ends in a fixed limiter that is not saved: rack.js's limiter at MASTER_LIMITER.
+// The "limiter" type is rack.js's limiter too: { threshold, ceiling in dB, attack, release in ms }.
 // An effect is { type, on, ...settings }. Types and their settings are in FX below:
 // [min, max, default, unit].  Unknown types are dropped, numbers are clamped.
 // The "eq" type is rack.js's parametric EQ: { bands: [ {id, type, freq, gain, q, on} ] }, up to 24, as a song's Sound tab.
@@ -18,7 +19,7 @@
 // The "wam" type is a plugin: { url, name, state } (state is the plugin's own saved settings, at most 64 KB of JSON).
 // Old song files (v1-v4) have none of this and open with defaults.
 
-import { cleanBands } from "./rack.js";
+import { cleanBands, UNITS } from "./rack.js";
 
 export const MAX_FX = 8;
 export const MAX_BUSES = 16;
@@ -30,10 +31,14 @@ export const FX = {
   dist:   { label: "Drive",  params: { drive: [0, 1, 0.4, ""], mix: [0, 1, 1, ""] } },
   delay:  { label: "Delay",  params: { time: [0.05, 1.5, 0.375, "s"], feedback: [0, 0.9, 0.35, ""], mix: [0, 1, 0.3, ""] } },
   reverb: { label: "Reverb", params: { size: [0.3, 6, 2, "s"], mix: [0, 1, 0.3, ""] } },
+  // rack.js's limiter; its knobs (ranges, defaults) are read off rack.js, so there is one set of numbers.
+  limiter: { label: "Limiter", params: Object.fromEntries(UNITS.limiter.knobs.map((k) => [k.key, [k.min, k.max, k.value, k.unit]])) },
   // A Web Audio Module (WAM 2) plugin loaded from an address: { url, name, state }. No knobs here; the plugin has its own window.
   wam:    { label: "Plugin", params: {} },
 };
-export const FX_TYPES = ["eq", "comp", "dist", "delay", "reverb", "wam"];
+export const FX_TYPES = ["eq", "comp", "dist", "delay", "reverb", "limiter", "wam"];
+// The master's fixed limiter (not saved), built by rack.js like any Limiter effect.
+export const MASTER_LIMITER = { id: "master", kind: "limiter", on: true, threshold: -1, ceiling: -1, attack: 3, release: 100 };
 export const WAM_STATE_MAX = 65536;
 // A plugin address: https, or a path on this server. Anything else is dropped.
 export const wamUrl = (u) => (typeof u === "string" && u.length <= 500 && /^(https:\/\/[^\s]+|\/(?!\/)[^\s]*)$/.test(u) ? u : "");

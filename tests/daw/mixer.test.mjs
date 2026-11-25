@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newFx, moveFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, WAM_STATE_MAX, pluginOrigin, addBus, removeBus, loops, MAX_BUSES } from "../../web/daw/mixer.js";
+import { newFx, moveFx, cleanFx, cleanTrackMix, defaultMixer, cleanMixer, ensureMix, trackGain, impulse, distCurve, level, chainKey, MAX_FX, WAM_STATE_MAX, pluginOrigin, addBus, removeBus, loops, MAX_BUSES, FX_TYPES, MASTER_LIMITER } from "../../web/daw/mixer.js";
+import { UNITS } from "../../web/daw/rack.js";
+import { readFileSync } from "node:fs";
 import { songToText, textToSong } from "../../web/daw/midi.js";
 
 const seeded = () => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); };
@@ -198,4 +200,24 @@ test("EQ bands survive saving and opening a song", () => {
   const eq = { ...newFx("eq"), bands: [{ id: "z", type: "notch", freq: 440, gain: 0, q: 5, on: false }] };
   const song = textToSong(songToText({ bpm: 120, bars: 4, tracks: [{ name: "T", instrument: "piano", notes: [], fx: [eq] }] }));
   assert.deepEqual(song.tracks[0].fx[0].bands, eq.bands);
+});
+
+test("a Limiter has rack.js's defaults, is clamped, and survives saving", () => {
+  const f = newFx("limiter");
+  const want = Object.fromEntries(UNITS.limiter.knobs.map((k) => [k.key, k.value]));
+  assert.deepEqual({ threshold: f.threshold, ceiling: f.ceiling, attack: f.attack, release: f.release }, want);
+  assert.deepEqual(want, { threshold: -6, ceiling: -0.3, attack: 5, release: 120 });
+  const [c] = cleanFx([{ type: "limiter", threshold: 5, ceiling: -99, attack: 500, release: 1 }]);
+  assert.deepEqual({ threshold: c.threshold, ceiling: c.ceiling, attack: c.attack, release: c.release }, { threshold: 0, ceiling: -30, attack: 100, release: 10 });
+  const song = textToSong(songToText({ bpm: 120, bars: 4, tracks: [{ name: "T", instrument: "piano", notes: [], fx: [{ ...f, ceiling: -3 }] }] }));
+  assert.equal(song.tracks[0].fx[0].type, "limiter");
+  assert.equal(song.tracks[0].fx[0].ceiling, -3);
+  assert.ok(FX_TYPES.includes("limiter"));
+});
+
+test("the master limiter is rack.js's, and mixgraph.js has no limiter of its own", () => {
+  assert.deepEqual([MASTER_LIMITER.threshold, MASTER_LIMITER.ceiling, MASTER_LIMITER.attack, MASTER_LIMITER.release], [-1, -1, 3, 100]);
+  const g = readFileSync(new URL("../../web/daw/mixgraph.js", import.meta.url), "utf8");
+  assert.ok(!/limiter\.threshold|ratio\.value = 20/.test(g));
+  assert.ok(g.includes("buildUnit(ctx, MASTER_LIMITER"));
 });

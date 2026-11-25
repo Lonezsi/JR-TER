@@ -202,6 +202,45 @@ try {
     })()`);
     need(diff.peak > 0.1 && diff.m < 1e-6, "old and new EQ differ: " + JSON.stringify(diff));
   });
+  await scenario("the master limiter from rack.js sounds like the old hand-made one", async () => {
+    const r = await js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js"); const { MASTER_LIMITER } = await import("/daw/mixer.js");
+      const N = 24000, make = () => new OfflineAudioContext(1, N, 48000);
+      const tone = (ctx) => { const o = ctx.createOscillator(); o.frequency.value = 440; const g = ctx.createGain(); g.gain.value = 2; o.connect(g); o.start(); return g; };
+      const a = make(), ta = tone(a), old = a.createDynamicsCompressor();
+      old.threshold.value = -1; old.knee.value = 0; old.ratio.value = 20; old.attack.value = 0.003; old.release.value = 0.1;
+      ta.connect(old); old.connect(a.destination);
+      const b = make(), tb = tone(b), u = buildUnit(b, MASTER_LIMITER, {});
+      tb.connect(u.input); u.output.connect(b.destination);
+      const [ra, rb] = await Promise.all([a.startRendering(), b.startRendering()]);
+      const x = ra.getChannelData(0), y = rb.getChannelData(0); let m = 0, peak = 0;
+      for (let i = 0; i < N; i++) { m = Math.max(m, Math.abs(x[i] - y[i])); peak = Math.max(peak, Math.abs(x[i])); }
+      return { m, peak };
+    })()`);
+    need(r.peak > 0.5 && r.m < 1e-6, "master limiters differ: " + JSON.stringify(r));
+  });
+  await scenario("a Limiter effect has four knobs and holds the peak down", async () => {
+    await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(150);
+    need((await js(`!!document.querySelector('#mixerview [data-add="limiter"]')`)), "no Limiter add button");
+    await js(`document.querySelector('#mixerview [data-add="limiter"]').click()`); await sleep(300);
+    const nk = await js(`[...document.querySelectorAll("#mixerview .mx-fx")].map((c) => c.querySelector("b").textContent + ":" + c.querySelectorAll(".mx-knob[role=slider]").length).join()`); need((await js(`[...document.querySelectorAll("#mixerview .mx-fx")].pop().querySelectorAll(".mx-knob[role=slider]").length`)) === 4, "Limiter should have 4 knobs: " + nk);
+    const peakDb = (ceiling) => js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js");
+      const N = 48000, ctx = new OfflineAudioContext(1, N, 48000);
+      const b = ctx.createBuffer(1, N, 48000), d = b.getChannelData(0);
+      for (let i = 0; i < N; i++) d[i] = 0.9 * Math.sin(2 * Math.PI * 440 * i / 48000);
+      const n = ctx.createBufferSource(); n.buffer = b;
+      const u = buildUnit(ctx, { id: "x", kind: "limiter", on: true, threshold: -12, ceiling: ${ceiling}, attack: 5, release: 120 }, {});
+      n.connect(u.input); u.output.connect(ctx.destination); n.start();
+      const out = (await ctx.startRendering()).getChannelData(0); let p = 0;
+      for (let i = 2400; i < N; i++) p = Math.max(p, Math.abs(out[i]));
+      return 20 * Math.log10(p);
+    })()`);
+    const hi = await peakDb(-6), lo = await peakDb(-12);
+    console.log("limiter measured: ceiling -6 gives peak " + hi.toFixed(2) + " dB, ceiling -12 gives " + lo.toFixed(2) + " dB (input -0.92 dB)");
+    need(Math.abs((hi - lo) - 6) < 0.5, "the ceiling should move the level 1:1: " + hi + " vs " + lo);
+  });
   await scenario("effect slots reorder by dragging the grip, by the arrow keys, and one Undo puts it back", async () => {
     await js(`document.activeElement && document.activeElement.blur()`);
     await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(150);

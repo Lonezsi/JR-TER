@@ -123,3 +123,4 @@ The project format is `jriter-daw` JSON (version 9; see `web/daw/midi.js` `songT
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.
 
 Rack 2 (4.30.0): the mixer's EQ is rack.js's parametric EQ (`fx.bands`, up to 24, `cleanBands`); an old 3-band EQ converts in `cleanFx` (`oldEqBands`) and automation lanes on its low/mid/high are dropped.
+Rack 3 (4.31.0): a Limiter effect (`limiter`: threshold, ceiling, attack, release) from rack.js; the master's fixed limiter is the same code (`MASTER_LIMITER` in mixer.js: -1 dB, -1 dB, 3 ms, 100 ms), so mixgraph.js has none of its own.

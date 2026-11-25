@@ -13,9 +13,9 @@
 //        fader -> one send gain per bus -> that bus.
 // Bus:   input -> inserts -> pan -> volume -> meter -> its out (the master or another bus), and
 //        a mute that is a gain at 0.
-// Master: bus -> inserts -> volume -> limiter -> meter -> speakers.
+// Master: bus -> inserts -> volume -> limiter (rack.js, MASTER_LIMITER) -> meter -> speakers.
 // Outputs are rewired only when they change; mixer.js keeps buses from going round in a loop.
-import { FX, ensureMix, trackGain, impulse, distCurve, level, chainKey } from "./mixer.js";
+import { FX, MASTER_LIMITER, ensureMix, trackGain, impulse, distCurve, level, chainKey } from "./mixer.js";
 import { allowed, loadPlugin } from "./wamhost.js";
 import { buildUnit } from "./rack.js";
 
@@ -76,6 +76,10 @@ export function createMixer(ctx) {
       const w = wetDry(inp, d);
       return { in: inp, out: w.out, set: (p) => { ease(d.delayTime, p.time); ease(fb.gain, p.feedback); w.mix(p.mix); } };
     }
+    if (fx.type === "limiter") {
+      const u = buildUnit(ctx, { ...fx, kind: "limiter" }, {});
+      return { in: u.input, out: u.output, set: (p) => u.set({ ...p, kind: "limiter" }) };
+    }
     const inp = gain(), conv = ctx.createConvolver(); // reverb
     inp.connect(conv);
     const w = wetDry(inp, conv); let last = -1;
@@ -120,14 +124,12 @@ export function createMixer(ctx) {
   const buf = new Float32Array(512);
 
   // master
-  const bus = gain(1), masterVol = gain(0.8), limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -1; limiter.knee.value = 0; limiter.ratio.value = 20;
-  limiter.attack.value = 0.003; limiter.release.value = 0.1;
+  const bus = gain(1), masterVol = gain(0.8), limiter = buildUnit(ctx, MASTER_LIMITER, {});
   const masterMeter = analyser();
   const masterHead = gain(1);
   bus.connect(masterHead);
   const masterChain = chain(masterHead, masterVol);
-  masterVol.connect(limiter); limiter.connect(masterMeter); masterMeter.connect(ctx.destination);
+  masterVol.connect(limiter.input); limiter.output.connect(masterMeter); masterMeter.connect(ctx.destination);
   const direct = gain(1); direct.connect(bus);
 
   // The buses: as many as the song has, made when first needed.
