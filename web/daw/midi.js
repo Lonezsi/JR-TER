@@ -5,14 +5,14 @@
 //                           notes: [{ pitch 0-127, start, length, velocity 1-127 }] }] }
 
 export const TEXT_FORMAT = "jriter-daw";
-export const TEXT_VERSION = 10; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples, 9 sample tempo and stretch, 10 routing (any number of buses, out, a send per bus); older files still open
+export const TEXT_VERSION = 11; // 2 added chords and scripts, 3 patterns, steps and swing, 4 clips and mode, 5 the mixer, 6 samples and audio clips, 7 automation, 8 clips at sixteenths of a bar and one-shot samples, 9 sample tempo and stretch, 10 routing (any number of buses, out, a send per bus), 11 rack effects (comp, drive, delay, reverb in rack.js units: ms, %, dB); older files still open
 
 import { cleanAutomation } from "./automation.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
 import { cleanSample } from "./sampler.js";
 import { cleanClips } from "./playlist.js";
-import { cleanTrackMix, cleanMixer, defaultMixer } from "./mixer.js";
+import { cleanTrackMix, cleanMixer, defaultMixer, upgradeOldFx } from "./mixer.js";
 import { withPatterns, cleanSteps, emptySteps, defaultKey } from "./pattern.js";
 
 export function parseMidi(buf) {
@@ -126,7 +126,7 @@ export function songToText(song) {
       "the language): name, code, and the values of the sliders its params make. Mixer: each track has pan " +
       "(-1..1), sends (one per bus, in bus order: how much goes to that bus, 0..1), out (where its fader goes: m for the " +
       "master, b0 for the first bus, and so on) and fx, its insert effects in order " +
-      "(eq, comp, dist, delay, reverb, limiter (threshold, ceiling in dB, attack, release in ms), each with its settings; on = false bypasses it; eq has bands instead, up to 24 of { id, type, freq in Hz, gain in dB, q, on }, the same as a song's Sound tab). mixer holds the master " +
+      "(eq, comp (threshold dB, ratio, attack and release ms, knee dB, makeup dB), drive (amount %, mix %, output dB), delay (time ms, feedback %, tone Hz, mix %), reverb (size seconds, predelay ms, tone Hz, mix %), limiter (threshold, ceiling in dB, attack, release in ms), each with its settings; on = false bypasses it; eq has bands instead, up to 24 of { id, type, freq in Hz, gain in dB, q, on }, the same as a song's Sound tab). mixer holds the master " +
       "(volume, fx; a limiter always follows) and the buses (2 to 16; each has name, volume, pan, mute, out and fx; " +
       "a bus may go out to another bus but never in a loop). A track with instrument sampler has a sample " +
       "from the library: src is where its audio comes from, start and end are seconds (end 0 = to the end), root is the " +
@@ -159,6 +159,7 @@ export function textToSong(text) {
   try { j = JSON.parse(text); } catch { throw new Error("That is not a song file (not valid JSON)."); }
   if (!j || j.format !== TEXT_FORMAT) throw new Error("That is not a JR!TER DAW song.");
   if (j.version > TEXT_VERSION) throw new Error("That song is from a newer version of the DAW.");
+  if ((j.version ?? 1) < 11) upgradeOldFx(j); // comp, dist, delay, reverb were in seconds and 0..1 before rack.js
   const num = (v, d) => (Number.isFinite(v) ? v : d);
   const readNotes = (list) => (Array.isArray(list) ? list : []).map((n) => ({
     pitch: Math.min(127, Math.max(0, Math.round(num(n.pitch, 60)))),

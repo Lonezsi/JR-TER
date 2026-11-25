@@ -261,6 +261,49 @@ try {
     })()`);
     need(diff.peak > 0.1 && diff.m < 1e-6, "old and new EQ differ: " + JSON.stringify(diff));
   });
+  await scenario("old comp, drive, delay and reverb, converted, sound like the old hand-made ones", async () => {
+    const r = await js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js"); const { upgradeOldFx } = await import("/daw/mixer.js");
+      const N = 48000, R = 48000;
+      const rnd = () => { let s = 11; return () => ((s = (s * 16807) % 2147483647) / 2147483647); };
+      const source = (ctx, kind) => { const b = ctx.createBuffer(1, N, R), d = b.getChannelData(0), f = rnd();
+        for (let i = 0; i < N; i++) d[i] = (kind === "noise" ? (f() * 2 - 1) * 0.4 : 0.5 * Math.sin(2 * Math.PI * 440 * i / R)) * (i < N / 2 ? 1 : 0.2);
+        const n = ctx.createBufferSource(); n.buffer = b; n.start(); return n; };
+      const gain = (ctx, v) => { const g = ctx.createGain(); g.gain.value = v; return g; };
+      const wetDry = (ctx, inp, wetOut, m) => { const out = gain(ctx, 1), dry = gain(ctx, 1 - m / 2), wet = gain(ctx, m);
+        inp.connect(dry); dry.connect(out); wetOut.connect(wet); wet.connect(out); return out; };
+      const old = {
+        comp: (ctx, x) => { const c = ctx.createDynamicsCompressor(); c.knee.value = 6; c.threshold.value = x.threshold; c.ratio.value = x.ratio; c.attack.value = x.attack; c.release.value = x.release; return [c, c]; },
+        dist: (ctx, x) => { const inp = gain(ctx, 1), sh = ctx.createWaveShaper(); sh.oversample = "4x"; const k = Math.min(1, Math.max(0, x.drive)) * 100, c = new Float32Array(1024);
+          for (let i = 0; i < 1024; i++) { const v = (i / 1023) * 2 - 1; c[i] = ((1 + k) * v) / (1 + k * Math.abs(v)); } sh.curve = c; inp.connect(sh); return [inp, wetDry(ctx, inp, sh, x.mix)]; },
+        delay: (ctx, x) => { const inp = gain(ctx, 1), d = ctx.createDelay(2), fb = gain(ctx, x.feedback); inp.connect(d); d.connect(fb); fb.connect(d); d.delayTime.value = x.time; return [inp, wetDry(ctx, inp, d, x.mix)]; },
+        reverb: (ctx, x) => { const inp = gain(ctx, 1), cv = ctx.createConvolver(), len = Math.round(x.size * R), buf = ctx.createBuffer(2, len, R), f = rnd();
+          for (let ch = 0; ch < 2; ch++) { const a = buf.getChannelData(ch); for (let i = 0; i < len; i++) a[i] = (f() * 2 - 1) * Math.pow(1 - i / len, 3); }
+          cv.buffer = buf; inp.connect(cv); return [inp, wetDry(ctx, inp, cv, x.mix)]; },
+      };
+      const cases = [
+        ["comp", "noise", { type: "comp", on: true, threshold: -24, ratio: 6, attack: 0.01, release: 0.2 }],
+        ["dist", "sine", { type: "dist", on: true, drive: 0.4, mix: 1 }],
+        ["dist", "sine", { type: "dist", on: true, drive: 0.1, mix: 0.5 }],
+        ["delay", "noise", { type: "delay", on: true, time: 0.2, feedback: 0.4, mix: 0.3 }],
+        ["reverb", "noise", { type: "reverb", on: true, size: 0.8, mix: 0.3 }],
+      ];
+      const out = [];
+      for (const [kind, src, fx] of cases) {
+        const a = new OfflineAudioContext(1, N, R), s1 = source(a, src), [ai, ao] = old[kind](a, fx); s1.connect(ai); ao.connect(a.destination);
+        const conv = upgradeOldFx({ tracks: [{ fx: [JSON.parse(JSON.stringify(fx))] }] }).tracks[0].fx[0];
+        const b = new OfflineAudioContext(1, N, R), s2 = source(b, src), u = buildUnit(b, { ...conv, kind: conv.type }, {}); s2.connect(u.input); u.output.connect(b.destination);
+        const [ra, rb] = await Promise.all([a.startRendering(), b.startRendering()]);
+        const x = ra.getChannelData(0), y = rb.getChannelData(0); let ex = 0, ey = 0, m = 0;
+        for (let i = 0; i < N; i++) { ex += x[i] * x[i]; ey += y[i] * y[i]; m = Math.max(m, Math.abs(x[i] - y[i])); }
+        out.push({ kind, mix: fx.mix, db: 10 * Math.log10((ey + 1e-12) / (ex + 1e-12)), maxdiff: m });
+      }
+      return out;
+    })()`);
+    for (const c of r) console.log("old vs new " + c.kind + (c.mix !== undefined ? " (mix " + c.mix + ")" : "") + ": level " + c.db.toFixed(2) + " dB, max sample diff " + c.maxdiff.toFixed(4));
+    for (const c of r) need(Math.abs(c.db) < 1.5, c.kind + " differs by " + c.db.toFixed(2) + " dB");
+    need(r[0].maxdiff < 1e-6, "comp should match exactly: " + r[0].maxdiff);
+  });
   await scenario("the master limiter from rack.js sounds like the old hand-made one", async () => {
     const r = await js(`(async () => {
       const { buildUnit } = await import("/daw/rack.js"); const { MASTER_LIMITER } = await import("/daw/mixer.js");

@@ -19,7 +19,7 @@ import { icon } from "./icons.js";
 import { knob as knobHtml, wireKnobs } from "./knob.js";
 import { FX, FX_TYPES, newFx, moveFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops, wamUrl, pluginOrigin, WAM_STATE_MAX } from "./mixer.js";
 import { allowed, allow } from "./wamhost.js";
-import { BAND_TYPES, TYPE_LABEL, MAX_BANDS, newBand, addBand, freqToX, xToFreq, fmtHz, isGainless } from "./rack.js";
+import { UNITS, BAND_TYPES, TYPE_LABEL, MAX_BANDS, newBand, addBand, freqToX, xToFreq, fmtHz, isGainless } from "./rack.js";
 import { wireEq, observeEq, readout } from "./eqview.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -132,7 +132,7 @@ export function mountMixer(el, api) {
       `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">${icon("close", 14)}</button></div>` +
       (f.type === "wam" ? wamBody(f, i) : f.type === "eq" ? eqBody(f, i) : "") +
       `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
-        `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${k}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
+        `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${esc(((UNITS[f.type] || {}).knobs || []).find((n) => n.key === k)?.label || k)}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
       `</div>`;
   }
 

@@ -9,28 +9,23 @@
 //   mix.plugins()  [{ fx, status: "loading"|"on"|"blocked"|"failed", error, inst }] for the plugin effects now in the graph
 //   mix.levels()   { tracks: [dB...], buses: [dB...], master: dB } for the meters
 //
+// Every effect but a plugin is built by rack.js (buildUnit).
 // Track: input -> inserts -> pan -> fader -> meter -> its out (the master or a bus), and
 //        fader -> one send gain per bus -> that bus.
 // Bus:   input -> inserts -> pan -> volume -> meter -> its out (the master or another bus), and
 //        a mute that is a gain at 0.
 // Master: bus -> inserts -> volume -> limiter (rack.js, MASTER_LIMITER) -> meter -> speakers.
 // Outputs are rewired only when they change; mixer.js keeps buses from going round in a loop.
-import { FX, MASTER_LIMITER, ensureMix, trackGain, impulse, distCurve, level, chainKey } from "./mixer.js";
+import { FX, MASTER_LIMITER, ensureMix, trackGain, level, chainKey } from "./mixer.js";
 import { allowed, loadPlugin } from "./wamhost.js";
 import { buildUnit } from "./rack.js";
 
 export function createMixer(ctx) {
   const gain = (v = 1) => { const g = ctx.createGain(); g.gain.value = v; return g; };
-  const reverbCache = new Map();
   const at = () => ctx.currentTime;
   const ease = (param, v) => param.setTargetAtTime(v, at(), 0.02);
 
-  // One effect: { in, out, set(fx) }. dry/wet effects share wet().
-  function wetDry(inp, wetOut) {
-    const out = gain(), dry = gain(1), wet = gain(0.3);
-    inp.connect(dry); dry.connect(out); wetOut.connect(wet); wet.connect(out);
-    return { out, mix: (m) => { ease(dry.gain, 1 - m / 2); ease(wet.gain, m); } };
-  }
+  // One effect: { in, out, set(fx) }.
   // Plugins (WAM): sound passes straight through until the plugin has loaded, and for good if it is
   // blocked (its site not allowed here) or fails. `live` holds one status per plugin in the graph.
   const live = new Set(), pending = new Set();
@@ -60,43 +55,9 @@ export function createMixer(ctx) {
       const u = buildUnit(ctx, { id: "eq", kind: "eq", on: true }, { bands: fx.bands });
       return { in: u.input, out: u.output, set: (p) => u.set(null, { bands: p.bands }) };
     }
-    if (fx.type === "comp") {
-      const c = ctx.createDynamicsCompressor(); c.knee.value = 6;
-      return { in: c, out: c, set: (p) => { c.threshold.value = p.threshold; c.ratio.value = p.ratio; c.attack.value = p.attack; c.release.value = p.release; } };
-    }
-    if (fx.type === "dist") {
-      const inp = gain(), shaper = ctx.createWaveShaper(); shaper.oversample = "4x";
-      inp.connect(shaper);
-      const w = wetDry(inp, shaper); let last = -1;
-      return { in: inp, out: w.out, set: (p) => { if (p.drive !== last) { shaper.curve = distCurve(p.drive); last = p.drive; } w.mix(p.mix); } };
-    }
-    if (fx.type === "delay") {
-      const inp = gain(), d = ctx.createDelay(2), fb = gain(0.3);
-      inp.connect(d); d.connect(fb); fb.connect(d);
-      const w = wetDry(inp, d);
-      return { in: inp, out: w.out, set: (p) => { ease(d.delayTime, p.time); ease(fb.gain, p.feedback); w.mix(p.mix); } };
-    }
-    if (fx.type === "limiter") {
-      const u = buildUnit(ctx, { ...fx, kind: "limiter" }, {});
-      return { in: u.input, out: u.output, set: (p) => u.set({ ...p, kind: "limiter" }) };
-    }
-    const inp = gain(), conv = ctx.createConvolver(); // reverb
-    inp.connect(conv);
-    const w = wetDry(inp, conv); let last = -1;
-    return { in: inp, out: w.out, set: (p) => {
-      const key = Math.round(p.size * 10);
-      if (key !== last) {
-        last = key;
-        if (!reverbCache.has(key)) {
-          const [l, r] = impulse(key / 10, ctx.sampleRate);
-          const buf = ctx.createBuffer(2, l.length, ctx.sampleRate);
-          buf.copyToChannel(l, 0); buf.copyToChannel(r, 1);
-          reverbCache.set(key, buf);
-        }
-        conv.buffer = reverbCache.get(key);
-      }
-      w.mix(p.mix);
-    } };
+    // comp, drive, delay, reverb, limiter: rack.js builds them all.
+    const u = buildUnit(ctx, { ...fx, kind: fx.type }, {});
+    return { in: u.input, out: u.output, set: (p) => u.set({ ...p, kind: p.type }) };
   }
 
   // A chain sits between `head` and `tail`. rebuild() rewires when effects were added/removed/bypassed.

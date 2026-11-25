@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.33.0",
+  "date": "2026-11-25",
+  "name": "JR!TER",
+  "title": "Every mixer effect is JR!TER's",
+  "notes": [
+    "The DAW mixer's Comp, Drive, Delay and Reverb are now the same effects as on a song's Sound tab. Comp gets Knee and Makeup, Drive gets Output, Delay and Reverb get Tone, and Reverb gets Pre-delay.",
+    "Settings now read in ms and %, not seconds and 0 to 1.",
+    "Old songs open converted. The balance of dry and wet is kept, so they sound close to before: the same level within about 1.5 dB, and Comp exactly the same. Automation on those knobs is converted too.",
+    "The reverb tail is now the same on every play and in a bounce."
+  ]
+ }, {
   "version": "4.32.0",
   "date": "2026-11-25",
   "name": "JR!TER",

@@ -17,6 +17,8 @@
 // The "eq" type is rack.js's parametric EQ: { bands: [ {id, type, freq, gain, q, on} ] }, up to 24, as a song's Sound tab.
 // An old 3-band EQ (low, mid, high) opens as a low shelf 200 Hz, a bell 1 kHz Q 0.8 and a high shelf 5 kHz.
 // The "wam" type is a plugin: { url, name, state } (state is the plugin's own saved settings, at most 64 KB of JSON).
+// comp, drive, delay, reverb are rack.js's too (its units: ms, %, dB, Hz). Song files older than version 11 had
+// their own (seconds, 0..1, "dist"); upgradeOldFx converts them when a file opens.
 // Old song files (v1-v4) have none of this and open with defaults.
 
 import { cleanBands, UNITS } from "./rack.js";
@@ -24,19 +26,22 @@ import { cleanBands, UNITS } from "./rack.js";
 export const MAX_FX = 8;
 export const MAX_BUSES = 16;
 
+// An effect's knobs as [min, max, default, unit], read off rack.js so there is one set of numbers.
+const fromRack = (kind) => Object.fromEntries(UNITS[kind].knobs.map((k) => [k.key, [k.min, k.max, k.value, k.unit]]));
+
 export const FX = {
   // The EQ is rack.js's parametric EQ: no knobs here, its bands are in fx.bands.
   eq:     { label: "EQ",     params: {} },
-  comp:   { label: "Comp",   params: { threshold: [-60, 0, -18, "dB"], ratio: [1, 20, 4, ":1"], attack: [0.001, 0.3, 0.01, "s"], release: [0.02, 1, 0.2, "s"] } },
-  dist:   { label: "Drive",  params: { drive: [0, 1, 0.4, ""], mix: [0, 1, 1, ""] } },
-  delay:  { label: "Delay",  params: { time: [0.05, 1.5, 0.375, "s"], feedback: [0, 0.9, 0.35, ""], mix: [0, 1, 0.3, ""] } },
-  reverb: { label: "Reverb", params: { size: [0.3, 6, 2, "s"], mix: [0, 1, 0.3, ""] } },
+  comp:   { label: "Comp",   params: fromRack("comp") },
+  drive:  { label: "Drive",  params: fromRack("drive") },
+  delay:  { label: "Delay",  params: fromRack("delay") },
+  reverb: { label: "Reverb", params: fromRack("reverb") },
   // rack.js's limiter; its knobs (ranges, defaults) are read off rack.js, so there is one set of numbers.
-  limiter: { label: "Limiter", params: Object.fromEntries(UNITS.limiter.knobs.map((k) => [k.key, [k.min, k.max, k.value, k.unit]])) },
+  limiter: { label: "Limiter", params: fromRack("limiter") },
   // A Web Audio Module (WAM 2) plugin loaded from an address: { url, name, state }. No knobs here; the plugin has its own window.
   wam:    { label: "Plugin", params: {} },
 };
-export const FX_TYPES = ["eq", "comp", "dist", "delay", "reverb", "limiter", "wam"];
+export const FX_TYPES = ["eq", "comp", "drive", "delay", "reverb", "limiter", "wam"];
 // The master's fixed limiter (not saved), built by rack.js like any Limiter effect.
 export const MASTER_LIMITER = { id: "master", kind: "limiter", on: true, threshold: -1, ceiling: -1, attack: 3, release: 100 };
 export const WAM_STATE_MAX = 65536;
@@ -117,8 +122,8 @@ export function defaultMixer() {
   return {
     master: { volume: 0.8, fx: [] },
     buses: [
-      newBus("Reverb", [newFx("reverb")].map((f) => ({ ...f, mix: 1 }))),
-      newBus("Delay", [newFx("delay")].map((f) => ({ ...f, mix: 1 }))),
+      newBus("Reverb", [newFx("reverb")].map((f) => ({ ...f, mix: 100 }))),
+      newBus("Delay", [newFx("delay")].map((f) => ({ ...f, mix: 100 }))),
     ],
   };
 }
@@ -191,26 +196,6 @@ export function removeBus(song, i) {
 
 export const trackGain = (t, anySolo) => ((t.mute || (anySolo && !t.solo)) ? 0 : num(t.volume, 0.8));
 
-// Reverb tail: noise that dies away. Two channels. `rand` can be seeded for tests.
-export function impulse(seconds, sampleRate, rand = Math.random) {
-  const len = Math.max(1, Math.round(seconds * sampleRate));
-  return [0, 1].map(() => {
-    const a = new Float32Array(len);
-    for (let i = 0; i < len; i++) a[i] = (rand() * 2 - 1) * Math.pow(1 - i / len, 3);
-    return a;
-  });
-}
-
-// Waveshaper curve: soft clipping, odd, bounded, rising.
-export function distCurve(drive, n = 1024) {
-  const k = clamp(drive, 0, 1) * 100, c = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    c[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
-  }
-  return c;
-}
-
 // Peak of a block of samples in dB, never below -60.
 export function level(samples) {
   let p = 0;
@@ -222,3 +207,62 @@ export const chainKey = (fx) => fx.map((f) => f.type + (f.on ? "1" : "0") + (f.t
   (f.type === "eq" ? "#" + (f.bands || []).map((b) => b.id + b.type + (b.on ? 1 : 0)).join("|") : "")).join(",");
 // Where a plugin address comes from: "" for this server, else its origin (what the person allows).
 export const pluginOrigin = (u) => (/^https:\/\//.test(u || "") ? new URL(u).origin : "");
+
+// ── old effects (song files before version 11) ──────────────────────────────────────────────
+const r1 = (n) => Math.round(n * 10) / 10;
+// An old mix (0..1: dry 1 - m/2, wet m) as rack.js's % (equal power) with the same wet:dry balance.
+export const oldMix = (m) => { m = clamp(num(m, 0.3), 0, 1); return r1(Math.atan2(m, 1 - m / 2) / (Math.PI / 2) * 100); };
+// The level the old mix had over the new one, in dB (Drive puts it on its Output knob).
+export const oldMixDb = (m) => { m = clamp(num(m, 0.3), 0, 1); return r1(20 * Math.log10(Math.hypot(1 - m / 2, m))); };
+// Old drive (0..1; curve (1+k)x/(1+k|x|), k = 100d) as rack.js's amount %, matching the curve's slope at 0
+// (rack: tanh(kx)/tanh(k) with k = 1 + 0.4 * amount, slope k/tanh(k)).
+export function oldDrive(d) {
+  const target = 1 + 100 * clamp(num(d, 0.4), 0, 1);
+  if (target <= 1 / Math.tanh(1)) return 0;
+  let lo = 1, hi = 41;
+  for (let i = 0; i < 60; i++) { const k = (lo + hi) / 2; if (k / Math.tanh(k) < target) lo = k; else hi = k; }
+  return clamp(r1(((lo + hi) / 2 - 1) / 0.4), 0, 100);
+}
+
+// One old effect as rack.js's, or the same object if it is not one of the old kinds.
+function oldEffect(x) {
+  const on = x.on !== false, n = (v, d) => num(v, d);
+  switch (x.type) {
+    case "comp": return { type: "comp", on, threshold: n(x.threshold, -18), ratio: n(x.ratio, 4),
+      attack: r1(n(x.attack, 0.01) * 1000), release: r1(n(x.release, 0.2) * 1000), knee: 6, makeup: 0 };
+    case "dist": return { type: "drive", on, amount: oldDrive(x.drive), mix: oldMix(n(x.mix, 1)), output: oldMixDb(n(x.mix, 1)) };
+    case "delay": return { type: "delay", on, time: r1(n(x.time, 0.375) * 1000), feedback: r1(n(x.feedback, 0.35) * 100), tone: 16000, mix: oldMix(n(x.mix, 0.3)) };
+    case "reverb": return { type: "reverb", on, size: n(x.size, 2), predelay: 0, tone: 18000, mix: oldMix(n(x.mix, 0.3)) };
+    default: return x;
+  }
+}
+
+// An automation lane's value on an old effect's knob, in rack.js's units; null param = keep.
+function oldLane(fx, param) {
+  if (!fx) return null;
+  const f = { comp: { attack: [null, (v) => r1(v * 1000)], release: [null, (v) => r1(v * 1000)] },
+    dist: { drive: ["amount", oldDrive], mix: [null, oldMix] },
+    delay: { time: [null, (v) => r1(v * 1000)], feedback: [null, (v) => r1(v * 100)], mix: [null, oldMix] },
+    reverb: { mix: [null, oldMix] } }[fx.type];
+  return f && f[param] ? f[param] : null;
+}
+
+// Convert a parsed song (version < 11) in place: every effect list and the automation lanes on them.
+export function upgradeOldFx(j) {
+  const lists = { master: j.mixer && j.mixer.master };
+  (Array.isArray(j.tracks) ? j.tracks : []).forEach((t, i) => { lists["t" + i] = t; });
+  (j.mixer && Array.isArray(j.mixer.buses) ? j.mixer.buses : []).forEach((b, i) => { lists["bus" + i] = b; });
+  const fxAt = (who, k) => { const o = lists[who]; return o && Array.isArray(o.fx) ? o.fx[k] : null; };
+  if (Array.isArray(j.automation)) {
+    for (const lane of j.automation) {
+      const m = lane && typeof lane.target === "string" && /^(t\d+|master|bus\d+)\.fx(\d+)\.(\w+)$/.exec(lane.target);
+      if (!m) continue;
+      const map = oldLane(fxAt(m[1], +m[2]), m[3]);
+      if (!map) continue;
+      if (map[0]) lane.target = `${m[1]}.fx${m[2]}.${map[0]}`;
+      for (const p of Array.isArray(lane.points) ? lane.points : []) if (p && Number.isFinite(p.value)) p.value = map[1](p.value);
+    }
+  }
+  for (const o of Object.values(lists)) if (o && Array.isArray(o.fx)) o.fx = o.fx.map((x) => (x && typeof x === "object" ? oldEffect(x) : x));
+  return j;
+}
