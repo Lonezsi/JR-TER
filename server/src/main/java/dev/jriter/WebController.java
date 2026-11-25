@@ -144,6 +144,14 @@ public class WebController {
     @GetMapping("/jriter.css")
     public ResponseEntity<byte[]> css(HttpServletRequest req) throws Exception { return bundled(req, "css", ".css"); }
 
+    /** The shared glass on its own, as Python serves it: the Svelte app links it separately from its
+     *  bundle. Without this the catch-all below answered with the app's page, and nothing had glass. */
+    @GetMapping("/glass.css")
+    public ResponseEntity<byte[]> glass() {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-cache")
+                .contentType(MediaType.parseMediaType("text/css;charset=utf-8")).body(sharedGlass());
+    }
+
     @GetMapping("/jriter.js")
     public ResponseEntity<byte[]> js(HttpServletRequest req) throws Exception { return bundled(req, "js", ".js"); }
 
