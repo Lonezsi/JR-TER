@@ -1071,7 +1071,12 @@ function refreshView() {
   else if (view === "sampler") samplerUI.render();
   samplerUI.refresh(); // the instrument dialog follows every change, wherever it was made
   if (studio) { // the docked panels stay current, but never under a hand that is typing in them
-    const typing = (id) => $(id).contains(document.activeElement);
+    // Typing means a field that takes text. A pressed button keeps focus too, and skipping the redraw for that
+    // left the mixer's on/off dots and M/S showing the old state.
+    const typing = (id) => {
+      const a = document.activeElement;
+      return $(id).contains(a) && (a.isContentEditable || a.matches("textarea, select, input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])"));
+    };
     if (view !== "mixer" && dockOpen("mixer") && !typing("mixerview")) mixUI.render();
     if (view !== "sampler" && dockOpen("sampler") && !typing("samplerview")) samplerUI.render();
   }

@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.34.0",
+  "date": "2026-11-25",
+  "name": "JR!TER",
+  "title": "Mixer effects switch off, and fold",
+  "notes": [
+    "The on/off dot on a mixer effect now shows what you pressed. The effect did switch, but the docked mixer kept drawing the old state; M and S had the same problem.",
+    "The dot is easier to hit, and its tooltip says whether the effect is on or bypassed. A bypassed effect's name dims too.",
+    "Press an effect's name to fold it to one line, and again to open it. It stays folded when you open the song again."
+  ]
+ }, {
   "version": "4.33.0",
   "date": "2026-11-25",
   "name": "JR!TER",
