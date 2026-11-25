@@ -121,3 +121,5 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
 
 The project format is `jriter-daw` JSON (version 9; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.
+
+Rack 2 (4.30.0): the mixer's EQ is rack.js's parametric EQ (`fx.bands`, up to 24, `cleanBands`); an old 3-band EQ converts in `cleanFx` (`oldEqBands`) and automation lanes on its low/mid/high are dropped.

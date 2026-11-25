@@ -393,6 +393,25 @@ export function bandAtPoint(x, y, size, range) {
   };
 }
 
+/** Most bands an equaliser holds (as jriter/modules/sound.py). */
+export const MAX_BANDS = 24;
+
+/** Whatever a file holds, as bands Web Audio will accept. Matches jriter/modules/sound.py normalise(). */
+export function cleanBands(list) {
+  const num = (v, a, b, d) => { const n = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(n) ? clamp(n, a, b) : d; };
+  const out = [];
+  for (const x of (Array.isArray(list) ? list : []).slice(0, MAX_BANDS)) {
+    if (!x || typeof x !== "object" || Array.isArray(x)) continue;
+    out.push({
+      id: x.id ? String(x.id) : "b" + (out.length + 1),
+      type: BAND_TYPES.includes(x.type) ? x.type : "peaking",
+      freq: num(x.freq, 10, 22000, 1000), gain: num(x.gain, -30, 30, 0), q: num(x.q, 0.05, 30, 1),
+      on: x.on !== false,
+    });
+  }
+  return out;
+}
+
 /** Add and keep the list in frequency order. */
 export function addBand(bands, band) {
   bands.push(band);

@@ -169,7 +169,9 @@ try {
   });
   await scenario("effect settings are knobs that answer the arrow keys; Swing is a knob", async () => {
     await js(`document.querySelector('#mixerview [data-add="eq"]').click()`); await sleep(150);
-    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "EQ should have 3 knobs");
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-band").length`)) === 0, "a new EQ should be flat");
+    await js(`document.querySelector('#mixerview [data-fx="band-add"]').click()`); await sleep(150);
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "a bell band should have freq, gain and Q knobs");
     need((await js(`document.querySelectorAll("#mixerview .mx-param").length`)) === 0, "sliders are still there");
     const v0 = await js(`(() => { const k = document.querySelector("#mixerview .mx-fx .mx-knob"); k.focus(); return +k.getAttribute("aria-valuenow"); })()`);
     await js(`document.querySelector("#mixerview .mx-fx .mx-knob").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }))`);
@@ -177,6 +179,28 @@ try {
     await js(`window.jriterDaw.setView("rack")`); await sleep(200);
     need((await js(`!!document.querySelector('#rackview .mx-knob[data-knob="swing"]')`)), "no Swing knob");
     await js(`window.jriterDaw.setView("song")`); await sleep(150);
+  });
+  await scenario("an old 3-band EQ, as bands, sounds the same as the old filters", async () => {
+    const diff = await js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js"); const { cleanFx } = await import("/daw/mixer.js");
+      const N = 24000, make = () => new OfflineAudioContext(1, N, 48000);
+      const noise = (ctx) => { const b = ctx.createBuffer(1, N, 48000), d = b.getChannelData(0); let s = 7; for (let i = 0; i < N; i++) { s = (s * 16807) % 2147483647; d[i] = (s / 2147483647) * 2 - 1; } const n = ctx.createBufferSource(); n.buffer = b; return n; };
+      const a = make(), na = noise(a);
+      const lo = a.createBiquadFilter(), mid = a.createBiquadFilter(), hi = a.createBiquadFilter();
+      lo.type = "lowshelf"; lo.frequency.value = 200; lo.gain.value = 6;
+      mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.8; mid.gain.value = -4;
+      hi.type = "highshelf"; hi.frequency.value = 5000; hi.gain.value = 3;
+      na.connect(lo); lo.connect(mid); mid.connect(hi); hi.connect(a.destination); na.start();
+      const b = make(), nb = noise(b);
+      const [fx] = cleanFx([{ type: "eq", low: 6, mid: -4, high: 3 }]);
+      const u = buildUnit(b, { id: "eq", kind: "eq", on: true }, { bands: fx.bands });
+      nb.connect(u.input); u.output.connect(b.destination); nb.start();
+      const [ra, rb] = await Promise.all([a.startRendering(), b.startRendering()]);
+      const x = ra.getChannelData(0), y = rb.getChannelData(0); let m = 0, peak = 0;
+      for (let i = 0; i < N; i++) { m = Math.max(m, Math.abs(x[i] - y[i])); peak = Math.max(peak, Math.abs(x[i])); }
+      return { m, peak };
+    })()`);
+    need(diff.peak > 0.1 && diff.m < 1e-6, "old and new EQ differ: " + JSON.stringify(diff));
   });
   await scenario("effect slots reorder by dragging the grip, by the arrow keys, and one Undo puts it back", async () => {
     await js(`document.activeElement && document.activeElement.blur()`);

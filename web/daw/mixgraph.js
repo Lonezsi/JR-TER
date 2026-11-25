@@ -17,6 +17,7 @@
 // Outputs are rewired only when they change; mixer.js keeps buses from going round in a loop.
 import { FX, ensureMix, trackGain, impulse, distCurve, level, chainKey } from "./mixer.js";
 import { allowed, loadPlugin } from "./wamhost.js";
+import { buildUnit } from "./rack.js";
 
 export function createMixer(ctx) {
   const gain = (v = 1) => { const g = ctx.createGain(); g.gain.value = v; return g; };
@@ -56,12 +57,8 @@ export function createMixer(ctx) {
   function build(fx) {
     if (fx.type === "wam") return plugin(fx);
     if (fx.type === "eq") {
-      const lo = ctx.createBiquadFilter(), mid = ctx.createBiquadFilter(), hi = ctx.createBiquadFilter();
-      lo.type = "lowshelf"; lo.frequency.value = 200;
-      mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.8;
-      hi.type = "highshelf"; hi.frequency.value = 5000;
-      lo.connect(mid); mid.connect(hi);
-      return { in: lo, out: hi, set: (p) => { lo.gain.value = p.low; mid.gain.value = p.mid; hi.gain.value = p.high; } };
+      const u = buildUnit(ctx, { id: "eq", kind: "eq", on: true }, { bands: fx.bands });
+      return { in: u.input, out: u.output, set: (p) => u.set(null, { bands: p.bands }) };
     }
     if (fx.type === "comp") {
       const c = ctx.createDynamicsCompressor(); c.knee.value = 6;

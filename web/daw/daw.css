@@ -416,6 +416,10 @@ input[type="range"].mx-fader::-moz-range-thumb { width: 12px; height: 6px; borde
 .mx-fx.drop-after { box-shadow: 0 2px 0 0 var(--d-acc); }
 @media (prefers-reduced-motion: no-preference) { .mx-fx { transition: box-shadow 150ms; } .mx-fx.drag { transition: none; } }
 /* A Plugin effect (wamhost.js): its address, a status, Allow and Open; Open shows its own window. */
+.mx-bands { display: flex; flex-direction: column; gap: var(--d-s2); align-items: flex-start; min-width: 0; }
+.mx-band { display: flex; flex-wrap: wrap; align-items: center; gap: var(--d-s2) var(--d-s3); }
+.mx-band.off .mx-p, .mx-band.off select { opacity: 0.45; }
+.mx-band select { max-width: 96px; font-size: 11px; }
 .mx-wam { display: flex; flex-direction: column; gap: var(--d-s2); min-width: 0; }
 .mx-wurl { width: 100%; font-size: 12px; }
 .mx-wrow { display: flex; align-items: center; gap: var(--d-s2); min-width: 0; }

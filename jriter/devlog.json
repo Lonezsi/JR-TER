@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.30.0",
+  "date": "2026-11-25",
+  "name": "JR!TER",
+  "title": "The DAW's EQ is JR!TER's EQ",
+  "notes": [
+    "The mixer's EQ is now the same parametric EQ as a song's Sound tab: up to 24 bands, any type (bell, shelves, cuts, notch, band).",
+    "An old 3-band EQ turns into a low shelf at 200 Hz, a bell at 1 kHz and a high shelf at 5 kHz with the same gains, so old songs sound the same.",
+    "Automation lanes on the old Low, Mid and High knobs are gone, because those knobs no longer exist. Other lanes are untouched.",
+    "Drawing the EQ as a curve comes next; for now each band is a row of knobs."
+  ]
+ }, {
   "version": "4.29.0",
   "date": "2026-11-24",
   "name": "JR!TER",

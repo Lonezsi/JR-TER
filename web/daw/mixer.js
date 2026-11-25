@@ -13,14 +13,19 @@
 // The master ends in a fixed limiter that is not saved.
 // An effect is { type, on, ...settings }. Types and their settings are in FX below:
 // [min, max, default, unit].  Unknown types are dropped, numbers are clamped.
+// The "eq" type is rack.js's parametric EQ: { bands: [ {id, type, freq, gain, q, on} ] }, up to 24, as a song's Sound tab.
+// An old 3-band EQ (low, mid, high) opens as a low shelf 200 Hz, a bell 1 kHz Q 0.8 and a high shelf 5 kHz.
 // The "wam" type is a plugin: { url, name, state } (state is the plugin's own saved settings, at most 64 KB of JSON).
 // Old song files (v1-v4) have none of this and open with defaults.
+
+import { cleanBands } from "./rack.js";
 
 export const MAX_FX = 8;
 export const MAX_BUSES = 16;
 
 export const FX = {
-  eq:     { label: "EQ",     params: { low: [-12, 12, 0, "dB"], mid: [-12, 12, 0, "dB"], high: [-12, 12, 0, "dB"] } },
+  // The EQ is rack.js's parametric EQ: no knobs here, its bands are in fx.bands.
+  eq:     { label: "EQ",     params: {} },
   comp:   { label: "Comp",   params: { threshold: [-60, 0, -18, "dB"], ratio: [1, 20, 4, ":1"], attack: [0.001, 0.3, 0.01, "s"], release: [0.02, 1, 0.2, "s"] } },
   dist:   { label: "Drive",  params: { drive: [0, 1, 0.4, ""], mix: [0, 1, 1, ""] } },
   delay:  { label: "Delay",  params: { time: [0.05, 1.5, 0.375, "s"], feedback: [0, 0.9, 0.35, ""], mix: [0, 1, 0.3, ""] } },
@@ -42,7 +47,18 @@ export function newFx(type) {
   const fx = { type, on: true };
   for (const [k, [, , d]] of Object.entries(spec.params)) fx[k] = d;
   if (type === "wam") Object.assign(fx, { url: "", name: "", state: null });
+  if (type === "eq") fx.bands = [];
   return fx;
+}
+
+// An old 3-band EQ (low, mid, high in dB, -12..12) as the bands that sound the same.
+export function oldEqBands(x) {
+  const g = (v) => clamp(num(v, 0), -12, 12);
+  return [
+    { id: "b1", type: "lowshelf", freq: 200, gain: g(x && x.low), q: 0.7, on: true },
+    { id: "b2", type: "peaking", freq: 1000, gain: g(x && x.mid), q: 0.8, on: true },
+    { id: "b3", type: "highshelf", freq: 5000, gain: g(x && x.high), q: 0.7, on: true },
+  ];
 }
 
 // Move the effect at `from` to `to` in place (`to` is clamped); returns the list.
@@ -60,6 +76,7 @@ export function cleanFx(list) {
     if (!x || !FX[x.type] || out.length >= MAX_FX) continue;
     const fx = { type: x.type, on: x.on !== false };
     for (const [k, [lo, hi, d]] of Object.entries(FX[x.type].params)) fx[k] = clamp(num(x[k], d), lo, hi);
+    if (x.type === "eq") fx.bands = Array.isArray(x.bands) ? cleanBands(x.bands) : oldEqBands(x);
     if (x.type === "wam") {
       fx.url = wamUrl(x.url);
       fx.name = typeof x.name === "string" ? x.name.slice(0, 80) : "";
@@ -196,6 +213,7 @@ export function level(samples) {
   return p <= 0.001 ? -60 : Math.max(-60, 20 * Math.log10(p));
 }
 
-export const chainKey = (fx) => fx.map((f) => f.type + (f.on ? "1" : "0") + (f.type === "wam" ? "@" + f.url : "")).join(",");
+export const chainKey = (fx) => fx.map((f) => f.type + (f.on ? "1" : "0") + (f.type === "wam" ? "@" + f.url : "") +
+  (f.type === "eq" ? "#" + (f.bands || []).map((b) => b.id + b.type + (b.on ? 1 : 0)).join("|") : "")).join(",");
 // Where a plugin address comes from: "" for this server, else its origin (what the person allows).
 export const pluginOrigin = (u) => (/^https:\/\//.test(u || "") ? new URL(u).origin : "");

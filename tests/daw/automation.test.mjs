@@ -91,3 +91,17 @@ test("automation is saved with the song and old files open without it", () => {
   const old = JSON.parse(songToText(s)); delete old.automation; old.version = 6;
   assert.deepEqual(textToSong(JSON.stringify(old)).automation, []);
 });
+
+test("lanes on an old EQ's Low, Mid and High knobs go; other lanes stay", () => {
+  const text = JSON.stringify({ format: "jriter-daw", version: 10, bpm: 120, bars: 4,
+    tracks: [{ name: "T", instrument: "piano", notes: [], fx: [{ type: "eq", low: 3, mid: 0, high: -2 }] }],
+    automation: [
+      { target: "t0.fx0.low", points: [{ beat: 0, value: 1 }] },
+      { target: "t0.fx0.high", points: [{ beat: 0, value: 1 }] },
+      { target: "t0.volume", points: [{ beat: 0, value: 0.5 }] },
+    ] });
+  const song = textToSong(text);
+  assert.deepEqual(song.automation.map((l) => l.target), ["t0.volume"]);
+  assert.equal(song.tracks[0].fx[0].bands[0].gain, 3);
+  assert.ok(!targets(song).some((t) => t.id.startsWith("t0.fx0.")));
+});

@@ -19,6 +19,7 @@ import { icon } from "./icons.js";
 import { knob as knobHtml, wireKnobs } from "./knob.js";
 import { FX, FX_TYPES, newFx, moveFx, ensureMix, MAX_FX, MAX_BUSES, addBus, removeBus, loops, wamUrl, pluginOrigin, WAM_STATE_MAX } from "./mixer.js";
 import { allowed, allow } from "./wamhost.js";
+import { BAND_TYPES, TYPE_LABEL, MAX_BANDS, newBand, addBand, freqToX, xToFreq, fmtHz, isGainless } from "./rack.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(2));
@@ -103,6 +104,22 @@ export function mountMixer(el, api) {
       (st.status === "on" ? `<button data-fx="open" data-i="${i}" data-tip="Open the plugin" aria-label="Open the plugin">Open</button>` : "") +
       `</div></div>`;
   }
+  // The EQ's bands: one row each (on, type, frequency, gain, Q, remove). The frequency knob turns along a log axis.
+  const bandWords = { freq: (b) => fmtHz(b.freq) + " Hz", gain: (b) => (b.gain > 0 ? "+" : "") + b.gain.toFixed(1) + " dB", q: (b) => "Q " + b.q.toFixed(2) };
+  function eqBody(f, i) {
+    const rows = f.bands.map((b, j) => {
+      const k = (field, v, lo, hi, home, step) => knobHtml({ key: `band.${i}.${j}.${field}`, label: `Band ${j + 1} ${field}`, value: v, lo, hi, home, step, words: bandWords[field](b) });
+      return `<div class="mx-band${b.on ? "" : " off"}" data-b="${j}">` +
+        `<button role="switch" class="mx-led" aria-checked="${b.on}" data-fx="band-on" data-i="${i}" data-b="${j}" aria-label="Band ${j + 1} on or off" data-tip="On or off"></button>` +
+        `<select data-btype="${i}.${j}" aria-label="Band ${j + 1} type">${BAND_TYPES.map((t) => `<option value="${t}"${t === b.type ? " selected" : ""}>${TYPE_LABEL[t]}</option>`).join("")}</select>` +
+        `<div class="mx-p">${k("freq", freqToX(b.freq, 1000), 0, 1000, freqToX(1000, 1000), 0)}<span>Hz</span><output>${fmtHz(b.freq)}</output></div>` +
+        (isGainless(b.type) ? "" : `<div class="mx-p">${k("gain", b.gain, -30, 30, 0, 0.1)}<span>dB</span><output>${b.gain.toFixed(1)}</output></div>`) +
+        `<div class="mx-p">${k("q", b.q, 0.05, 30, 1, 0.01)}<span>Q</span><output>${b.q.toFixed(2)}</output></div>` +
+        `<button data-fx="band-del" data-i="${i}" data-b="${j}" aria-label="Remove band ${j + 1}" data-tip="Remove band">${icon("close", 14)}</button></div>`;
+    }).join("");
+    return `<div class="mx-bands">${rows || `<div class="sv-doc">Flat. Add a band.</div>`}` +
+      `<button data-fx="band-add" data-i="${i}" data-tip="Add a band" aria-label="Add a band"${f.bands.length >= MAX_BANDS ? " disabled" : ""}>${icon("plus", 14)}Band</button></div>`;
+  }
   function fxCard(f, i, n) {
     const spec = FX[f.type];
     return `<div class="mx-fx${f.on ? "" : " off"}" data-i="${i}">` +
@@ -110,7 +127,7 @@ export function mountMixer(el, api) {
       `<button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="On or off"></button>` +
       `<span class="mx-slot">${i + 1}</span><b>${spec.label}</b><span class="mx-gap"></span>` +
       `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">${icon("close", 14)}</button></div>` +
-      (f.type === "wam" ? wamBody(f, i) : "") +
+      (f.type === "wam" ? wamBody(f, i) : f.type === "eq" ? eqBody(f, i) : "") +
       `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
         `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${k}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
       `</div>`;
@@ -173,6 +190,10 @@ export function mountMixer(el, api) {
   el.addEventListener("change", (e) => {
     const t = e.target, song = api.song();
     if (t.matches("input[type=range]")) return end();
+    if (t.dataset.btype !== undefined) {
+      const [i, j] = t.dataset.btype.split(".").map(Number);
+      return api.change(() => { const b = (picked(song).fx[i] || {}).bands?.[j]; if (b) b.type = t.value; });
+    }
     if (t.id === "mx-out") return api.change(() => { picked(song).obj.out = t.value; ensureMix(song); });
     if (t.dataset.wurl !== undefined) {
       const i = +t.dataset.wurl, u = t.value.trim(), ok = wamUrl(u);
@@ -189,7 +210,13 @@ export function mountMixer(el, api) {
     turn: (key, v, node) => {
       const song = api.song();
       let words;
-      if (key.startsWith("fx.")) {
+      if (key.startsWith("band.")) {
+        const [, i, j, field] = key.split(".");
+        const f = picked(song).fx[+i], b = f && f.bands[+j]; if (!b) return;
+        b[field] = field === "freq" ? Math.round(xToFreq(v, 1000) * 10) / 10 : v;
+        words = bandWords[field](b);
+        const out = node.parentElement.querySelector("output"); if (out) out.textContent = field === "freq" ? fmtHz(b.freq) : field === "q" ? b.q.toFixed(2) : b.gain.toFixed(1);
+      } else if (key.startsWith("fx.")) {
         const [, i, p] = key.split(".");
         const f = picked(song).fx[+i]; if (!f) return;
         f[p] = v; words = fmt(v) + (FX[f.type].params[p][3] || "");
@@ -245,6 +272,9 @@ export function mountMixer(el, api) {
     if (!b || b.disabled) return;
     const list = picked(song).fx, i = +b.dataset.i, a = b.dataset.fx;
     if (a === "toggle") api.change(() => { list[i].on = !list[i].on; });
+    else if (a === "band-add") api.change(() => { if (list[i].bands.length < MAX_BANDS) addBand(list[i].bands, newBand()); });
+    else if (a === "band-on") api.change(() => { const bd = list[i].bands[+b.dataset.b]; if (bd) bd.on = !bd.on; });
+    else if (a === "band-del") api.change(() => { list[i].bands.splice(+b.dataset.b, 1); });
     else if (a === "allow") { allow(list[i].url); api.sync(); render(); }
     else if (a === "open") openPlugin(list[i]);
     else if (a === "del") { api.change(() => { list.splice(i, 1); }); api.toast("Effect removed.", { label: "Undo", run: api.undo }); }

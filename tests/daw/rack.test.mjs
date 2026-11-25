@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   UNITS, ADDABLE, newUnit, rackOf, valueOf, summary, shapeOf, buildUnit, rackImpulse, responseOf,
   freqToX, xToFreq, gainToY, yToGain, bandAt, addBand, dragBand, qFromWheel,
-  limiterLineAt, setLimiterLine, ReductionHistory, HISTORY, dbToGain,
+  limiterLineAt, setLimiterLine, ReductionHistory, HISTORY, dbToGain, cleanBands, MAX_BANDS,
 } from "../../web/daw/rack.js";
 
 // A fake audio context: nodes are plain objects, params are { value }.
@@ -126,4 +126,17 @@ test("responseOf multiplies the bands, skips off bands, flat on bypass", () => {
   assert.ok(Math.abs(responseOf(ctx, [band, { ...band, on: false }], f)[0] - 6.02) < 0.01);
   assert.deepEqual([...responseOf(ctx, [band], f, true)], [0, 0]);
   assert.deepEqual([...responseOf(null, [band], f)], [0, 0]);
+});
+
+test("cleanBands follows the server's limits", () => {
+  const out = cleanBands([{ type: "zap", freq: 0, gain: 99, q: NaN }, null, { id: "x", type: "highpass", freq: 99999, q: 0, on: false }]);
+  assert.equal(out.length, 2);
+  assert.deepEqual(out[0], { id: "b1", type: "peaking", freq: 10, gain: 30, q: 1, on: true });
+  assert.deepEqual(out[1], { id: "x", type: "highpass", freq: 22000, gain: 0, q: 0.05, on: false });
+  assert.deepEqual(cleanBands("x"), []);
+});
+
+test("cleanBands keeps at most 24", () => {
+  assert.equal(MAX_BANDS, 24);
+  assert.equal(cleanBands(Array.from({ length: 40 }, () => ({}))).length, 24);
 });

@@ -14,7 +14,8 @@ test("new effects have their defaults", () => {
 test("cleanFx drops unknown types, clamps, and caps the chain", () => {
   const out = cleanFx([{ type: "eq", low: 99 }, { type: "zap" }, null, { type: "comp", on: false, ratio: -3 }]);
   assert.equal(out.length, 2);
-  assert.equal(out[0].low, 12);
+  assert.equal(out[0].bands[0].gain, 12);
+  assert.equal(out[0].low, undefined);
   assert.equal(out[1].on, false);
   assert.equal(out[1].ratio, 1);
   assert.equal(cleanFx(Array.from({ length: 20 }, () => ({ type: "eq" }))).length, MAX_FX);
@@ -163,4 +164,38 @@ test("plugins survive the song text round trip", () => {
   const song = textToSong(songToText({ ...textToSong(JSON.stringify({ format: "jriter-daw", version: 1, bpm: 120, bars: 1, tracks: [{ name: "T", instrument: "piano", notes: [], fx: [{ type: "wam", url: "https://p.example/x.js", name: "X", state: { k: [1, 2] } }] }] })) }));
   const f = song.tracks[0].fx[0];
   assert.deepEqual([f.type, f.url, f.name, f.state], ["wam", "https://p.example/x.js", "X", { k: [1, 2] }]);
+});
+
+test("an old 3-band EQ opens as a low shelf, a bell and a high shelf", () => {
+  const [f] = cleanFx([{ type: "eq", on: true, low: 6, mid: -4, high: 3 }]);
+  assert.deepEqual(f.bands, [
+    { id: "b1", type: "lowshelf", freq: 200, gain: 6, q: 0.7, on: true },
+    { id: "b2", type: "peaking", freq: 1000, gain: -4, q: 0.8, on: true },
+    { id: "b3", type: "highshelf", freq: 5000, gain: 3, q: 0.7, on: true },
+  ]);
+  assert.equal(f.high, undefined);
+});
+
+test("an EQ with bands keeps them (up to 24, clamped); a new EQ has none", () => {
+  assert.deepEqual(newFx("eq").bands, []);
+  const [f] = cleanFx([{ type: "eq", bands: Array.from({ length: 30 }, () => ({ type: "bogus", gain: 99 })) }]);
+  assert.equal(f.bands.length, 24);
+  assert.equal(f.bands[0].type, "peaking");
+  assert.equal(f.bands[0].gain, 30);
+  assert.deepEqual(cleanFx([{ type: "eq", bands: [] }])[0].bands, []);
+});
+
+test("chainKey changes when an EQ band is added, retyped or switched off", () => {
+  const eq = (bands) => chainKey([{ type: "eq", on: true, bands }]);
+  const b = { id: "a", type: "peaking", on: true };
+  assert.notEqual(eq([b]), eq([]));
+  assert.notEqual(eq([b]), eq([{ ...b, type: "lowshelf" }]));
+  assert.notEqual(eq([b]), eq([{ ...b, on: false }]));
+  assert.equal(eq([b]), eq([{ ...b, freq: 99, gain: 3 }]));
+});
+
+test("EQ bands survive saving and opening a song", () => {
+  const eq = { ...newFx("eq"), bands: [{ id: "z", type: "notch", freq: 440, gain: 0, q: 5, on: false }] };
+  const song = textToSong(songToText({ bpm: 120, bars: 4, tracks: [{ name: "T", instrument: "piano", notes: [], fx: [eq] }] }));
+  assert.deepEqual(song.tracks[0].fx[0].bands, eq.bands);
 });
