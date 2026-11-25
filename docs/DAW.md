@@ -65,6 +65,8 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    (EQ, compressor, drive, delay, reverb from a generated impulse), a master with effects and a fixed
    limiter, meters. Code: `web/daw/mixer.js` (model and maths, tested), `mixgraph.js` (the Web Audio graph),
    `mixerview.js` (the Mixer tab). The song format is v5: per-track `pan`, `sends`, `fx` and a `mixer`.
+   `rack.js` is the one effects engine (a copy of JR!TER's `ui/` rack.ts + eq.ts + responseOf); the mixer moves onto it in
+   the rack 2-5 tasks, and `ui/` should import it once its source is committed.
 5. **Sampler and audio clips. Done in 4.9.0.** A take, vocal take or waiting render from the library
    becomes a sampler track (`instrument: "sampler"`, with a `sample` on the track). The Sampler tab
    (Alt+7) lists the library's sounds, draws the waveform, trims it by dragging the ends, and
