@@ -65,6 +65,8 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    (EQ, compressor, drive, delay, reverb from a generated impulse), a master with effects and a fixed
    limiter, meters. Code: `web/daw/mixer.js` (model and maths, tested), `mixgraph.js` (the Web Audio graph),
    `mixerview.js` (the Mixer tab). The song format is v5: per-track `pan`, `sends`, `fx` and a `mixer`.
+   `rack.js` is the one effects engine (a copy of JR!TER's `ui/` rack.ts + eq.ts + responseOf); the mixer moves onto it in
+   the rack 2-5 tasks, and `ui/` should import it once its source is committed.
 5. **Sampler and audio clips. Done in 4.9.0.** A take, vocal take or waiting render from the library
    becomes a sampler track (`instrument: "sampler"`, with a `sample` on the track). The Sampler tab
    (Alt+7) lists the library's sounds, draws the waveform, trims it by dragging the ends, and
@@ -117,5 +119,10 @@ Every step is its own release (see `CLAUDE.md`), useful alone.
    only for a one-shot the song's DAW project uses (`sharing.py` and `SharingController.java`, kind `sample`).
    Not yet: a friend's own one-shots, and takes from the owner's other songs, in a shared song.
 
-The project format is `jriter-daw` JSON (version 9; see `web/daw/midi.js` `songToText`). Old
+The project format is `jriter-daw` JSON (version 11; see `web/daw/midi.js` `songToText`). Old
 files keep opening: a version 1 or 2 file becomes one pattern (a version 3 file has no clips), and gets the default chords and scripts if it has none.
+
+Rack 2 (4.30.0): the mixer's EQ is rack.js's parametric EQ (`fx.bands`, up to 24, `cleanBands`); an old 3-band EQ converts in `cleanFx` (`oldEqBands`) and automation lanes on its low/mid/high are dropped.
+Rack 3 (4.31.0): a Limiter effect (`limiter`: threshold, ceiling, attack, release) from rack.js; the master's fixed limiter is the same code (`MASTER_LIMITER` in mixer.js: -1 dB, -1 dB, 3 ms, 100 ms), so mixgraph.js has none of its own.
+Rack 4 (4.32.0): the mixer's EQ card draws its curve and you shape it on it (`web/daw/eqview.js`, a port of the Sound tab's EqCanvas.svelte: press adds a band, drag, wheel for Q, double-click removes, keys); only the picked band shows knobs.
+Rack 5 (4.33.0): comp, drive (was dist), delay and reverb come from rack.js too, so the DAW keeps no effect code of its own (`mixgraph.js` only calls `buildUnit`). Song format version 11: files older than that convert once on opening (`upgradeOldFx` in mixer.js): seconds to ms, 0..1 to %, `dist` to `drive` (amount matched by the curve slope, the level difference on Output), mix keeps the old wet:dry balance, automation lanes follow.

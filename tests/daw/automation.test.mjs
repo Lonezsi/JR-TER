@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { targets, targetSpec, valueAt, cleanAutomation, automated, addPoint, movePoint, removePoint, fixAutomationAfterTrackRemove } from "../../web/daw/automation.js";
-import { newFx } from "../../web/daw/mixer.js";
+import { newFx, oldMix } from "../../web/daw/mixer.js";
 import { songToText, textToSong } from "../../web/daw/midi.js";
 import { removeTrackEverywhere } from "../../web/daw/pattern.js";
 
@@ -27,7 +27,7 @@ test("targets list the knobs, including a track's effects", () => {
   assert.ok(ids.includes("t0.volume") && ids.includes("t1.pan") && ids.includes("master.volume") && ids.includes("bus1.volume"));
   assert.ok(ids.includes("t0.fx0.feedback"));
   assert.ok(!ids.includes("t1.fx0.mix"));
-  assert.equal(targetSpec(mk(), "t0.fx0.time").max, 1.5);
+  assert.equal(targetSpec(mk(), "t0.fx0.time").max, 2000);
   assert.equal(targetSpec(mk(), "t9.volume"), null);
   assert.equal(targetSpec(mk(), "nonsense"), null);
 });
@@ -48,17 +48,17 @@ test("automated applies the value at a beat and leaves the song alone", () => {
   const s = mk();
   s.automation = cleanAutomation([
     { target: "t1.volume", points: [{ beat: 0, value: 0 }, { beat: 4, value: 1 }] },
-    { target: "t0.fx0.mix", points: [{ beat: 0, value: 0.2 }] },
+    { target: "t0.fx0.mix", points: [{ beat: 0, value: 20 }] },
     { target: "master.volume", points: [{ beat: 0, value: 0.5 }] },
     { target: "t1.send1", points: [{ beat: 0, value: 0.7 }] },
   ], s);
   const a = automated(s, 2);
   assert.equal(a.tracks[1].volume, 0.5);
-  assert.equal(a.tracks[0].fx[0].mix, 0.2);
+  assert.equal(a.tracks[0].fx[0].mix, 20);
   assert.equal(a.mixer.master.volume, 0.5);
   assert.equal(a.tracks[1].sends[1], 0.7);
   assert.equal(s.tracks[1].volume, 0.8);
-  assert.equal(s.tracks[0].fx[0].mix, 0.3);
+  assert.equal(s.tracks[0].fx[0].mix, 20);
 });
 
 test("points stay sorted when added and moved", () => {
@@ -90,4 +90,35 @@ test("automation is saved with the song and old files open without it", () => {
   assert.deepEqual(back.automation, s.automation);
   const old = JSON.parse(songToText(s)); delete old.automation; old.version = 6;
   assert.deepEqual(textToSong(JSON.stringify(old)).automation, []);
+});
+
+test("lanes on an old EQ's Low, Mid and High knobs go; other lanes stay", () => {
+  const text = JSON.stringify({ format: "jriter-daw", version: 10, bpm: 120, bars: 4,
+    tracks: [{ name: "T", instrument: "piano", notes: [], fx: [{ type: "eq", low: 3, mid: 0, high: -2 }] }],
+    automation: [
+      { target: "t0.fx0.low", points: [{ beat: 0, value: 1 }] },
+      { target: "t0.fx0.high", points: [{ beat: 0, value: 1 }] },
+      { target: "t0.volume", points: [{ beat: 0, value: 0.5 }] },
+    ] });
+  const song = textToSong(text);
+  assert.deepEqual(song.automation.map((l) => l.target), ["t0.volume"]);
+  assert.equal(song.tracks[0].fx[0].bands[0].gain, 3);
+  assert.ok(!targets(song).some((t) => t.id.startsWith("t0.fx0.")));
+});
+
+test("lanes on old effect knobs (version 10) are converted with the effect", () => {
+  const text = JSON.stringify({ format: "jriter-daw", version: 10, bpm: 120, bars: 4,
+    tracks: [{ name: "T", instrument: "piano", notes: [], fx: [{ type: "delay", time: 0.4, feedback: 0.3, mix: 0.3 }, { type: "dist", drive: 0.4, mix: 1 }, { type: "comp", attack: 0.05 }] }],
+    automation: [
+      { target: "t0.fx0.mix", points: [{ beat: 0, value: 0.3 }] },
+      { target: "t0.fx0.time", points: [{ beat: 0, value: 0.5 }] },
+      { target: "t0.fx1.drive", points: [{ beat: 0, value: 0.4 }] },
+      { target: "t0.fx2.attack", points: [{ beat: 0, value: 0.05 }] },
+    ] });
+  const song = textToSong(text);
+  const by = Object.fromEntries(song.automation.map((l) => [l.target, l.points[0].value]));
+  assert.equal(by["t0.fx0.mix"], oldMix(0.3));
+  assert.equal(by["t0.fx0.time"], 500);
+  assert.equal(by["t0.fx1.amount"], 100);
+  assert.equal(by["t0.fx2.attack"], 50);
 });

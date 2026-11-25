@@ -1,0 +1,390 @@
+package dev.jriter.desktop;
+
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
+
+/** jriter-cli commands, and the tray app when started with none (or --minimised). */
+public final class Main {
+    public static void main(String[] argv) {
+        System.exit(run(argv, System.out));
+    }
+
+    static boolean yes(List<String> a) { return a.remove("--yes") | a.remove("-y"); }
+
+    static String opt(List<String> a, String name) {
+        int i = a.indexOf(name);
+        if (i < 0 || i + 1 >= a.size()) return null;
+        String v = a.get(i + 1);
+        a.remove(i + 1); a.remove(i);
+        return v;
+    }
+
+    static boolean ask(String q) {
+        System.out.print("  " + q + " [Y/n] ");
+        System.out.flush();
+        try {
+            String line = new java.util.Scanner(System.in).nextLine().trim().toLowerCase();
+            return line.isEmpty() || line.equals("y") || line.equals("yes");
+        } catch (NoSuchElementException e) { return false; }
+    }
+
+    static int run(String[] argv, java.io.PrintStream out) {
+        List<String> a = new ArrayList<>(Arrays.asList(argv));
+        Config cfg = Config.load();
+        Log log = new Log(cfg.dir());
+        if (a.isEmpty() || a.get(0).equals("--minimised")) return tray(a.contains("--minimised"), cfg, log);
+        String cmd = a.remove(0);
+        try {
+            switch (cmd) {
+                case "help", "--help", "-h": return help(out);
+                case "add": {
+                    Path p = Path.of(a.get(0)).toAbsolutePath().normalize();
+                    if (!Files.isDirectory(p)) { out.println("There is no folder at " + p); return 1; }
+                    if (cfg.folders().contains(p.toString())) { out.println("Already watching " + p); return 0; }
+                    cfg.addFolder(p.toString()).save();
+                    out.println("Watching " + p);
+                    return 0;
+                }
+                case "folders": {
+                    if (cfg.folders().isEmpty()) out.println("No folders yet. Add one with `add <path>`.");
+                    cfg.folders().forEach(f -> out.println("  " + f + (Files.isDirectory(Path.of(f)) ? "" : "   (missing)")));
+                    out.println("\nServer: " + cfg.server());
+                    out.println("Config: " + cfg.path());
+                    return 0;
+                }
+                case "server": {
+                    cfg.set("server", a.get(0).replaceAll("/+$", "")).save();
+                    out.println("Server set to " + cfg.server());
+                    return 0;
+                }
+                case "flpath": {
+                    cfg.set("fl_path", a.get(0)).save();
+                    out.println("FL Studio set to " + a.get(0));
+                    return 0;
+                }
+                case "login": return login(cfg, a, out);
+                case "scan": {
+                    Library lib = new Library(cfg.server(), cfg.token());
+                    Survey.Result r = Survey.run(cfg, lib);
+                    out.println(r.known().size() + " file(s) already in the library");
+                    if (r.fresh().isEmpty()) { out.println("Nothing new."); return 0; }
+                    out.println("\n" + r.fresh().size() + " new file(s):");
+                    for (Survey.Found f : r.fresh()) {
+                        String name = f.path().getFileName().toString();
+                        var s = lib.get("/api/songs/match?name=" + Library.enc(name)).path("suggest");
+                        out.println("  " + name);
+                        out.println("      " + (s.isObject() ? "looks like a new render of " + s.path("title").asText() : "no obvious match, would be a new song"));
+                    }
+                    out.println("\nRun `push` to send them.");
+                    return 0;
+                }
+                case "push": {
+                    boolean y = yes(a);
+                    Library lib = new Library(cfg.server(), cfg.token());
+                    Survey.Result r = Survey.run(cfg, lib);
+                    if (r.fresh().isEmpty()) { out.println("Nothing new. " + r.known().size() + " file(s) already in the library."); return 0; }
+                    int sent = 0, skipped = 0;
+                    for (Survey.Found f : r.fresh()) {
+                        if (Send.one(lib, cfg, f.path(), y, Main::ask, t -> out.println("      " + t))) sent++; else skipped++;
+                    }
+                    out.println("\n" + sent + " sent, " + skipped + " skipped, " + r.known().size() + " already held.");
+                    return 0;
+                }
+                case "push-file": {
+                    boolean y = yes(a);
+                    Path p = Path.of(a.get(0)).toAbsolutePath();
+                    if (!Files.isRegularFile(p)) { out.println("There is no file at " + p); return 1; }
+                    if (!Survey.isAudio(p)) { out.println(p.getFileName() + " is not audio JR!TER handles."); return 1; }
+                    out.println("JR!TER at " + cfg.server());
+                    return Send.one(new Library(cfg.server(), cfg.token()), cfg, p, y, Main::ask, t -> out.println("  " + t)) ? 0 : 1;
+                }
+                case "push-folder": {
+                    boolean y = yes(a);
+                    Path folder = Path.of(a.get(0)).toAbsolutePath();
+                    if (!Files.isDirectory(folder)) { out.println("There is no folder at " + folder); return 1; }
+                    out.println("JR!TER at " + cfg.server());
+                    out.println("Looking in " + folder);
+                    List<Path> files = Survey.walk(List.of(folder.toString()));
+                    if (files.isEmpty()) { out.println("  no sound files in there."); return 0; }
+                    out.println("  " + files.size() + " sound file(s).");
+                    if (!(y || ask("Send all of them?"))) return 0;
+                    Library lib = new Library(cfg.server(), cfg.token());
+                    int sent = 0, failed = 0;
+                    for (Path f : files) {
+                        try { if (Send.one(lib, cfg, f, true, Main::ask, t -> out.println("  " + t))) sent++; }
+                        catch (RuntimeException | IOException e) { out.println("  could not send " + f.getFileName() + ": " + e.getMessage()); failed++; }
+                    }
+                    out.println("\n" + sent + " sent, " + failed + " could not be sent.");
+                    return failed > 0 && sent == 0 ? 1 : 0;
+                }
+                case "render": return render(cfg, a, out);
+                case "plugins": return plugins(cfg, a, out);
+                case "vst": return vst(cfg, a, out, VstHost.processRunner());
+                case "url": {
+                    var id = a.isEmpty() ? Optional.<String>empty() : Release.parseUrl(a.get(0));
+                    if (id.isEmpty()) { out.println("Not a JR!TER link I know: expected jriter://release/ID"); return 2; }
+                    return Release.run(id.get(), Release.defaultFolder(), 60, true, out);
+                }
+                case "release": {
+                    String folder = opt(a, "--folder");
+                    if (a.isEmpty() || !a.get(0).matches("\\d{1,9}")) { out.println("Usage: jriter-cli release ALBUM_ID [--folder DIR]"); return 2; }
+                    return Release.run(a.get(0), folder == null ? Release.defaultFolder() : Path.of(folder), 60, true, out);
+                }
+                case "watch": {
+                    boolean once = a.contains("--once");
+                    out.println("Watching " + cfg.folders().size() + " folder(s), every " + cfg.intervalMinutes() + " minute(s). Ctrl-C to stop.");
+                    while (true) {
+                        try { Watcher.once(Config.load(), (k, t) -> { out.println("[" + k + "] " + t); log.line(t); }); }
+                        catch (Library.LibraryException e) { out.println(e.getMessage()); }
+                        if (once) return 0;
+                        Thread.sleep(cfg.intervalMinutes() * 60_000L);
+                    }
+                }
+                case "shell": {
+                    if (a.isEmpty() || a.get(0).equals("install")) {
+                        Path icon = cfg.dir().resolve("jriter.ico");
+                        int n = Windows.installMenu(Windows.cliExe(), Files.exists(icon) ? icon : null);
+                        out.println("Added " + n + " entries under HKEY_CURRENT_USER.");
+                    } else { Windows.removeMenu(); out.println("Removed."); }
+                    return 0;
+                }
+                case "autostart": {
+                    boolean on = a.isEmpty() || a.get(0).equals("on");
+                    Path exe = Windows.cliExe().resolveSibling("JRITER.exe");
+                    Windows.autostart(on, exe);
+                    out.println(on ? "JR!TER will start at logon." : "JR!TER will not start at logon.");
+                    return 0;
+                }
+                default:
+                    out.println("Unknown command: " + cmd);
+                    help(out);
+                    return 2;
+            }
+        } catch (Library.LibraryException e) {
+            out.println(e.getMessage());
+            return 1;
+        } catch (IndexOutOfBoundsException e) {
+            out.println("`" + cmd + "` needs an argument. Try `help`.");
+            return 2;
+        } catch (IOException | InterruptedException e) {
+            out.println(e.toString());
+            return 1;
+        }
+    }
+
+    static int login(Config cfg, List<String> a, java.io.PrintStream out) throws IOException {
+        String handle = Optional.ofNullable(opt(a, "--handle")).orElse("").trim();
+        String name = opt(a, "--name");
+        String password = opt(a, "--password");
+        if (name == null) name = Optional.ofNullable(System.getenv("COMPUTERNAME")).filter(s -> !s.isBlank()).orElse("a machine");
+        if (password == null) {
+            java.io.Console c = System.console();
+            if (c == null) { out.println("No console to ask for the password: pass --password."); return 1; }
+            char[] pw = c.readPassword("Password for %s: ", cfg.server());
+            password = pw == null ? "" : new String(pw);
+        }
+        if (password.isEmpty()) { out.println("Nothing entered."); return 1; }
+        cfg.setToken(Library.login(cfg.server(), handle, password, name)).save();
+        out.println("This machine can now reach " + cfg.server() + " as \"" + name + "\".");
+        out.println("It can upload renders and read the library. It cannot delete anything.");
+        return 0;
+    }
+
+    static int render(Config cfg, List<String> a, java.io.PrintStream out) {
+        Path path = Path.of(a.get(0)).toAbsolutePath();
+        Optional<Path> fl = FlRender.find(cfg.flPath());
+        if (fl.isEmpty()) { out.println("FL Studio was not found. Set it once with:\n    jriter-cli flpath \"C:\\Program Files\\Image-Line\\FL Studio 2024\\FL64.exe\""); return 1; }
+        out.println("Using " + fl.get());
+        out.println("FL will open while it renders. It is not a silent process, and on some\nversions the export dialog waits for Start to be pressed.\n");
+        List<Path> projects = Files.isDirectory(path) ? FlRender.projectsIn(path) : List.of(path);
+        if (!Files.exists(path)) { out.println("There is nothing at " + path); return 1; }
+        Path outDir = cfg.renderOut().isBlank() ? null : Path.of(cfg.renderOut());
+        Library lib = new Library(cfg.server(), cfg.token());
+        List<Path> vstDirs = VstFolders.defaults(cfg);
+        VstFolders.Installed inst = vstDirs.isEmpty() ? null : VstFolders.scan(vstDirs);
+        List<String> failed = new ArrayList<>();
+        int done = 0;
+        for (Path p : projects) {
+            try {
+                FlRender.Rendered r = FlRender.render(p, outDir, cfg.renderFormat(), cfg.flPath(), 1800, 4.0, t -> out.println("  " + t));
+                done++;
+                try {
+                    String pl = "";
+                    try { pl = Send.pluginsHeader(FlProject.plugins(p), inst); } catch (IOException | RuntimeException e) { /* no list is fine */ }
+                    boolean added = Send.render(lib, r.audio(), r.projectAt(), r.renderedAt(), true, pl);
+                    out.println("  " + r.audio().getFileName() + (added ? " is waiting in Renders" : " was already there"));
+                } catch (RuntimeException e) { out.println("  could not send " + r.audio().getFileName() + ": " + e.getMessage()); }
+            } catch (FlRender.RenderException e) {
+                out.println("  " + e.getMessage());
+                failed.add(p.getFileName() + ": " + e.getMessage());
+            }
+        }
+        out.println("\n" + done + " rendered.");
+        if (!failed.isEmpty()) { out.println("\n" + failed.size() + " did not render:"); failed.forEach(f -> out.println("  " + f)); }
+        return done == 0 && !failed.isEmpty() ? 1 : 0;
+    }
+
+    static int vst(Config cfg, List<String> a, java.io.PrintStream out, VstHost.Runner runner) throws IOException, InterruptedException {
+        String sub = a.isEmpty() ? "" : a.remove(0);
+        switch (sub) {
+            case "list": {
+                List<Path> found = VstHost.installed(VstFolders.defaults(cfg));
+                if (found.isEmpty()) out.println("No VST plugins found in the usual folders (add more with vst_folders in client.json).");
+                for (Path p : found) out.println(p.getFileName() + "    " + p);
+                return 0;
+            }
+            case "path": {
+                if (a.isEmpty()) { out.println("Usage: jriter-cli vst path \"C:\\...\\plugalyzer.exe\""); return 2; }
+                cfg.set("plugalyzer", a.get(0)).save();
+                out.println("VST host set to " + a.get(0));
+                return 0;
+            }
+            case "render": {
+                boolean noSend = a.remove("--no-send");
+                String outOpt = opt(a, "--out"), tailOpt = opt(a, "--tail"), midiOpt = opt(a, "--midi");
+                List<String> params = new ArrayList<>();
+                String pv;
+                while ((pv = opt(a, "--param")) != null) params.add(pv);
+                if (a.size() < 2 && !(a.size() == 1 && midiOpt != null)) {
+                    out.println("Usage: jriter-cli vst render PLUGIN IN.mid|IN.wav [--midi X.mid] [--out FILE] [--tail S] [--param NAME:VALUE]... [--no-send]");
+                    return 2;
+                }
+                double tail = 2;
+                try { if (tailOpt != null) tail = Double.parseDouble(tailOpt); }
+                catch (NumberFormatException e) { out.println("--tail wants a number of seconds."); return 2; }
+                Optional<Path> exe = VstHost.findPlugalyzer(cfg);
+                if (exe.isEmpty()) {
+                    out.println("The VST host Plugalyzer was not found. Get it from " + VstHost.DOWNLOAD
+                            + "\nthen tell me where it is:\n    jriter-cli vst path \"C:\\...\\plugalyzer.exe\"");
+                    return 1;
+                }
+                List<Path> dirs = VstFolders.defaults(cfg);
+                Optional<Path> plugin = VstHost.resolve(a.get(0), dirs);
+                if (plugin.isEmpty()) { out.println("No VST called \"" + a.get(0) + "\" here. `jriter-cli vst list` shows what is installed."); return 1; }
+                Path in = a.size() > 1 ? Path.of(a.get(1)).toAbsolutePath() : null;
+                Path wav = null, mid = midiOpt == null ? null : Path.of(midiOpt).toAbsolutePath();
+                if (in != null) {
+                    String n = in.getFileName().toString().toLowerCase();
+                    if (n.endsWith(".mid") || n.endsWith(".midi")) mid = in; else wav = in;
+                }
+                for (Path p : new Path[] { wav, mid })
+                    if (p != null && !Files.isRegularFile(p)) { out.println("There is no file at " + p); return 1; }
+                Path first = wav != null ? wav : mid;
+                String stem = first.getFileName().toString().replaceAll("\\.[^.]*$", "");
+                String pname = plugin.get().getFileName().toString().replaceAll("\\.[^.]*$", "");
+                Path dest = outOpt != null ? Path.of(outOpt).toAbsolutePath() : first.resolveSibling(stem + " - " + pname + ".wav");
+                out.println("Playing through " + pname + " with " + exe.get().getFileName() + " ...");
+                Path made;
+                try { made = VstHost.render(runner, exe.get(), plugin.get(), wav, mid, dest, tail, params); }
+                catch (IOException e) { out.println(e.getMessage()); return 1; }
+                out.println("Wrote " + made);
+                if (noSend) return 0;
+                String name = pname;
+                String ext = plugin.get().getFileName().toString().toLowerCase().endsWith(".vst3") ? "vst3" : "vst2";
+                var pl = List.of(new FlProject.Plugin(ext, name, "", plugin.get().toString(), 1));
+                double now = System.currentTimeMillis() / 1000.0;
+                try {
+                    boolean added = Send.render(new Library(cfg.server(), cfg.token()), made, now, now, false,
+                            Send.pluginsHeader(pl, VstFolders.scan(dirs)));
+                    out.println(made.getFileName() + (added ? " is waiting in Renders; the DAW's Browser has it under Renders." : " was already there."));
+                } catch (RuntimeException e) { out.println("Could not send it: " + e.getMessage()); return 1; }
+                return 0;
+            }
+            default:
+                out.println("Usage:\n  jriter-cli vst list\n  jriter-cli vst path PLUGALYZER.EXE\n  jriter-cli vst render PLUGIN IN.mid|IN.wav [--midi X.mid] [--out FILE] [--tail S] [--param NAME:VALUE]... [--no-send]");
+                return 2;
+        }
+    }
+
+    static int plugins(Config cfg, List<String> a, java.io.PrintStream out) {
+        boolean json = a.remove("--json");
+        List<Path> vstDirs = new java.util.ArrayList<>();
+        for (int i = 0; i < a.size() - 1; ) {
+            if (a.get(i).equals("--vst-folder")) { vstDirs.add(Path.of(a.get(i + 1))); a.remove(i); a.remove(i); }
+            else i++;
+        }
+        if (vstDirs.isEmpty()) vstDirs = VstFolders.defaults(cfg);
+        boolean known = !vstDirs.isEmpty();
+        VstFolders.Installed inst = VstFolders.scan(vstDirs);
+        if (!known && !json) out.println("(no VST folders found on this PC, so nothing is marked missing)");
+        Path path = Path.of(a.get(0)).toAbsolutePath();
+        if (!Files.exists(path)) { out.println("There is nothing at " + path); return 1; }
+        List<Path> projects = Files.isDirectory(path) ? FlRender.projectsIn(path) : List.of(path);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var all = mapper.createArrayNode();
+        int read = 0;
+        for (Path p : projects) {
+            try {
+                List<FlProject.Plugin> pl = FlProject.plugins(p);
+                read++;
+                if (json) {
+                    var o = all.addObject();
+                    o.put("project", p.getFileName().toString());
+                    var arr = o.putArray("plugins");
+                    for (FlProject.Plugin x : pl) {
+                        var po = arr.addObject();
+                        po.put("kind", x.kind()); po.put("name", x.name()); po.put("vendor", x.vendor());
+                        po.put("path", x.path()); po.put("uses", x.uses());
+                        if (known && !x.kind().equals("fl")) po.put("installed", VstFolders.has(inst, x));
+                    }
+                } else {
+                    out.println(p.getFileName());
+                    if (pl.isEmpty()) out.println("  no plugins found");
+                    int missing = 0;
+                    for (FlProject.Plugin x : pl) {
+                        boolean gone = known && !VstFolders.has(inst, x);
+                        if (gone) missing++;
+                        out.println("  " + String.format("%-5s", x.kind().toUpperCase()) + " " + x.name()
+                                + (x.vendor().isEmpty() ? "" : "  (" + x.vendor() + ")") + (x.uses() > 1 ? "  x" + x.uses() : "")
+                                + (gone ? "  missing here" : ""));
+                    }
+                    if (missing > 0) out.println("  " + missing + " VST(s) missing here");
+                }
+            } catch (IOException | RuntimeException e) {
+                if (!json) { out.println(p.getFileName()); out.println("  could not read: " + e.getMessage()); }
+            }
+        }
+        if (json) out.println(all.toString());
+        if (projects.isEmpty() && !json) out.println("no .flp files there.");
+        return read == 0 && !projects.isEmpty() ? 1 : 0;
+    }
+
+    static int tray(boolean minimised, Config cfg, Log log) {
+        if (!Windows.firstInstance()) {
+            if (!minimised) Windows.openWindow(cfg.server());
+            return 0;
+        }
+        Tray.run(cfg, log);
+        if (!minimised) Windows.openWindow(cfg.server());
+        try { Thread.currentThread().join(); } catch (InterruptedException ignored) { }
+        return 0;
+    }
+
+    static int help(java.io.PrintStream out) {
+        out.println("""
+                JR!TER desktop
+
+                  jriter-cli server URL         where the library is
+                  jriter-cli login [--handle H] [--name N] [--password P]
+                  jriter-cli add FOLDER         watch a folder for renders
+                  jriter-cli folders
+                  jriter-cli scan               what is new, sending nothing
+                  jriter-cli push [--yes]       send what is new onto songs
+                  jriter-cli push-file FILE [--yes]
+                  jriter-cli push-folder FOLDER [--yes]
+                  jriter-cli render FLP_OR_FOLDER   render with FL Studio, send to Renders
+                  jriter-cli plugins FLP_OR_FOLDER [--json] [--vst-folder DIR]   plugins a project uses, missing ones marked
+                  jriter-cli vst list           VST plugins installed on this PC
+                  jriter-cli vst path PLUGALYZER.EXE   where the VST host is
+                  jriter-cli vst render PLUGIN IN.mid|IN.wav [--out FILE] [--tail S] [--param N:V] [--no-send]   play it through a real VST, send to Renders
+                  jriter-cli release ALBUM_ID [--folder DIR]   start Claude Code on a downloaded RouteNote release card
+                  jriter-cli url jriter://release/ID           the same, from the link on the release page
+                  jriter-cli flpath FL64.EXE
+                  jriter-cli watch [--once]     keep sending new renders
+                  jriter-cli shell install|remove    right-click menu
+                  jriter-cli autostart on|off   start the tray at logon
+                  JRITER.exe [--minimised]      the tray app""");
+        return 0;
+    }
+}

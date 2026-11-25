@@ -169,7 +169,9 @@ try {
   });
   await scenario("effect settings are knobs that answer the arrow keys; Swing is a knob", async () => {
     await js(`document.querySelector('#mixerview [data-add="eq"]').click()`); await sleep(150);
-    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "EQ should have 3 knobs");
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-band").length`)) === 0, "a new EQ should be flat");
+    await js(`document.querySelector('#mixerview [data-fx="band-add"]').click()`); await sleep(150);
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "a bell band should have freq, gain and Q knobs");
     need((await js(`document.querySelectorAll("#mixerview .mx-param").length`)) === 0, "sliders are still there");
     const v0 = await js(`(() => { const k = document.querySelector("#mixerview .mx-fx .mx-knob"); k.focus(); return +k.getAttribute("aria-valuenow"); })()`);
     await js(`document.querySelector("#mixerview .mx-fx .mx-knob").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }))`);
@@ -177,6 +179,169 @@ try {
     await js(`window.jriterDaw.setView("rack")`); await sleep(200);
     need((await js(`!!document.querySelector('#rackview .mx-knob[data-knob="swing"]')`)), "no Swing knob");
     await js(`window.jriterDaw.setView("song")`); await sleep(150);
+  });
+  await scenario("the EQ draws its curve: press adds a band, drag moves it, wheel sets Q, double-click removes, keys work", async () => {
+    await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(150);
+    await js(`document.querySelector('#mixerview [data-add="eq"]').click()`); await sleep(300);
+    const bands = () => js(`window.jriterDaw.song().tracks[0].fx.find((f) => f.type === "eq").bands`);
+    const cv = "#mixerview canvas[data-eq]";
+    need(await vis(cv), "no EQ canvas");
+    need((await js(`document.querySelectorAll("#mixerview .mx-band").length`)) === 0, "a band row shows with nothing picked");
+    let r = await rect(cv);
+    const mouse = (type, x, y, extra = {}) => send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1, ...extra });
+    const x0 = r.l + r.w * 0.5, y0 = r.t + r.h * 0.5;
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0, y: y0 });
+    await mouse("mousePressed", x0, y0);
+    for (let i = 1; i <= 6; i++) { await sleep(16); await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x0 + 20 * i, y: y0 - 4 * i, button: "left", buttons: 1 }); }
+    await mouse("mouseReleased", x0 + 120, y0 - 24); await sleep(250);
+    let b = await bands();
+    need(b.length === 1, "press made " + b.length + " bands");
+    r = await rect(cv);
+    const want = 20 * Math.pow(1100, (x0 + 120 - r.l) / r.w);
+    need(Math.abs(Math.log2(b[0].freq / want)) < 0.1, "freq " + b[0].freq + " is not near " + Math.round(want));
+    need(b[0].gain > 0, "gain " + b[0].gain + " should be a boost (dragged up)");
+    need((await js(`document.querySelectorAll("#mixerview .mx-band").length`)) === 1, "the picked band's row is missing");
+    need((await js(`document.querySelectorAll("#mixerview .mx-fx .mx-knob[role=slider]").length`)) === 3, "the picked band should show 3 knobs");
+    const q0 = b[0].q;
+    const bx = r.l + r.w * Math.log10(b[0].freq / 20) / Math.log10(1100), by = r.t + r.h / 2 - (b[0].gain / 18) * (r.h / 2 - 12);
+    await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: bx, y: by, deltaX: 0, deltaY: -200 }); await sleep(700);
+    b = await bands(); need(b[0].q > q0, "wheel up should tighten Q: " + q0 + " -> " + b[0].q);
+    // keys on the focused curve do not reach the DAW's own shortcuts
+    await js(`document.querySelector(${JSON.stringify(cv)}).focus()`);
+    const key = async (k, code) => { await send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code, ...(k === "Enter" ? { text: "\r" } : {}), windowsVirtualKeyCode: code === "ArrowRight" ? 39 : code === "ArrowLeft" ? 37 : code === "Enter" ? 13 : code === "Delete" ? 46 : 0 }); await send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code }); await sleep(150); };
+    const f0 = (await bands())[0].freq;
+    await key("ArrowRight", "ArrowRight");
+    b = await bands(); need(b[0].freq > f0, "ArrowRight did not raise the frequency");
+    need(!(await js(`document.getElementById("helpbox") && !document.getElementById("helpbox").hidden`)), "a DAW shortcut fired");
+    await key("Enter", "Enter");
+    b = await bands(); need(b.length === 1, "Enter with a band picked should not add one (got " + b.length + ")");
+    // double-click on the node removes it; Undo brings it back
+    r = await rect(cv);
+    const nx = r.l + r.w * Math.log10(b[0].freq / 20) / Math.log10(1100), ny = r.t + r.h / 2 - (b[0].gain / 18) * (r.h / 2 - 12);
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: nx, y: ny });
+    for (const n of [1, 2]) { await mouse("mousePressed", nx, ny, { clickCount: n }); await mouse("mouseReleased", nx, ny, { clickCount: n }); }
+    await sleep(250);
+    need((await bands()).length === 0, "double-click did not remove the band (" + (await bands()).length + ")");
+    await click("#undo"); await sleep(200);
+    need((await bands()).length === 1, "Undo did not bring the band back");
+    // Delete on the focused curve, then Enter adds one
+    await js(`document.querySelector(${JSON.stringify(cv)}).focus()`);
+    await key("ArrowLeft", "ArrowLeft");   // nothing picked: the first arrow picks the lowest band
+    await key("Delete", "Delete");
+    need((await bands()).length === 0, "Delete did not remove the picked band");
+    await js(`document.querySelector(${JSON.stringify(cv)}).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`); await sleep(200);
+    need((await bands()).length === 1, "Enter did not add a band");
+    await js(`document.querySelector('#mixerview [data-fx="band-add"]').click()`); await sleep(200);
+    need((await bands()).length === 2, "the plus button did not add a band");
+    await shot("rack4-eq-dark.png");
+    await js(`document.documentElement.setAttribute("data-theme", "light")`); await sleep(200);
+    await shot("rack4-eq-light.png");
+    await js(`document.documentElement.removeAttribute("data-theme")`);
+  });
+  await scenario("an old 3-band EQ, as bands, sounds the same as the old filters", async () => {
+    const diff = await js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js"); const { cleanFx } = await import("/daw/mixer.js");
+      const N = 24000, make = () => new OfflineAudioContext(1, N, 48000);
+      const noise = (ctx) => { const b = ctx.createBuffer(1, N, 48000), d = b.getChannelData(0); let s = 7; for (let i = 0; i < N; i++) { s = (s * 16807) % 2147483647; d[i] = (s / 2147483647) * 2 - 1; } const n = ctx.createBufferSource(); n.buffer = b; return n; };
+      const a = make(), na = noise(a);
+      const lo = a.createBiquadFilter(), mid = a.createBiquadFilter(), hi = a.createBiquadFilter();
+      lo.type = "lowshelf"; lo.frequency.value = 200; lo.gain.value = 6;
+      mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.8; mid.gain.value = -4;
+      hi.type = "highshelf"; hi.frequency.value = 5000; hi.gain.value = 3;
+      na.connect(lo); lo.connect(mid); mid.connect(hi); hi.connect(a.destination); na.start();
+      const b = make(), nb = noise(b);
+      const [fx] = cleanFx([{ type: "eq", low: 6, mid: -4, high: 3 }]);
+      const u = buildUnit(b, { id: "eq", kind: "eq", on: true }, { bands: fx.bands });
+      nb.connect(u.input); u.output.connect(b.destination); nb.start();
+      const [ra, rb] = await Promise.all([a.startRendering(), b.startRendering()]);
+      const x = ra.getChannelData(0), y = rb.getChannelData(0); let m = 0, peak = 0;
+      for (let i = 0; i < N; i++) { m = Math.max(m, Math.abs(x[i] - y[i])); peak = Math.max(peak, Math.abs(x[i])); }
+      return { m, peak };
+    })()`);
+    need(diff.peak > 0.1 && diff.m < 1e-6, "old and new EQ differ: " + JSON.stringify(diff));
+  });
+  await scenario("old comp, drive, delay and reverb, converted, sound like the old hand-made ones", async () => {
+    const r = await js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js"); const { upgradeOldFx } = await import("/daw/mixer.js");
+      const N = 48000, R = 48000;
+      const rnd = () => { let s = 11; return () => ((s = (s * 16807) % 2147483647) / 2147483647); };
+      const source = (ctx, kind) => { const b = ctx.createBuffer(1, N, R), d = b.getChannelData(0), f = rnd();
+        for (let i = 0; i < N; i++) d[i] = (kind === "noise" ? (f() * 2 - 1) * 0.4 : 0.5 * Math.sin(2 * Math.PI * 440 * i / R)) * (i < N / 2 ? 1 : 0.2);
+        const n = ctx.createBufferSource(); n.buffer = b; n.start(); return n; };
+      const gain = (ctx, v) => { const g = ctx.createGain(); g.gain.value = v; return g; };
+      const wetDry = (ctx, inp, wetOut, m) => { const out = gain(ctx, 1), dry = gain(ctx, 1 - m / 2), wet = gain(ctx, m);
+        inp.connect(dry); dry.connect(out); wetOut.connect(wet); wet.connect(out); return out; };
+      const old = {
+        comp: (ctx, x) => { const c = ctx.createDynamicsCompressor(); c.knee.value = 6; c.threshold.value = x.threshold; c.ratio.value = x.ratio; c.attack.value = x.attack; c.release.value = x.release; return [c, c]; },
+        dist: (ctx, x) => { const inp = gain(ctx, 1), sh = ctx.createWaveShaper(); sh.oversample = "4x"; const k = Math.min(1, Math.max(0, x.drive)) * 100, c = new Float32Array(1024);
+          for (let i = 0; i < 1024; i++) { const v = (i / 1023) * 2 - 1; c[i] = ((1 + k) * v) / (1 + k * Math.abs(v)); } sh.curve = c; inp.connect(sh); return [inp, wetDry(ctx, inp, sh, x.mix)]; },
+        delay: (ctx, x) => { const inp = gain(ctx, 1), d = ctx.createDelay(2), fb = gain(ctx, x.feedback); inp.connect(d); d.connect(fb); fb.connect(d); d.delayTime.value = x.time; return [inp, wetDry(ctx, inp, d, x.mix)]; },
+        reverb: (ctx, x) => { const inp = gain(ctx, 1), cv = ctx.createConvolver(), len = Math.round(x.size * R), buf = ctx.createBuffer(2, len, R), f = rnd();
+          for (let ch = 0; ch < 2; ch++) { const a = buf.getChannelData(ch); for (let i = 0; i < len; i++) a[i] = (f() * 2 - 1) * Math.pow(1 - i / len, 3); }
+          cv.buffer = buf; inp.connect(cv); return [inp, wetDry(ctx, inp, cv, x.mix)]; },
+      };
+      const cases = [
+        ["comp", "noise", { type: "comp", on: true, threshold: -24, ratio: 6, attack: 0.01, release: 0.2 }],
+        ["dist", "sine", { type: "dist", on: true, drive: 0.4, mix: 1 }],
+        ["dist", "sine", { type: "dist", on: true, drive: 0.1, mix: 0.5 }],
+        ["delay", "noise", { type: "delay", on: true, time: 0.2, feedback: 0.4, mix: 0.3 }],
+        ["reverb", "noise", { type: "reverb", on: true, size: 0.8, mix: 0.3 }],
+      ];
+      const out = [];
+      for (const [kind, src, fx] of cases) {
+        const a = new OfflineAudioContext(1, N, R), s1 = source(a, src), [ai, ao] = old[kind](a, fx); s1.connect(ai); ao.connect(a.destination);
+        const conv = upgradeOldFx({ tracks: [{ fx: [JSON.parse(JSON.stringify(fx))] }] }).tracks[0].fx[0];
+        const b = new OfflineAudioContext(1, N, R), s2 = source(b, src), u = buildUnit(b, { ...conv, kind: conv.type }, {}); s2.connect(u.input); u.output.connect(b.destination);
+        const [ra, rb] = await Promise.all([a.startRendering(), b.startRendering()]);
+        const x = ra.getChannelData(0), y = rb.getChannelData(0); let ex = 0, ey = 0, m = 0;
+        for (let i = 0; i < N; i++) { ex += x[i] * x[i]; ey += y[i] * y[i]; m = Math.max(m, Math.abs(x[i] - y[i])); }
+        out.push({ kind, mix: fx.mix, db: 10 * Math.log10((ey + 1e-12) / (ex + 1e-12)), maxdiff: m });
+      }
+      return out;
+    })()`);
+    for (const c of r) console.log("old vs new " + c.kind + (c.mix !== undefined ? " (mix " + c.mix + ")" : "") + ": level " + c.db.toFixed(2) + " dB, max sample diff " + c.maxdiff.toFixed(4));
+    for (const c of r) need(Math.abs(c.db) < 1.5, c.kind + " differs by " + c.db.toFixed(2) + " dB");
+    need(r[0].maxdiff < 1e-6, "comp should match exactly: " + r[0].maxdiff);
+  });
+  await scenario("the master limiter from rack.js sounds like the old hand-made one", async () => {
+    const r = await js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js"); const { MASTER_LIMITER } = await import("/daw/mixer.js");
+      const N = 24000, make = () => new OfflineAudioContext(1, N, 48000);
+      const tone = (ctx) => { const o = ctx.createOscillator(); o.frequency.value = 440; const g = ctx.createGain(); g.gain.value = 2; o.connect(g); o.start(); return g; };
+      const a = make(), ta = tone(a), old = a.createDynamicsCompressor();
+      old.threshold.value = -1; old.knee.value = 0; old.ratio.value = 20; old.attack.value = 0.003; old.release.value = 0.1;
+      ta.connect(old); old.connect(a.destination);
+      const b = make(), tb = tone(b), u = buildUnit(b, MASTER_LIMITER, {});
+      tb.connect(u.input); u.output.connect(b.destination);
+      const [ra, rb] = await Promise.all([a.startRendering(), b.startRendering()]);
+      const x = ra.getChannelData(0), y = rb.getChannelData(0); let m = 0, peak = 0;
+      for (let i = 0; i < N; i++) { m = Math.max(m, Math.abs(x[i] - y[i])); peak = Math.max(peak, Math.abs(x[i])); }
+      return { m, peak };
+    })()`);
+    need(r.peak > 0.5 && r.m < 1e-6, "master limiters differ: " + JSON.stringify(r));
+  });
+  await scenario("a Limiter effect has four knobs and holds the peak down", async () => {
+    await js(`document.activeElement && document.activeElement.blur()`);
+    await js(`window.jriterDaw.load(${JSON.stringify(EMPTY)})`); await sleep(150);
+    need((await js(`!!document.querySelector('#mixerview [data-add="limiter"]')`)), "no Limiter add button");
+    await js(`document.querySelector('#mixerview [data-add="limiter"]').click()`); await sleep(300);
+    const nk = await js(`[...document.querySelectorAll("#mixerview .mx-fx")].map((c) => c.querySelector("b").textContent + ":" + c.querySelectorAll(".mx-knob[role=slider]").length).join()`); need((await js(`[...document.querySelectorAll("#mixerview .mx-fx")].pop().querySelectorAll(".mx-knob[role=slider]").length`)) === 4, "Limiter should have 4 knobs: " + nk);
+    const peakDb = (ceiling) => js(`(async () => {
+      const { buildUnit } = await import("/daw/rack.js");
+      const N = 48000, ctx = new OfflineAudioContext(1, N, 48000);
+      const b = ctx.createBuffer(1, N, 48000), d = b.getChannelData(0);
+      for (let i = 0; i < N; i++) d[i] = 0.9 * Math.sin(2 * Math.PI * 440 * i / 48000);
+      const n = ctx.createBufferSource(); n.buffer = b;
+      const u = buildUnit(ctx, { id: "x", kind: "limiter", on: true, threshold: -12, ceiling: ${ceiling}, attack: 5, release: 120 }, {});
+      n.connect(u.input); u.output.connect(ctx.destination); n.start();
+      const out = (await ctx.startRendering()).getChannelData(0); let p = 0;
+      for (let i = 2400; i < N; i++) p = Math.max(p, Math.abs(out[i]));
+      return 20 * Math.log10(p);
+    })()`);
+    const hi = await peakDb(-6), lo = await peakDb(-12);
+    console.log("limiter measured: ceiling -6 gives peak " + hi.toFixed(2) + " dB, ceiling -12 gives " + lo.toFixed(2) + " dB (input -0.92 dB)");
+    need(Math.abs((hi - lo) - 6) < 0.5, "the ceiling should move the level 1:1: " + hi + " vs " + lo);
   });
   await scenario("effect slots reorder by dragging the grip, by the arrow keys, and one Undo puts it back", async () => {
     await js(`document.activeElement && document.activeElement.blur()`);

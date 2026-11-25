@@ -29,3 +29,13 @@ So VST support in JR!TER comes in steps, each useful alone.
    load and says if one was left out. Code: `web/daw/wamhost.js`, `mixgraph.js`, `mixerview.js`; the WAM host SDK is
    vendored in `web/daw/vendor/wam/` (see its README). Not tried against a real WAM plugin yet, only a stand-in
    (`test-gain.js`). Hosting actual VST files is still only a native-host idea, worth it only if WAM is not enough.
+5. **Play a part through a real VST. Done on the PC (4.29.0).** `jriter-cli vst render PLUGIN song.mid`
+   plays a MIDI (or a .wav, with `--midi` to play it too) through an installed VST with the free
+   command-line host [Plugalyzer](https://github.com/CrushedPixel/Plugalyzer/releases) (VST3; VST2 only
+   if Plugalyzer loads it). Tell the app where it is once with `jriter-cli vst path "C:\...\plugalyzer.exe"`
+   (it also looks on PATH and in `%LOCALAPPDATA%\Programs\plugalyzer`); `jriter-cli vst list` shows what is
+   installed, and PLUGIN is a name from that list or a path. MIDI alone gets a silent input as long as
+   the MIDI plus `--tail` seconds (default 2). `--param NAME:VALUE` sets plugin parameters. The WAV
+   lands in Renders with the plugin on it (`--no-send` keeps it as a file). The DAW round trip: More >
+   Save as .mid, `vst render`, then Browser > Renders, drag it onto the Layout. Code: `VstHost.java`.
+   Tested with a stand-in host only, not with Plugalyzer or a real plugin.
