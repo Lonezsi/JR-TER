@@ -125,14 +125,16 @@ export function mountMixer(el, api) {
   }
   function fxCard(f, i, n) {
     const spec = FX[f.type];
-    return `<div class="mx-fx${f.on ? "" : " off"}" data-i="${i}">` +
+    const open = !f.fold;
+    return `<div class="mx-fx${f.on ? "" : " off"}${open ? "" : " folded"}" data-i="${i}">` +
       `<div class="mx-fxh"><button class="mx-grip" data-grip="${i}" aria-label="Move ${spec.label}, slot ${i + 1} of ${n}. Drag, or use the up and down arrows" data-tip="Drag to reorder">${icon("drag", 14)}</button>` +
-      `<button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="On or off"></button>` +
-      `<span class="mx-slot">${i + 1}</span><b>${spec.label}</b><span class="mx-gap"></span>` +
+      `<button role="switch" class="mx-led" aria-checked="${f.on}" data-fx="toggle" data-i="${i}" aria-label="${spec.label} on or off" data-tip="${f.on ? "On: press to bypass" : "Bypassed: press to turn on"}"></button>` +
+      `<button class="mx-fold" data-fx="fold" data-i="${i}" aria-expanded="${open}" aria-label="${spec.label}, slot ${i + 1}: ${open ? "fold" : "unfold"}" data-tip="${open ? "Fold" : "Unfold"}">` +
+        `<span class="sp-car" aria-hidden="true"></span><span class="mx-slot">${i + 1}</span><b>${spec.label}</b></button><span class="mx-gap"></span>` +
       `<button data-fx="del" data-i="${i}" aria-label="Remove" data-tip="Remove">${icon("close", 14)}</button></div>` +
-      (f.type === "wam" ? wamBody(f, i) : f.type === "eq" ? eqBody(f, i) : "") +
+      (!open ? "" : (f.type === "wam" ? wamBody(f, i) : f.type === "eq" ? eqBody(f, i) : "") +
       `<div class="mx-params">` + Object.entries(spec.params).map(([k, [lo, hi, home, unit]]) =>
-        `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${esc(((UNITS[f.type] || {}).knobs || []).find((n) => n.key === k)?.label || k)}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>` +
+        `<div class="mx-p">${knobHtml({ key: "fx." + i + "." + k, label: spec.label + " " + k, value: f[k], lo, hi, home, words: fmt(f[k]) + unit })}<span>${esc(((UNITS[f.type] || {}).knobs || []).find((n) => n.key === k)?.label || k)}</span><output>${fmt(f[k])}${unit}</output></div>`).join("") + `</div>`) +
       `</div>`;
   }
 
@@ -296,6 +298,10 @@ export function mountMixer(el, api) {
     if (!b || b.disabled) return;
     const list = picked(song).fx, i = +b.dataset.i, a = b.dataset.fx;
     if (a === "toggle") api.change(() => { list[i].on = !list[i].on; });
+    else if (a === "fold") { // a view setting, kept in the song so it opens the same way, but not an undo step
+      if (list[i].fold) delete list[i].fold; else list[i].fold = true;
+      api.save(); render(); el.querySelector(`[data-fx="fold"][data-i="${i}"]`)?.focus({ preventScroll: true });
+    }
     else if (a === "band-add") api.change(() => { if (list[i].bands.length < MAX_BANDS) { const nb = newBand(); addBand(list[i].bands, nb); eq.select(pick + ":" + i, nb.id); } });
     else if (a === "band-on") api.change(() => { const bd = list[i].bands[+b.dataset.b]; if (bd) bd.on = !bd.on; });
     else if (a === "band-del") api.change(() => { list[i].bands.splice(+b.dataset.b, 1); });

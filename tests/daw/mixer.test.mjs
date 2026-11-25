@@ -13,6 +13,12 @@ test("new effects have their defaults", () => {
   assert.throws(() => newFx("nope"));
 });
 
+test("cleanFx keeps a folded effect folded, and only says so when it is", () => {
+  const [a, b] = cleanFx([{ type: "comp", fold: true }, { type: "comp", fold: "yes" }]);
+  assert.equal(a.fold, true);
+  assert.equal("fold" in b, false);
+});
+
 test("cleanFx drops unknown types, clamps, and caps the chain", () => {
   const out = cleanFx([{ type: "eq", low: 99 }, { type: "zap" }, null, { type: "comp", on: false, ratio: -3 }]);
   assert.equal(out.length, 2);

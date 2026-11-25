@@ -85,6 +85,7 @@ export function cleanFx(list) {
   for (const x of list) {
     if (!x || !FX[x.type] || out.length >= MAX_FX) continue;
     const fx = { type: x.type, on: x.on !== false };
+    if (x.fold === true) fx.fold = true; // folded in the mixer: only its header shows
     for (const [k, [lo, hi, d]] of Object.entries(FX[x.type].params)) fx[k] = clamp(num(x[k], d), lo, hi);
     if (x.type === "eq") fx.bands = Array.isArray(x.bands) ? cleanBands(x.bands) : oldEqBands(x);
     if (x.type === "wam") {
