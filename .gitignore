@@ -40,3 +40,7 @@ server/run/
 
 # Saved copies of the host's scheduled task, made by Switch-JriterServer.ps1.
 hostsetup/task-backup/
+
+# The interface's build tools and its default build folder
+ui/node_modules/
+web-next/

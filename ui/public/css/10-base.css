@@ -1,0 +1,297 @@
+/* Base: the ground, the type, and the things every screen uses. */
+
+* { box-sizing: border-box; }
+
+/* The hidden attribute has to win against the layout.
+ *
+ * A browser's own stylesheet says [hidden] { display: none }, but that is a user agent
+ * rule and any author rule beats it. So .sheet-backdrop { display: grid } quietly turned
+ * the hidden attribute off, and the modal backdrop sat over the whole app at 60% black
+ * with nothing in it: the page looked dimmed and swallowed every click. The player did
+ * the same thing with nothing playing.
+ *
+ * Anything given a display by its class needs this to stay hideable. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--bg);
+  /* Fixed, so it stays put while a page scrolls: a gradient that slides with the content
+     reads as an object on the page rather than as the light in the room. */
+  background-image: var(--bg-dot);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+/* An arrow over the chrome, an I-beam over the words.
+ *
+ * Reported as "sok szoveg nem kattinthato vagy atirhato, de cursor text type-ra valt": the
+ * browser's default puts an I-beam over any text, so every label, heading, count and eyebrow
+ * in the app offered to be edited. That is a small lie everywhere and a real one here,
+ * because the song title genuinely is an editable line you click into, and it looked
+ * exactly like the labels around it.
+ *
+ * So the shell is an arrow and the things you actually read or copy ask for the I-beam
+ * back. Selection is untouched either way: a drag still selects, whichever cursor is
+ * showing, so nothing about copying gets harder. Anything with a cursor of its own, which
+ * is every button and every handle, keeps it: this is one class of specificity and those
+ * are set on the element.
+ */
+body { cursor: default; }
+
+/* The words. Lyrics, prose, paths, names, numbers you might want out of the app: text
+   that is there to be read, and therefore text worth offering to select. */
+.card-body,
+.card-title,
+.lyric-body,
+.path,
+.sub,
+.md,
+.devlog-body,
+.legal-body,
+p, li, code, pre { cursor: auto; }
+/* Not kbd: those are key caps in the shortcuts sheet, which are chrome drawn as objects
+   rather than text anybody wants out of the app. */
+
+h1, h2, h3 {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+  text-wrap: balance;
+}
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; }
+h2 { font-size: 21px; }
+h3 { font-size: 16px; letter-spacing: -0.01em; }
+
+a { color: inherit; text-decoration: none; }
+
+button, input, textarea, select { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+::selection { background: var(--accent-soft); }
+
+/* Numbers that sit in columns get to line up. */
+.num, .dur, .meta-num { font-variant-numeric: tabular-nums; }
+
+.grow { flex: 1; }
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
+.bad-text { color: var(--bad); }
+.nowrap { white-space: nowrap; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.stack { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: var(--s3); }
+.row.wrap { flex-wrap: wrap; }
+
+/* Nothing here yet.
+ *
+ * A dashed outline is the convention for "drop something here", which is not what most
+ * of these are. They are a sentence explaining what this screen will hold and a way to
+ * put the first thing in it, so they read as a panel with a little light on it. */
+.empty {
+  padding: var(--s8) var(--s6);
+  text-align: center;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(var(--accent-rgb), 0.05), transparent 62%),
+    var(--grad-surface);
+  box-shadow: var(--edge-top);
+}
+.empty h3 { margin-bottom: var(--s2); color: var(--text); }
+.empty p { max-width: 46ch; margin-inline: auto; }
+
+/* Scrollbars, quiet but present. */
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.16) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+/* No stepper arrows, and no corner block.
+ *
+ * Chromium draws both as soon as a scrollbar is styled at all. They are square, and they
+ * sit at the ends of the track, which on a rounded panel is exactly where the radius is:
+ * on a dropdown that scrolls they merge with the thumb into what reads as one full height
+ * bar with square ends cutting through both corners. Reported as the scrollbar going
+ * outside the border radius, which is precisely what it was doing.
+ *
+ * Nothing in this app scrolls a line at a time by pressing an arrow, so there is nothing
+ * to miss. The thumb above is already held off the edge by a transparent border, which is
+ * what keeps it clear of the curve once these are gone. */
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* A scrollbar inside a rounded box, not across its corners.
+ *
+ * The thumb is already held off the sides by a transparent border, so it never sticks out
+ * sideways. What it does do is run the whole height of the track, and on a panel with
+ * enough content to nearly fill the thumb, its ends land inside the corner curve: a light
+ * bar crossing the round, which is what "the scrollbar for dropdowns can go outside of the
+ * border radius" describes. Measured with two panels side by side, one at 160 pixels of
+ * content in 150 and one at 700 in 150: only the long thumb touches the corners.
+ *
+ * So the track is inset from each end by the panel's own radius, and the thumb cannot
+ * reach a corner however long it gets. Per surface because the inset is the radius, and
+ * these three have two different ones between them: they are the only rules in the app
+ * that both scroll and round their corners, which is the pairing that shows this.
+ */
+.slot-menu::-webkit-scrollbar-track,
+.yt-log::-webkit-scrollbar-track { margin: var(--r-md) 0; }
+.sheet::-webkit-scrollbar-track { margin: var(--r-xl) 0; }
+
+
+/* ── moving between screens ───────────────────────────────────────────────── */
+
+/* The new screen arrives rather than appearing. A few pixels of travel and a fade is
+   enough to say "this replaced that" without anybody waiting for an animation. */
+.view.entering {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0);
+}
+.view {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--med), transform var(--med);
+}
+
+/* The line at the top, for a navigation slow enough to notice. It fills most of the way
+   and waits, because the honest thing is that we do not know how long is left. */
+.nav-bar {
+  position: fixed; top: 0; left: 0; right: 0; height: 2px;
+  z-index: 100;
+  pointer-events: none;
+}
+.nav-bar span {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent-lo), var(--accent-hi));
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6);
+}
+.nav-bar.running span { width: 82%; transition: width 2.4s cubic-bezier(0.1, 0.8, 0.2, 1); }
+.nav-bar.done span { width: 100%; opacity: 0; transition: width 140ms linear, opacity 220ms 120ms linear; }
+
+/* ── the shape of a screen that has not arrived yet ───────────────────────── */
+
+.sk { padding: var(--s6) var(--s7); animation: sk-in var(--med) both; }
+@keyframes sk-in { from { opacity: 0; } to { opacity: 1; } }
+
+.sk-hero { display: flex; gap: var(--s5); align-items: flex-end; margin-bottom: var(--s7); }
+.sk-stack { display: flex; flex-direction: column; gap: var(--s3); flex: 1; min-width: 0; }
+.sk-block { display: flex; flex-direction: column; gap: var(--s3); margin-bottom: var(--s6); }
+.sk-row { display: flex; align-items: center; gap: var(--s3); }
+
+.sk-line, .sk-cover, .sk-thumb {
+  display: block;
+  border-radius: var(--r-sm);
+  /* A slow sweep rather than a pulse. It should read as "still coming" from the corner
+     of your eye and never ask to be looked at directly. */
+  background:
+    linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.045) 40%, transparent 62%),
+    var(--surface-2);
+  background-size: 260% 100%, auto;
+  animation: sk-sweep 1.9s var(--ease) infinite;
+}
+.sk-cover { width: 148px; height: 148px; border-radius: var(--r-lg); flex: none; }
+.sk-thumb { width: 40px; height: 40px; border-radius: var(--r-md); flex: none; }
+
+@keyframes sk-sweep {
+  from { background-position: 130% 0, 0 0; }
+  to   { background-position: -30% 0, 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-line, .sk-cover, .sk-thumb { animation: none; }
+}
+
+@media (max-width: 900px) {
+  .sk { padding: var(--s4); }
+  .sk-cover { width: 96px; height: 96px; }
+  .sk-hero { gap: var(--s4); }
+}
+
+
+/* ── keyboard ─────────────────────────────────────────────────────────────── */
+
+/* Only for people actually using a keyboard: :focus-visible leaves mouse clicks alone.
+   The browser's own ring is a thin dark outline, which against a near black ground is
+   the same as having no ring at all. */
+:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.btn:focus-visible, .icon-btn:focus-visible, .pill:focus-visible { outline-offset: 3px; }
+
+/* ── glass ────────────────────────────────────────────────────────────────
+
+   Applied directly on the four surfaces that have the page moving behind them: the
+   rail, the bar across the top, the player and dialogs. Not offered as a utility class,
+   because glass is not a decoration to sprinkle: it means something only where content
+   passes underneath, and everywhere else it is a grey box that costs a compositor layer.
+
+   Where the filter cannot be had at all, those surfaces fall back to solid. */
+/* The probe names the blur, because the blur is now all that is asked for.
+   It used to name url(#glass), on the reasoning that a probe should name the thing that is
+   depended on. That was right and it still did not work: WebKit parses an SVG reference
+   here and then never renders it, so the @supports said yes, the filter did nothing, and
+   the fallback never came. Nothing in the chain can fail any more, so this block is for
+   browsers with no backdrop-filter at all, and the tints below it are readable without
+   one either way. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .rail, .topbar, .player, .sheet, .slot-menu { background: var(--surface); }
+  /* The card carries text rather than chrome, so it falls back to the panel colour
+     it used to be rather than to a nearly invisible film. */
+  .lyric-card { background: var(--surface-2); }
+}
+
+/* Somebody who has asked their system for less transparency has asked for exactly this:
+   not a weaker blur, no glass. Turning it off in one place rather than per surface means
+   the refraction, the fringing and the blur all go together and none of them can be left
+   on by a rule somewhere else.
+
+   prefers-reduced-motion is deliberately not here. Nothing in the filter animates: it is
+   a fixed distortion of whatever is behind it, and reduced motion is about animation. */
+@media (prefers-reduced-transparency: reduce) {
+  .rail, .topbar, .player, .sheet, .slot-menu {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .lyric-card {
+    background: var(--surface-2);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

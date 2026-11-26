@@ -1,0 +1,406 @@
+/* The app's own furniture, on top of the shared glass.
+ *
+ * /glass.css (foyer/shared, one copy for every site on the machine) is loaded first and
+ * defines the material: colours, the three tiers of glass, radii, spacing, shadows,
+ * timings, and the accent scaffolding. Nothing here redefines any of that. What is here
+ * is what is this app's alone: its type, its layout numbers, and its motion.
+ */
+
+:root {
+  --font: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Jriter Display", "Orbitron", var(--font);
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+
+  /* Layout. Everything floats: panes sit --gap off the edges and off each other. */
+  --gap: 12px;
+  --rail-w: 252px;
+  --top-h: 52px;
+  --bar-h: 72px;
+  --tab-h: 0px;
+  --content-max: 1180px;
+
+  /* Motion. --spring is the curve a sheet arrives on: fast out, long soft landing, no
+     overshoot. --pop is for small things that appear in place: quick and settled, no bounce. */
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --pop: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sheet: 460ms var(--spring);
+
+  /* Type scale. */
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 20px;
+  --t-2xl: 28px;
+  --t-3xl: clamp(30px, 4.6vw, 46px);
+
+  /* The shared glass gives --text-2 and --text-3 for a black page, which is what Foyer is.
+     Here the ground is the song's own artwork, so a hot pink or white cover puts a
+     saturated, bright colour behind every label, and the grey that read fine on black
+     measured 1.8:1. These are the same two greys lifted until they hold 4.5:1 against the
+     brightest ground the shader allows (tools/audit.js checks it on real pixels). */
+  --text-2: #CDD0D5;
+  --text-3: #B0B4BA;
+  /* The accent as TEXT. The accent itself is for fills, rings and icons: as small text on a
+     ground that is tinted the same hue it measured 2:1, so text uses this lighter mix. */
+  --accent-text: color-mix(in srgb, var(--accent) 42%, #fff);
+
+  --bad: #FF6B6B;
+  --bad-soft: color-mix(in srgb, var(--bad) 16%, transparent);
+  --good: #6EE7A8;
+  --warn: #FFC861;
+
+  /* Safe areas, so nothing sits under a notch or a home indicator. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+
+  color-scheme: dark;
+}
+
+/* LIGHT. The same glass in daylight: a pale warm-grey page, white film, dark ink. The
+   colour-split shader is a night thing (it draws on black), so in light the CSS glass does
+   the work and the shader's canvas stays out of the way (Ground.svelte). Set on <html> by
+   the script in index.html, from Settings, Appearance, Theme. */
+:root[data-theme="light"] {
+  --bg: #F3F1F2;
+  --bg-deep: #ECE9EB;
+  --surface: #FFFFFF;
+  --surface-2: #F7F5F6;
+  --elevated: #FFFFFF;
+  --hover: rgba(20, 16, 24, 0.06);
+  --pressed: rgba(20, 16, 24, 0.10);
+  --line: rgba(20, 16, 24, 0.10);
+  --line-2: rgba(20, 16, 24, 0.17);
+  --text: #17151A;
+  --text-2: #4A4650;
+  --text-3: #6B6672;
+  --accent-text: color-mix(in srgb, var(--accent) 55%, #000);
+  --glass: rgb(255 255 255 / 0.62);
+  --glass-hover: rgb(255 255 255 / 0.82);
+  --glass-2: rgb(252 251 252 / 0.94);
+  --glass-line: rgba(20, 16, 24, 0.10);
+  --edge-top: inset 0 1px 0 rgb(255 255 255 / 0.9), inset 0 -1px 0 rgb(20 16 24 / 0.04);
+  --edge-line: linear-gradient(135deg, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0.4) 20%,
+    rgb(20 16 24 / 0.05) 50%, rgb(20 16 24 / 0.08) 100%);
+  --glass-shadow: 0 10px 30px rgba(40, 20, 40, 0.10);
+  --shadow-1: 0 1px 2px rgba(40, 20, 40, 0.10);
+  --shadow-2: 0 10px 30px rgba(40, 20, 40, 0.12);
+  --shadow-3: 0 24px 60px rgba(40, 20, 40, 0.16);
+  --bad: #C9303A;
+  --good: #1E8F57;
+  --warn: #A86A00;
+  color-scheme: light;
+}
+
+/* Narrow is decided once, in the shell (shell/state.svelte.ts), and written here as an
+   attribute. A media query here as well would be a second answer to the same question,
+   and the two disagree for a moment every time a window is resized across the line. */
+:root[data-narrow] { --gap: var(--s2); --tab-h: 58px; --bar-h: 60px; }
+/* One cover size for the top of a song, an album and a playlist on a phone: small enough
+   that the tabs and the list under it start on the first screen. */
+:root { --hero-art: min(52vw, 200px); }
+/* Words for a mouse and words for a thumb: say "click" or "right-click" only where there
+   is one, "tap" or "hold" on a phone. */
+.if-touch { display: none; }
+html[data-narrow] .if-mouse { display: none; }
+html[data-narrow] .if-touch { display: inline; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  cursor: default;
+  background: var(--bg);
+  color: var(--text);
+  font: 500 var(--t-md)/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app { height: 100%; }
+
+h1, h2, h3, h4, p { margin: 0; }
+h1, h2, h3 { font-family: var(--display); letter-spacing: 0.01em; line-height: 1.12; }
+h1 { font-size: var(--t-3xl); font-weight: 800; }
+h2 { font-size: var(--t-xl); font-weight: 600; }
+h3 { font-size: var(--t-lg); font-weight: 600; }
+
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+img, svg, canvas { display: block; }
+kbd {
+  font: 600 var(--t-xs)/1 var(--mono);
+  padding: var(--s1) var(--s2); border-radius: 6px;
+  background: var(--hover); border: 1px solid var(--line-2); color: var(--text-2);
+}
+
+::selection { background: var(--accent-soft); color: var(--text); }
+
+/* Focus is a ring in the accent, and only for the keyboard. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* Scrollbars: thin, quiet, and only as dark as they need to be. */
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: 999px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; border: 3px solid transparent; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ── the material ───────────────────────────────────────────────────────────
+ *
+ * WHY THE PANES HAVE NO backdrop-filter. The sidebar, the player and the bar's controls sit
+ * on the ground, and the ground is already a 70px blur of the artwork: blurring it again
+ * changes nothing anyone could see. What a backdrop-filter does add is a re-read of whatever
+ * is under the pane every time anything inside it repaints, and every hover is a repaint.
+ * That read can pick up pixels the pane itself drew a frame ago, so a patch the size of the
+ * hovered row comes out filtered twice, with a hard edge, and saturate() compounds it into
+ * hot pink. That patch is the flicker. It never shows in a screenshot (which draws the page
+ * in one pass), which is why it survived so long. A pane that filters nothing has nothing to
+ * read back and nothing to compound: a film and an edge over a picture that is already soft.
+ *
+ * What does float over content (menus, sheets, the palette, toasts) keeps a blur, but on a
+ * film so opaque that nothing a filter could get wrong is visible through it.
+ *
+ * ONE material for every surface: a pane, a card, a menu, a sheet. It is the shared
+ * glass's own film and blur (--glass, --glass-filter, from /glass.css) plus an edge, and
+ * nothing else. There is deliberately no second renderer: every surface is made of the
+ * same thing, so the particles under it, the artwork under it and the content passing
+ * under it are all blurred by the same blur, and nothing can switch on late.
+ *
+ * THE EDGE is the only thing this file adds. A gradient border 1.5px wide whose gradient
+ * runs ALONG the edge rather than into the pane: bright at the corner the light lands on
+ * (top left), fading to nothing along the sides, and a warm answer at the opposite corner.
+ * The cool top left and the warm bottom right are the chromatic split a real glass edge
+ * has, drawn as colour instead of computed from a backdrop. --edge-k (0..2, the Chromatic
+ * aberration setting) scales how much colour there is; at 0 the edge is plain white light.
+ *
+ * It is a masked pseudo-element rather than a border-image (which ignores border-radius)
+ * or a second background layer (which shows through a translucent film). */
+:root {
+  /* One film, whatever the engine. The shared glass gives WebKit and Gecko a dark one
+     because there it has to survive a blur that may not arrive; here there is no blur to
+     wait for, so every engine gets the light film the Blink tier has. */
+  --glass: rgb(255 255 255 / 0.07);
+  /* What a pane or a control becomes under the pointer: a lighter film, never a darker one. */
+  --glass-hover: rgb(255 255 255 / 0.15);
+  --glass-2: rgb(24 25 29 / 0.86);
+  /* Blur only. saturate() and brightness() clip a vivid ground (pink goes to a flat 255 in
+     one channel) and compound whenever a region is filtered twice. */
+  --glass-filter: blur(14px);
+  --glass-filter-thin: blur(14px);
+  --glass-filter-edge: blur(14px);
+  --edge-k: 1;
+  /* The side tints the rim of the film itself carries: a hair of cool on the left, of warm
+     on the right. Kept under 1px of visible width. */
+  --edge-top:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 1px 0 0 rgb(150 200 255 / calc(0.10 * var(--edge-k))),
+    inset -1px 0 0 rgb(255 190 150 / calc(0.09 * var(--edge-k))),
+    inset 0 -1px 0 rgb(255 255 255 / 0.05);
+  --edge-line: linear-gradient(135deg,
+    rgb(200 235 255 / calc(0.70 * (0.55 + 0.45 * var(--edge-k)))) 0%,
+    rgb(255 255 255 / 0.20) 14%,
+    rgb(255 255 255 / 0.04) 36%,
+    rgb(255 255 255 / 0.04) 64%,
+    rgb(255 205 170 / calc(0.26 * var(--edge-k))) 86%,
+    rgb(255 175 135 / calc(0.50 * var(--edge-k))) 100%);
+}
+
+.glass, .glass-2, .card { position: relative; }
+.glass::after, .glass-2::after, .card::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  background: var(--edge-line);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* GLASS, the default (data-blur="native", Settings, Appearance, Glass): the browser blurs
+ * everything under each pane with backdrop-filter, page content included, the way Apple's
+ * own sites do. It flickered here before because of what was UNDER the glass, not because
+ * of the blur: an SVG displacement filter in the chain, a 2D particle canvas redrawing under
+ * every pane, and a full screen 70px CSS blur layer the panes sampled in tiles. All three
+ * are gone: the ground and the particles are one WebGL canvas now (lib/glass), drawn from
+ * the picture, with no filter of its own.
+ *
+ * "gl" is the shader on its own (it blurs the ground and splits colours at the rim, never
+ * page content); "off" is no blur. data-blur on <html>, from localStorage (App.svelte). */
+/* Not inside a screen: a screen fades in as it arrives, which would cut the blur off until
+   the fade ended, and glass inside a screen only ever has the (already blurred) ground
+   behind it anyway. */
+html[data-blur="native"] .glass:not(.screen .glass) {
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+/* The search's own backing layer is for "gl" mode; in native the panel itself is filtered. */
+html[data-blur="native"] .backing { display: none; }
+
+/* A floating pane: the sidebar, the player, the bar's controls, the tab bar. */
+.glass {
+  /* Without a blur a pane has to say "glass" some other way: it is lighter at the top, where
+     the light is, than at its foot, which is what a slab of frosted glass looks like. */
+  background: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0)), var(--glass);
+  border: 0;
+  box-shadow: var(--edge-top), var(--glass-shadow);
+  border-radius: var(--r-xl);
+}
+/* The search and the sheets: the same glass, with a little more film, because what is behind
+   them is the page itself (blurred by Shell.svelte while they are open) rather than the
+   quiet ground. */
+.glass.modal {
+  background: linear-gradient(rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02)), rgb(255 255 255 / 0.09);
+  box-shadow: var(--edge-top), var(--shadow-3);
+}
+
+/* The same pane, a little heavier, for what opens over other glass: menus, sheets, the
+   palette, toasts. */
+.glass-2 {
+  background: var(--glass-2);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border: 0;
+  box-shadow: var(--edge-top), var(--shadow-3);
+  border-radius: var(--r-lg);
+}
+/* A card inside a screen: the same film and the same edge. It does not blur anything of
+   its own, because what is behind it is the ground, which is already a 70px blur: blurring
+   a blur changes nothing you could see, and it costs a render pass per card. */
+.card {
+  background: var(--glass);
+  border: 0;
+  border-radius: var(--r-lg);
+  box-shadow: var(--edge-top);
+}
+
+/* ── utilities ────────────────────────────────────────────────────────────── */
+
+.row { display: flex; align-items: center; gap: var(--s3); }
+.col { display: flex; flex-direction: column; gap: var(--s3); }
+.grow { flex: 1 1 auto; min-width: 0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.eyebrow {
+  font: 500 var(--t-sm)/1 var(--font);
+ color: var(--text-3);
+}
+.wrap { flex-wrap: wrap; }
+[hidden] { display: none !important; }
+
+/* A screen's content column. A size container too, so a screen can answer to the room it
+   was given (the sidebar being open or not) rather than to the window. */
+.page {
+  container: page / inline-size;
+  width: 100%; max-width: var(--content-max); margin: 0 auto;
+  padding: var(--s5) var(--s6) var(--s8);
+  display: flex; flex-direction: column; gap: var(--s6);
+}
+@media (max-width: 900px) { .page { padding: var(--s4) var(--s4) var(--s7); gap: var(--s5); } }
+
+.page-head { display: flex; align-items: flex-end; gap: var(--s4); flex-wrap: wrap; }
+.page-head h1 { flex: 1 1 auto; min-width: 0; }
+.section-head { display: flex; align-items: center; gap: var(--s3); min-height: 32px; }
+.section-head h2, .section-head h3 { flex: 1 1 auto; min-width: 0; }
+
+/* Entering: a screen fades up a few pixels. Small on purpose, so navigation feels like
+   moving and not like a slideshow. */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { 0% { opacity: 0.5; } 50% { opacity: 0.9; } 100% { opacity: 0.5; } }
+.enter { animation: rise 320ms var(--spring) both; }
+
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--line-2); border-top-color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter { animation: none; }
+}
+
+/* ── opening and closing (lib/morph) ─────────────────────────────────────── */
+/* The pressed cover grows into the hero, or the hero shrinks back into it: a spring with a
+   touch of overshoot, a little slower than the crossfade around it so the eye follows it. */
+::view-transition-group(morph) { animation-duration: 460ms; animation-timing-function: cubic-bezier(0.32, 1.18, 0.4, 1); }
+::view-transition-old(morph), ::view-transition-new(morph) { animation-duration: 300ms; height: 100%; object-fit: cover; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 260ms; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+
+/* ── albums ─────────────────────────────────────────────────────────────── */
+/* An album is drawn by ui/AlbumArt.svelte everywhere: a CD case, rainbow disc, stickers,
+   a lid that opens on hover. These two are its measurements: the case's corners, and the
+   room a tile keeps on its right for the disc that peeks out. */
+:root { --vinyl-peek: 18px; --case-r: 5px; }
+/* The angle the light catches a CD at (AlbumArt). Registered so it can glide. */
+@property --cd-a { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+
+/* No keyboard shortcuts on a phone: there is no keyboard to press them on. */
+html[data-narrow] kbd, html[data-narrow] .combo { display: none !important; }
+
+/* LIGHT IS SOFT. Neumorphism, which can't work at night (it needs light to cast both a
+   highlight and a shadow off one surface), is what light mode is made of: the page, the
+   panes, the buttons and the fields are all the same pale material, shaped only by a white
+   highlight on the top left and a soft violet-grey shadow on the bottom right. Raised for
+   things you press, pressed in for things that hold (tracks, fields). The glass edge line
+   and the film are dark-mode things, so they step aside here. */
+:root[data-theme="light"] {
+  --bg: #ECE9EE;
+  --neu-hi: rgb(255 255 255 / 0.95);
+  --neu-lo: rgb(166 152 172 / 0.42);
+  --neu-out: 6px 6px 16px var(--neu-lo), -6px -6px 16px var(--neu-hi);
+  --neu-out-sm: 3px 3px 8px var(--neu-lo), -3px -3px 8px var(--neu-hi);
+  --neu-in: inset 3px 3px 7px var(--neu-lo), inset -3px -3px 7px var(--neu-hi);
+  --neu-in-sm: inset 2px 2px 4px var(--neu-lo), inset -2px -2px 4px var(--neu-hi);
+  --glass: var(--bg);
+  --glass-2: #F1EEF3;
+}
+:root[data-theme="light"] .glass, :root[data-theme="light"] .glass-2, :root[data-theme="light"] .card {
+  background: var(--bg); box-shadow: var(--neu-out); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+:root[data-theme="light"] .glass-2 { background: var(--glass-2); }
+:root[data-theme="light"] .glass::after, :root[data-theme="light"] .glass-2::after, :root[data-theme="light"] .card::after { display: none; }
+/* Cards inside a pane sit pressed into it rather than floating twice. */
+:root[data-theme="light"] .glass .card, :root[data-theme="light"] .card .card { box-shadow: var(--neu-in-sm); }
+
+:root[data-theme="light"] .btn { background: var(--bg); border-color: transparent; box-shadow: var(--neu-out-sm); }
+:root[data-theme="light"] .btn:hover { background: #F3F0F5; }
+:root[data-theme="light"] .btn:active { box-shadow: var(--neu-in-sm); transform: none; }
+:root[data-theme="light"] .btn.primary { background: var(--accent); box-shadow: var(--neu-out-sm); }
+:root[data-theme="light"] .btn.ghost { background: transparent; box-shadow: none; }
+:root[data-theme="light"] .btn.ghost:hover { background: var(--bg); box-shadow: var(--neu-out-sm); }
+:root[data-theme="light"] .btn.danger { box-shadow: var(--neu-out-sm); }
+:root[data-theme="light"] .icon-btn:hover { background: var(--bg); box-shadow: var(--neu-out-sm); }
+:root[data-theme="light"] .icon-btn:active { box-shadow: var(--neu-in-sm); transform: none; }
+:root[data-theme="light"] .icon-btn.glass { box-shadow: var(--neu-out-sm); }
+
+:root[data-theme="light"] .field { background: var(--bg); border-color: transparent; box-shadow: var(--neu-in); }
+:root[data-theme="light"] .field:hover { border-color: transparent; }
+:root[data-theme="light"] .field:focus, :root[data-theme="light"] .field:focus-visible { box-shadow: var(--neu-in), 0 0 0 2px var(--accent-line); }
+:root[data-theme="light"] input[type="checkbox"], :root[data-theme="light"] input[type="radio"] { background: var(--bg); border-color: transparent; box-shadow: var(--neu-in-sm); }
+:root[data-theme="light"] input[type="checkbox"]:checked, :root[data-theme="light"] input[type="radio"]:checked { background: var(--accent); box-shadow: var(--neu-out-sm); }
