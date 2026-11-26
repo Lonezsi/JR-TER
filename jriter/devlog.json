@@ -1,5 +1,13 @@
 [
  {
+  "version": "4.34.4",
+  "date": "2026-11-26",
+  "name": "JR!TER",
+  "title": "The notice says what guests can do",
+  "notes": [
+   "The README and the notice said a guest on a shared song only makes a copy. In fact they change your song itself; every change is in its edit history under the name you gave them, and you can undo it."
+  ]
+ }, {
   "version": "4.34.3",
   "date": "2026-11-26",
   "name": "JR!TER",

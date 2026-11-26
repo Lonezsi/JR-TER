@@ -85,12 +85,13 @@ Signing up needs an invite. Make one in **Settings → People**, send them the c
 choose their own handle and password. Without that, an open signup form on a public address
 is an offer to whoever finds it.
 
-**Sharing one song.** On a song's title menu, *Share with somebody*. They can play it, read
-the words, and work on the equaliser and the limiter. Anything they save becomes their own
-copy in their own library; yours is untouched. Give them a name on the share and their edits
-are labelled with it, so `Wide master` comes back as `Wide master, edited by Jozsef`. They
-cannot see your other songs, your samples or your renders, and cannot post anything. Take it
-back whenever you like: what they made stays theirs, because it was always in their library.
+**Sharing one song.** On a song's title menu, *Share with somebody*. They can play it and work
+on the song itself: its title, pictures, words, sound, DAW project, arrangement, mixes and
+vocal takes. Those are changes to your song, not to a copy. Every change is kept in the
+song's edit history under the name you gave them, so `Wide master` comes back as `Wide
+master, edited by Jozsef`, and you can undo any of them from there. They cannot delete the
+song, see your other songs, samples or renders, or post anything. Take the share back
+whenever you like: what they changed stays in the song's edit history until you undo it.
 
 Your friends can run the desktop agent against their own library too. It signs in with a
 handle:
