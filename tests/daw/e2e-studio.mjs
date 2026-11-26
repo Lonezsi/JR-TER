@@ -11,6 +11,7 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { makeProfile, closeBrowser } from "./profile.mjs";
 
 const WEB = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "web");
 const EDGE = process.env.EDGE || [
@@ -31,7 +32,7 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const SITE = "http://127.0.0.1:" + server.address().port;
 
 const dbg = 9300 + Math.floor(Math.random() * 500);
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), "daw-studio-"));
+const profile = makeProfile("daw-studio-");
 const edge = spawn(EDGE, ["--headless=new", "--disable-gpu", "--no-first-run", "--remote-debugging-port=" + dbg,
   "--user-data-dir=" + profile, "about:blank"], { stdio: "ignore" });
 
@@ -450,6 +451,7 @@ try {
 for (const [ok, name] of results) console.log((ok ? "  ok   " : "  FAIL ") + name);
 const bad = results.filter(([ok]) => !ok).length;
 console.log(bad ? bad + " failed" : "all " + results.length + " passed");
-try { edge.kill(); } catch {}
+try { ws?.close(); } catch {}
+await closeBrowser(edge, profile);
 server.close();
 process.exit(bad ? 1 : 0);

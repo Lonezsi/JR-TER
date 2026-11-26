@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.34.1",
+  "date": "2026-11-26",
+  "name": "JR!TER",
+  "title": "Tests clean up after themselves",
+  "notes": [
+    "The DAW browser tests now delete their temporary browser profile when they finish; 31 leftovers had filled 3 GB on the server.",
+    "Profiles left by a crashed run are swept the next time a test starts, once they are over 6 hours old."
+  ]
+ }, {
   "version": "4.34.0",
   "date": "2026-11-25",
   "name": "JR!TER",
