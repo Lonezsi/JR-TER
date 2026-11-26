@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.34.3",
+  "date": "2026-11-26",
+  "name": "JR!TER",
+  "title": "Foyer ties only when you ask",
+  "notes": [
+    "Signing in with a password no longer ties whatever Foyer account is open in that browser to your library. Before, on a friend's laptop their Foyer sign-in could end up opening yours.",
+    "Only Settings, Connect to Foyer, ties it, and it now says which Foyer handle is tied. Changing your password, or the new Sign out everywhere, unties it."
+  ]
+ }, {
   "version": "4.34.2",
   "date": "2026-11-26",
   "name": "JR!TER",

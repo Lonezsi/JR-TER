@@ -197,10 +197,20 @@ albums and in playlists), or let it go. Its audio stays until it leaves the grav
 **Accounts.** Without one, JR!TER is a guest library kept in your browser, everything
 included. On a machine that also runs Foyer, a Foyer handle and password work on the sign
 in page, and `data/foyer-owner.txt` (one line, a Foyer handle) names which Foyer account
-is the owner.
+is the owner. A password sign-in never ties a Foyer account; only Settings, Connect to
+Foyer does (it shows the tied handle), and a password change or "Sign out everywhere"
+unties it.
 
 **Light and dark.** Settings, Appearance, Theme: the glass at night, a soft neumorphic
 look by day.
+
+**DAW.** `/daw.html` is a MIDI player and a very simple piano-roll editor: open a `.mid`
+(or drop one on the page), add notes by clicking, drag to move, drag the right edge to
+resize, right-click to delete, and play it with built-in browser instruments (piano, pad,
+bass, pluck, drums). Space plays, `L` loops, `j`/`k` change track, `N` adds one, `Ctrl+Z`
+undoes. Save as `.mid` or as a plain-text `.json` that explains itself. It is plain ES
+modules in `web/daw/` (no build step) with phone controls (tap, drag, pinch, long-press);
+the plan is in `docs/DAW.md`. It becomes a song tab once the Svelte `ui/` is here.
 
 **Phone.** The sidebar follows your thumb from the edge, Back closes whatever is on top,
 and the player grows out of the mini bar.
@@ -208,6 +218,13 @@ and the player grows out of the mini bar.
 ---
 
 ## The desktop agent
+
+> **New:** the PC side is being replaced by a desktop app with no Python in it, in desktop/
+> (Java 21, built by desktop\build.ps1 into JRITER.exe for the tray and jriter-cli.exe for the
+> commands, which have the same names as below: jriter-cli server/login/add/scan/push/watch/render/shell).
+> It reads the same client.json. See desktop/README.md. The Python client below stays as the way
+> back until the app has had real use.
+> `jriter-cli plugins X.flp` lists the VSTs a project uses; the plan for the rest is in docs/VST.md.
 
 ```
 cd client
@@ -382,7 +399,7 @@ jriter/
   blobs.py             content addressed storage
   http.py              routing, static files, byte ranges for audio
   registry.py          loads whichever modules are switched on
-  devlog.py            the release notes, and the version they name
+  devlog.py            loads the release notes (devlog.json) and compares versions
   modules/             one file per feature
 ui/                    the interface: Svelte 5 + TypeScript, built with Vite
   src/shell/           sidebar, phone drawer, player, search, Now Playing
@@ -393,7 +410,7 @@ ui/                    the interface: Svelte 5 + TypeScript, built with Vite
 web/                   what `npm run ship` builds; the server serves this
 client/                the desktop agent
 tools/                 build_lexicon.py and other one-off builders
-tests/                 python -m pytest -q
+tests/                 python -m pytest -q; node --test tests/daw/*.test.mjs
 data/                  your library. Not in git.
 ```
 

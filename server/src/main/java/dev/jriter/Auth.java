@@ -295,7 +295,7 @@ public class Auth {
         if (here != null && accounts.byId(here) != null) return here;
         if (Boolean.TRUE.equals(f.get("owner")) && accounts.byId(Accounts.OWNER) != null
                 && accounts.foyerOf(Accounts.OWNER) == null) {
-            accounts.linkFoyer((String) f.get("id"), Accounts.OWNER);
+            accounts.linkFoyer((String) f.get("id"), (String) f.get("handle"), Accounts.OWNER);
             return Accounts.OWNER;
         }
         return null;

@@ -53,7 +53,7 @@ public class Accounts {
             + " last_used REAL NOT NULL DEFAULT 0)",
         "CREATE INDEX IF NOT EXISTS tokens_account ON tokens(account_id)",
         "CREATE TABLE IF NOT EXISTS foyer_links (foyer_id TEXT PRIMARY KEY,"
-            + " account_id INTEGER NOT NULL UNIQUE, linked_at REAL NOT NULL)",
+            + " account_id INTEGER NOT NULL UNIQUE, linked_at REAL NOT NULL, handle TEXT NOT NULL DEFAULT '')",
     };
 
     private final Config config;
@@ -78,6 +78,9 @@ public class Accounts {
         List<Map<String, Object>> cols = db.queryForList("PRAGMA table_info(shares)");
         boolean have = cols.stream().anyMatch(r -> "token_digest".equals(r.get("name")));
         if (!have) db.execute("ALTER TABLE shares ADD COLUMN token_digest TEXT NOT NULL DEFAULT ''");
+        boolean hasHandle = db.queryForList("PRAGMA table_info(foyer_links)").stream()
+                .anyMatch(r -> "handle".equals(r.get("name")));
+        if (!hasHandle) db.execute("ALTER TABLE foyer_links ADD COLUMN handle TEXT NOT NULL DEFAULT ''");
     }
 
     // -- small helpers -----------------------------------------------------------
@@ -212,6 +215,8 @@ public class Accounts {
     }
 
     public void signOutEverywhere(long id) {
+        // A Foyer tie is a way in too: ending every session ends it (CONDOM 3).
+        unlinkFoyer(id);
         run("UPDATE accounts SET secret = ? WHERE id = ?", hex(randomBytes(32)), id);
     }
 
@@ -375,9 +380,21 @@ public class Accounts {
         return r == null ? null : (String) r.get("foyer_id");
     }
 
-    public void linkFoyer(String foyerId, long account) {
+    public void linkFoyer(String foyerId, String handle, long account) {
         run("DELETE FROM foyer_links WHERE foyer_id = ? OR account_id = ?", foyerId, account);
-        run("INSERT INTO foyer_links (foyer_id, account_id, linked_at) VALUES (?, ?, ?)", foyerId, account, now());
+        run("INSERT INTO foyer_links (foyer_id, account_id, linked_at, handle) VALUES (?, ?, ?, ?)",
+                foyerId, account, now(), handle == null ? "" : handle);
+    }
+
+    /** The Foyer handle this account is tied to ("" if tied before handles were kept), or null. */
+    public String foyerHandleOf(long account) {
+        Map<String, Object> r = one("SELECT handle FROM foyer_links WHERE account_id = ?", account);
+        return r == null ? null : (String) r.get("handle");
+    }
+
+    public void foyerSeenAs(String foyerId, String handle) {
+        if (handle == null || handle.isEmpty()) return;
+        run("UPDATE foyer_links SET handle = ? WHERE foyer_id = ? AND handle <> ?", handle, foyerId, handle);
     }
 
     public void unlinkFoyer(long account) { run("DELETE FROM foyer_links WHERE account_id = ?", account); }
