@@ -432,7 +432,7 @@
         <p>Songs people on this server share with you show up here, separate from your own library.</p>
       </div>
     {:else}
-      <p class="muted lede">Someone else's song. You can listen and work on the sound and the words. Anything you save becomes your own copy, theirs stays as is.</p>
+      <p class="muted lede">Someone else's song. You can listen and work on the sound and the words. What you change goes into their song and its edit history, and they can undo it.</p>
       <div class="list" data-rows>
         {#each shownShared as row (row.share)}
           <a class="item" href={href.share(row.share)} use:navRow>

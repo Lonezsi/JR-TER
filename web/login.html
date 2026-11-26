@@ -131,6 +131,8 @@ body { display: grid; place-items: center; min-height: 100dvh; padding: var(--s4
     <a href="#" id="swapLink">I have an invite</a>
   </p>
 
+  <p class="note" id="age" hidden>Accounts are for people 16 and over.</p>
+
   <p class="note" id="note">
     Guessing is limited to a few tries before this address has to wait.
   </p>
@@ -259,6 +261,7 @@ function draw() {
     : "Guessing is limited to a few tries before this address has to wait.";
 
   $("swap").hidden = setup || !canSignUp;
+  $("age").hidden = !joining;
   $("swapLink").textContent = joining ? "I already have an account" : "I have an invite";
   (fresh ? $("code") : $("password")).focus();
 }

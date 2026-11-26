@@ -175,6 +175,8 @@ body::before {
     <a href="#" id="swapLink">I have an invite</a>
   </p>
 
+  <p class="note" id="age" hidden>Accounts are for people 16 and over.</p>
+
   <!-- Signed out, the library opens anyway, as a guest library kept in this browser. -->
   <p class="note">
     <a href="/">Keep going without an account</a>
@@ -312,6 +314,7 @@ function draw() {
     : "Guessing is limited to a few tries before this address has to wait.";
 
   $("swap").hidden = setup || !canSignUp;
+  $("age").hidden = !joining;
   $("swapLink").textContent = joining ? "I already have an account" : "I have an invite";
   (fresh ? $("code") : $("password")).focus();
 }
@@ -336,9 +339,9 @@ function foyerLine(f) {
       try { await api("/api/auth/signup", { foyer: true }); location.href = onwards(); }
       catch (err) { problem(err.message); b.disabled = false; }
     };
-    line.append("Signed in on Foyer as @" + f.handle + ". Already have a library here? Sign in below once to connect it. If not, ", b, ".");
+    line.append("Signed in on Foyer as @" + f.handle + ". Already have a library here? Sign in below, then connect Foyer in Settings. If not, ", b, " (16 and over).");
   } else {
-    line.append("Signed in on Foyer as @" + f.handle + ". Sign in below once, and Foyer opens this library from then on.");
+    line.append("Signed in on Foyer as @" + f.handle + ". Sign in below, then connect Foyer in Settings, and Foyer opens this library from then on.");
   }
   line.hidden = false;
 }

@@ -81,9 +81,10 @@ separate audio, separate settings. Nothing in the app shows one person another's
 renders, samples or lyrics, and that is structural rather than a permission check, because
 each library is a different file on disk.
 
-Signing up needs an invite. Make one in **Settings → People**, send them the code, and they
-choose their own handle and password. Without that, an open signup form on a public address
-is an offer to whoever finds it.
+Accounts are for people 16 and over. An account comes from an invite (make one in **Settings →
+People**, send them the code, and they choose their own handle and password), from a song share
+link, or from being the owner's friend on Foyer. Without one of those, an open signup form on a
+public address is an offer to whoever finds it.
 
 **Sharing one song.** On a song's title menu, *Share with somebody*. They can play it and work
 on the song itself: its title, pictures, words, sound, DAW project, arrangement, mixes and

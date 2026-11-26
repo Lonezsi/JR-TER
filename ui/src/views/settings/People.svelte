@@ -57,7 +57,7 @@
 
 <div class="sections">
   <Block title="People"
-         note="Everyone gets their own library and sees only theirs; a song crosses over only when you share it. Signing up needs an invite.">
+         note="Everyone gets their own library and sees only theirs; a song crosses over only when you share it. Accounts come from an invite, a song share link or Foyer friendship, and are for people 16 and over.">
     {#snippet actions()}
       <span class="faint">{plural(data.data?.accounts.length ?? 0, "account")}</span>
       <button class="btn sm primary" onclick={invite}><Icon name="plus" size={14} /> Invite somebody</button>

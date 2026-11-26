@@ -227,8 +227,15 @@ body { padding: var(--s6) var(--s5) 20vh; }
     recipient was given on it.
   </li>
   <li>
-    For each change a guest made to a shared song: which share it came through, when, and
-    what the song looked like before it, so it can be undone.
+    For each change a guest made to a shared song: which account made it, which share it
+    came through, when, and what the song looked like before it, so it can be undone.
+  </li>
+  <li>
+    If you tied a Foyer account: which Foyer account (its id and handle) opens which account
+    here.
+  </li>
+  <li>
+    The owner's timetable: the week, and notes per subject. It can name other people.
   </li>
   <li>Your settings, including any typeface you uploaded.</li>
 </ul>
@@ -237,8 +244,16 @@ body { padding: var(--s6) var(--s5) 20vh; }
 <p>
   This server can hold an account for more than one person. Each account has its own
   database file and its own folder of audio, and nothing in the application will show one
-  account another's songs, renders, samples, lyrics, presets, albums or settings. Signing up
-  needs an invite from the owner.
+  account another's songs, renders, samples, lyrics, presets, albums or settings. An account
+  comes from one of three places: an invite from the owner, a song share link (which works
+  once, and makes an account for whoever opens it first), or being a friend of the owner on
+  Foyer, the front door of this machine. Accounts are for people 16 and over. A Foyer account
+  can be tied to an account here from Settings, so that signing in on Foyer opens it; changing
+  the password or signing out everywhere unties it.
+</p>
+<p>
+  Every account can see every other account's handle and display name (Settings, People), so
+  that you can pick who to share a song with. It sees nothing else about them.
 </p>
 <p>
   The one thing that crosses between two accounts is a song deliberately shared. Sharing
@@ -287,12 +302,24 @@ body { padding: var(--s6) var(--s5) 20vh; }
   And if you run it as a background service, whatever the server prints goes to a log file
   on that machine, which holds startup messages and faults rather than requests.
 </p>
+<p>
+  The third is a fault log. When something breaks, the server keeps in memory the last 200
+  faults: the time, the address and method that were called, the kind of error, its message
+  and its stack trace. It holds no songs and no passwords, and it is gone when the server
+  stops. Any signed in account can read it at the moment.
+</p>
 
 <h3>Cookies</h3>
 <p>
-  One, and only once you sign in: the cookie that keeps you signed in. It holds a signed
-  token and nothing else. No identifier, no profile, nothing that could follow you
+  One of its own, and only once you sign in: the cookie that keeps you signed in. It holds a
+  signed token and nothing else. No identifier, no profile, nothing that could follow you
   anywhere. There is no analytics cookie because there is no analytics.
+</p>
+<p>
+  If you are also signed in on Foyer, your browser sends Foyer's cookie here too, because
+  both live on the same address. JR!TER passes that one cookie, and nothing else, to Foyer on
+  the same machine, to ask who you are. It never leaves the machine, and the answer is
+  remembered for 30 seconds. Foyer's own page describes that cookie.
 </p>
 <p>
   That is why this page has no cookie banner. Consent under the ePrivacy rules is not
@@ -345,6 +372,14 @@ body { padding: var(--s6) var(--s5) 20vh; }
   </li>
 </ul>
 
+<h3>The timetable</h3>
+<p>
+  The owner keeps a weekly timetable here. It lives in the owner's folder, only the owner can
+  change it, and at the moment every signed in account can read it. It can name other people
+  and where they are when. If you are named in it and would rather not be, tell the owner and
+  it comes out.
+</p>
+
 <h3>Your data, as two buttons</h3>
 <p>
   A notice describing how you could in principle request your data is worth less than a
@@ -377,7 +412,8 @@ body { padding: var(--s6) var(--s5) 20vh; }
 <h3>Children</h3>
 <p>
   This is a tool for making records, not a service for the public, and it is not directed at
-  children.
+  children. Accounts are for people 16 and over, which in Hungary is the age at which you can
+  agree to this yourself (GDPR, Article 8). If you are younger, please do not make one.
 </p>
 
 <h3>If this page changes</h3>
@@ -388,7 +424,7 @@ body { padding: var(--s6) var(--s5) 20vh; }
 </p>
 
 <p class="stamp">
-  This text last changed in JR!TER 4.34.4, on 26 November 2026.
+  This text last changed in JR!TER 4.34.6, on 26 November 2026.
   <!-- The release this wording went out in, not the version running. What a page like
        this has to answer is "which text am I reading", and a number fetched from the
        server answers a different question while quietly going stale in the markup. -->

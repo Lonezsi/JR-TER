@@ -69,7 +69,7 @@
       <span class="eyebrow">A song for you</span>
       <h1>{invite.from} shared a song with you</h1>
       <p class="song">{invite.song.title}</p>
-      <p class="muted">You can listen, read the words and work on the sound. Nothing else of theirs, and anything you save becomes your own copy.</p>
+      <p class="muted">You can listen, read the words and work on it with them. Your changes go into their song itself and its edit history. Nothing else of theirs is open to you.</p>
       {#if invite.as_name}
         <p class="muted">On this song you are <b>{invite.as_name}</b>, so anything you save is named after you.</p>
       {/if}
@@ -89,6 +89,7 @@
           </label>
           <button class="btn primary lg" type="submit" disabled={working}>{working ? "Making it…" : "Make an account and take it"}</button>
           <p class="faint small">Already have one here? <a class="link" href={`/login#/join/${encodeURIComponent(token)}`}>Sign in</a> and this page will finish by itself.</p>
+          <p class="faint small">Accounts are for people 16 and over.</p>
         </form>
       {/if}
     </div>

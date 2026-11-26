@@ -289,3 +289,23 @@ def test_the_docs_say_guests_change_the_shared_song_itself():
             text = re.sub(r"\s+", " ", f.read())
         assert "becomes a copy" not in text and "becomes their own copy" not in text, rel
         assert "edit history" in text, rel
+
+def test_the_notice_and_the_doors_say_16_and_over_and_what_changed():
+    """GDPR Article 8 (Hungary: 16): every way to make an account says who it is for, and
+    the notice names how accounts come about, what is shared and what is kept."""
+    stamps = []
+    for rel in ("web/legal.html", "ui/public/legal.html"):
+        with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
+            raw = f.read()
+        text = re.sub(r"\s+", " ", raw)
+        for word in ("16 and over", "share link", "Foyer", "fault log", "timetable", "Settings", "4.34.6"):
+            assert word in text, (rel, word)
+        assert "Signing up needs an invite" not in text, rel
+        stamps.append(re.search(r'<p class="stamp">\s*(.*?)\s*<!--', raw, re.S).group(1))
+    assert stamps[0] == stamps[1], "the two notices carry different dates"
+
+    for rel in ("web/login.html", "ui/public/login.html", "ui/src/views/Join.svelte"):
+        with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
+            text = f.read()
+        assert "16 and over" in text, rel
+        assert "your own copy" not in text, rel
