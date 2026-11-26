@@ -1,5 +1,14 @@
 [
  {
+  "version": "4.34.7",
+  "date": "2026-11-26",
+  "name": "JR!TER",
+  "title": "The fonts are JR!TER's own",
+  "notes": [
+   "Orbitron and Manrope are served by JR!TER itself (both open licence), so no page asks Google for a typeface any more.",
+   "The privacy notice drops the Google Fonts entry: three things leave your machine now, all only when you ask."
+  ]
+ }, {
   "version": "4.34.6",
   "date": "2026-11-26",
   "name": "JR!TER",

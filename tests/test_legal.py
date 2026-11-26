@@ -298,7 +298,7 @@ def test_the_notice_and_the_doors_say_16_and_over_and_what_changed():
         with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
             raw = f.read()
         text = re.sub(r"\s+", " ", raw)
-        for word in ("16 and over", "share link", "Foyer", "fault log", "timetable", "Settings", "4.34.6"):
+        for word in ("16 and over", "share link", "Foyer", "fault log", "timetable", "Settings", "4.34.7"):
             assert word in text, (rel, word)
         assert "Signing up needs an invite" not in text, rel
         stamps.append(re.search(r'<p class="stamp">\s*(.*?)\s*<!--', raw, re.S).group(1))
@@ -309,3 +309,33 @@ def test_the_notice_and_the_doors_say_16_and_over_and_what_changed():
             text = f.read()
         assert "16 and over" in text, rel
         assert "your own copy" not in text, rel
+
+
+def test_no_page_asks_google_for_a_font_and_the_fonts_are_ours():
+    """The library page used to load Orbitron and Manrope from Google Fonts, which sent
+    every visitor's address to Google on load (ePrivacy, German Google Fonts rulings).
+    Both are served from JR!TER now; this keeps it that way, in the page the server
+    sends and in the source the app is built from."""
+    for base in ("web", "ui"):
+        for here, dirs, names in os.walk(os.path.join(ROOT, base)):
+            dirs[:] = [d for d in dirs if d not in ("node_modules", "assets")]
+            for n in names:
+                if not n.endswith((".html", ".css", ".svelte")):
+                    continue
+                with open(os.path.join(here, n), encoding="utf-8") as f:
+                    text = f.read()
+                if n in ("login.html", "legal.html"):
+                    continue  # they talk about it, in comments and in the notice
+                assert "fonts.googleapis.com" not in text and "fonts.gstatic.com" not in text, os.path.join(here, n)
+    for rel in ("web/legal.html", "ui/public/legal.html"):
+        with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
+            assert "fonts.googleapis.com" not in f.read(), rel
+    for folder in ("web", os.path.join("ui", "public")):
+        with open(os.path.join(ROOT, folder, "fonts", "fonts.css"), encoding="utf-8") as f:
+            files = re.findall(r"url\(/fonts/([^)]+)\)", f.read())
+        assert files, folder
+        for name in files:
+            assert os.path.isfile(os.path.join(ROOT, folder, "fonts", name)), (folder, name)
+    for rel in ("web/index.html", "web/daw.html", "ui/index.html"):
+        with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
+            assert "/fonts/fonts.css" in f.read(), rel

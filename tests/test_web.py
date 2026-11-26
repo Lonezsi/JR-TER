@@ -153,15 +153,13 @@ def test_the_page_links_what_the_server_bundles():
     with open(os.path.join(WEB, "index.html"), encoding="utf-8") as f:
         page = f.read()
     assert '"/jriter.css"' in page and '"/jriter.js"' in page
-    # The stylesheet link itself, not merely a mention. This assertion used to pass on a
-    # comment describing a typeface the page had stopped loading, which is a test that
-    # cannot fail: deleting the link entirely would not have moved it.
-    # The css2 request specifically. A preconnect hint to the same host is not a request
-    # for a typeface, and matching it made this pass while loading nothing.
-    link = re.search(r'<link[^>]+fonts\.googleapis\.com/css2\?[^>]*>', page)
-    assert link, "the typefaces are never fetched"
+    # The stylesheet link itself, not merely a mention of it in a comment, and the file it
+    # names has to declare both typefaces (served by JR!TER, not Google).
+    assert re.search(r'<link[^>]+href="/fonts/fonts\.css"[^>]*>', page), "the typefaces are never fetched"
+    with open(os.path.join(WEB, "fonts", "fonts.css"), encoding="utf-8") as f:
+        faces = f.read()
     for family in ("Orbitron", "Manrope"):
-        assert "family=" + family in link.group(0), "%s is not requested" % family
+        assert "font-family: '%s'" % family in faces, "%s is not declared" % family
 
 
 def test_the_bundles_are_not_empty():
