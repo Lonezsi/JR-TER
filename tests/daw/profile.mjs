@@ -9,7 +9,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const OURS = /^(daw-studio-|daw-e2e-)/;
+const OURS = /^(daw-studio-|daw-e2e-|daw-measure-)/;
 
 export function sweepProfiles(dir = os.tmpdir(), maxAgeMs = 6 * 3600e3) {
   let n = 0;
