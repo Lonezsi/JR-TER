@@ -23,6 +23,7 @@
   import TakesTab from "./song/TakesTab.svelte";
   import ReleaseTab from "./song/ReleaseTab.svelte";
   import AboutTab from "./song/AboutTab.svelte";
+  import PluginsTab from "./song/PluginsTab.svelte";
 
   let { params }: { params: Record<string, string> } = $props();
 
@@ -44,7 +45,7 @@
   });
 
   // ── tabs ──────────────────────────────────────────────────────────────────
-  type Tab = "words" | "arrange" | "sound" | "takes" | "release" | "about";
+  type Tab = "words" | "arrange" | "sound" | "takes" | "release" | "plugins" | "about";
   const tabs = $derived.by(() => {
     const out: { value: Tab; label: string; icon: string; badge?: number | null }[] = [];
     if (song.has("lyrics")) out.push({ value: "words", label: "Words", icon: "words" });
@@ -55,6 +56,7 @@
     if (song.has("sound")) out.push({ value: "sound", label: "Sound", icon: "eq" });
     if (song.has("versions")) out.push({ value: "takes", label: "Renders", icon: "wave", badge: song.versions.length || null });
     if (!song.guest && (song.has("youtube") || song.has("sharing"))) out.push({ value: "release", label: "Release", icon: "rocket" });
+    if (!song.guest && song.versions.some((v) => Array.isArray(v.plugins) && v.plugins.length)) out.push({ value: "plugins", label: "Plugins", icon: "eq" });
     out.push({ value: "about", label: "About", icon: "info" });
     return out;
   });
@@ -178,6 +180,7 @@
         {:else if tab === "sound"}<SoundTab />
         {:else if tab === "takes"}<TakesTab {uploader} />
         {:else if tab === "release"}<ReleaseTab {gw} />
+        {:else if tab === "plugins"}<PluginsTab />
         {:else}<AboutTab />{/if}
       </div>
     {/key}

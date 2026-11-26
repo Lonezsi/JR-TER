@@ -13,7 +13,7 @@ So VST support in JR!TER comes in steps, each useful alone.
    `VersionsController`) clean it, store it in a `plugins` column on the render, copy it onto the version
    when the render is attached, and return it as a `plugins` list in `/api/renders` and
    `/api/songs/ID/versions`. It is also in the library export. The list shows on `/plugins.html?song=ID`
-   (`web/plugins/`), reached from a Plugins tab on the song (a bundle hand patch until `ui/` lands),
+   (`web/plugins/`), reached from a Plugins tab on the song (built in `ui/src/views/song/PluginsTab.svelte`),
    with "missing here" from `installed`.
 3. **Say what is missing. Done in the CLI.** `jriter-cli plugins` looks in the usual VST2/VST3
    folders (plus `vst_folders` in client.json, or `--vst-folder DIR`) and marks each VST
