@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.34.2",
+  "date": "2026-11-26",
+  "name": "JR!TER",
+  "title": "The DAW is measured",
+  "notes": [
+    "A new test bounces real songs and analyses the audio: a 4-bar song comes out 10.00 s long (8 s plus the 2 s tail) and every bar is audible (about -28 dBFS).",
+    "Keep pitch: a 440 Hz loop stretched from 120 to 180 BPM renders at 439.8 Hz (0.04% off); with Keep pitch off it plays at 660 Hz, like tape.",
+    "A real Web Audio Module 2 plugin loads, opens its window, sounds (-6.02 dB, then -12.04 dB after its saved setting changed) and comes back as saved.",
+    "Effects reorder by their grip with a finger as well as the mouse, and two browser sessions editing one song at once end up in step in about a second."
+  ]
+ }, {
   "version": "4.34.1",
   "date": "2026-11-26",
   "name": "JR!TER",

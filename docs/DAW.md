@@ -13,7 +13,7 @@ settings (at most 64 KB). `wamhost.js` loads it (host SDK vendored in `web/daw/v
 person pressed Allow for in this browser; `mixgraph.js` passes sound straight through until it is loaded, and
 `mix.ready()` / `mix.plugins()` say how it went. The mixer card shows the address, a status, Allow and Open (the
 plugin's own window, the same kind of dialog as the sampler); Bounce waits for plugins and says if one was left out.
-Tests: `tests/daw/mixer.test.mjs`, and `e2e-studio.mjs` with `web/daw/vendor/wam/test-gain.js`. See docs/VST.md.
+Tests: `tests/daw/mixer.test.mjs`, `e2e-studio.mjs` with `web/daw/vendor/wam/test-gain.js`, and `e2e-measure.mjs` (analyses bounced audio: length, Keep pitch, a real WAM 2 plugin `test-wam2.js`, touch grip, Together with two browser contexts; prints `measured:` lines). See docs/VST.md.
 
 **Routing, MIDI, the runway (4.19.0).** Song format v10: any number of buses (2..16, `addBus`, `removeBus`),
 a send per bus on every track, and `out` on tracks and buses (`m` or `b<i>`); `cleanMixer` sends a bus that
