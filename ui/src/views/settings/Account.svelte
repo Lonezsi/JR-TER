@@ -20,7 +20,7 @@
   import Rows from "./Rows.svelte";
   import Trouble from "./Trouble.svelte";
   import SavedField from "./SavedField.svelte";
-  import { signOut, changePassword } from "./acts";
+  import { signOut, signOutEverywhere, changePassword } from "./acts";
   import type { Person, GoogleState } from "./shapes";
 
   const auth = has("auth");
@@ -31,7 +31,7 @@
 
   // Foyer, the front door of this machine and its one sign-in: whether this account opens
   // through it, and who Foyer says this browser is (auth.foyer_state on the server)
-  type FoyerState = { foyer: { handle: string; linked: boolean; can_make: boolean } | null; foyer_tied: boolean };
+  type FoyerState = { foyer: { handle: string; linked: boolean; can_make: boolean } | null; foyer_tied: boolean; foyer_tied_as: string | null };
   const foyer = auth ? resource(() => get<FoyerState>("/api/auth/state")) : null;
 
   async function foyerConnect() {
@@ -270,7 +270,7 @@
       <div class="setting">
         <div class="what">
           <div class="t">Password</div>
-          <div class="s">Changing it signs every other device out; this one stays signed in.</div>
+          <div class="s">Changing it signs every other device out and unties Foyer; this one stays signed in.</div>
         </div>
         <div class="ctl"><button class="btn sm" onclick={changePassword}><Icon name="lock" size={14} /> Change</button></div>
       </div>
@@ -281,6 +281,13 @@
         </div>
         <div class="ctl"><button class="btn sm" onclick={signOut}><Icon name="logout" size={14} /> Sign out</button></div>
       </div>
+      <div class="setting">
+        <div class="what">
+          <div class="t">Sign out everywhere</div>
+          <div class="s">Every device, this one too, and Foyer is untied.</div>
+        </div>
+        <div class="ctl"><button class="btn sm" onclick={signOutEverywhere}><Icon name="logout" size={14} /> Everywhere</button></div>
+      </div>
     </Block>
 
     <Block title="Foyer" note="Foyer is this machine's front door, and one sign-in for every site on it. Connected, signing in there opens this library on any device.">
@@ -288,8 +295,8 @@
         <div class="setting">
           <div class="what">
             {#if foyer.data.foyer_tied}
-              <div class="t">Connected</div>
-              <div class="s">Signing in on Foyer opens this library.</div>
+              <div class="t">Connected{foyer.data.foyer_tied_as ? ` as @${foyer.data.foyer_tied_as}` : ""}</div>
+              <div class="s">Signing in on Foyer opens this library. A password change or signing out everywhere ends it.</div>
             {:else if foyer.data.foyer}
               <div class="t">Signed in on Foyer as @{foyer.data.foyer.handle}</div>
               <div class="s">Not connected to this library yet.</div>

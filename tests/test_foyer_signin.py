@@ -72,7 +72,8 @@ def test_foyers_owner_opens_the_owners_library(foyer):
     assert accounts.foyer_of(accounts.OWNER) == "f-owner"
 
 
-def test_a_password_sign_in_ties_the_two_once(foyer):
+def test_a_password_sign_in_ties_nothing(foyer):
+    # CONDOM 3: a password proves the library, not whose Foyer is in this browser
     accounts.create("owner", "pw", account_id=accounts.OWNER)
     anna = accounts.create("anna", "her password")
     # the stranger is nobody, and isn't offered a library
@@ -81,10 +82,11 @@ def test_a_password_sign_in_ties_the_two_once(foyer):
     # a wrong password ties nothing
     with pytest.raises(Error):
         auth.login(Req("stra.nger.cookie", {"handle": "anna", "password": "wrong"}))
-    assert auth.account_for(headers("stra.nger.cookie")) is None
+    # and neither does the right one
     auth.login(Req("stra.nger.cookie", {"handle": "anna", "password": "her password"}))
-    assert auth.account_for(headers("stra.nger.cookie")) == anna["id"]
-    assert auth.foyer_state(Req("stra.nger.cookie"))["foyer"]["linked"] is True
+    assert accounts.foyer_of(anna["id"]) is None
+    assert auth.account_for(headers("stra.nger.cookie")) is None
+    assert auth.foyer_state(Req("stra.nger.cookie"))["foyer"]["linked"] is False
 
 
 def test_a_friend_of_the_owner_can_have_a_library_made(foyer):
@@ -122,6 +124,7 @@ def test_settings_connects_and_disconnects(foyer):
     req.headers["Cookie"] = cookie + "; foyer=stra.nger.cookie"
     assert auth.foyer_connect(req)["foyer"] == "who"
     assert auth.account_for(headers("stra.nger.cookie")) == anna["id"]
+    assert auth.state(req)["foyer_tied_as"] == "who"
     auth.foyer_disconnect(req)
     assert auth.account_for(headers("stra.nger.cookie")) is None
     # signed in here but not on Foyer: nothing to connect to
@@ -130,3 +133,42 @@ def test_settings_connects_and_disconnects(foyer):
     with pytest.raises(Error) as e:
         auth.foyer_connect(alone)
     assert e.value.status == 409
+
+
+def _tied_anna():
+    accounts.create("owner", "pw", account_id=accounts.OWNER)
+    anna = accounts.create("anna", "her password")
+    req = Req("stra.nger.cookie")
+    req.headers["Cookie"] = "jriter_session=" + auth.issue(anna["id"]) + "; foyer=stra.nger.cookie"
+    auth.foyer_connect(req)
+    return anna, req
+
+
+def test_changing_the_password_unties_foyer(foyer):
+    anna, req = _tied_anna()
+    assert accounts.foyer_of(anna["id"]) is not None
+    req.payload = {"current": "her password", "new": "another one"}
+    assert b"foyer_untied" in auth.change(req).body
+    assert accounts.foyer_of(anna["id"]) is None
+    assert auth.account_for(headers("stra.nger.cookie")) is None
+    assert auth.state(req)["foyer_tied_as"] is None
+
+
+def test_sign_out_everywhere_unties_foyer_and_ends_the_session(foyer):
+    anna, req = _tied_anna()
+    session = auth.issue(anna["id"])
+    res = auth.everywhere(req)
+    assert "Max-Age=0" in res.headers["Set-Cookie"]
+    assert accounts.foyer_of(anna["id"]) is None
+    assert auth.whose(session) is None
+    nobody = Req()
+    with pytest.raises(Error) as e:
+        auth.everywhere(nobody)
+    assert e.value.status == 401
+
+
+def test_a_tie_from_before_handles_were_kept_reports_empty(foyer):
+    accounts.create("owner", "pw", account_id=accounts.OWNER)
+    anna = accounts.create("anna", "her password")
+    accounts.link_foyer("f-who", anna["id"])
+    assert accounts.foyer_handle_of(anna["id"]) == ""

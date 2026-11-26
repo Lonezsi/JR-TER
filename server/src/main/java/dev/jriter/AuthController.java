@@ -86,6 +86,12 @@ public class AuthController {
         out.put("custom_font", false);
         out.put("foyer", foyerState(req).get("foyer"));
         out.put("foyer_tied", here != null && accounts.foyerOf(here) != null);
+        if (here != null && accounts.foyerOf(here) != null) {
+            Map<String, Object> f = auth.foyer(req.getHeader("Cookie"));
+            if (f != null && accounts.foyerOf(here).equals(f.get("id")))
+                accounts.foyerSeenAs((String) f.get("id"), (String) f.get("handle"));
+        }
+        out.put("foyer_tied_as", here == null ? null : accounts.foyerHandleOf(here));
         return out;
     }
 
@@ -166,7 +172,7 @@ public class AuthController {
         Map<String, Object> made = accounts.create(accounts.freeHandle((String) f.get("handle")),
                 java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(Accounts.randomBytes(24)),
                 f.get("name") == null ? "" : String.valueOf(f.get("name")).strip(), null);
-        accounts.linkFoyer((String) f.get("id"), Accounts.num(made.get("id")));
+        accounts.linkFoyer((String) f.get("id"), (String) f.get("handle"), Accounts.num(made.get("id")));
         return json(Map.of("ok", true, "handle", made.get("handle")));
     }
 
@@ -186,8 +192,8 @@ public class AuthController {
         auth.clear(ip);
         long id = Accounts.num(account.get("id"));
         accounts.seen(id);
-        Map<String, Object> f = auth.foyer(req.getHeader("Cookie"));
-        if (f != null) accounts.linkFoyer((String) f.get("id"), id);
+        // A password proves this library, not whose Foyer is in this browser. Tying is
+        // Settings > Connect to Foyer only (CONDOM 3).
         return json(Map.of("ok", true), cookie(req, auth.issue(id), Auth.SESSION_DAYS));
     }
 
@@ -205,11 +211,20 @@ public class AuthController {
             throw new ApiError("That is not the current password.", 401);
         }
         accounts.setPassword(here, Body.str(data, "new"));
+        boolean wasTied = accounts.foyerOf(here) != null;
         accounts.signOutEverywhere(here);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
+        if (wasTied) body.put("foyer_untied", true);
         body.put("signed_out", true);
         return json(body, cookie(req, auth.issue(here), Auth.SESSION_DAYS));
+    }
+
+    /** Every device signed out, this one too, and the Foyer tie dropped. */
+    @PostMapping("/api/auth/everywhere")
+    public ResponseEntity<Object> everywhere(HttpServletRequest req) {
+        accounts.signOutEverywhere(here(req));
+        return json(Map.of("ok", true), Auth.COOKIE + "=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
     }
 
     // -- invites -------------------------------------------------------------------
@@ -298,7 +313,7 @@ public class AuthController {
         long here = here(req);
         Map<String, Object> f = auth.foyer(req.getHeader("Cookie"));
         if (f == null) throw new ApiError("Sign in on Foyer first, then press this again.", 409);
-        accounts.linkFoyer((String) f.get("id"), here);
+        accounts.linkFoyer((String) f.get("id"), (String) f.get("handle"), here);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", true);
         out.put("foyer", f.get("handle"));

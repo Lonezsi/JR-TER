@@ -2,7 +2,7 @@
  * screen and a line in the command palette. One definition each. */
 import { api, post, attempt } from "$lib/api";
 import { plural } from "$lib/util";
-import { sheet } from "$lib/dialog.svelte";
+import { sheet, confirm } from "$lib/dialog.svelte";
 import { toast } from "$lib/toast.svelte";
 
 export async function signOut() {
@@ -11,11 +11,21 @@ export async function signOut() {
   location.href = "/login";
 }
 
+/** Every device signed out, this one too, and the Foyer tie dropped. */
+export async function signOutEverywhere() {
+  const sure = await confirm("Sign out everywhere?",
+    "Every device is signed out, this one too, and Foyer stops opening this library until you connect it again.",
+    "Sign out everywhere", "Keep me in");
+  if (!sure) return;
+  await post("/api/auth/everywhere").catch(() => null);
+  location.href = "/login";
+}
+
 export async function changePassword() {
   const said = await sheet<{ current: string; next: string }>({
     title: "Change password",
-    sub: "Anything you like. Every signed in device is signed out when it changes; "
-       + "this one stays in.",
+    sub: "Anything you like. Every signed in device is signed out when it changes, and "
+       + "Foyer is untied; this one stays in.",
     confirm: "Change it",
     fields: [
       { name: "current", label: "Current password", type: "password", required: true,
@@ -28,7 +38,7 @@ export async function changePassword() {
   });
   if (!said) return;
   const done = await attempt(() => post("/api/auth/password", { current: said.current, new: said.next }));
-  if (done) toast("Password changed. Other devices will have to sign in again.");
+  if (done) toast("Password changed. Other devices will have to sign in again, and Foyer is untied.");
 }
 
 /* A tab rather than fetch and a blob URL. The zip is built on a temporary file on the

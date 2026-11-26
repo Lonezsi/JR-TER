@@ -114,7 +114,8 @@ SCHEMA = [
     CREATE TABLE IF NOT EXISTS foyer_links (
       foyer_id   TEXT PRIMARY KEY,
       account_id INTEGER NOT NULL UNIQUE,
-      linked_at  REAL NOT NULL
+      linked_at  REAL NOT NULL,
+      handle     TEXT NOT NULL DEFAULT ''
     )
     """,
 ]
@@ -158,6 +159,9 @@ def _migrate(conn):
     have = {row["name"] for row in conn.execute("PRAGMA table_info(shares)")}
     if "token_digest" not in have:
         conn.execute("ALTER TABLE shares ADD COLUMN token_digest TEXT NOT NULL DEFAULT ''")
+    have = {row["name"] for row in conn.execute("PRAGMA table_info(foyer_links)")}
+    if "handle" not in have:
+        conn.execute("ALTER TABLE foyer_links ADD COLUMN handle TEXT NOT NULL DEFAULT ''")
 
 
 def close():
@@ -227,6 +231,8 @@ def sign_out_everywhere(account_id):
     """
     _run("UPDATE accounts SET secret = ? WHERE id = ?",
          (secrets.token_hex(32), account_id))
+    # A Foyer tie is a way in too: ending every session ends it (CONDOM 3).
+    unlink_foyer(account_id)
 
 
 def secret_of(account_id):
@@ -540,11 +546,24 @@ def foyer_of(account_id):
     return row["foyer_id"] if row else None
 
 
-def link_foyer(foyer_id, account_id):
-    """Ties them, and unties whatever either one was tied to before."""
+def link_foyer(foyer_id, account_id, handle=""):
+    """Ties them, and unties whatever either one was tied to before. The handle is only
+    kept so Settings can say who is tied."""
     _run("DELETE FROM foyer_links WHERE foyer_id = ? OR account_id = ?", (foyer_id, account_id))
-    _run("INSERT INTO foyer_links (foyer_id, account_id, linked_at) VALUES (?, ?, ?)",
-         (foyer_id, account_id, time.time()))
+    _run("INSERT INTO foyer_links (foyer_id, account_id, linked_at, handle) VALUES (?, ?, ?, ?)",
+         (foyer_id, account_id, time.time(), handle or ""))
+
+
+def foyer_handle_of(account_id):
+    """The Foyer handle tied to this account ("" if tied before handles were kept), or None."""
+    row = _one("SELECT handle FROM foyer_links WHERE account_id = ?", (account_id,))
+    return row["handle"] if row else None
+
+
+def foyer_seen_as(foyer_id, handle):
+    if handle:
+        _run("UPDATE foyer_links SET handle = ? WHERE foyer_id = ? AND handle <> ?",
+             (handle, foyer_id, handle))
 
 
 def unlink_foyer(account_id):

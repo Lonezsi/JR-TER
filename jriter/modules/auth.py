@@ -509,13 +509,13 @@ def foyer_library(f):
     named = foyer_owner_handle()
     if named and (f.get("handle") or "").lstrip("@").lower() == named and accounts.by_id(accounts.OWNER):
         if accounts.foyer_of(accounts.OWNER) != f["id"]:
-            accounts.link_foyer(f["id"], accounts.OWNER)
+            accounts.link_foyer(f["id"], accounts.OWNER, f.get("handle"))
         return accounts.OWNER
     here = accounts.foyer_account(f["id"])
     if here and accounts.by_id(here):
         return here
     if f.get("owner") and accounts.by_id(accounts.OWNER) and not accounts.foyer_of(accounts.OWNER):
-        accounts.link_foyer(f["id"], accounts.OWNER)
+        accounts.link_foyer(f["id"], accounts.OWNER, f.get("handle"))
         return accounts.OWNER
     return None
 
@@ -541,7 +541,7 @@ def foyer_connect(req):
     f = foyer(req.headers)
     if not f:
         raise Error("Sign in on Foyer first, then press this again.", 409)
-    accounts.link_foyer(f["id"], here)
+    accounts.link_foyer(f["id"], here, f.get("handle"))
     return {"ok": True, "foyer": f.get("handle")}
 
 
@@ -593,7 +593,7 @@ def foyer_login(req):
     if not here and f.get("ownerFriend") and accounts.count():
         made = accounts.create(accounts.free_handle(f.get("handle")), secrets.token_urlsafe(24),
                                name=(f.get("name") or "").strip())
-        accounts.link_foyer(f["id"], made["id"])
+        accounts.link_foyer(f["id"], made["id"], f.get("handle"))
         here = made["id"]
     if not here:
         raise Error("That Foyer account doesn't open a library here. Ask whoever runs this one "
@@ -619,7 +619,7 @@ def foyer_new(req):
         raise Error("This library has no owner yet.", 409)
     made = accounts.create(accounts.free_handle(f.get("handle")), secrets.token_urlsafe(24),
                            name=(f.get("name") or "").strip())
-    accounts.link_foyer(f["id"], made["id"])
+    accounts.link_foyer(f["id"], made["id"], f.get("handle"))
     return {"ok": True, "handle": made["handle"]}
 
 
@@ -730,7 +730,14 @@ def state(req):
         "foyer": foyer_state(req)["foyer"],
         # whether the account signed in here opens through Foyer at all (settings asks)
         "foyer_tied": bool(here and accounts.foyer_of(here)),
+        # which Foyer handle it is tied to ("" if tied before handles were kept)
+        "foyer_tied_as": accounts.foyer_handle_of(here) if here else None,
     }
+    if here and accounts.foyer_of(here):
+        f = foyer(req.headers)
+        if f and f.get("id") == accounts.foyer_of(here):
+            accounts.foyer_seen_as(f["id"], f.get("handle"))
+            answer["foyer_tied_as"] = accounts.foyer_handle_of(here)
     # The door wears the same face as the library, and this is the only call it is
     # allowed to make before signing in. Asking the font endpoint directly meant a 404
     # in the console every time nobody had uploaded one.
@@ -850,17 +857,25 @@ def login(req):
 
     _clear(ip)
     accounts.seen(account["id"])
-    # Signed in on Foyer as well: the password just proved this library is theirs, so from
-    # now on the front door opens it.
-    f = foyer(req.headers)
-    if f:
-        accounts.link_foyer(f["id"], account["id"])
+    # A password proves this library, not whose Foyer is in this browser, so it ties
+    # nothing. Tying is Settings > Connect to Foyer only (CONDOM 3).
     return Response(status=200, body=b'{"ok":true}', content_type="application/json",
                     headers={"Set-Cookie": _cookie_header(req, issue(account["id"]),
                                                           SESSION_DAYS)})
 
 
 def logout(req):
+    return Response(status=200, body=b'{"ok":true}', content_type="application/json",
+                    headers={"Set-Cookie": "%s=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                                           % COOKIE})
+
+
+def everywhere(req):
+    """Every device signed out, this one too, and the Foyer tie dropped."""
+    here = account_for(req.headers)
+    if not here:
+        raise Error("Sign in first.", 401)
+    accounts.sign_out_everywhere(here)
     return Response(status=200, body=b'{"ok":true}', content_type="application/json",
                     headers={"Set-Cookie": "%s=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
                                            % COOKIE})
@@ -876,10 +891,13 @@ def change(req):
         _note_failure(_who(req))
         raise Error("That is not the current password.", 401)
     accounts.set_password(here, data.get("new") or "")
+    was_tied = accounts.foyer_of(here) is not None
     # Theirs alone. This used to rotate the server secret, which signed out every person
     # on the machine because one of them changed their password.
     accounts.sign_out_everywhere(here)
-    return Response(status=200, body=b'{"ok":true,"signed_out":true}',
+    return Response(status=200,
+                    body=b'{"ok":true,"signed_out":true,"foyer_untied":true}' if was_tied
+                    else b'{"ok":true,"signed_out":true}',
                     content_type="application/json",
                     headers={"Set-Cookie": _cookie_header(req, issue(here), SESSION_DAYS)})
 
@@ -998,6 +1016,7 @@ def ROUTES():
         ("POST", "/api/auth/tokens"): create_token,
         ("DELETE", "/api/auth/tokens/<id>"): revoke_token,
         ("POST", "/api/auth/logout"): logout,
+        ("POST", "/api/auth/everywhere"): everywhere,
         ("POST", "/api/auth/password"): change,
         ("POST", "/api/auth/foyer/connect"): foyer_connect,
         ("POST", "/api/auth/foyer/disconnect"): foyer_disconnect,

@@ -197,7 +197,9 @@ albums and in playlists), or let it go. Its audio stays until it leaves the grav
 **Accounts.** Without one, JR!TER is a guest library kept in your browser, everything
 included. On a machine that also runs Foyer, a Foyer handle and password work on the sign
 in page, and `data/foyer-owner.txt` (one line, a Foyer handle) names which Foyer account
-is the owner.
+is the owner. A password sign-in never ties a Foyer account; only Settings, Connect to
+Foyer does (it shows the tied handle), and a password change or "Sign out everywhere"
+unties it.
 
 **Light and dark.** Settings, Appearance, Theme: the glass at night, a soft neumorphic
 look by day.
