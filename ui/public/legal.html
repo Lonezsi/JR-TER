@@ -226,6 +226,10 @@ body { padding: var(--s6) var(--s5) 20vh; }
     For each song shared with somebody: which song, which two accounts, and the name the
     recipient was given on it.
   </li>
+  <li>
+    For each change a guest made to a shared song: which share it came through, when, and
+    what the song looked like before it, so it can be undone.
+  </li>
   <li>Your settings, including any typeface you uploaded.</li>
 </ul>
 
@@ -238,12 +242,15 @@ body { padding: var(--s6) var(--s5) 20vh; }
 </p>
 <p>
   The one thing that crosses between two accounts is a song deliberately shared. Sharing
-  gives the other person that one song: they can play its current render, read its words,
-  and work on its equaliser and limiter. Anything they save becomes a copy in their own
-  library rather than a change to yours. It gives them nothing else: not your other songs,
-  not your samples, not your renders list, not your account, and nothing that posts
-  anywhere. The person who shared it can take it back at any time, and what the recipient
-  made stays in their own library because it was always theirs.
+  gives the other person that one song: they can play it, read its words, and change it:
+  its title, pictures, words, sound, DAW project, arrangement, mixes and vocal takes. These
+  are changes to your song itself, not to a copy. Each one is written into the song's edit
+  history with the name they were given and what the song looked like before, so you can
+  see it and undo it. It gives them nothing else: not your other songs, not your samples,
+  not your renders list, not your account, and nothing that posts anywhere. The person who
+  shared it can take it back at any time; what the recipient changed stays in the song's
+  history until it is undone, and anything they saved as their own copy stays in their
+  library.
 </p>
 <p>
   <strong>What the separation is, and what it is not.</strong> It is a wall inside the
@@ -381,7 +388,7 @@ body { padding: var(--s6) var(--s5) 20vh; }
 </p>
 
 <p class="stamp">
-  This text last changed in JR!TER 2.4.1, on 7 September 2026.
+  This text last changed in JR!TER 4.34.4, on 26 November 2026.
   <!-- The release this wording went out in, not the version running. What a page like
        this has to answer is "which text am I reading", and a number fetched from the
        server answers a different question while quietly going stale in the markup. -->

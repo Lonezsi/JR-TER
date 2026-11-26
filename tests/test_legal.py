@@ -280,3 +280,12 @@ def test_no_stylesheet_reaches_for_a_token_that_does_not_exist():
     assert not missing, (
         "these custom properties are used but never defined, so every rule that reaches "
         "for one silently keeps whatever it inherited: %s" % missing)
+
+
+def test_the_docs_say_guests_change_the_shared_song_itself():
+    """Guests work on the owner's song, recorded in its edit history; they don't get a copy."""
+    for rel in ("README.md", os.path.join("web", "legal.html"), os.path.join("ui", "public", "legal.html")):
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+            text = re.sub(r"\s+", " ", f.read())
+        assert "becomes a copy" not in text and "becomes their own copy" not in text, rel
+        assert "edit history" in text, rel
