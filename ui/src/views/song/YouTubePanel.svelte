@@ -21,6 +21,7 @@
   const posts = resource<{ posts: Post[] }>(() => get(`/api/songs/${song.id}/youtube`), { on: ["youtube:changed"] });
   const list = $derived((posts.data?.posts || []).filter((x) => !hidden(`post:${x.id}`)));
 
+  const safe = (url: string) => /^https:\/\/[^\s/]/i.test(url || "");
   const idOf = (url: string) => url.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([A-Za-z0-9_-]{6,})/)?.[1] || null;
 
   async function record() {
@@ -63,7 +64,7 @@
 
   const items = (p: Post): MenuItem[] => [
     { label: "Copy the link", icon: "copy", run: () => copyText(p.url, "Link copied") },
-    { label: "Watch on YouTube", icon: "external", run: () => window.open(p.url, "_blank", "noopener") },
+    { label: "Watch on YouTube", icon: "external", disabled: !safe(p.url), run: () => { if (safe(p.url)) window.open(p.url, "_blank", "noopener"); } },
     { label: "Change which render it was", icon: "edit", run: () => moveTo(p) },
     { divider: true },
     { label: "Forget this link", icon: "trash", danger: true, run: () => forget(p) },
@@ -90,7 +91,7 @@
           <span class="grow truncate"><span class="t">{p.title || song.song?.title}</span><br />
             <span class="s">{p.version_n ? `v${p.version_n}` : "render unknown"} · {p.status}{p.created_at ? ` · ${when(p.created_at)}` : ""}</span></span>
           <button class="btn sm ghost" onclick={() => copyText(p.url, "Link copied")}>Copy link</button>
-          <a class="btn sm ghost" href={p.url} target="_blank" rel="noopener noreferrer">Watch</a>
+          {#if safe(p.url)}<a class="btn sm ghost" href={p.url} target="_blank" rel="noopener noreferrer">Watch</a>{/if}
           <button class="icon-btn sm" aria-label="More" onclick={(e) => showMenu(items(p), { anchor: e.currentTarget })}><Icon name="more" size={18} /></button>
         </div>
       {/each}

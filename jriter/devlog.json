@@ -1,5 +1,13 @@
 [
  {
+  "version": "4.34.5",
+  "date": "2026-11-26",
+  "name": "JR!TER",
+  "title": "YouTube links have to be https",
+  "notes": [
+   "A YouTube link saved on a post has to start with https://. The Watch button ignores any older link that doesn't."
+  ]
+ }, {
   "version": "4.34.4",
   "date": "2026-11-26",
   "name": "JR!TER",

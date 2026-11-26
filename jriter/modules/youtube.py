@@ -139,7 +139,7 @@ def _add_post(song_id, **fields):
     now = time.time()
     post_id = db.insert("youtube_posts", {
         "song_id": song_id, "version_id": fields.get("version_id"),
-        "url": (fields.get("url") or "").strip(),
+        "url": _post_url(fields.get("url")),
         "title": (fields.get("title") or "").strip(),
         "status": status, "note": fields.get("note", ""),
         "video_id": fields.get("video_id", ""),
@@ -147,6 +147,16 @@ def _add_post(song_id, **fields):
         "created_at": now, "updated_at": now})
     songs.touch(song_id)
     return get(post_id)
+
+
+def _post_url(value):
+    """A post's link: empty, or https:// with a host. javascript: and http: are refused."""
+    s = (value or "").strip()
+    if not s:
+        return ""
+    if not s.lower().startswith("https://") or not urllib.parse.urlsplit(s).netloc:
+        raise Error("A link has to start with https://")
+    return s
 
 
 def create_post(req):
@@ -161,7 +171,7 @@ def update_post(req):
     patch = {}
     for field in ("url", "title", "note"):
         if field in data:
-            patch[field] = (data[field] or "").strip()
+            patch[field] = _post_url(data[field]) if field == "url" else (data[field] or "").strip()
     if "version_id" in data:
         patch["version_id"] = data["version_id"]
     if "status" in data:

@@ -77,7 +77,8 @@ public class YouTubeController {
         for (String f : List.of("url", "title", "note"))
             if (data.containsKey(f)) {
                 Object v = data.get(f);
-                patch.put(f, v == null || Boolean.FALSE.equals(v) || "".equals(v) ? "" : String.valueOf(v).strip());
+                if (f.equals("url")) patch.put(f, YouTube.postUrl(v));
+                else patch.put(f, v == null || Boolean.FALSE.equals(v) || "".equals(v) ? "" : String.valueOf(v).strip());
             }
         if (data.containsKey("version_id")) patch.put("version_id", data.get("version_id"));
         if (data.containsKey("status")) {
