@@ -92,6 +92,17 @@ public class YouTube {
         return row;
     }
 
+    /** A post's link: empty, or https:// with a host. Anything else (javascript:, http:) is refused. */
+    static String postUrl(Object v) {
+        String s = stripped(v);
+        if (s.isEmpty()) return "";
+        String host = null;
+        try { host = URI.create(s).getHost(); } catch (IllegalArgumentException e) { /* refused below */ }
+        if (!s.toLowerCase(Locale.ROOT).startsWith("https://") || host == null || host.isBlank())
+            throw new ApiError("A link has to start with https://");
+        return s;
+    }
+
     private static String stripped(Object v) {
         return v == null || Boolean.FALSE.equals(v) ? "" : String.valueOf(v).strip();
     }
@@ -104,7 +115,7 @@ public class YouTube {
         Map<String, Object> v = new LinkedHashMap<>();
         v.put("song_id", songId);
         v.put("version_id", f.get("version_id"));
-        v.put("url", stripped(f.get("url")));
+        v.put("url", postUrl(f.get("url")));
         v.put("title", stripped(f.get("title")));
         v.put("status", s);
         v.put("note", f.containsKey("note") ? f.get("note") : "");
