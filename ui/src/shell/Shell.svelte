@@ -178,6 +178,7 @@
       { label: "New song", icon: "songs", hint: "N", run: newSong },
       has("albums") ? { label: "New album", icon: "album", run: newAlbum } : null,
       has("playlists") ? { label: "New playlist", icon: "playlist", run: newPlaylist } : null,
+      { label: "Open the DAW", icon: "wave", run: () => location.assign("/daw.html") },
       has("renders") ? { divider: true } : null,
       has("renders") ? { label: "Upload renders…", icon: "upload", run: () => go(href.inbox() + "?upload=1") } : null,
     ], { anchor: e.currentTarget as Element });
@@ -200,6 +201,7 @@
       { id: "new.song", group: "Create", title: "New song", icon: "plus", hint: "N", run: newSong },
       has("albums") ? { id: "new.album", group: "Create", title: "New album", icon: "plus", run: newAlbum } : null,
       has("playlists") ? { id: "new.playlist", group: "Create", title: "New playlist", icon: "plus", run: newPlaylist } : null,
+      { id: "new.daw", group: "Create", title: "Open the DAW", icon: "wave", keywords: "midi bounce sequencer", run: () => location.assign("/daw.html") },
       has("renders") ? { id: "new.upload", group: "Create", title: "Upload renders", icon: "upload", keywords: "bounce audio file add", run: () => go(href.inbox() + "?upload=1") } : null,
 
       player.song ? { id: "p.toggle", group: "Player", title: player.playing ? "Pause" : "Play", icon: player.playing ? "pause" : "play", hint: "Space", run: toggle } : null,

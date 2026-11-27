@@ -45,7 +45,7 @@
   });
 
   // ── tabs ──────────────────────────────────────────────────────────────────
-  type Tab = "words" | "arrange" | "sound" | "takes" | "release" | "plugins" | "about";
+  type Tab = "words" | "arrange" | "sound" | "takes" | "release" | "daw" | "plugins" | "about";
   const tabs = $derived.by(() => {
     const out: { value: Tab; label: string; icon: string; badge?: number | null }[] = [];
     if (song.has("lyrics")) out.push({ value: "words", label: "Words", icon: "words" });
@@ -56,12 +56,13 @@
     if (song.has("sound")) out.push({ value: "sound", label: "Sound", icon: "eq" });
     if (song.has("versions")) out.push({ value: "takes", label: "Renders", icon: "wave", badge: song.versions.length || null });
     if (!song.guest && (song.has("youtube") || song.has("sharing"))) out.push({ value: "release", label: "Release", icon: "rocket" });
+    if (!song.guest) out.push({ value: "daw", label: "DAW", icon: "wave" });
     if (!song.guest && song.versions.some((v) => Array.isArray(v.plugins) && v.plugins.length)) out.push({ value: "plugins", label: "Plugins", icon: "eq" });
     out.push({ value: "about", label: "About", icon: "info" });
     return out;
   });
   let local = $state<Tab | "">("");        // a guest's address has no room for a tab
-  const tab = $derived<Tab>((tabs.find((t) => t.value === (song.guest ? local : params.tab))?.value ?? tabs[0].value));
+  const tab = $derived<Tab>((tabs.find((t) => t.value !== "daw" && t.value === (song.guest ? local : params.tab))?.value ?? tabs[0].value));
   let tabbar = $state<HTMLElement>();
   // How far down the pinned tabs reach: what sticks inside a tab (the Words tools) sits under them.
   let tabsH = $state(40);
@@ -77,6 +78,8 @@
     return () => port.removeEventListener("scroll", check);
   });
   function choose(next: Tab) {
+    // The DAW is its own page, not a tab on this one.
+    if (next === "daw") { location.assign(`/daw.html?song=${encodeURIComponent(String(song.id))}`); return; }
     if (song.guest) local = next; else replace(href.song(song.id, next));
     // On a phone the top of the song fills the screen: bring the tabs up so the tab you
     // picked is what you see, instead of a heading peeking above the dock.
@@ -97,6 +100,10 @@
   useCommands(() => !song.song ? [] : [
     { id: "song.play", group: "This song", title: song.playing ? "Pause" : "Play", sub: song.song.title, icon: song.playing ? "pause" : "play", hint: "Space", run: () => song.play() },
     ...(song.has("versions") && !song.guest ? [{ id: "song.addrender", group: "This song", title: "Add a render to this song", icon: "upload", run: () => uploader.pick() }] : []),
+    ...(song.guest ? [] : [
+      ...(tabs.some((t) => t.value === "plugins") ? [{ id: "song.plugins", group: "This song", title: "Plugins this song used", icon: "eq", keywords: "vst plugins fl missing", run: () => choose("plugins") }] : []),
+      { id: "song.daw", group: "This song", title: "Open in the DAW", icon: "wave", keywords: "daw midi bounce", run: () => choose("daw") },
+    ]),
     ...(song.guest ? [] : [{ id: "song.rename", group: "This song", title: "Rename this song", icon: "edit", hint: "F2", run: () => hero?.startRename() }]),
     ...(song.has("sharing") ? [{ id: "song.share", group: "This song", title: "Share this song", icon: "share", run: () => shareSong(song) }] : []),
     { id: "song.download", group: "This song", title: "Download the current version", icon: "download", run: () => act.downloadVersion(song, song.current) },

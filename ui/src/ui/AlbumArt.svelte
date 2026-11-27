@@ -80,6 +80,7 @@
 
   /* The lid: the cover, swinging on the left edge. */
   .lid { position: absolute; inset: 0; z-index: 1; transform-origin: 0% 50%; transform-style: preserve-3d;
+         overflow: hidden; /* stickers are cut off at the edge of the case */
          transition: transform 560ms var(--spring); container-type: inline-size; border-radius: var(--case-r); }
   .face { position: absolute; inset: 0; display: block; border-radius: var(--case-r); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); }
   .face :global(.cover) { width: 100% !important; height: 100% !important; }

@@ -176,12 +176,15 @@
   const remove = () => album && deleteAlbum(album, () => go(href.library("albums")));
   const rename = () => { titleBox?.focus(); titleBox?.select(); };
 
+  const release = () => location.assign(`/release.html?album=${encodeURIComponent(String(id))}`);
+
   function more(e: MouseEvent) {
     showMenu([
       { label: "Rename", icon: "edit", run: rename },
       { label: "Replace the cover", icon: "image", run: () => picker?.click() },
       { label: "Add songs…", icon: "plus", run: addSongs },
       { label: "Shuffle", icon: "shuffle", disabled: !songs.length, run: shuffle },
+      { label: "Release to RouteNote…", icon: "rocket", run: release },
       { divider: true },
       { label: "Delete the album…", icon: "trash", danger: true, run: remove },
     ], { anchor: e.currentTarget as Element });
@@ -193,6 +196,7 @@
     { id: "album.add", group: "This album", title: "Add songs to this album", icon: "plus", run: addSongs },
     { id: "album.cover", group: "This album", title: "Replace the cover", icon: "image", run: () => picker?.click() },
     { id: "album.rename", group: "This album", title: "Rename this album", icon: "edit", run: rename },
+    { id: "album.release", group: "This album", title: "Release this album to RouteNote", icon: "rocket", run: release },
     { id: "album.delete", group: "This album", title: "Delete this album", icon: "trash", run: remove },
   ] : []);
 </script>
@@ -250,6 +254,7 @@
           <button class="btn" disabled={!songs.length} onclick={shuffle}><Icon name="shuffle" size={16} /> Shuffle</button>
           <button class="btn ghost" onclick={addSongs}><Icon name="plus" size={16} /> Add songs</button>
           <button class="icon-btn" aria-label="More" title="More" onclick={more}><Icon name="more" size={20} /></button>
+          <button class="btn ghost" onclick={release}><Icon name="rocket" size={16} /> Release</button>
         </div>
       </div>
     </div>

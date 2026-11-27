@@ -198,11 +198,13 @@
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="layer" bind:this={layer} style:width="{SIZE}px" style:height="{SIZE}px"
         onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up} onwheel={wheel}>
+        <div class="cut">
         {#each list as s, i (s.id)}
           <Sticker {s} live selected={i === sel} index={i} label={nameOf(s.kind)}
             onkeydown={(e: KeyboardEvent) => key(e, i)} onfocus={() => (sel = i)}
             ondblclick={() => hasText(s.kind) && textInput?.focus()} />
         {/each}
+        </div>
         {#if picked && sizes[sel!] && !dragging}
           {@const z = sizes[sel!]}
           <span class="frame" aria-hidden="true"
@@ -263,6 +265,9 @@
   .case { position: relative; display: inline-block; }
   .layer { position: absolute; top: 0; left: 0; z-index: 2; container-type: inline-size; touch-action: none; user-select: none; -webkit-user-select: none; }
   .dragging .layer { cursor: grabbing; }
+  /* Stickers are cut off at the edge of the case, except while one is being dragged. */
+  .cut { position: absolute; inset: 0; border-radius: var(--case-r); clip-path: inset(0 round var(--case-r)); }
+  .dragging .cut { clip-path: none; }
 
   /* The picked sticker's frame and its resize-and-turn handle. */
   .frame { position: absolute; z-index: 3; pointer-events: none; border: 1.5px solid #fff; border-radius: 4px;

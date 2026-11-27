@@ -42,6 +42,7 @@
       edit ? { label: isCurrent(v) ? "Current" : "Make current", icon: "star", disabled: isCurrent(v), run: () => act.makeCurrent(song, v) } : null,
       edit ? { label: "Rename the label", icon: "edit", run: () => act.renameLabel(song, v) } : null,
       { label: "Download", icon: "download", run: () => act.downloadVersion(song, v) },
+      v.has_daw ? { label: "Open in the DAW", icon: "wave", run: () => location.assign(`/daw.html?song=${encodeURIComponent(String(song.id))}&version=${encodeURIComponent(String(v.id))}`) } : null,
       online.has(v.id as number) ? { label: "On YouTube", icon: "youtube", run: () => replace(href.song(song.id, "release")) } : null,
       edit ? { divider: true } : null,
       edit ? { label: "Delete", icon: "trash", danger: true, run: () => act.deleteVersion(song, v) } : null,
