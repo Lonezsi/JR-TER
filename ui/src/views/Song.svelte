@@ -24,6 +24,7 @@
   import ReleaseTab from "./song/ReleaseTab.svelte";
   import AboutTab from "./song/AboutTab.svelte";
   import PluginsTab from "./song/PluginsTab.svelte";
+  import DawTab from "./song/DawTab.svelte";
 
   let { params }: { params: Record<string, string> } = $props();
 
@@ -62,7 +63,7 @@
     return out;
   });
   let local = $state<Tab | "">("");        // a guest's address has no room for a tab
-  const tab = $derived<Tab>((tabs.find((t) => t.value !== "daw" && t.value === (song.guest ? local : params.tab))?.value ?? tabs[0].value));
+  const tab = $derived<Tab>((tabs.find((t) => t.value === (song.guest ? local : params.tab))?.value ?? tabs[0].value));
   let tabbar = $state<HTMLElement>();
   // How far down the pinned tabs reach: what sticks inside a tab (the Words tools) sits under them.
   let tabsH = $state(40);
@@ -78,8 +79,6 @@
     return () => port.removeEventListener("scroll", check);
   });
   function choose(next: Tab) {
-    // The DAW is its own page, not a tab on this one.
-    if (next === "daw") { location.assign(`/daw.html?song=${encodeURIComponent(String(song.id))}`); return; }
     if (song.guest) local = next; else replace(href.song(song.id, next));
     // On a phone the top of the song fills the screen: bring the tabs up so the tab you
     // picked is what you see, instead of a heading peeking above the dock.
@@ -102,7 +101,7 @@
     ...(song.has("versions") && !song.guest ? [{ id: "song.addrender", group: "This song", title: "Add a render to this song", icon: "upload", run: () => uploader.pick() }] : []),
     ...(song.guest ? [] : [
       ...(tabs.some((t) => t.value === "plugins") ? [{ id: "song.plugins", group: "This song", title: "Plugins this song used", icon: "eq", keywords: "vst plugins fl missing", run: () => choose("plugins") }] : []),
-      { id: "song.daw", group: "This song", title: "Open in the DAW", icon: "wave", keywords: "daw midi bounce", run: () => choose("daw") },
+      { id: "song.daw", group: "This song", title: "Open in the DAW", icon: "wave", keywords: "daw midi bounce", run: () => location.assign(`/daw.html?song=${encodeURIComponent(String(song.id))}`) },
     ]),
     ...(song.guest ? [] : [{ id: "song.rename", group: "This song", title: "Rename this song", icon: "edit", hint: "F2", run: () => hero?.startRename() }]),
     ...(song.has("sharing") ? [{ id: "song.share", group: "This song", title: "Share this song", icon: "share", run: () => shareSong(song) }] : []),
@@ -188,6 +187,7 @@
         {:else if tab === "takes"}<TakesTab {uploader} />
         {:else if tab === "release"}<ReleaseTab {gw} />
         {:else if tab === "plugins"}<PluginsTab />
+        {:else if tab === "daw"}<DawTab />
         {:else}<AboutTab />{/if}
       </div>
     {/key}

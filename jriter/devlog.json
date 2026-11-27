@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.34.12",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "The DAW is a tab on the song",
+  "notes": [
+   "A song's DAW project now shows on the song page: its notes as an overview, with play, stop and a click to jump.",
+   "Save it as a .mid from the tab, or open the full DAW from there.",
+   "A song with no project can start one by loading a .mid file.",
+   "Tracks that use a sampler only play in the full DAW; the tab marks them."
+  ]
+ },
+ {
   "version": "4.34.11",
   "date": "2026-11-27",
   "name": "JR!TER",

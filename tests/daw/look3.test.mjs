@@ -14,6 +14,8 @@ const IN_SOURCE = [
   ["views/Album.svelte", "album.release"],
   ["views/Song.svelte", 'value: "daw"'],
   ["views/Song.svelte", "song.daw"],
+  ["views/Song.svelte", "<DawTab"],
+  ["views/song/DawTab.svelte", "/daw.html?song="],
   ["views/song/TakesTab.svelte", "v.has_daw"],
   ["views/song/TakesTab.svelte", "&version="],
   ["shell/Shell.svelte", "Open the DAW"],
