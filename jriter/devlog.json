@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.34.15",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "Record a release on the album",
+  "notes": [
+   "The release page has a Released box: the date, the store link and the UPC. Save puts them on the album.",
+   "The store link must start with https:// and a UPC is 12 or 13 digits. Leave a field empty to clear it.",
+   "After a RouteNote submit, Wh;le fills the box itself; it saves only the date until RouteNote gives a UPC."
+  ]
+ },
+ {
   "version": "4.34.14",
   "date": "2026-11-27",
   "name": "JR!TER",

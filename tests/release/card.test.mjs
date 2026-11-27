@@ -34,6 +34,8 @@ test("card shape and checks", () => {
   assert.equal(c.version, VERSION);
   assert.ok(c.about.includes("final submit"));
   assert.equal(c.release.release_date, "2025");
+  assert.ok(c.about.includes("Released box"));
+  assert.equal(c.release_page, "http://x/release.html?album=7");
   assert.equal(c.tracks[1].explicit, true);
   assert.equal(c.tracks[0].duration, 61.23);
   const t = c.checks.join("\n");

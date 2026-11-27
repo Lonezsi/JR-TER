@@ -15,7 +15,7 @@ export const ABOUT = [
   "3. Start a new release. Fill in the release fields, then upload the cover. For each track in order, upload its file and fill in its title, explicit flag and credits. File inputs need a real OS dialog: click the upload button, type the full path into the Windows dialog and press Enter.",
   "4. If RouteNote asks for something that is not in this card, ask the owner and do not invent it. Do not pay for anything, pick a paid tier or accept new terms for the owner; ask them.",
   "5. Stop at the final review screen and summarise what will be sent. Press the final submit only after the owner writes OK in this chat.",
-  "6. Afterwards, say what was submitted. Nothing is written back to JR!TER yet.",
+  "6. Afterwards, say what was submitted. Then open the page named in 'release_page' in the same Brave and fill its Released box, then press Save: the release date always; the store link and the UPC only once RouteNote shows them. If RouteNote has no UPC yet, save only the date.",
   "Pages change, so work from what is on screen. 'checks' lists problems JR!TER already saw; mention them to the owner.",
 ].join("\n");
 
@@ -80,6 +80,7 @@ export function buildCard(album, songs, details, origin, files, cover) {
     about: ABOUT,
     made: new Date().toISOString(),
     from: `${origin || ""}/#/album/${album.id}`,
+    release_page: `${origin || ""}/release.html?album=${album.id}`,
     store: "RouteNote",
     release: {
       title: album.title || "",

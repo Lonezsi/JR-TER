@@ -131,9 +131,52 @@ public class AlbumsController {
         if (data.containsKey("year")) patch.put("year", year(data.get("year")));
         if (data.containsKey("notes")) patch.put("notes", ArrangeController.truthy(data.get("notes")) ? data.get("notes") : "");
         if (data.containsKey("stickers")) patch.put("stickers", stickers(data.get("stickers")));
+        if (data.containsKey("released_at")) patch.put("released_at", releasedAt(data.get("released_at")));
+        if (data.containsKey("store_link")) patch.put("store_link", storeLink(data.get("store_link")));
+        if (data.containsKey("upc")) patch.put("upc", upc(data.get("upc")));
         patch.put("updated_at", Accounts.now());
         db.update("albums", Accounts.num(album.get("id")), patch);
         return Map.of("album", getAlbum(db, album.get("id")));
+    }
+
+    private static String blank(Object v) {
+        return v == null ? "" : String.valueOf(v).strip();
+    }
+
+    /** The day the album came out, as 2026-11-27; empty clears it. */
+    static String releasedAt(Object value) {
+        String s = blank(value);
+        if (s.isEmpty()) return "";
+        try {
+            if (!s.matches("\\d{4}-\\d{2}-\\d{2}")) throw new java.time.DateTimeException(s);
+            java.time.LocalDate.parse(s);
+        } catch (java.time.DateTimeException e) {
+            throw new ApiError("The release date must look like 2026-11-27.");
+        }
+        return s;
+    }
+
+    /** Where the album is in a store: an https:// address only; empty clears it. */
+    static String storeLink(Object value) {
+        String s = blank(value);
+        if (s.isEmpty()) return "";
+        String host = null;
+        try {
+            if (s.length() <= 500 && s.regionMatches(true, 0, "https://", 0, 8) && !s.matches(".*\\s.*"))
+                host = java.net.URI.create(s).getHost();
+        } catch (IllegalArgumentException e) {
+            host = null;
+        }
+        if (host == null || host.isEmpty()) throw new ApiError("The store link must be an https:// address.");
+        return s;
+    }
+
+    /** A UPC or EAN barcode: 12 or 13 digits (spaces and dashes dropped); empty clears it. */
+    static String upc(Object value) {
+        String s = blank(value).replaceAll("[ -]", "");
+        if (s.isEmpty()) return "";
+        if (!s.matches("\\d{12,13}")) throw new ApiError("A UPC is 12 or 13 digits.");
+        return s;
     }
 
     private static double num(Map<?, ?> s, String key, double low, double high, double def) {

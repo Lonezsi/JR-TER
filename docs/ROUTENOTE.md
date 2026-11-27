@@ -20,6 +20,9 @@ Steps, each useful alone:
    Needs Claude Code (`claude`) on the PC's PATH.
 3. **The button on the album page.** Waits for the Svelte `ui/` source; until then it is the page
    above. The button should only link to `/release.html?album=ID`.
-4. **Later.** Write the store link or UPC back onto the album after a release.
+4. **The release on the album. Done.** Albums have `released_at`, `store_link` and `upc` (PATCH
+   `/api/albums/ID`; link https:// only, UPC 12-13 digits, empty clears). The Released box on
+   the release page saves them; the card's recipe tells the agent to fill it after the submit
+   (only the date while RouteNote has no UPC yet).
 
 Not decided for the agent: pricing, territories, release tier. It must ask.

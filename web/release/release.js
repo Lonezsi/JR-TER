@@ -26,6 +26,7 @@ const ICON = {
   down: "M12 4v10m0 0l-4-4m4 4l4-4M5 19h14",
   go: "M5 12h14m0 0l-6-6m6 6l-6 6",
   copy: "M9 9h10v10H9zM5 15V5h10",
+  check: "M5 12l5 5L19 7",
 };
 function icon(name) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -149,6 +150,30 @@ async function editAlbum(id) {
     try { await navigator.clipboard.writeText(`jriter-cli release ${album.id}`); toast("Copied."); } catch { toast(`jriter-cli release ${album.id}`); }
   };
 
+  const rel = {
+    released_at: el("input", { type: "date", name: "released_at", value: album.released_at || "" }),
+    store_link: el("input", { type: "url", name: "store_link", placeholder: "https://", value: album.store_link || "" }),
+    upc: el("input", { type: "text", name: "upc", inputMode: "numeric", value: album.upc || "" }),
+  };
+  const bSave = el("button", { className: "b", type: "button", tip: "Save the release on the album" }, icon("check"), "Save");
+  bSave.onclick = async () => {
+    bSave.disabled = true;
+    try {
+      const r = await fetch(`/api/albums/${album.id}`, {
+        method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ released_at: rel.released_at.value, store_link: rel.store_link.value, upc: rel.upc.value }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || r.status);
+      for (const k in rel) rel[k].value = j.album[k] || "";
+      toast("Saved on the album.");
+    } catch (e) {
+      toast("That did not save: " + e.message);
+    } finally {
+      bSave.disabled = false;
+    }
+  };
+
   app.replaceChildren(
     el("div", { className: "panel head" },
       album.has_cover ? el("img", { className: "cover", src: `/api/albums/${album.id}/cover`, alt: "" }) : el("div", { className: "cover" }),
@@ -167,6 +192,12 @@ async function editAlbum(id) {
           el("span", { className: "mute", textContent: mixOf(s) ? "" : "no mix" }),
           el("label", {}, cb, "Explicit"));
       }))),
+    el("div", { className: "panel", id: "released" }, el("h2", { textContent: "Released" }),
+      el("div", { className: "grid" },
+        el("label", { className: "f" }, "Release date", rel.released_at),
+        el("label", { className: "f" }, "Store link", rel.store_link),
+        el("label", { className: "f" }, "UPC", rel.upc)),
+      el("div", { className: "bar", style: "margin-top:8px" }, bSave)),
     warn,
     el("div", { className: "bar" }, bDown, bGo, bCopy));
   preview();
