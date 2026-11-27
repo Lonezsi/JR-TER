@@ -505,6 +505,8 @@
   .n { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; font: 600 var(--t-sm)/1 var(--font); background: var(--accent-soft); color: var(--accent-text); }
   /* Lists read as one calm column on a wide screen, not 1100px rows with nothing in the middle. */
   .page > :global(*) { max-width: 900px; }
+  /* Rows have a version and a length at their right end: a row wider than this leaves them far from the title. */
+  .page :global(.list[data-rows]) { max-width: 720px; }
   /* A square the fanned playlist cover fills (PlaylistArt keeps its own room above). */
   .plwrap { display: block; width: 100%; aspect-ratio: 1; }
   .plwrap :global(.plart) { width: 100% !important; height: 100% !important; margin-top: 0; }
