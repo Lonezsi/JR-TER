@@ -5,9 +5,10 @@
 //        setMode(m), editPattern(k), editSample(track), undo()
 // The brush is a pattern number, or "t3": an audio clip of track 3's sample (sampler.js).
 // Tap an empty cell to place the pattern you paint with. Drag a clip to move it, drag its end to
-// repeat it, hold it to delete it. Model and maths: playlist.js.
+// repeat it, hold it to delete it. Drag along the bar ruler to loop a range (drag its edges or
+// middle, arrows nudge, double-click or Delete clears). Model and maths: playlist.js.
 import { icon } from "./icons.js";
-import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, MAX_LANES, MAX_BARS } from "./playlist.js";
+import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, setLoop, moveLoop, cleanLoop, MAX_LANES, MAX_BARS } from "./playlist.js";
 
 import { clipBars } from "./sampler.js";
 import { SONG_STEPS, stepFor, snapFloor, snapRound, snapOptions, loadSnap, saveSnap } from "./snap.js";
@@ -21,7 +22,7 @@ const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
 const QB = 16;         // clips sit on sixteenths of a bar
 
 export function mountSong(el, api) {
-  let brush = 0, selected = -1, drag = null, hold = 0, zoomS = 1, others = [];
+  let ldrag = null, brush = 0, selected = -1, drag = null, hold = 0, zoomS = 1, others = [];
   const snapSet = loadSnap(localStorage);
   const barPx = () => BAR_PX * zoomS;
   // How far clips snap, in beats (0 = to the sixteenth of a bar, the grid clips live on).
@@ -40,6 +41,7 @@ export function mountSong(el, api) {
     const lanes = clamp(Math.max(4, ...clips.map((c) => c.lane + 2)), 4, MAX_LANES);
     const bars = clamp(Math.ceil(songBars(song)) + 8, 16, MAX_BARS);
     const sel = clips[selected];
+    const L = cleanLoop(song.loop);
     const BP = barPx(), every = BP >= 60 ? 1 : BP >= 24 ? 4 : 16;
     let ruler = "", lanesHtml = "";
     for (let b = 0; b < bars; b++) ruler += `<span class="sl-n">${b % every === 0 ? b + 1 : ""}</span>`;
@@ -55,6 +57,7 @@ export function mountSong(el, api) {
               `<span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`)).join("") +
         `</div>`;
     }
+    const { loopHtml, bandHtml } = loopMarkup(L, BP);
     el.innerHTML =
             `<div class="cv-line" role="group" aria-label="What Play plays">` +
         `<button data-mode="pattern" aria-pressed="${song.mode !== "song"}" data-tip="Play loops the pattern you are editing">Pattern</button>` +
@@ -72,7 +75,7 @@ export function mountSong(el, api) {
         `<span class="sl-sep"></span><button data-act="zoomout" aria-label="Zoom out" data-tip="Zoom out (Ctrl+wheel, or pinch)">${icon("zoom-out")}</button><button data-act="zoomin" aria-label="Zoom in" data-tip="Zoom in (Ctrl+wheel, or pinch)">${icon("zoom-in")}</button>` +
         `<label>Snap <select data-snap aria-label="Snap">${snapOptions(SONG_STEPS, snapSet.song, step())}</select></label></div>` + autoLanes.menu(song) +
       `<div class="sl-scroll"><div class="sl-grid" style="--bar:${BP}px;width:${bars * BP}px">` +
-        `<div class="sl-ruler">${ruler}</div>${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>`;
+        `<div class="sl-ruler" data-tip="Drag to loop a range">${ruler}${loopHtml}</div>${bandHtml}${lanesHtml}${autoLanes.html(song, bars)}<div class="sl-head" hidden></div></div></div>`;
     drawPeople();
   }
 
@@ -99,6 +102,65 @@ export function mountSong(el, api) {
     for (const r of rows) { const b = r.getBoundingClientRect(); if (e.clientY >= b.top && e.clientY < b.bottom) return +r.dataset.lane; }
     return e.clientY < rows[0].getBoundingClientRect().top ? 0 : rows.length - 1;
   };
+
+  function clearLoop() {
+    api.change(() => { delete api.song().loop; });
+    api.toast("Loop cleared.", { label: "Undo", run: api.undo });
+  }
+  function loopMarkup(L, BP) {
+    if (!L) return { loopHtml: "", bandHtml: "" };
+    const pos = `style="left:${L.from * BP}px;width:${(L.to - L.from) * BP}px"`;
+    return {
+      loopHtml: `<div class="sl-loop" data-loop="move" tabindex="0" ${pos} aria-label="Loop, bar ${L.from + 1} to ${L.to + 1}. Arrows move it, Delete clears it" data-tip="Loop: drag to move, double-click to clear">` +
+        `<span class="sl-loop-e a" data-loop="from" role="slider" tabindex="0" aria-label="Loop start" aria-valuenow="${L.from + 1}"></span><span class="sl-loop-e b" data-loop="to" role="slider" tabindex="0" aria-label="Loop end" aria-valuenow="${L.to + 1}"></span></div>`,
+      bandHtml: `<div class="sl-loopband" ${pos}></div>`,
+    };
+  }
+  function placeLoop() {
+    const l = cleanLoop(api.song().loop), BP = barPx();
+    const a = el.querySelector(".sl-loop"), b = el.querySelector(".sl-loopband");
+    if (!l) { a?.remove(); b?.remove(); return; }
+    if (!a || !b) { // the first bit of a drag: add the range without redrawing, so the pointer keeps its element
+      a?.remove(); b?.remove();
+      const m = loopMarkup(l, BP);
+      el.querySelector(".sl-ruler").insertAdjacentHTML("beforeend", m.loopHtml);
+      el.querySelector(".sl-ruler").insertAdjacentHTML("afterend", m.bandHtml);
+      return;
+    }
+    for (const n of [a, b]) { n.style.left = l.from * BP + "px"; n.style.width = (l.to - l.from) * BP + "px"; }
+  }
+  el.addEventListener("pointerdown", (e) => {
+    const ruler = e.target.closest(".sl-ruler");
+    if (!ruler) return;
+    const grid = el.querySelector(".sl-grid"), l = cleanLoop(api.song().loop), bar0 = barAt(e, grid);
+    const kind = e.target.closest("[data-loop]")?.dataset.loop || "draw";
+    ldrag = { kind, id: e.pointerId, x0: e.clientX, bar0, from0: l ? l.from : bar0, to0: l ? l.to : bar0, before: api.snap(), grid, moved: false };
+    try { ruler.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!ldrag || e.pointerId !== ldrag.id) return;
+    if (!ldrag.moved && Math.abs(e.clientX - ldrag.x0) < 4) return;
+    ldrag.moved = true;
+    const song = api.song(), d = ldrag, db = barAt(e, d.grid) - d.bar0, sb = step() / 4, sm = stepBars();
+    const snapped = (x) => (sb > 0 ? snapRound(x, sb) : Math.round(x * QB) / QB);
+    if (d.kind === "draw") setLoop(song, snapped(d.bar0), snapped(d.bar0 + db));
+    else if (d.kind === "from") setLoop(song, Math.min(snapped(d.from0 + db), d.to0 - sm), d.to0);
+    else if (d.kind === "to") setLoop(song, d.from0, Math.max(snapped(d.to0 + db), d.from0 + sm));
+    else { song.loop = { from: d.from0, to: d.to0 }; moveLoop(song, snapped(d.from0 + db) - d.from0); }
+    placeLoop();
+  });
+  const endLoop = (e) => {
+    if (!ldrag || e.pointerId !== ldrag.id) return;
+    const d = ldrag; ldrag = null;
+    if (!d.moved) return;
+    if (api.snap() !== d.before) { api.pushUndo(d.before); api.save(); }
+    render();
+  };
+  el.addEventListener("pointerup", endLoop);
+  el.addEventListener("pointercancel", endLoop);
+  el.addEventListener("dblclick", (e) => {
+    if (e.target.closest(".sl-ruler") && cleanLoop(api.song().loop)) clearLoop();
+  });
 
   function removeSel(i) {
     api.change(() => { removeClip(api.song(), i); selected = -1; });
@@ -182,6 +244,22 @@ export function mountSong(el, api) {
   });
 
   el.addEventListener("keydown", (e) => {
+    const lp = e.target.closest && e.target.closest("[data-loop]");
+    if (lp) {
+      const song = api.song(), l = cleanLoop(song.loop), kind = lp.dataset.loop, k = e.key, sm = stepBars();
+      if (!l) return;
+      if (k === "Delete" || k === "Backspace") { e.preventDefault(); return clearLoop(); }
+      if (k !== "ArrowLeft" && k !== "ArrowRight") return;
+      const d = k === "ArrowRight" ? sm : -sm;
+      api.change(() => {
+        if (kind === "from") setLoop(song, Math.min(l.from + d, l.to - sm), l.to);
+        else if (kind === "to") setLoop(song, l.from, Math.max(l.to + d, l.from + sm));
+        else moveLoop(song, d);
+      });
+      e.preventDefault(); render();
+      el.querySelector(`[data-loop="${kind}"]`)?.focus();
+      return;
+    }
     const clip = e.target.closest && e.target.closest(".sl-clip");
     if (!clip) return;
     const i = +clip.dataset.c, song = api.song(), c = song.clips[i];
@@ -232,7 +310,7 @@ export function mountSong(el, api) {
     if (fingers.size === 2) {
       const [a, b] = [...fingers.values()];
       pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: zoomS };
-      clearTimeout(hold); drag = null; // two fingers is a zoom, not a clip being dragged
+      clearTimeout(hold); drag = null; ldrag = null; // two fingers is a zoom, not a clip being dragged
     }
   }, true);
   el.addEventListener("pointermove", (e) => {

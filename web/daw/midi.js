@@ -11,7 +11,7 @@ import { cleanAutomation } from "./automation.js";
 import { DEFAULT_PROGRESSION } from "./chords.js";
 import { defaultScripts } from "./script.js";
 import { cleanSample } from "./sampler.js";
-import { cleanClips } from "./playlist.js";
+import { cleanClips, cleanLoop } from "./playlist.js";
 import { cleanTrackMix, cleanMixer, defaultMixer, upgradeOldFx } from "./mixer.js";
 import { withPatterns, cleanSteps, emptySteps, defaultKey } from "./pattern.js";
 
@@ -120,7 +120,7 @@ export function songToText(song) {
       "beats; velocity 1-127) and steps (16 entries, one bar of sixteenths: null = off, or " +
       "{velocity, pitch}; the bar repeats over the loop). pattern = the index of the pattern open in " +
       "the editor. clips place patterns on the song timeline: pattern (index), lane, start, length and offset, all in bars (down to a sixteenth of a bar); " +
-      "a clip longer than its pattern repeats it; mode is song or pattern, what Play plays. Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
+      "a clip longer than its pattern repeats it; mode is song or pattern, what Play plays; loop (optional) is the Layout's loop range, from and to in bars, and in song mode Play loops it (older versions of the DAW ignore it). Edit it by hand and open it again on /daw.html. chords is the chord editor's " +
       "progression (symbols like Cmaj9 or G13/B, beats each, how to voice them); it is only a way to " +
       "write notes, so the notes are the music. scripts are note scripts (see web/daw/script.js for " +
       "the language): name, code, and the values of the sliders its params make. Mixer: each track has pan " +
@@ -141,6 +141,7 @@ export function songToText(song) {
     pattern: song.pattern || 0,
     mode: song.mode === "song" ? "song" : "pattern",
     clips: (song.clips || []).map((c) => ({ ...c })),
+    loop: cleanLoop(song.loop) || undefined,
     chords: song.chords ?? JSON.parse(JSON.stringify(DEFAULT_PROGRESSION)),
     mixer: cleanMixer(song.mixer),
     automation: cleanAutomation(song.automation, song),
@@ -201,6 +202,7 @@ export function textToSong(text) {
   }
   song.mode = j.mode === "song" ? "song" : "pattern";
   song.clips = cleanClips(j.clips, song.patterns.length, song.tracks.length);
+  { const loop = cleanLoop(j.loop); if (loop) song.loop = loop; }
   song.automation = cleanAutomation(j.automation, song);
   const cur = song.patterns[song.pattern];
   song.tracks.forEach((t, i) => {

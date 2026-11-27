@@ -309,8 +309,14 @@ body.drop .roll, .midi-over { box-shadow: inset 0 0 0 2px var(--d-acc) !importan
 .sl-paint { color: var(--d-mute); font-size: 12.5px; }
 .sl-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--d-line); border-radius: var(--d-rc); }
 .sl-grid { position: relative; display: flex; flex-direction: column; }
-.sl-ruler { display: flex; height: 20px; align-items: center; color: var(--d-faint); font-size: var(--t-xs, 11px); font-variant-numeric: tabular-nums; }
-.sl-n { flex: none; width: var(--bar); padding-left: 4px; }
+.sl-ruler { position: relative; touch-action: none; cursor: col-resize; display: flex; height: 20px; align-items: center; color: var(--d-faint); font-size: var(--t-xs, 11px); font-variant-numeric: tabular-nums; }
+.sl-n { flex: none; width: var(--bar); padding-left: 4px; pointer-events: none; }
+.sl-loop { position: absolute; top: 2px; bottom: 2px; border: 1px solid var(--d-acc); border-radius: 4px; background: color-mix(in srgb, var(--d-acc) 30%, transparent); cursor: grab; }
+.sl-loop-e { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
+.sl-loop-e.a { left: -5px; }
+.sl-loop-e.b { right: -5px; }
+.sl-loop:focus-visible, .sl-loop-e:focus-visible { outline: 2px solid var(--d-fg); outline-offset: 1px; }
+.sl-loopband { position: absolute; top: 20px; bottom: 0; background: color-mix(in srgb, var(--d-acc) 8%, transparent); pointer-events: none; }
 .sl-lane { position: relative; display: flex; height: 44px; border-top: 1px solid var(--d-line); }
 .sl-cell { flex: none; width: var(--bar); height: 100%; min-width: 0; min-height: 0; padding: 0; border: 0; border-left: 1px solid var(--d-grid); border-radius: 0; background: transparent; }
 .sl-cell:hover { background: var(--d-key); }

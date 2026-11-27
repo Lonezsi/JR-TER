@@ -135,6 +135,37 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     need((await song()).mode === "song" && (await song()).clips.length === n0 + 2, "mode or clips not saved");
     await noSideways("song tab with clips");
   });
+  await scenario("the Layout ruler: drag a loop range, move its edge, clear it, Play stays inside it", async () => {
+    await js(`window.jriterDaw.setSongSnap("bar")`);
+    await js(`document.querySelector(".sl-scroll").scrollLeft = 0`);
+    await js(`document.querySelector(".sl-ruler").scrollIntoView({ block: "center" })`); await sleep(100);
+    const BP = 36 * (await js("window.jriterDaw.songZoom()"));
+    const r = await rect(".sl-ruler"), left = r.l;
+    await dragAt({ x: left + 1.1 * BP, y: r.y }, { x: left + 3.1 * BP, y: r.y });
+    let lp = await js("window.jriterDaw.loop()");
+    need(lp && lp.from === 1 && lp.to === 3, "drawn loop " + JSON.stringify(lp) + " BP " + BP + " left " + left + " snap " + JSON.stringify(await js("window.jriterDaw.songSnap()")));
+    need(JSON.stringify((await song()).loop) === JSON.stringify(lp), "loop not saved in the song");
+    const e = await rect(".sl-loop-e.b");
+    await dragAt({ x: e.x, y: e.y }, { x: e.x + BP, y: e.y });
+    lp = await js("window.jriterDaw.loop()");
+    need(lp.from === 1 && lp.to === 4, "dragged edge gave " + JSON.stringify(lp));
+    await js(`(() => { const n = document.querySelector(".sl-loop-e.b"); n.focus(); n.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); })()`);
+    lp = await js("window.jriterDaw.loop()");
+    need(lp.to === 3, "arrow gave " + JSON.stringify(lp));
+    await tapEl("#play");
+    await sleep(700);
+    const x = await js(`(document.querySelector(".sl-head").getBoundingClientRect().left - document.querySelector(".sl-grid").getBoundingClientRect().left) / ${BP}`);
+    need(x >= 1 && x < 3, "playhead at bar offset " + x);
+    await tapEl("#play");
+    await js(`document.querySelector(".sl-loop").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`);
+    need((await js("window.jriterDaw.loop()")) === null, "double-click did not clear the loop");
+    need(await js(`[...document.querySelectorAll(".toast")].some((t) => t.textContent.includes("Loop cleared"))`), "no Loop cleared toast");
+    await js(`[...document.querySelectorAll(".toast")].find((t) => t.textContent.includes("Loop cleared")).querySelector("button").click()`);
+    lp = await js("window.jriterDaw.loop()");
+    need(lp && lp.from === 1 && lp.to === 3, "undo gave " + JSON.stringify(lp));
+    await noSideways("song tab with a loop");
+    await js(`document.querySelector(".sl-loop").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`); // leave the song as it was
+  });
   await scenario("the mixer: strips, an effect, a fader, meters while playing, fits the phone", async () => {
     await tapEl("#view-mixer");
     need((await view()) === "mixer", "view is " + (await view()));
