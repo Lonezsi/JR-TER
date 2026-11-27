@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.34.12",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "The DAW is a tab on the song",
+  "notes": [
+   "A song's DAW project now shows on the song page: its notes as an overview, with play, stop and a click to jump.",
+   "Save it as a .mid from the tab, or open the full DAW from there.",
+   "A song with no project can start one by loading a .mid file.",
+   "Tracks that use a sampler only play in the full DAW; the tab marks them."
+  ]
+ },
+ {
   "version": "4.34.11",
   "date": "2026-11-27",
   "name": "JR!TER",
@@ -21,7 +33,8 @@
    "Nothing in the DAW is smaller than 11px any more, and small buttons (mute, solo, routing) are easier to hit.",
    "The docks have the glass edge the top bar has."
   ]
- }, {
+ },
+ {
   "version": "4.34.9",
   "date": "2026-11-27",
   "name": "JR!TER",
@@ -31,7 +44,8 @@
    "A new Sign out everywhere row signs every device out, this one too, and unties Foyer.",
    "The password texts now say that changing it unties Foyer."
   ]
- }, {
+ },
+ {
   "version": "4.34.6",
   "date": "2026-11-26",
   "name": "JR!TER",
@@ -40,7 +54,8 @@
    "The privacy notice now covers accounts made from a share link or from Foyer, the Foyer cookie check, who can see handles, guest edits, the fault log and the timetable.",
    "The sign-up forms (sign-in page and share link page) say accounts are for people 16 and over, and so does the notice."
   ]
- }, {
+ },
+ {
   "version": "4.34.5",
   "date": "2026-11-26",
   "name": "JR!TER",
@@ -48,7 +63,8 @@
   "notes": [
    "A YouTube link saved on a post has to start with https://. The Watch button ignores any older link that doesn't."
   ]
- }, {
+ },
+ {
   "version": "4.34.4",
   "date": "2026-11-26",
   "name": "JR!TER",
@@ -56,192 +72,211 @@
   "notes": [
    "The README and the notice said a guest on a shared song only makes a copy. In fact they change your song itself; every change is in its edit history under the name you gave them, and you can undo it."
   ]
- }, {
+ },
+ {
   "version": "4.34.3",
   "date": "2026-11-26",
   "name": "JR!TER",
   "title": "Foyer ties only when you ask",
   "notes": [
-    "Signing in with a password no longer ties whatever Foyer account is open in that browser to your library. Before, on a friend's laptop their Foyer sign-in could end up opening yours.",
-    "Only Settings, Connect to Foyer, ties it, and it now says which Foyer handle is tied. Changing your password, or the new Sign out everywhere, unties it."
+   "Signing in with a password no longer ties whatever Foyer account is open in that browser to your library. Before, on a friend's laptop their Foyer sign-in could end up opening yours.",
+   "Only Settings, Connect to Foyer, ties it, and it now says which Foyer handle is tied. Changing your password, or the new Sign out everywhere, unties it."
   ]
- }, {
+ },
+ {
   "version": "4.34.2",
   "date": "2026-11-26",
   "name": "JR!TER",
   "title": "The DAW is measured",
   "notes": [
-    "A new test bounces real songs and analyses the audio: a 4-bar song comes out 10.00 s long (8 s plus the 2 s tail) and every bar is audible (about -28 dBFS).",
-    "Keep pitch: a 440 Hz loop stretched from 120 to 180 BPM renders at 439.8 Hz (0.04% off); with Keep pitch off it plays at 660 Hz, like tape.",
-    "A real Web Audio Module 2 plugin loads, opens its window, sounds (-6.02 dB, then -12.04 dB after its saved setting changed) and comes back as saved.",
-    "Effects reorder by their grip with a finger as well as the mouse, and two browser sessions editing one song at once end up in step in about a second."
+   "A new test bounces real songs and analyses the audio: a 4-bar song comes out 10.00 s long (8 s plus the 2 s tail) and every bar is audible (about -28 dBFS).",
+   "Keep pitch: a 440 Hz loop stretched from 120 to 180 BPM renders at 439.8 Hz (0.04% off); with Keep pitch off it plays at 660 Hz, like tape.",
+   "A real Web Audio Module 2 plugin loads, opens its window, sounds (-6.02 dB, then -12.04 dB after its saved setting changed) and comes back as saved.",
+   "Effects reorder by their grip with a finger as well as the mouse, and two browser sessions editing one song at once end up in step in about a second."
   ]
- }, {
+ },
+ {
   "version": "4.34.1",
   "date": "2026-11-26",
   "name": "JR!TER",
   "title": "Tests clean up after themselves",
   "notes": [
-    "The DAW browser tests now delete their temporary browser profile when they finish; 31 leftovers had filled 3 GB on the server.",
-    "Profiles left by a crashed run are swept the next time a test starts, once they are over 6 hours old."
+   "The DAW browser tests now delete their temporary browser profile when they finish; 31 leftovers had filled 3 GB on the server.",
+   "Profiles left by a crashed run are swept the next time a test starts, once they are over 6 hours old."
   ]
- }, {
+ },
+ {
   "version": "4.34.0",
   "date": "2026-11-25",
   "name": "JR!TER",
   "title": "Mixer effects switch off, and fold",
   "notes": [
-    "The on/off dot on a mixer effect now shows what you pressed. The effect did switch, but the docked mixer kept drawing the old state; M and S had the same problem.",
-    "The dot is easier to hit, and its tooltip says whether the effect is on or bypassed. A bypassed effect's name dims too.",
-    "Press an effect's name to fold it to one line, and again to open it. It stays folded when you open the song again."
+   "The on/off dot on a mixer effect now shows what you pressed. The effect did switch, but the docked mixer kept drawing the old state; M and S had the same problem.",
+   "The dot is easier to hit, and its tooltip says whether the effect is on or bypassed. A bypassed effect's name dims too.",
+   "Press an effect's name to fold it to one line, and again to open it. It stays folded when you open the song again."
   ]
- }, {
+ },
+ {
   "version": "4.33.0",
   "date": "2026-11-25",
   "name": "JR!TER",
   "title": "Every mixer effect is JR!TER's",
   "notes": [
-    "The DAW mixer's Comp, Drive, Delay and Reverb are now the same effects as on a song's Sound tab. Comp gets Knee and Makeup, Drive gets Output, Delay and Reverb get Tone, and Reverb gets Pre-delay.",
-    "Settings now read in ms and %, not seconds and 0 to 1.",
-    "Old songs open converted. The balance of dry and wet is kept, so they sound close to before: the same level within about 1.5 dB, and Comp exactly the same. Automation on those knobs is converted too.",
-    "The reverb tail is now the same on every play and in a bounce."
+   "The DAW mixer's Comp, Drive, Delay and Reverb are now the same effects as on a song's Sound tab. Comp gets Knee and Makeup, Drive gets Output, Delay and Reverb get Tone, and Reverb gets Pre-delay.",
+   "Settings now read in ms and %, not seconds and 0 to 1.",
+   "Old songs open converted. The balance of dry and wet is kept, so they sound close to before: the same level within about 1.5 dB, and Comp exactly the same. Automation on those knobs is converted too.",
+   "The reverb tail is now the same on every play and in a bounce."
   ]
- }, {
+ },
+ {
   "version": "4.32.0",
   "date": "2026-11-25",
   "name": "JR!TER",
   "title": "Shape the EQ on its curve",
   "notes": [
-    "The DAW mixer's EQ draws its real curve. Press on it to add a band, drag a band to move it, roll the wheel over it for width (Q), double-click it to remove it.",
-    "The keys work on the curve too: Enter adds a band, the arrows move the picked one, + and - change its width, Delete removes it.",
-    "Only the band you picked shows its knobs, so the EQ card is slimmer."
+   "The DAW mixer's EQ draws its real curve. Press on it to add a band, drag a band to move it, roll the wheel over it for width (Q), double-click it to remove it.",
+   "The keys work on the curve too: Enter adds a band, the arrows move the picked one, + and - change its width, Delete removes it.",
+   "Only the band you picked shows its knobs, so the EQ card is slimmer."
   ]
- }, {
+ },
+ {
   "version": "4.31.0",
   "date": "2026-11-25",
   "name": "JR!TER",
   "title": "A limiter in the mixer",
   "notes": [
-    "The mixer has a Limiter effect for any track, insert or the master: threshold, ceiling, attack and release, the same limiter as a song's Sound tab.",
-    "The master's own limiter is now built by that same code and sounds the same as before."
+   "The mixer has a Limiter effect for any track, insert or the master: threshold, ceiling, attack and release, the same limiter as a song's Sound tab.",
+   "The master's own limiter is now built by that same code and sounds the same as before."
   ]
- }, {
+ },
+ {
   "version": "4.30.0",
   "date": "2026-11-25",
   "name": "JR!TER",
   "title": "The DAW's EQ is JR!TER's EQ",
   "notes": [
-    "The mixer's EQ is now the same parametric EQ as a song's Sound tab: up to 24 bands, any type (bell, shelves, cuts, notch, band).",
-    "An old 3-band EQ turns into a low shelf at 200 Hz, a bell at 1 kHz and a high shelf at 5 kHz with the same gains, so old songs sound the same.",
-    "Automation lanes on the old Low, Mid and High knobs are gone, because those knobs no longer exist. Other lanes are untouched.",
-    "Drawing the EQ as a curve comes next; for now each band is a row of knobs."
+   "The mixer's EQ is now the same parametric EQ as a song's Sound tab: up to 24 bands, any type (bell, shelves, cuts, notch, band).",
+   "An old 3-band EQ turns into a low shelf at 200 Hz, a bell at 1 kHz and a high shelf at 5 kHz with the same gains, so old songs sound the same.",
+   "Automation lanes on the old Low, Mid and High knobs are gone, because those knobs no longer exist. Other lanes are untouched.",
+   "Drawing the EQ as a curve comes next; for now each band is a row of knobs."
   ]
- }, {
+ },
+ {
   "version": "4.29.0",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "Play a part through a real VST",
   "notes": [
-    "jriter-cli vst render PLUGIN song.mid plays a MIDI part (or audio) through a VST installed on your PC and puts the result in Renders.",
-    "In the DAW: More, Save as .mid, run the command, then drag the render from the Browser onto the Layout.",
-    "It uses the free Plugalyzer host: jriter-cli vst path tells the app where it is, and jriter-cli vst list shows your installed VSTs.",
-    "Only tried with a stand-in host so far, so a real plugin on your PC is the true test."
+   "jriter-cli vst render PLUGIN song.mid plays a MIDI part (or audio) through a VST installed on your PC and puts the result in Renders.",
+   "In the DAW: More, Save as .mid, run the command, then drag the render from the Browser onto the Layout.",
+   "It uses the free Plugalyzer host: jriter-cli vst path tells the app where it is, and jriter-cli vst list shows your installed VSTs.",
+   "Only tried with a stand-in host so far, so a real plugin on your PC is the true test."
   ]
- }, {
+ },
+ {
   "version": "4.28.0",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "A calmer, slimmer DAW",
   "notes": [
-    "The DAW uses JR!TER's own icons instead of text symbols, and its toolbar fits on one row: what plays, then the song's settings. Opening and saving files are under More.",
-    "Pink is kept for what is on or playing: Play, the playhead, lit steps and what you picked. Everything else is quieter.",
-    "Panels are flat inside, with no boxes in boxes, and every button in a row is the same height.",
-    "The mixer is slimmer: narrow strips with a line between them, thin faders and small labels.",
-    "The help lines under each panel moved into tooltips and the ? sheet."
+   "The DAW uses JR!TER's own icons instead of text symbols, and its toolbar fits on one row: what plays, then the song's settings. Opening and saving files are under More.",
+   "Pink is kept for what is on or playing: Play, the playhead, lit steps and what you picked. Everything else is quieter.",
+   "Panels are flat inside, with no boxes in boxes, and every button in a row is the same height.",
+   "The mixer is slimmer: narrow strips with a line between them, thin faders and small labels.",
+   "The help lines under each panel moved into tooltips and the ? sheet."
   ]
- }, {
+ },
+ {
   "version": "4.27.0",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "Plugins in the mixer",
   "notes": [
-    "The DAW mixer has a new + Plugin effect that loads a Web Audio Module (the web's version of a VST) from an address you type.",
-    "A plugin is someone else's code, so it only loads after you press Allow for its site, once per browser. Shared songs keep their plugins off until you allow them.",
-    "Open shows the plugin's own window; closing it keeps its settings in the song. Bounce waits for plugins and tells you if one was left out.",
-    "Real VST files still need a native host, so they are not loaded; this is the browser's way in."
+   "The DAW mixer has a new + Plugin effect that loads a Web Audio Module (the web's version of a VST) from an address you type.",
+   "A plugin is someone else's code, so it only loads after you press Allow for its site, once per browser. Shared songs keep their plugins off until you allow them.",
+   "Open shows the plugin's own window; closing it keeps its settings in the song. Bounce waits for plugins and tells you if one was left out.",
+   "Real VST files still need a native host, so they are not loaded; this is the browser's way in."
   ]
- }, {
+ },
+ {
   "version": "4.26.0",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "See what plugins a song used",
   "notes": [
-    "A song whose FL render sent a plugin list now has a Plugins tab, also in the command palette.",
-    "It lists the VSTs and FL plugins per version, with how often each is used.",
-    "Plugins that were not installed on the PC that rendered it are marked missing here."
+   "A song whose FL render sent a plugin list now has a Plugins tab, also in the command palette.",
+   "It lists the VSTs and FL plugins per version, with how often each is used.",
+   "Plugins that were not installed on the PC that rendered it are marked missing here."
   ]
- }, {
+ },
+ {
   "version": "4.25.2",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "One command to switch the host",
   "notes": [
-    "The host can switch to the Spring server with one command, and back with one: hostsetup/Switch-JriterServer.ps1 -To jar or -To python.",
-    "It saves the scheduled task first and goes back to Python by itself if the new server does not answer."
+   "The host can switch to the Spring server with one command, and back with one: hostsetup/Switch-JriterServer.ps1 -To jar or -To python.",
+   "It saves the scheduled task first and goes back to Python by itself if the new server does not answer."
   ]
- }, {
+ },
+ {
   "version": "4.25.1",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "The new server follows the live branch",
   "notes": [
-    "The Spring server's updater now follows the live branch the host runs, like the Python one, so it keeps updating once the switch happens.",
-    "The Spring server now lists the DAW and Sampler modules and counts their projects and one-shots, so it answers /api/state exactly like the Python one."
+   "The Spring server's updater now follows the live branch the host runs, like the Python one, so it keeps updating once the switch happens.",
+   "The Spring server now lists the DAW and Sampler modules and counts their projects and one-shots, so it answers /api/state exactly like the Python one."
   ]
- }, {
+ },
+ {
   "version": "4.25.0",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "Drag effects into order",
   "notes": [
-    "In the mixer, drag an effect by its grip to move it up or down the chain; a line shows where it lands.",
-    "The grip also answers the up and down arrow keys, and one Undo puts a move back."
+   "In the mixer, drag an effect by its grip to move it up or down the chain; a line shows where it lands.",
+   "The grip also answers the up and down arrow keys, and one Undo puts a move back."
   ]
- }, {
+ },
+ {
   "version": "4.24.0",
   "date": "2026-11-24",
   "name": "JR!TER",
   "title": "Drag a sound where you want it",
   "notes": [
-    "Drag a sound from the Browser onto the Drumroll to add it as a channel, onto a track to make that track play it, or onto the Layout to place it as an audio clip where you let go.",
-    "Inst and Drum still work, and one Undo takes a drop back."
+   "Drag a sound from the Browser onto the Drumroll to add it as a channel, onto a track to make that track play it, or onto the Layout to place it as an audio clip where you let go.",
+   "Inst and Drum still work, and one Undo takes a drop back."
   ]
- }, {
+ },
+ {
   "version": "4.23.0",
   "date": "2026-11-23",
   "name": "JR!TER",
   "title": "Shape the envelope by hand",
   "notes": [
-    "In the sampler, drag the points on the envelope curve: the peak sets the attack, the next point the decay and sustain, the flat end the sustain, the last point the release.",
-    "The knobs follow, and one Undo puts the whole drag back."
+   "In the sampler, drag the points on the envelope curve: the peak sets the attack, the next point the decay and sustain, the flat end the sustain, the last point the release.",
+   "The knobs follow, and one Undo puts the whole drag back."
   ]
- }, {
+ },
+ {
   "version": "4.22.0",
   "date": "2026-11-23",
   "name": "JR!TER",
   "title": "Effects you turn",
   "notes": [
-    "Every effect setting in the mixer is a knob now: drag it up or down, use the wheel or the arrow keys, double-click to put it back.",
-    "Swing in the Drumroll is a knob too. Steps already change their velocity or pitch when you drag them."
+   "Every effect setting in the mixer is a knob now: drag it up or down, use the wheel or the arrow keys, double-click to put it back.",
+   "Swing in the Drumroll is a knob too. Steps already change their velocity or pitch when you drag them."
   ]
- }, {
+ },
+ {
   "version": "4.21.0",
   "date": "2026-11-23",
   "name": "JR!TER",
   "title": "Drag a number to change it",
   "notes": [
-    "BPM, Bars, the sampler's Root and Tempo, and every other number field in the DAW change when you drag them up or down, like the knobs. Hold Shift to go finer.",
-    "A click without dragging still lets you type the number."
+   "BPM, Bars, the sampler's Root and Tempo, and every other number field in the DAW change when you drag them up or down, like the knobs. Hold Shift to go finer.",
+   "A click without dragging still lets you type the number."
   ]
  },
  {
@@ -250,10 +285,10 @@
   "name": "JR!TER",
   "title": "A sampler for every instrument",
   "notes": [
-    "The sampler is a dialog now, for the instrument you picked: it opens when you add a sound, or from the 〰 button on a sampler track. Escape or a click outside closes it.",
-    "Each instrument has an envelope (attack, decay, sustain, release, drawn as you turn them), Loop for held notes, and Cut itself, so a new note stops the one still ringing.",
-    "Pitch it up or down in semitones, and Stretch it longer or shorter without changing its pitch. Resample renders the sound as you have set it into a new one-shot, in One-shots under Resampled, and the instrument plays that.",
-    "The Sampler tab is the Browser now: your sounds, MIDI files, renders and takes."
+   "The sampler is a dialog now, for the instrument you picked: it opens when you add a sound, or from the 〰 button on a sampler track. Escape or a click outside closes it.",
+   "Each instrument has an envelope (attack, decay, sustain, release, drawn as you turn them), Loop for held notes, and Cut itself, so a new note stops the one still ringing.",
+   "Pitch it up or down in semitones, and Stretch it longer or shorter without changing its pitch. Resample renders the sound as you have set it into a new one-shot, in One-shots under Resampled, and the instrument plays that.",
+   "The Sampler tab is the Browser now: your sounds, MIDI files, renders and takes."
   ]
  },
  {
@@ -262,11 +297,11 @@
   "name": "JR!TER",
   "title": "Mixer routing, MIDI in the browser, and room past the pattern",
   "notes": [
-    "The Mixer is laid out like a desk: Master first, then a numbered insert per track, then the buses. Add as many buses as you like with + Insert. Pick a strip and click the arrow under another to send there (its knob sets how much), or double-click it to make it the main output. Routes that would go round in a loop are never offered.",
-    "Pan and sends are knobs: drag up or down, scroll, use the arrow keys, double-click to reset. Every bus has a meter, a pan and a mute now.",
-    "Your one-shots are back in their real folders, as deep as the pack has them, and the packs' MIDI files are in the browser too. Press Pattern on one for a new pattern from it, or drag it onto the roll or onto a pattern number in the Drumroll.",
-    "The roll goes two bars past the end of the pattern. Put a note there, or drag or stretch one into it, and the pattern grows to fit.",
-    "The Rack is called the Drumroll now, and the Song tab is the Layout."
+   "The Mixer is laid out like a desk: Master first, then a numbered insert per track, then the buses. Add as many buses as you like with + Insert. Pick a strip and click the arrow under another to send there (its knob sets how much), or double-click it to make it the main output. Routes that would go round in a loop are never offered.",
+   "Pan and sends are knobs: drag up or down, scroll, use the arrow keys, double-click to reset. Every bus has a meter, a pan and a mute now.",
+   "Your one-shots are back in their real folders, as deep as the pack has them, and the packs' MIDI files are in the browser too. Press Pattern on one for a new pattern from it, or drag it onto the roll or onto a pattern number in the Drumroll.",
+   "The roll goes two bars past the end of the pattern. Put a note there, or drag or stretch one into it, and the pattern grows to fit.",
+   "The Rack is called the Drumroll now, and the Song tab is the Layout."
   ]
  },
  {
@@ -275,10 +310,10 @@
   "name": "JR!TER",
   "title": "A browser for your sounds, and the DAW in JR!TER's glass",
   "notes": [
-    "The Sampler is a browser of folders now: One-shots holds your own sounds in the folders they came in, and Samples holds your waiting renders and every song's takes and vocals. Click a folder to open it; the search box looks through all of them.",
-    "Press the pencil to arrange your one-shots: rename a folder or a sound, drag sounds and folders onto another folder to move them (a name with / in it nests), and delete a whole folder. Undo brings deleted sounds back. Deleting is only there, not on every row.",
-    "The DAW uses JR!TER's own controls: its dropdowns, number fields with their own arrows, sliders, readable tooltips and thin scrollbars, on glass panes over the accent light. On a phone too.",
-    "On a phone, the Sampler tab shows the sound you are editing first and the browser under it."
+   "The Sampler is a browser of folders now: One-shots holds your own sounds in the folders they came in, and Samples holds your waiting renders and every song's takes and vocals. Click a folder to open it; the search box looks through all of them.",
+   "Press the pencil to arrange your one-shots: rename a folder or a sound, drag sounds and folders onto another folder to move them (a name with / in it nests), and delete a whole folder. Undo brings deleted sounds back. Deleting is only there, not on every row.",
+   "The DAW uses JR!TER's own controls: its dropdowns, number fields with their own arrows, sliders, readable tooltips and thin scrollbars, on glass panes over the accent light. On a phone too.",
+   "On a phone, the Sampler tab shows the sound you are editing first and the browser under it."
   ]
  },
  {
@@ -287,10 +322,10 @@
   "name": "JR!TER",
   "title": "The DAW looks like JR!TER",
   "notes": [
-    "The DAW now wears JR!TER's glass, type and light mode, and follows the light or dark choice in Settings.",
-    "On a computer it is laid out like a studio: toolbar on top, your library (the Sampler) on the left, the Song playlist in the middle, the mixer along the bottom.",
-    "The Mixer and Sampler tabs show or hide those side panels (Alt+6 and Alt+7 too).",
-    "Phones are unchanged: one panel at a time with the bottom bar."
+   "The DAW now wears JR!TER's glass, type and light mode, and follows the light or dark choice in Settings.",
+   "On a computer it is laid out like a studio: toolbar on top, your library (the Sampler) on the left, the Song playlist in the middle, the mixer along the bottom.",
+   "The Mixer and Sampler tabs show or hide those side panels (Alt+6 and Alt+7 too).",
+   "Phones are unchanged: one panel at a time with the bottom bar."
   ]
  },
  {
@@ -299,9 +334,9 @@
   "name": "JR!TER",
   "title": "See friends on the Song tab",
   "notes": [
-    "A friend in your song's DAW now shows as a coloured line with their name on the Song tab, the way they already did in the piano roll.",
-    "A friend now hears the song's sampler sounds: its takes and vocals, and your one-shots that the song uses. Before, their DAW looked for those sounds in their own library.",
-    "A friend's Sampler offers this song's takes and vocals instead of their own library. Sounds from your other songs or waiting renders still don't play for a friend."
+   "A friend in your song's DAW now shows as a coloured line with their name on the Song tab, the way they already did in the piano roll.",
+   "A friend now hears the song's sampler sounds: its takes and vocals, and your one-shots that the song uses. Before, their DAW looked for those sounds in their own library.",
+   "A friend's Sampler offers this song's takes and vocals instead of their own library. Sounds from your other songs or waiting renders still don't play for a friend."
   ]
  },
  {
@@ -310,9 +345,9 @@
   "name": "JR!TER",
   "title": "Loops follow the tempo",
   "notes": [
-    "In the DAW Sampler, a sound can now have a Tempo (or press Guess, which reads it from the trim as whole bars). Its audio clips on the Song tab then play at the song tempo, so a 90 BPM loop sits in a 120 BPM song.",
-    "Keep pitch is on by default: the sound is stretched without changing its pitch. Turn it off for tape style, where speed and pitch move together. Notes you play from a sampler are not changed by the tempo.",
-    "Old projects sound the same until you give a sound a tempo. Stretching is done when you press Play or Bounce, so the first play of a long sound waits a moment. Clips you already placed keep their length."
+   "In the DAW Sampler, a sound can now have a Tempo (or press Guess, which reads it from the trim as whole bars). Its audio clips on the Song tab then play at the song tempo, so a 90 BPM loop sits in a 120 BPM song.",
+   "Keep pitch is on by default: the sound is stretched without changing its pitch. Turn it off for tape style, where speed and pitch move together. Notes you play from a sampler are not changed by the tempo.",
+   "Old projects sound the same until you give a sound a tempo. Stretching is done when you press Play or Bounce, so the first play of a long sound waits a moment. Clips you already placed keep their length."
   ]
  },
  {
