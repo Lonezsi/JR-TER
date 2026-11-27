@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.34.11",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "The interface is built from its source again",
+  "notes": [
+   "Release on an album, the DAW tab on a song, Open in the DAW on a take, and stickers cut off at the case edge are now part of the interface source, not patches on a built file.",
+   "The look from the last release reaches every page: the library, songs, albums, settings and sign-in.",
+   "tools/look3_check.mjs checks a build has every one of them before it goes live.",
+   "The sign-in page uses the same text sizes as the rest of the app."
+  ]
+ },
+ {
   "version": "4.34.10",
   "date": "2026-11-27",
   "name": "JR!TER",

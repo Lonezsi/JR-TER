@@ -1,0 +1,3 @@
+Fonts served by JR!TER, from Google Fonts, both under the SIL Open Font License 1.1
+(https://openfontlicense.org): Orbitron and Manrope. Each font's copyright stays with its
+authors; the files are unmodified. fonts.css says which file is which.
