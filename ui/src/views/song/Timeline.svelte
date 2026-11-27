@@ -396,7 +396,7 @@
   .seg.live { box-shadow: inset 0 2px 0 var(--accent-hi), 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent); }
   .seg.on.live { box-shadow: 0 0 0 2px var(--accent), inset 0 2px 0 var(--accent-hi); }
   .seg .n { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
-  .seg .w { display: flex; align-items: center; gap: var(--s1); font-weight: 600; font-size: 10.5px; opacity: 0.8; }
+  .seg .w { display: flex; align-items: center; gap: var(--s1); font-weight: 600; font-size: var(--t-xs); opacity: 0.8; }
 
   /* One line, always the same height when any words are pointed at a section, so the card
      lighting up never moves what is under it. */

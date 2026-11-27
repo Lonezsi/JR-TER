@@ -483,12 +483,12 @@
   }
   .tab {
     flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    border-radius: calc(var(--r-xl) - 5px); font: 600 10.5px/1 var(--font); color: var(--text-3);
+    border-radius: calc(var(--r-xl) - 5px); font: 600 var(--t-xs)/1 var(--font); color: var(--text-3);
     transition: color var(--fast), background var(--fast);
   }
   .tab.on { color: var(--accent-text); background: color-mix(in srgb, var(--text) 8%, transparent); }
   .tico { position: relative; }
-  .tico .badge { position: absolute; top: -5px; left: 14px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 var(--s1); }
+  .tico .badge { position: absolute; top: -5px; left: 14px; min-width: 16px; height: 16px; font-size: var(--t-xs); padding: 0 var(--s1); }
 
 
   @media (max-width: 900px) {

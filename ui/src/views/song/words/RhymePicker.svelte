@@ -111,7 +111,7 @@
   .langs button.on { background: var(--accent); color: var(--accent-ink); }
   .body { overflow-y: auto; padding: var(--s2) var(--s4) var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
   .wait { display: flex; align-items: center; gap: var(--s2); padding: var(--s3) 0; font-size: var(--t-sm); }
-  .gname { font: 600 10.5px/1 var(--font); color: var(--text-3); margin-bottom: var(--s2); }
+  .gname { font: 600 var(--t-xs)/1 var(--font); color: var(--text-3); margin-bottom: var(--s2); }
   .chips { display: flex; flex-wrap: wrap; gap: 4px; }
   .pick {
     padding: 5px 10px; border-radius: 999px; font-size: var(--t-sm); font-weight: 600; color: var(--text-2);
@@ -119,7 +119,7 @@
   }
   .pick.same { color: var(--text); }
   .pick:hover { background: var(--accent-soft); color: var(--text); }
-  .pick i { font-style: normal; font-size: 9px; color: var(--text-3); margin-left: 4px; text-transform: uppercase; }
+  .pick i { font-style: normal; font-size: var(--t-xs); color: var(--text-3); margin-left: var(--s1); text-transform: uppercase; }
 
   /* The back button: phones only, where a pop-out covers the page. */
   .backbtn { display: none; }

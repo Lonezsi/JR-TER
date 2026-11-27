@@ -826,7 +826,7 @@
     position: relative; height: 22px; min-width: 100%; cursor: pointer; user-select: none;
     background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 -1px 0 var(--glass-line);
   }
-  .tick { position: absolute; left: 0; top: 0; height: 100%; padding-left: 4px; font-size: 10.5px; line-height: 22px; color: var(--text-3); border-left: 1px solid var(--line-2); pointer-events: none; }
+  .tick { position: absolute; left: 0; top: 0; height: 100%; padding-left: var(--s1); font-size: var(--t-xs); line-height: 22px; color: var(--text-3); border-left: 1px solid var(--line-2); pointer-events: none; }
   .drop-mark { position: absolute; top: 4px; bottom: 4px; left: -1px; width: 3px; border-radius: 2px; background: var(--accent-hi); box-shadow: 0 0 10px var(--accent); z-index: 6; pointer-events: none; }
 
   /* The mixer slides up out of the bottom edge. */
@@ -877,7 +877,7 @@
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .words { position: absolute; left: 7px; bottom: 5px; color: rgba(255, 255, 255, 0.78); pointer-events: none; display: grid; }
-  .beats { position: absolute; right: 7px; bottom: 4px; font-size: 10.5px; color: rgba(255, 255, 255, 0.7); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); pointer-events: none; }
+  .beats { position: absolute; right: 7px; bottom: 4px; font-size: var(--t-xs); color: rgba(255, 255, 255, 0.7); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); pointer-events: none; }
   .grip { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; z-index: 3; touch-action: none; }
   .grip.start { left: 0; }
   .grip.end { right: 0; }

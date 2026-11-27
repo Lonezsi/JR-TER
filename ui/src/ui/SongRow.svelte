@@ -135,7 +135,7 @@
   .grip:hover { color: var(--text); background: var(--hover); }
   .grip:active { cursor: grabbing; }
   .over {
-    position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px;
+    position: absolute; inset: 0; display: grid; place-items: center; border-radius: var(--r-sm);
     background: rgba(0, 0, 0, 0.45); color: var(--accent-text);
   }
   .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; color: var(--accent-text); }

@@ -186,7 +186,7 @@
   <div class="list" aria-hidden="true">
     {#each Array(n) as _, i (i)}
       <div class="item">
-        <span class="sk" style="width:44px;height:44px;border-radius:10px"></span>
+        <span class="sk" style="width:44px;height:44px;border-radius:var(--r-sm)"></span>
         <span class="grow col" style="gap:6px">
           <span class="sk" style="height:13px;width:{38 + ((i * 17) % 30)}%"></span>
           <span class="sk" style="height:10px;width:22%"></span>
@@ -411,7 +411,7 @@
       <div class="list" data-rows>
         {#each shownPlaylists as p (p.id)}
           <a class="item" href={href.playlist(p.id)} use:navRow use:contextMenu={() => playlistMenu(p)}>
-            <PlaylistArt title={p.title} behind={behindOf(p)} size={44} radius="10px" />
+            <PlaylistArt title={p.title} behind={behindOf(p)} size={44} radius="var(--r-sm)" />
             <span class="grow body"><span class="t truncate">{p.title}</span>
               <span class="s truncate">{plural(p.count || 0, "item")}</span></span>
             <Icon name="chev-right" size={16} />
@@ -475,7 +475,7 @@
   .s { font-size: var(--t-sm); color: var(--text-2); }
   .line { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   mark { background: var(--accent-soft); color: var(--accent-text); border-radius: 4px; padding: 0 2px; }
-  .kind { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--hover); color: var(--text-2); }
+  .kind { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: var(--r-sm); background: var(--hover); color: var(--text-2); }
   .results { display: flex; flex-direction: column; gap: var(--s4); }
   .results hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 

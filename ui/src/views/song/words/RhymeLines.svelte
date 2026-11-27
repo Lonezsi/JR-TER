@@ -274,14 +274,14 @@
   .row:hover .gutter { opacity: 1; }
   .syl { width: 2.2ch; text-align: right; color: var(--text-3); }
   .lang {
-    font: 600 9.5px/1 var(--font); letter-spacing: 0.06em; color: var(--text-3); padding: 3px 5px; border-radius: 5px;
+    font: 600 var(--t-xs)/1 var(--font); letter-spacing: 0.06em; color: var(--text-3); padding: var(--s1); border-radius: var(--r-sm);
     border: 1px solid transparent; min-width: 26px;
   }
   .lang:hover { border-color: var(--line-2); color: var(--text); }
   .lang.forced { color: var(--accent-text); border-color: var(--accent-line); }
   .letter {
-    width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px;
-    font: 800 10px/1 var(--display); color: hsl(var(--h) 70% 72%); background: hsl(var(--h) 70% 62% / 0.2);
+    width: 18px; height: 18px; display: grid; place-items: center; border-radius: var(--r-sm);
+    font: 800 var(--t-xs)/1 var(--display); color: hsl(var(--h) 70% 72%); background: hsl(var(--h) 70% 62% / 0.2);
   }
   .letter.alone { background: transparent; color: var(--text-3); box-shadow: inset 0 0 0 1px var(--line-2); }
 
@@ -290,7 +290,7 @@
   .stanza-head:first-child { margin-top: 0; }
   .title { font-weight: 600; color: var(--text-2); }
   .scheme { display: inline-flex; gap: 1px; }
-  .scheme b { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 4px; font: 800 9px/1 var(--display); color: hsl(var(--h) 70% 70%); background: hsl(var(--h) 70% 62% / 0.18); }
+  .scheme b { display: grid; place-items: center; width: 14px; height: 14px; border-radius: var(--r-sm); font: 800 var(--t-xs)/1 var(--display); color: hsl(var(--h) 70% 70%); background: hsl(var(--h) 70% 62% / 0.18); }
   /* A line that breaks the scheme: a thin amber mark at its left, and one quiet line of
      text under it. The fixes are plain words, not buttons. */
   .row.flagged .text { box-shadow: -10px 0 0 -8px hsl(38 90% 60% / 0.7); }
@@ -312,15 +312,15 @@
      editor's line numbers: a line's syllables, letter and warning sit right against it
      however long or short the line is. */
   .edit .row { position: relative; gap: 0; flex-direction: row-reverse; justify-content: flex-end; }
-  .edit .text { width: calc(100% - var(--gw, 96px)); flex: none; }
-  .gutter.fixed { width: var(--gw, 96px); justify-content: flex-end; padding-right: var(--s3); gap: var(--s2); pointer-events: auto; opacity: 0.55; }
+  .edit .text { width: calc(100% - var(--gw, calc(var(--s8) + var(--s7)))); flex: none; }
+  .gutter.fixed { width: var(--gw, calc(var(--s8) + var(--s7))); justify-content: flex-end; padding-right: var(--s3); gap: var(--s2); pointer-events: auto; opacity: 0.55; }
   .edit .row:hover .gutter.fixed, .gutter.fixed:focus-within { opacity: 1; }
   /* The warning is the app's own warning icon, in amber; a meter note is the same icon, quieter. */
   .flag { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: hsl(38 90% 62%); }
   .flag:hover, .flag[aria-expanded="true"] { background: var(--hover); }
   .flag.meter { color: var(--text-3); }
   .pop {
-    position: absolute; left: var(--gw, 96px); top: 100%; z-index: 5; width: min(420px, 92%); pointer-events: auto;
+    position: absolute; left: var(--gw, calc(var(--s8) + var(--s7))); top: 100%; z-index: 5; width: min(420px, 92%); pointer-events: auto;
     display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3) var(--s4); border-radius: var(--r-md);
     font-size: var(--t-xs); line-height: 1.5; background: rgb(20 21 25 / 0.96); color: var(--text-2);
   }

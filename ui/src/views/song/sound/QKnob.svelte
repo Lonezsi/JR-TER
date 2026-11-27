@@ -83,7 +83,7 @@
   }
   .knob:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .v {
-    position: absolute; font: 600 9px/1 var(--font); color: var(--text-2); pointer-events: none;
+    position: absolute; font: 600 var(--t-xs)/1 var(--font); color: var(--text-2); pointer-events: none;
   }
   .knob:hover .v, .knob.turning .v { color: var(--text); }
   @media (pointer: coarse) { .knob { width: 46px; height: 46px; } }

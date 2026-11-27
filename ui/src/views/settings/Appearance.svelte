@@ -278,7 +278,7 @@
   .slide { gap: var(--s3); width: min(300px, 100%); }
   .dialrow .slide { flex: 0 0 300px; }
   @media (max-width: 640px) { .dialrow .slide { flex: 1 1 auto; width: 100%; } }
-  .fontname { font-family: var(--display); font-size: 19px; }
+  .fontname { font-family: var(--display); font-size: var(--t-xl); }
 
   .swatch {
     position: relative; display: inline-flex; align-items: center; gap: var(--s3);

@@ -565,7 +565,7 @@
   }
   /* The marks under the editor: the same text in the same box, invisible, so its vowel
      marks and rhyme tints land under the letters typed above them. */
-  .editwrap { position: relative; flex: 1 1 auto; min-width: 0; --gw: 96px; }
+  .editwrap { position: relative; flex: 1 1 auto; min-width: 0; --gw: calc(var(--s8) + var(--s7)); }
   .bodyrow { display: flex; align-items: flex-start; gap: var(--s3); }
   /* The tool column rides along as you scroll the words. */
   .toolcol { flex: none; position: sticky; top: var(--below-tabs, var(--s3)); align-self: flex-start; }
@@ -574,15 +574,15 @@
   /* The rhyme tools: a column of icons at the top right of the sheet. Coloured when on,
      plain when off. The words keep clear of it. */
   .rtools {
-    display: flex; flex-direction: column; gap: 4px; padding: 4px; border-radius: 14px;
+    display: flex; flex-direction: column; gap: var(--s1); padding: var(--s1); border-radius: var(--r-md);
     background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line);
   }
-  .rt { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--text-3); transition: color var(--fast), background var(--fast); }
+  .rt { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--text-3); transition: color var(--fast), background var(--fast); }
   .rt:hover { color: var(--text); background: var(--hover); }
   .rt.on { color: var(--accent-text); background: var(--accent-soft); }
   .rt.go { color: var(--text-2); }
   .rt.go:hover { color: var(--accent-text); }
-  .rsep { height: 1px; margin: 2px 6px; background: var(--line-2); }
+  .rsep { height: 1px; margin: var(--s1) var(--s2); background: var(--line-2); }
 
   /* The layer that draws the words, under the field that takes the typing. The field's
      own letters are invisible (the layer draws them, with marks and dimmed asides); its
@@ -601,7 +601,7 @@
   .state { min-width: 9ch; }
   .hist { padding: var(--s2); }
   .hist .item { width: 100%; text-align: left; cursor: pointer; }
-  @media (max-width: 640px) { .sheet { padding: var(--s4); } .editwrap { --gw: 78px; } }
+  @media (max-width: 640px) { .sheet { padding: var(--s4); } .editwrap { --gw: calc(var(--s8) + var(--s5)); } }
   /* Wide screens: the lines stay one readable column; the tools are a row above them, the
      same as on a phone. */
   .editwrap { max-width: calc(600px + var(--gw)); }
@@ -610,7 +610,7 @@
   .bodyrow { flex-direction: column; align-items: stretch; gap: var(--s2); }
   .toolcol { order: -1; z-index: 5; align-self: flex-start; }
   .rtools { flex-direction: row; background: color-mix(in srgb, var(--bg, #000) 94%, transparent); }
-  .rsep { width: 1px; height: auto; margin: 6px 2px; }
+  .rsep { width: 1px; height: auto; margin: var(--s2) var(--s1); }
   :global(html[data-narrow]) .toolcol { align-self: stretch; }
   :global(html[data-narrow]) .rtools { justify-content: space-between; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
   :global(html[data-narrow]) .rt { width: 36px; height: 36px; }

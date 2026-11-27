@@ -46,9 +46,9 @@
 
 <style>
   .plugins { display: flex; flex-direction: column; gap: 12px; }
-  h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+  h3 { margin: 0 0 6px; font-size: var(--t-md); font-weight: 600; }
   ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  li { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-md); }
   .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .mute { opacity: 0.65; font-size: 12px; margin: 0; }
   .tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; opacity: 0.7; }

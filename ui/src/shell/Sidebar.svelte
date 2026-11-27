@@ -150,7 +150,7 @@
             <a class="short" href={row.href} onclick={onnavigate}
                class:on={(row.song && route.view === "song" && route.params.id === String(row.song.id)) || (row.album && route.view === "album" && route.params.id === String(row.album.id)) || (row.playlist && route.view === "playlist" && route.params.id === String(row.playlist.id))}
                use:contextMenu={row.song ? () => songMenu(row.song) : row.album ? albumMenu(row.album) : playlistMenu(row.playlist)}>
-              {#if row.playlist}<PlaylistArt title={row.title} behind={behindOf(row.playlist)} size={30} radius="7px" />
+              {#if row.playlist}<PlaylistArt title={row.title} behind={behindOf(row.playlist)} size={30} radius="var(--r-sm)" />
               {:else if row.album}<AlbumArt album={row.album} url={row.cover} title={row.title} size={30} small />
               {:else}<Cover url={row.cover} title={row.title} size={30} />{/if}
               <span class="truncate"><span class="t truncate">{row.title}</span><span class="s truncate">{row.sub}</span></span>
@@ -257,7 +257,7 @@
           {#each playlistsShown as p (p.id)}
             <a class="short" class:on={route.view === "playlist" && route.params.id === String(p.id)}
                href={href.playlist(p.id)} onclick={onnavigate} use:contextMenu={playlistMenu(p)}>
-              <PlaylistArt title={p.title} behind={behindOf(p)} size={30} radius="7px" />
+              <PlaylistArt title={p.title} behind={behindOf(p)} size={30} radius="var(--r-sm)" />
               <span class="truncate">
                 <span class="t truncate">{p.title}</span>
                 <span class="s truncate">{plural(p.count || 0, "item")}</span>
@@ -329,7 +329,7 @@
   .top { padding: var(--s2) var(--s2) 2px; }
   .wordmark {
     display: flex; align-items: center; gap: var(--s2);
-    font: 800 19px/1 var(--display); letter-spacing: 0.02em; color: var(--text);
+    font: 800 var(--t-xl)/1 var(--display); letter-spacing: 0.02em; color: var(--text);
   }
   .rest { color: var(--accent-text); flex: none; }
 
@@ -367,7 +367,7 @@
     color: var(--text-3); text-align: left;
   }
   .fold:hover { color: var(--text-2); }
-  .all { font: 600 var(--t-xs)/1 var(--font); color: var(--text-3); padding: var(--s2); border-radius: 6px; opacity: 0; transition: opacity var(--fast); }
+  .all { font: 600 var(--t-xs)/1 var(--font); color: var(--text-3); padding: var(--s2); border-radius: var(--r-sm); opacity: 0; transition: opacity var(--fast); }
   .heading:hover .all, .all:focus-visible { opacity: 1; }
   /* A touch screen has no hover, so the link that only appears on hover would never appear. */
   @media (hover: none) { .all { opacity: 1; } }
@@ -382,7 +382,7 @@
   /* A render has no cover: a waveform tile in its place, the size a cover would be. */
   /* Each render in its own colour, the hue hashed from its name: the same one its wave has
      in the inbox and on the Takes tab, so it is recognisable wherever it shows up. */
-  .wave { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px;
+  .wave { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: var(--r-sm);
           background: hsl(var(--wave-hue, 150) 40% 22%); color: hsl(var(--wave-hue, 150) 80% 72%);
           box-shadow: inset 0 0 0 1px hsl(var(--wave-hue, 150) 60% 50% / 0.25); }
   .wave.playing { background: hsl(var(--wave-hue, 150) 55% 34%); color: #fff; }
@@ -400,7 +400,7 @@
   .account .t { color: var(--text); }
   .avatar {
     width: 30px; height: 30px; border-radius: 50%; flex: none;
-    display: grid; place-items: center; font: 600 13px/1 var(--font);
+    display: grid; place-items: center; font: 600 var(--t-md)/1 var(--font);
     background: var(--accent-soft) center/cover; color: var(--accent-text);
     box-shadow: inset 0 0 0 1px var(--accent-line);
   }

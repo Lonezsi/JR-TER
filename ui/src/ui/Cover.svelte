@@ -15,7 +15,7 @@
   const show = $derived(!!url && failed !== url);
   const px = (v: number | string) => (typeof v === "number" ? `${v}px` : v);
   const r = $derived(round ? "50%" : radius !== undefined ? px(radius)
-    : typeof size === "number" ? `${Math.max(6, Math.round(size * 0.22))}px` : "22%");
+    : typeof size === "number" ? (size >= 40 ? "var(--r-md)" : "var(--r-sm)") : "var(--r-md)");
 </script>
 
 <div class="cover {klass}" style:--size={px(size)} style:--r={r} style:--hue={hue(title)}>

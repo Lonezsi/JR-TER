@@ -60,7 +60,7 @@
 
 <style>
   .seg {
-    position: relative; display: inline-flex; padding: 3px; gap: 0;
+    position: relative; display: inline-flex; padding: var(--s1); gap: 0;
     border-radius: var(--r-pill);
     background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -71,7 +71,7 @@
   .seg.grow { display: flex; align-self: stretch; }
   .seg.grow button { flex: 1 1 0; }
   .thumb {
-    position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: var(--r-pill);
+    position: absolute; top: var(--s1); bottom: var(--s1); left: 0; border-radius: var(--r-pill);
     background: color-mix(in srgb, var(--text) 13%, transparent);
     border: 1px solid var(--line-2);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -81,19 +81,19 @@
   .thumb.ready { opacity: 1; transition: transform 320ms var(--spring), width 320ms var(--spring); }
   button {
     position: relative; z-index: 1; flex: none;
-    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    height: 30px; padding: 0 14px; border-radius: var(--r-pill);
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+    height: 30px; padding: 0 var(--s3); border-radius: var(--r-pill);
     font: 600 var(--t-sm)/1 var(--font); color: var(--text-2); white-space: nowrap;
     transition: color var(--fast);
   }
   .sm button { height: 28px; padding: 0 var(--s3); font-size: var(--t-xs); }
   button:hover { color: var(--text); }
   button.on { color: var(--text); }
-  .stack button { flex-direction: column; gap: 3px; height: 46px; padding: 0 2px; min-width: 0; font-size: 11px; }
-  .stack { border-radius: 18px; }
+  .stack button { flex-direction: column; gap: var(--s1); height: 46px; padding: 0 2px; min-width: 0; font-size: var(--t-xs); }
+  .stack { border-radius: var(--r-lg); }
   .stack .badge { position: absolute; top: 3px; left: calc(50% + 6px); }
-  .stack .thumb { border-radius: 15px; }
-  .badge { min-width: 17px; height: 17px; font-size: 10px; padding: 0 5px; }
+  .stack .thumb { border-radius: var(--r-md); }
+  .badge { min-width: 17px; height: 17px; font-size: var(--t-xs); padding: 0 var(--s1); }
   @media (pointer: coarse) { button { height: 40px; } .sm button { height: 36px; } .stack button { height: 50px; } }
   /* Light: a white track pressed into the page, and a white thumb standing up out of it. */
   :global(html[data-theme="light"]) .seg { background: #FAF9FB; border-color: transparent; box-shadow: var(--neu-in); }

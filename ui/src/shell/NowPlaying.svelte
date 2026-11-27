@@ -69,7 +69,7 @@
     </header>
 
     <div class="now">
-      <Cover url={coverOf(song)} title={song.title} size={shell.narrow ? (upNext > 0 ? "min(64vw, 300px)" : "min(78vw, 340px)") : 72} radius={shell.narrow ? 22 : 14} />
+      <Cover url={coverOf(song)} title={song.title} size={shell.narrow ? (upNext > 0 ? "min(64vw, 300px)" : "min(78vw, 340px)") : 72} radius={shell.narrow ? "var(--r-xl)" : "var(--r-md)"} />
       <div class="words truncate">
         {#if loose}<div class="title truncate">{song.title}</div>
         {:else}<a class="title truncate" href={href.song(song.id)} onclick={close}>{song.title}</a>{/if}

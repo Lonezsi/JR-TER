@@ -111,7 +111,7 @@
   .chan.muted .fader, .chan.muted .dial { opacity: 0.45; }
   .master { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, transparent), rgba(255, 255, 255, 0.015)); }
   .cname { max-width: 100%; font-size: 11px; font-weight: 600; color: var(--text-2); }
-  .read { font-size: 10.5px; color: var(--text-3); min-height: 13px; }
+  .read { font-size: var(--t-xs); color: var(--text-3); min-height: 13px; }
 
   /* A knob with a pointer line: the line is the promise that it turns. */
   .dial {
@@ -139,7 +139,7 @@
   .ms { display: flex; gap: 4px; }
   .flag {
     display: grid; place-items: center; width: 26px; height: 20px; border-radius: 4px;
-    font: 700 10.5px/1 var(--mono); color: var(--text-3); background: rgba(0, 0, 0, 0.35);
+    font: 700 var(--t-xs)/1 var(--mono); color: var(--text-3); background: rgba(0, 0, 0, 0.35);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); transition: background var(--fast), color var(--fast);
   }
   .flag:hover { color: var(--text); }

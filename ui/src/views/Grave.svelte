@@ -79,7 +79,7 @@
   .uplink { align-self: flex-start; margin: calc(var(--s2) * -1) 0 calc(var(--s1) * -1) calc(var(--s2) * -1); color: var(--text-2); }
   .lede { margin: 0; color: var(--text-2); }
   .item { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); }
-  .kind { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--hover); color: var(--text-2); }
+  .kind { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: var(--r-sm); background: var(--hover); color: var(--text-2); }
   .words { display: flex; flex-direction: column; min-width: 0; }
   .t { font-weight: 600; }
   .s { font-size: var(--t-sm); color: var(--text-3); }

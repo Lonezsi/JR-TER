@@ -195,7 +195,7 @@
     </div>
     <div class="list" aria-hidden="true">
       {#each Array(5) as _, i (i)}
-        <div class="item"><span class="sk" style="width:44px;height:44px;border-radius:10px"></span>
+        <div class="item"><span class="sk" style="width:44px;height:44px;border-radius:var(--r-sm)"></span>
           <span class="sk" style="height:13px;width:{35 + i * 6}%"></span></div>
       {/each}
     </div>

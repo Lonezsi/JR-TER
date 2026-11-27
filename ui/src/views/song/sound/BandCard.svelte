@@ -79,7 +79,7 @@
   .f input { padding-right: var(--s6); width: 100%; }
   .f .u {
     position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-    font-size: 10px; color: var(--text-3); pointer-events: none;
+    font-size: var(--t-xs); color: var(--text-3); pointer-events: none;
   }
   .foot { display: flex; align-items: center; gap: var(--s2); }
   .foot :global(.dropdown-field) { flex: 1 1 auto; min-width: 0; }
