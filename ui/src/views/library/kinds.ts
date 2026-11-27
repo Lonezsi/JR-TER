@@ -10,6 +10,9 @@ export interface AlbumRow extends Album {
   notes?: string;
   duration?: number;
   cover_digest?: string;
+  released_at?: number | string | null;
+  store_link?: string | null;
+  upc?: string | null;
   created_at?: number;
   updated_at?: number;
 }

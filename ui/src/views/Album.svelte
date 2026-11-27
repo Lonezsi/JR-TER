@@ -55,6 +55,9 @@
   let picker = $state<HTMLInputElement>();
   let titleBox = $state<HTMLInputElement>();
   const coverUrl = $derived(preview ?? albumCover(album));
+  // Where the record is sold, once it is released: https only, and nothing when empty.
+  const storeLink = $derived(/^https:\/\/[^\s/]/i.test(String(album?.store_link ?? "")) ? String(album?.store_link) : "");
+  const upc = $derived(String(album?.upc ?? "").trim());
 
   // The ground is the cover, enormous and out of focus, or a hue when there is none.
   $effect(() => {
@@ -241,6 +244,12 @@
         <input class="title-in" bind:this={titleBox} value={album.title} maxlength="200" aria-label="Album title"
                onblur={commitTitle}
                onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); else if (e.key === "Escape") { e.currentTarget.value = album.title; e.currentTarget.blur(); } }} />
+        {#if storeLink || upc}
+          <div class="row wrap released">
+            {#if storeLink}<a class="store" href={storeLink} target="_blank" rel="noopener noreferrer" title="Open the store page in a new tab"><Icon name="external" size={14} /> In stores</a>{/if}
+            {#if upc}<span class="muted num upc">UPC {upc}</span>{/if}
+          </div>
+        {/if}
         <div class="row wrap stats">
           <input class="year" inputmode="numeric" placeholder="Year" aria-label="Year" value={album.year ?? ""}
                  maxlength="4" onblur={commitYear} onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
@@ -323,6 +332,11 @@
   .year::placeholder { color: var(--text-3); }
   .stats { gap: 0 var(--s2); align-items: baseline; }
   .stats > * + *::before { content: "·"; margin-right: var(--s2); color: var(--text-3); }
+  .released { gap: 0 var(--s2); align-items: baseline; font-size: var(--t-sm); }
+  .released > * + *::before { content: "·"; margin-right: var(--s2); color: var(--text-3); }
+  .store { display: inline-flex; align-items: center; gap: var(--s1); color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  .store:hover { text-decoration-color: currentColor; }
+  .store:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
   .notes {
     width: 100%; resize: none; field-sizing: content; min-height: 24px; max-height: 120px;
     background: transparent; border: 0; border-radius: var(--r-sm); padding: var(--s1) 0; color: var(--text-2); font: inherit; font-size: var(--t-sm);

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 export const MARKERS = [
   ["Release button (album page)", "js", "/release.html?album="],
   ["Release in the album menu", "js", "Release to RouteNote"],
+  ["Store link and UPC (album page)", "js", "In stores"],
   ["DAW tab", "js", "value:`daw`"],
   ["DAW tab goes to the DAW page", "js", "/daw.html?song="],
   ["Open in the DAW (a take)", "js", "&version="],

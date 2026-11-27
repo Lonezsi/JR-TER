@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.34.16",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "Store link and UPC on the album",
+  "notes": [
+   "Under an album's title: a link to its store page (opens in a new tab) and its UPC, once the release is recorded.",
+   "Nothing shows while they are empty."
+  ]
+ },
+ {
   "version": "4.34.15",
   "date": "2026-11-27",
   "name": "JR!TER",

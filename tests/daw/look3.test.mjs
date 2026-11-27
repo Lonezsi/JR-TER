@@ -12,6 +12,9 @@ const src = (f) => fs.readFileSync(new URL("../../ui/src/" + f, import.meta.url)
 const IN_SOURCE = [
   ["views/Album.svelte", "/release.html?album="],
   ["views/Album.svelte", "album.release"],
+  ["views/Album.svelte", "album?.store_link"],
+  ["views/Album.svelte", 'rel="noopener noreferrer"'],
+  ["views/Album.svelte", "UPC {upc}"],
   ["views/Song.svelte", 'value: "daw"'],
   ["views/Song.svelte", "song.daw"],
   ["views/Song.svelte", "<DawTab"],
