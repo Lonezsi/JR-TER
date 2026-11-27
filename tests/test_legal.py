@@ -298,7 +298,7 @@ def test_the_notice_and_the_doors_say_16_and_over_and_what_changed():
         with open(os.path.join(ROOT, *rel.split("/")), encoding="utf-8") as f:
             raw = f.read()
         text = re.sub(r"\s+", " ", raw)
-        for word in ("16 and over", "share link", "Foyer", "fault log", "timetable", "Settings", "4.34.7"):
+        for word in ("16 and over", "share link", "Foyer", "fault log", "timetable", "Settings", "4.34.8"):
             assert word in text, (rel, word)
         assert "Signing up needs an invite" not in text, rel
         stamps.append(re.search(r'<p class="stamp">\s*(.*?)\s*<!--', raw, re.S).group(1))

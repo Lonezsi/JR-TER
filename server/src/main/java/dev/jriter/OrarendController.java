@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The timetable, a port of jriter/modules/orarend.py (read its docstring for why it is here and
- * why the data is not in the repo). The week is the OWNER's orarend.json, read by every account
- * and written only by the owner; notes, pages and absences are each account's own, in its library.
+ * why the data is not in the repo). The week is the OWNER's orarend.json, read by the owner and the
+ * owner's Foyer friends (CONDOM legal 3) and written only by the owner; notes, pages and absences are each account's own, in its library.
  *
  * shortcut: a week file that does not parse says what Jackson says, not Python's wording.
  */
@@ -36,11 +36,13 @@ public class OrarendController {
     private final Library library;
     private final Config config;
     private final Accounts accounts;
+    private final Auth auth;
 
-    public OrarendController(Library library, Config config, Accounts accounts) {
+    public OrarendController(Library library, Config config, Accounts accounts, Auth auth) {
         this.library = library;
         this.config = config;
         this.accounts = accounts;
+        this.auth = auth;
     }
 
     // -- the file ---------------------------------------------------------------------
@@ -58,6 +60,16 @@ public class OrarendController {
             String who = ownerName();
             throw new ApiError("Ezt az órarendet csak " + (who.isEmpty() ? "a tulajdonosa" : who) + " szerkesztheti.", 403);
         }
+    }
+
+    /** Who may read the week: the owner, or the owner's Foyer friend whose Foyer account, signed in in
+     *  this browser, is the one tied to this library (CONDOM legal 3). */
+    boolean mayRead(long me, String cookieHeader) {
+        if (me == Accounts.OWNER) return true;
+        String tied = accounts.foyerOf(me);
+        if (tied == null) return false;
+        Map<String, Object> f = auth.foyer(cookieHeader);
+        return f != null && tied.equals(f.get("id")) && Boolean.TRUE.equals(f.get("ownerFriend"));
     }
 
     /** The week as it is on disk: null when absent, {"broken": why} when it will not parse. */
@@ -256,7 +268,14 @@ public class OrarendController {
     }
 
     @GetMapping("/api/orarend")
-    public Object week(HttpServletRequest req) { return week(Api.acct(req)); }
+    public Object week(HttpServletRequest req) {
+        long me = Api.acct(req);
+        if (!mayRead(me, req.getHeader("Cookie"))) {
+            String who = ownerName();
+            throw new ApiError("Az órarendet csak " + (who.isEmpty() ? "a tulajdonosa" : who) + " és a Foyer-barátai láthatják. Ha az vagy, jelentkezz be a Foyeren, és kösd össze a fiókodat a Beállításokban.", 403);
+        }
+        return week(me);
+    }
 
     // -- writing the week -------------------------------------------------------------
 
