@@ -332,6 +332,8 @@ body.drop .roll, .midi-over { box-shadow: inset 0 0 0 2px var(--d-acc) !importan
 .sl-clip.audio { background-image: repeating-linear-gradient(90deg, #fff2 0 2px, transparent 2px 5px); }
 .sl-clip.sel { border-color: var(--d-acc); box-shadow: 0 0 0 1px var(--d-acc); }
 .sl-lbl { display: flex; align-items: center; gap: var(--d-s1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; pointer-events: none; }
+/* the left grip mirrors .sl-end */
+.sl-start { position: absolute; left: 0; top: 0; bottom: 0; width: 12px; cursor: ew-resize; background: #fff2; }
 .sl-end { position: absolute; right: 0; top: 0; bottom: 0; width: 12px; cursor: ew-resize; background: #fff2; }
 .sl-head { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--d-acc); pointer-events: none; }
 .sl-head[hidden] { display: none; }

@@ -126,6 +126,15 @@ export function resizeClip(song, i, length) {
   const c = song.clips[i];
   if (c) c.length = clamp(qb(length, 1), MIN, MAX_BARS - c.start);
 }
+// Trim from the left: start moves by d bars, offset by the same, the end stays.
+// Clamped so start >= 0, offset >= 0 and at least MIN of the clip is left.
+export function trimClipStart(song, i, d) {
+  const c = song.clips[i];
+  if (!c) return;
+  const off = c.offset || 0;
+  d = clamp(qb(d, 0), Math.max(-c.start, -off), c.length - MIN);
+  c.start = qb(c.start + d, 0); c.offset = qb(off + d, 0); c.length = qb(c.length - d, MIN);
+}
 // Cut at a bar strictly inside the clip. The second half keeps playing from where the first stopped.
 export function splitClip(song, i, atBar) {
   atBar = qb(atBar, 0);

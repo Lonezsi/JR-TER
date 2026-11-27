@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.34.14",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "Trim a clip from its start",
+  "notes": [
+   "On the Layout tab, drag the left edge of a clip to cut its beginning. The end stays where it is and what you hear doesn't shift.",
+   "Alt+Left and Alt+Right do the same from the keyboard, one snap step at a time.",
+   "Songs are saved exactly as before, so older files and versions are not affected."
+  ]
+ },
+ {
   "version": "4.34.13",
   "date": "2026-11-27",
   "name": "JR!TER",

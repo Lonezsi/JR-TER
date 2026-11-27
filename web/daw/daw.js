@@ -209,7 +209,7 @@ const HELP = [
   ["sidebar", "Tracks sit next to the roll. Pick one to edit it. M mutes, S solos.", "J, K, N"],
   ["songs", "Chords: pick a root and a type, or type a progression. To MIDI writes the notes into the song.", "Alt+1"],
   ["grid", "Drumroll: tap a step to light it, drag it up or down for its velocity or pitch. Swing loosens the groove.", "Alt+2, [ and ]"],
-  ["timeline", "Layout: tap a lane to place a pattern. Drag a clip to move it, drag its end to repeat it, hold it to delete it. Automate draws a knob's moves under the clips.", "Alt+5, S"],
+  ["timeline", "Layout: tap a lane to place a pattern. Drag a clip to move it, drag its end to repeat it, drag its start to trim it (Alt+arrows too), hold it to delete it. Automate draws a knob's moves under the clips.", "Alt+5, S"],
   ["eq", "Mixer: pick a strip, then click the arrow under another to send there. Double-click makes it the main output. The master ends in a limiter.", "Alt+6"],
   ["folder", "Browser: your one-shots, MIDI files, renders and takes. Drag a sound onto the Drumroll, a track or the Layout, a MIDI file onto the roll. Inst opens a sound in its own sampler.", "Alt+7"],
   ["code", "Script: pick one, set its sliders, run it on the track. Humanize and arpeggios come with it; edit them or write your own.", "Alt+4"],

@@ -114,7 +114,7 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     need((await song()).tracks[kick].steps[0], "pattern 1 lost its steps");
     await noSideways("rack after patterns");
   });
-  await scenario("the song playlist: place, repeat-drag, split, song mode, fits the phone", async () => {
+  await scenario("the song playlist: place, repeat-drag, left trim, split, song mode, fits the phone", async () => {
     await tapEl("#view-song");
     need((await view()) === "song", "view is " + (await view()));
     await noSideways("song tab");
@@ -127,6 +127,13 @@ export async function run({ scenario, need, js, sleep, tapEl, tapAt, holdAt, rec
     await dragAt({ x: e.x, y: e.y }, { x: e.x + 72, y: e.y });
     clips = await js("window.jriterDaw.clips()");
     need(clips[i].length === len0 + 2, "repeat-drag: length " + len0 + " -> " + clips[i].length);
+    const st = await rect(`.sl-clip[data-c="${i}"] .sl-start`);
+    await dragAt({ x: st.x, y: st.y }, { x: st.x + 36, y: st.y });
+    clips = await js("window.jriterDaw.clips()");
+    need(clips[i].start === 1 && clips[i].offset === 1 && clips[i].length === len0 + 1, "left trim gave " + JSON.stringify(clips[i]));
+    await js(`(() => { const n = document.querySelector('.sl-clip[data-c="${i}"]'); n.focus(); n.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", altKey: true, bubbles: true })); })()`);
+    clips = await js("window.jriterDaw.clips()");
+    need(clips[i].start === 0 && clips[i].offset === 0 && clips[i].length === len0 + 2, "Alt+Left gave " + JSON.stringify(clips[i]));
     await tapEl('[data-act="split"]');
     clips = await js("window.jriterDaw.clips()");
     need(clips.length === n0 + 2 && clips[i + 1].offset > 0, "split gave " + JSON.stringify(clips));
