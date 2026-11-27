@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.34.13",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "Loop a range on the Layout",
+  "notes": [
+   "Drag along the bar ruler on the Layout tab to loop part of the song.",
+   "Drag the range's edges or its middle to change it, or use the arrow keys. Double-click or Delete clears it, and Undo brings it back.",
+   "In Song mode, Play loops that range. Bounce still renders the whole song.",
+   "Saved in the song's text as an optional loop field; older files and older versions are not affected."
+  ]
+ },
+ {
   "version": "4.34.12",
   "date": "2026-11-27",
   "name": "JR!TER",

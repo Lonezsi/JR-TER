@@ -10,7 +10,7 @@ import { DEFAULT_PROGRESSION } from "./chords.js";
 import { run as runScript, defaultScripts } from "./script.js";
 import { mountRack } from "./rackview.js";
 import { mountSong } from "./songview.js";
-import { songNotes, songBars, addAudioClip } from "./playlist.js";
+import { songNotes, songBars, addAudioClip, cleanLoop, inSpan } from "./playlist.js";
 import { SOUND_TYPE } from "./library.js";
 import { createMixer } from "./mixgraph.js";
 import { mountSampler } from "./samplerview.js";
@@ -297,6 +297,10 @@ function grow(end) {
 }
 const inSong = () => song.mode === "song" && (song.clips || []).length > 0;
 const playLen = () => (inSong() ? songBars(song) * 4 : loopLen());
+// Song mode with a loop range: Play runs only that range (bounce still renders the whole song).
+const loopSpan = () => (inSong() ? cleanLoop(song.loop) : null);
+const runLen = () => { const l = loopSpan(); return l ? (l.to - l.from) * 4 : playLen(); };
+let loopAt = 0, playSpan = "null";
 function range() {
   let lo = 36, hi = 96;
   for (const t of song.tracks) for (const n of t.notes) { lo = Math.min(lo, n.pitch - 2); hi = Math.max(hi, n.pitch + 2); }
@@ -797,6 +801,9 @@ function play(from) {
   }
   songCache = inSong() ? songNotes(song) : null;
   audioCache = inSong() ? songAudio(song) : null;
+  const span = loopSpan();
+  loopAt = span ? span.from * 4 : 0; playSpan = JSON.stringify(span);
+  if (span) { songCache = songCache.map((x) => inSpan(x, loopAt, span.to * 4)); audioCache = inSpan(audioCache, loopAt, span.to * 4); }
   for (const t of song.tracks) if (t.sample) bufferOf(t.sample.src).catch(() => {}); // ready by the first note
   playing = true;
   t0 = ctx.currentTime + 0.05 - (from * 60) / song.bpm;
@@ -818,10 +825,11 @@ function stop(quiet) {
   }
 }
 function tick() {
-  const spb = 60 / song.bpm, len = playLen();
+  if (JSON.stringify(loopSpan()) !== playSpan) return play(0); // the loop range changed: start on the new one
+  const spb = 60 / song.bpm, len = runLen();
   if (mix && (song.automation || []).length) { // knobs that move: the mixer follows the lanes
     const b = curBeat();
-    mix.sync({ ...song, ...automated(song, looping ? b % len : b) });
+    mix.sync({ ...song, ...automated(song, loopAt + (looping ? b % len : b)) });
   }
   const upTo = curBeat() + 0.12 / spb;
   if (!looping && scheduled >= len) { if (curBeat() > len + 1) { playing = false; stop(); } return; }
@@ -847,7 +855,7 @@ function tick() {
 function frame() {
   draw();
   if (view === "rack") rackUI.playhead(playing ? Math.floor((curBeat() % 4) / 0.25) : -1);
-  if (view === "song") songUI.playhead(playing ? curBeat() % playLen() : -1);
+  if (view === "song") songUI.playhead(playing ? loopAt + (curBeat() % runLen()) : -1);
   if (view === "mixer" || (studio && dockOpen("mixer"))) mixUI.meters(playing && mix ? mix.levels() : null);
   if (playing) raf = requestAnimationFrame(frame);
 }
@@ -1196,6 +1204,7 @@ window.jriterDaw = {
   mode: () => song.mode,
   setMode,
   clips: () => JSON.parse(JSON.stringify(song.clips || [])),
+  loop: () => (song.loop ? { ...song.loop } : null),
   usePattern: switchPattern,
   load: (text) => { song = textToSong(text); sel = 0; selNote = null; changed(true); },
   zoom: () => zoom,

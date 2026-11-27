@@ -7,6 +7,7 @@
 //   offset   bars into the pattern where the clip starts (a cut makes the second half start later)
 // A pattern is song.bars long. A clip longer than that plays the pattern again (repeat-drag).
 // song.mode is "pattern" (Play loops the pattern being edited) or "song" (Play runs the clips).
+// song.loop (optional) = { from, to } in bars: in song mode Play loops that range.
 import { withPatterns, stepsToNotes } from "./pattern.js";
 
 export const MAX_LANES = 16;
@@ -37,6 +38,37 @@ export function cleanClips(list, nPatterns, nTracks = 0) {
       length: clamp(qb(c.length, 1), MIN, MAX_BARS),
       offset: clamp(qb(c.offset, 0), 0, MAX_BARS),
     });
+  }
+  return out;
+}
+
+// The loop range as { from, to } in bars on the sixteenth grid, or null when it is not a real range.
+export function cleanLoop(x) {
+  if (!x || typeof x !== "object") return null;
+  const a = qb(x.from, NaN), b = qb(x.to, NaN);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  const from = clamp(Math.min(a, b), 0, MAX_BARS), to = clamp(Math.max(a, b), 0, MAX_BARS);
+  return to - from < MIN - 1e-9 ? null : { from, to };
+}
+export function setLoop(song, a, b) {
+  const l = cleanLoop({ from: a, to: b });
+  if (l) song.loop = l; else delete song.loop;
+  return l;
+}
+export function moveLoop(song, d) {
+  const l = cleanLoop(song.loop);
+  if (!l) return;
+  const len = l.to - l.from, from = clamp(qb(l.from + d, l.from), 0, MAX_BARS - len);
+  song.loop = { from, to: qb(from + len, from + len) };
+}
+// Events (beats: { start, length, offset? }) that sound between f and t, moved so f is 0.
+// An audio event that began before f is cut and its offset moves on.
+export function inSpan(events, f, t) {
+  const out = [];
+  for (const e of events) {
+    const end = e.start + e.length;
+    if (e.start >= f && e.start < t) out.push({ ...e, start: e.start - f, length: Math.min(e.length, t - e.start) });
+    else if (e.offset != null && e.start < f && end > f) out.push({ ...e, start: 0, length: Math.min(end, t) - f, offset: e.offset + (f - e.start) });
   }
   return out;
 }
