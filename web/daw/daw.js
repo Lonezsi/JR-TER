@@ -324,7 +324,7 @@ function draw() {
   const blk = cssv("--d-black", "#0003"), mute = cssv("--d-mute", "#888");
   g.clearRect(0, 0, W, H);
   const y = (p) => (hi - p) * ROW - scrollY, x = (b) => GUTTER + b * pb - scrollX;
-  g.font = "10px system-ui, sans-serif"; g.textBaseline = "middle";
+  g.font = "11px system-ui, sans-serif"; g.textBaseline = "middle";
   for (let p = hi; p >= lo; p--) {
     const yy = y(p);
     if (yy > H || yy + ROW < 0) continue;
@@ -378,7 +378,7 @@ function draw() {
   if (cur && !cur.notes.length && !playing) {
     g.globalAlpha = 0.8; g.fillStyle = mute; g.font = "13px system-ui, sans-serif"; g.textAlign = "center";
     g.fillText(matchMedia("(pointer: coarse)").matches ? "Tap a square to add a note" : "Click a square to add a note", GUTTER + (W - GUTTER) / 2, H / 2);
-    g.textAlign = "left"; g.globalAlpha = 1; g.font = "10px system-ui, sans-serif";
+    g.textAlign = "left"; g.globalAlpha = 1; g.font = "11px system-ui, sans-serif";
   }
   g.clearRect(0, 0, GUTTER, H);
   for (let p = hi; p >= lo; p--) {
