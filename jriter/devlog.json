@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.34.10",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "The DAW on the shared look",
+  "notes": [
+   "The DAW's corners, gaps and text sizes now follow the same scale as the rest of JR!TER and Foyer.",
+   "Nothing in the DAW is smaller than 11px any more, and small buttons (mute, solo, routing) are easier to hit.",
+   "The docks have the glass edge the top bar has."
+  ]
+ }, {
   "version": "4.34.9",
   "date": "2026-11-27",
   "name": "JR!TER",
