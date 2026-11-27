@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { songNotes, songBars, addClip, moveClip, resizeClip, splitClip, removeClip, cleanClips, cleanLoop, setLoop, moveLoop, inSpan } from "../../web/daw/playlist.js";
+import { songNotes, songBars, addClip, moveClip, resizeClip, trimClipStart, splitClip, removeClip, cleanClips, cleanLoop, setLoop, moveLoop, inSpan } from "../../web/daw/playlist.js";
 import { songToText, textToSong, TEXT_VERSION } from "../../web/daw/midi.js";
 import { addPattern, removePattern, emptySteps } from "../../web/daw/pattern.js";
 
@@ -105,4 +105,17 @@ test("the loop is saved in the text, and the format version stays 11", () => {
   delete s.loop;
   assert.equal("loop" in JSON.parse(songToText(s)), false);
   assert.equal(TEXT_VERSION, 11);
+});
+
+test("trimming a clip from the left moves start and offset, and the end stays", () => {
+  const s = mk(); addClip(s, 0, 0, 2); resizeClip(s, 0, 4);
+  trimClipStart(s, 0, 1);
+  assert.deepEqual([s.clips[0].start, s.clips[0].offset, s.clips[0].length], [3, 1, 3]);
+  trimClipStart(s, 0, -5); // back to the clip's own beginning, no further
+  assert.deepEqual([s.clips[0].start, s.clips[0].offset, s.clips[0].length], [2, 0, 4]);
+  trimClipStart(s, 0, 10); // leaves one sixteenth, end still at 6
+  assert.equal(s.clips[0].length, 1 / 16);
+  assert.equal(s.clips[0].start + s.clips[0].length, 6);
+  assert.equal(s.clips[0].offset, s.clips[0].start - 2);
+  trimClipStart(s, 5, 1); // no such clip: nothing happens
 });

@@ -8,7 +8,7 @@
 // repeat it, hold it to delete it. Drag along the bar ruler to loop a range (drag its edges or
 // middle, arrows nudge, double-click or Delete clears). Model and maths: playlist.js.
 import { icon } from "./icons.js";
-import { addClip, addAudioClip, moveClip, resizeClip, splitClip, removeClip, songBars, setLoop, moveLoop, cleanLoop, MAX_LANES, MAX_BARS } from "./playlist.js";
+import { addClip, addAudioClip, moveClip, resizeClip, trimClipStart, splitClip, removeClip, songBars, setLoop, moveLoop, cleanLoop, MAX_LANES, MAX_BARS } from "./playlist.js";
 
 import { clipBars } from "./sampler.js";
 import { SONG_STEPS, stepFor, snapFloor, snapRound, snapOptions, loadSnap, saveSnap } from "./snap.js";
@@ -52,9 +52,9 @@ export function mountSong(el, api) {
         clips.map((c, i) => c.lane !== l ? "" :
           (c.track != null
             ? `<button class="sl-clip audio${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BP}px;width:${c.length * BP}px;--h:${(c.track * 67 + 200) % 360}" aria-label="${esc((song.tracks[c.track] || {}).name)}, audio, bar ${c.start + 1}, ${c.length} bars">` +
-              `<span class="sl-lbl">${icon("wave", 12)}${esc((song.tracks[c.track] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`
+              `<span class="sl-start" data-start="${i}"></span><span class="sl-lbl">${icon("wave", 12)}${esc((song.tracks[c.track] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`
             : `<button class="sl-clip${i === selected ? " sel" : ""}" data-c="${i}" style="left:${c.start * BP}px;width:${c.length * BP}px;--h:${(c.pattern * 67) % 360}" aria-label="${esc((pats[c.pattern] || {}).name)}, bar ${c.start + 1}, ${c.length} bars">` +
-              `<span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`)).join("") +
+              `<span class="sl-start" data-start="${i}"></span><span class="sl-lbl">${c.pattern + 1}. ${esc((pats[c.pattern] || {}).name)}</span><span class="sl-end" data-end="${i}"></span></button>`)).join("") +
         `</div>`;
     }
     const { loopHtml, bandHtml } = loopMarkup(L, BP);
@@ -171,12 +171,12 @@ export function mountSong(el, api) {
     const clip = e.target.closest(".sl-clip");
     if (!clip) return;
     const i = +clip.dataset.c, c = api.song().clips[i], grid = el.querySelector(".sl-grid");
-    const atEnd = !!e.target.closest(".sl-end");
+    const atEnd = !!e.target.closest(".sl-end"), atStart = !!e.target.closest(".sl-start");
     selected = i; if (c.pattern != null) brush = c.pattern;
-    drag = { i, end: atEnd, id: e.pointerId, x0: e.clientX, y0: e.clientY, bar0: barAt(e, grid), start0: c.start, len0: c.length, moved: false, before: api.snap(), grid };
+    drag = { i, end: atEnd, start: atStart, off0: c.offset || 0, id: e.pointerId, x0: e.clientX, y0: e.clientY, bar0: barAt(e, grid), start0: c.start, len0: c.length, moved: false, before: api.snap(), grid };
     try { clip.setPointerCapture(e.pointerId); } catch { /* moves still arrive */ }
     clearTimeout(hold);
-    if (!atEnd) hold = setTimeout(() => { if (drag && !drag.moved) { const d = drag; drag = null; navigator.vibrate?.(12); removeSel(d.i); } }, 460);
+    if (!atEnd && !atStart) hold = setTimeout(() => { if (drag && !drag.moved) { const d = drag; drag = null; navigator.vibrate?.(12); removeSel(d.i); } }, 460);
     el.querySelectorAll(".sl-clip.sel").forEach((x) => x.classList.remove("sel"));
     clip.classList.add("sel");
   });
@@ -189,7 +189,10 @@ export function mountSong(el, api) {
     const song = api.song(), db = barAt(e, drag.grid) - drag.bar0, sb = step() / 4;
     // Snap the result, not the movement: a clip that started off the grid lands on it.
     const snapped = (bars) => (sb > 0 ? snapRound(bars, sb) : bars);
-    if (drag.end) resizeClip(song, drag.i, Math.max(stepBars(), snapped(drag.len0 + db)));
+    if (drag.start) {
+      const c0 = song.clips[drag.i]; c0.start = drag.start0; c0.length = drag.len0; c0.offset = drag.off0;
+      trimClipStart(song, drag.i, Math.min(snapped(drag.start0 + db) - drag.start0, drag.len0 - stepBars()));
+    } else if (drag.end) resizeClip(song, drag.i, Math.max(stepBars(), snapped(drag.len0 + db)));
     else moveClip(song, drag.i, laneAt(e, drag.grid), snapped(drag.start0 + db));
     const c = song.clips[drag.i], node = el.querySelector(`.sl-clip[data-c="${drag.i}"]`);
     if (node) {
@@ -268,7 +271,7 @@ export function mountSong(el, api) {
     if (k === "Delete" || k === "Backspace") { e.preventDefault(); return removeSel(i); }
     if (k === "Enter") { e.preventDefault(); return c.track != null ? api.editSample(c.track) : api.editPattern(c.pattern); }
     const d = k === "ArrowRight" || k === "ArrowDown" ? 1 : -1;
-    if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { if (e.shiftKey) resizeClip(song, i, c.length + d * stepBars()); else moveClip(song, i, c.lane, c.start + d * stepBars()); });
+    if (k === "ArrowLeft" || k === "ArrowRight") api.change(() => { if (e.altKey) trimClipStart(song, i, d > 0 ? Math.min(stepBars(), c.length - stepBars()) : -stepBars()); else if (e.shiftKey) resizeClip(song, i, c.length + d * stepBars()); else moveClip(song, i, c.lane, c.start + d * stepBars()); });
     else if (k === "ArrowUp" || k === "ArrowDown") api.change(() => moveClip(song, i, c.lane + d, c.start));
     else return;
     e.preventDefault(); selected = i; render();
