@@ -18,8 +18,11 @@ Steps, each useful alone:
    app answers with `jriter-cli url jriter://release/ID`, which runs `jriter-cli release ID`:
    waits for the card and files in Downloads, then opens a terminal running `claude` on them.
    Needs Claude Code (`claude`) on the PC's PATH.
-3. **The button on the album page. Done** (rocket button next to More, a More-menu item and the palette entry `album.release`; hand patch of the built bundle, redo in `ui/` once it is committed). It waited for the Svelte `ui/` source; until then it is the page
+3. **The button on the album page.** Waits for the Svelte `ui/` source; until then it is the page
    above. The button should only link to `/release.html?album=ID`.
-4. **Later.** Write the store link or UPC back onto the album after a release.
+4. **The release on the album. Done.** Albums have `released_at`, `store_link` and `upc` (PATCH
+   `/api/albums/ID`; link https:// only, UPC 12-13 digits, empty clears). The Released box on
+   the release page saves them; the card's recipe tells the agent to fill it after the submit
+   (only the date while RouteNote has no UPC yet).
 
 Not decided for the agent: pricing, territories, release tier. It must ask.

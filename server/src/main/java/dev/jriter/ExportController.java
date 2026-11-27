@@ -65,6 +65,7 @@ public class ExportController {
         TAKEN.put("lyric_sheets", new String[] {"id", "song_id", "name", "position", "is_current", "created_at"});
         TAKEN.put("lyric_revisions", new String[] {"id", "sheet_id", "text", "created_at"});
         TAKEN.put("albums", new String[] {"id", "title", "year", "notes", "cover_digest", "cover_ext", "stickers",
+                "released_at", "store_link", "upc",
                 "created_at", "updated_at", "opened"});
         TAKEN.put("album_songs", new String[] {"album_id", "song_id", "position"});
         TAKEN.put("playlists", new String[] {"id", "title", "album_id", "created_at", "updated_at"});
