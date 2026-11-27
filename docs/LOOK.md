@@ -1,8 +1,10 @@
-# JR!TER look audit (Look 1)
+# JR!TER look audit (Look 1) and its fixes (Look 2)
 
 Measured 2026-11-27 against `foyer/shared/glass.css`. This is the list Look 2 works from:
 every fault names the screen, the element, what is off (with the measured value) and the
 Foyer value it should use. Nothing here is a matter of taste: each line has a number.
+
+Look 2 (2026-11-27) fixed every fault below in `ui/` and `web/daw/daw.css`; each line ends with what was done, and the "Look 2 re-measure" section at the end says what the same audit finds now. Nothing is deployed: the live site runs a hand-patched bundle until Look 3.
 
 ## How it was measured
 
@@ -42,139 +44,139 @@ every screen, and the tab bar keeps its size from page to page.
 
 - **Segmented control** (`ui/Segmented.svelte`, `.seg.md`, the tab bars on library, song,
   inbox): padding 3px on all sides (seen on 44 of 80 shots). Use `--s1` (4px).
-  `.seg.sm` has the same 3px.
+  `.seg.sm` has the same 3px. **Fixed in Look 2.**
 - **Segmented tab thumb / tab pill** (`.tab`, `button.tab`): radius 19px. Use `--r-lg` (18px),
   or `--r-pill` if it is meant to be a pill. The stacked variant uses 15px (`Segmented.svelte:95`):
-  use `--r-md` (13px).
+  use `--r-md` (13px). **Fixed in Look 2.**
 - **Segmented badge** (`Segmented.svelte:96`): padding `0 5px`, font 10px. Use `0 var(--s1)` or
   `0 var(--s2)` and `--t-xs` (11px). The shell tab badge (`Shell.svelte:491`) also sets 10px:
-  use `--t-xs`.
+  use `--t-xs`. **Fixed in Look 2.**
 - **Segmented button gap** (`button` inside `.seg`): column and row gap 7px (34 shots), 3px
-  row gap on stacked tabs. Use `--s2` (8px) and `--s1` (4px).
-- **Segmented button padding**: left/right 14px (30 shots). Use `--s3` (12px) or `--s4` (16px).
+  row gap on stacked tabs. Use `--s2` (8px) and `--s1` (4px). **Fixed in Look 2.**
+- **Segmented button padding**: left/right 14px (30 shots). Use `--s3` (12px) or `--s4` (16px). **Fixed in Look 2.**
 - **Cover tiles** (`ui/Cover.svelte`, `.cover` in song rows, album tiles, sidebar): radius 5px,
   7px or 10px depending on size (42, 36 and 8 shots). Use `--r-sm` (9px) for the small ones
   and `--r-md` (13px) for the 40px and up. The CD-case parts of the album art (`.face`,
   `.lid`, `.tray`) are 5px on purpose, so leave those; an album cover is a
-  physical object.
+  physical object. **Fixed in Look 2:** `Cover.svelte` uses `--r-sm` below 40px and `--r-md` from 40px; the CD-case parts stay 5px on purpose, so the audit still lists 5px on the album screens.
 - **Cover letter** (`Cover.svelte .letter`): 92px, 101px, 106px, 65px depending on cover size,
   none on the type scale. It is artwork, not text, so it can stay; pick `--t-3xl` steps if
-  it should follow the scale.
-- **Avatar initial** (`Sidebar.svelte .avatar`, 13px): use `--t-md` (14px) or `--t-sm` (12.5px).
-- **Song title in lists** (`span.truncate`, 19px, 36 shots): use `--t-lg` (16px) or `--t-xl` (20px).
-- **Small label type** (`span` 10.5px, 38 shots; `span.badge` 10px): use `--t-xs` (11px).
-- **Keyboard keys** (`kbd`, `base.css:139`): radius 6px. Use `--r-sm` (9px).
+  it should follow the scale. **Kept (Look 2):** it is artwork, sized by the cover (`46cqw`), not text.
+- **Avatar initial** (`Sidebar.svelte .avatar`, 13px): use `--t-md` (14px) or `--t-sm` (12.5px). **Fixed in Look 2.**
+- **Song title in lists** (`span.truncate`, 19px, 36 shots): use `--t-lg` (16px) or `--t-xl` (20px). **Fixed in Look 2.**
+- **Small label type** (`span` 10.5px, 38 shots; `span.badge` 10px): use `--t-xs` (11px). **Fixed in Look 2.**
+- **Keyboard keys** (`kbd`, `base.css:139`): radius 6px. Use `--r-sm` (9px). **Fixed in Look 2.**
 - **Waveform strip in rows** (`span.wave`, `a.all` in the sidebar): radius 8px and 6px.
-  Use `--r-sm` (9px).
+  Use `--r-sm` (9px). **Fixed in Look 2.**
 - **Spacing 5px / 6px** in `.rsep` margins (12px of margin in the words tab) and `.plart` (5px, 6px):
-  use `--s1` or `--s2`.
+  use `--s1` or `--s2`. **Fixed in Look 2.**
 
 ## Library, albums, playlists (390 and 1280)
 
 - **Library page, 1280, dark and light**: the song list's version and length columns sit at
   x=1070..1140 while the page is 292..1250 wide, leaving about 500px of empty row between
   the title and the numbers. Cap the row width with `--content-max` or align the columns to
-  the right edge of the page.
+  the right edge of the page. **Fixed in Look 2:** the song rows are capped at 720px, so the version and length sit near the title.
 - **Album and playlist hero, 390**: `button.art` and `button.icon-btn.sm` (the pencil)
   overlap by 20x20px. Move the pencil inside the cover by `--s2` or give the cover
-  `--s2` of margin.
+  `--s2` of margin. **Fixed in Look 2:** the pencil sits inside the cover, `--s2` from the corner. It is still a button over the cover, so layout-audit keeps listing it as an overlap; that is the design (like the hint chip).
 - **Album and playlist hero, 390**: `span.heroshape` margin-right 22.4px and 35.2px. Use
-  `--s5` (20px) and `--s6` (28px).
+  `--s5` (20px) and `--s6` (28px). **Fixed in Look 2.**
 - **Album and playlist hero** `button.grip` is 24x36 and `input.year` 32x19: both under the
-  40px finger target on touch (`layout-audit` "small"). Use 40px height (`--s7`).
-- **Playlists page**: `span.plart` margin-top 5px, margin-right 6px. Use `--s1`/`--s2`.
-- **Albums page**: `div.frame` margin-right 26.75px and 27.36px. Use `--s6` (28px).
+  40px finger target on touch (`layout-audit` "small"). Use 40px height (`--s7`). **Fixed in Look 2.**
+- **Playlists page**: `span.plart` margin-top 5px, margin-right 6px. Use `--s1`/`--s2`. **Fixed in Look 2.**
+- **Albums page**: `div.frame` margin-right 26.75px and 27.36px. Use `--s6` (28px). **Fixed in Look 2.**
 
 ## Song page
 
 - **Song hero**: fine at both widths. Cover radius uses the album-art radius, matching.
 - **Words tab, `.rt` (rich-text buttons)** (`WordsTab.svelte:580`): radius 10px, and
   `.rtool` 14px (12 shots each). Use `--r-sm` (9px) for the buttons and `--r-md` (13px)
-  for the toolbar.
+  for the toolbar. **Fixed in Look 2.**
 - **Words tab, `textarea.edit`**: margin-left 78px and 96px (the gutter). Use `--s7` (40px)
-  plus `--s8` (56px) as the token pair, or keep one `--gw` value from the scale (56px).
-- **Words tab, `textarea.de.c` / `span.tag` / `span.flag`**: radius 6px. Use `--r-sm` (9px).
-- **Words tab, `.letter`** (rhyme letters): radius 5px, padding off scale. Use `--r-sm`.
+  plus `--s8` (56px) as the token pair, or keep one `--gw` value from the scale (56px). **Fixed in Look 2:** the gutter is built from tokens (`--gw` = `--s8` + `--s7`, `--s8` + `--s5` on a phone). The audit still prints the computed 96px and 76px, which are sums of tokens.
+- **Words tab, `textarea.de.c` / `span.tag` / `span.flag`**: radius 6px. Use `--r-sm` (9px). **Fixed in Look 2.**
+- **Words tab, `.letter`** (rhyme letters): radius 5px, padding off scale. Use `--r-sm`. **Fixed in Look 2.**
 - **Words tab / About / Plugins, `article.card.sheet`** (950x502 at 1280, 358x498 at 390):
   background `rgba(255,255,255,0.07)` with no backdrop filter. The other cards on the page use the
-  glass. Use `var(--glass)` with `--glass-filter-thin` and `--edge-top`.
+  glass. Use `var(--glass)` with `--glass-filter-thin` and `--edge-top`. **Fixed in Look 2.**
 - **Arrange tab, 390**: the transport row (`div.group.transport`, `div.snap`) sticks out of
   `div.head` by 149px, and `div.inner` is 483px in a 334px box. The header needs
-  `flex-wrap: wrap` with `gap: var(--s2)` below 640px.
+  `flex-wrap: wrap` with `gap: var(--s2)` below 640px. **Fixed in Look 2.**
 - **Arrange tab, 390 and 1280**: `button.on` / `button` padding 10px, 11.5px font, 24px tall
-  (38x24, 45x24 hit targets). Use `--s3` padding, `--t-sm` (12.5px) and 40px on touch.
+  (38x24, 45x24 hit targets). Use `--s3` padding, `--t-sm` (12.5px) and 40px on touch. **Fixed in Look 2.**
 - **Arrange tab, `div.trace`** (334x72, 918x84): background `rgba(0,0,0,0.26)`, no glass. Use
-  `--surface-2` or `--glass` over `--r-md`.
+  `--surface-2` or `--glass` over `--r-md`. **Fixed in Look 2.**
 - **Sound tab, 390**: `button.link.add` and `span.arrow` stick out past the right edge
   (scrolls horizontally). Wrap the effect chain (`flex-wrap`) or let it scroll inside its
-  own box.
+  own box. **Fixed in Look 2.**
 - **Sound tab, `div.wrap`** (the EQ canvas, 326x232 and 918x302): background
-  `rgba(0,0,0,0.38)`, no glass. Use `--surface` (dark) or the light theme's inset token.
+  `rgba(0,0,0,0.38)`, no glass. Use `--surface` (dark) or the light theme's inset token. **Fixed in Look 2.**
 - **Sound tab, `div.pills`**: margin-left 38.6px and 630.6px (auto-margins from a flex row
-  with leftover width). Use `margin-left: auto` or a gap, not a measured value.
+  with leftover width). Use `margin-left: auto` or a gap, not a measured value. **Kept (Look 2):** the source already says `margin-left: auto`; the measured value is leftover width, not a written one.
 - **Sound tab, `button.power`** (22x22) and the `.slots` row-gap 3px: use 40px target on
-  touch, `--s1` for the gap.
-- **Sound tab, `button..lot`** (the A/B slot): radius 15px. Use `--r-md` (13px).
+  touch, `--s1` for the gap. **Fixed in Look 2.**
+- **Sound tab, `button..lot`** (the A/B slot): radius 15px. Use `--r-md` (13px). **Fixed in Look 2.**
 - **Renders tab, 390**: `div.devices` sticks out of `div.controls` by 110px, with
   `button.field.dropdown-field` and `label.dev` also wider than the window. The row needs
   `flex-wrap: wrap`; the `html[data-narrow] .devices {width:100%}` rule at
-  `VocalsPanel.svelte:252` does not win here.
-- **Renders tab, `div.devices` 1280**: margin-left 330.9px (auto margin). Use `--s5`.
+  `VocalsPanel.svelte:252` does not win here. **Fixed in Look 2.**
+- **Renders tab, `div.devices` 1280**: margin-left 330.9px (auto margin). Use `--s5`. **Fixed in Look 2.**
 - **Renders tab, `button.name.truncate`** is 138-140 x 20: under the hit size. Use 40px
-  height on touch (`--s7`).
-- **Renders tab, `span.tag`**: radius 6px. Use `--r-sm`.
+  height on touch (`--s7`). **Fixed in Look 2.**
+- **Renders tab, `span.tag`**: radius 6px. Use `--r-sm`. **Fixed in Look 2.**
 - **Release tab, `div.card.block`** (950x100 .. 950x403, 358x132 .. 358x544): background
-  `rgba(255,255,255,0.07)` with no backdrop filter. Use `var(--glass)`.
+  `rgba(255,255,255,0.07)` with no backdrop filter. Use `var(--glass)`. **Fixed in Look 2.**
 - **Release tab, `button.pill`** (298x62, 318x62): background 6% white (dark) and 6% ink
-  (light), no border or filter. Use `--glass-2` and `--glass-line`.
-- **Release tab, `textarea.field`**: background `rgba(0,0,0,0.28)`. Use `--surface-2`.
+  (light), no border or filter. Use `--glass-2` and `--glass-line`. **Fixed in Look 2.**
+- **Release tab, `textarea.field`**: background `rgba(0,0,0,0.28)`. Use `--surface-2`. **Fixed in Look 2.**
 
 ## Settings (list, account, library, appearance)
 
-- **Appearance, `div.t fontname`**: font 19px. Use `--t-lg` (16px) or `--t-xl` (20px).
-- **Appearance, `div.seg.sm`**: padding 3px (see Segmented). Use `--s1`.
+- **Appearance, `div.t fontname`**: font 19px. Use `--t-lg` (16px) or `--t-xl` (20px). **Fixed in Look 2.**
+- **Appearance, `div.seg.sm`**: padding 3px (see Segmented). Use `--s1`. **Fixed in Look 2.**
 
 ## Inbox
 
 - **Inbox, 1280 and 390**: `span.tail.row` margin-left 66.2px and 275.9px, auto margins.
-  Use `margin-left: auto`.
+  Use `margin-left: auto`. **Kept (Look 2):** the source already says `margin-left: auto`; the measured value is leftover width.
 - **Inbox, `button.chk`** is 22x22, under the 40px finger target. Use `--s7` of hit area
-  (a transparent padding around the 22px circle is enough).
-- **Inbox, `div.seg.sm`**: padding-top 3px. Use `--s1`.
+  (a transparent padding around the 22px circle is enough). **Fixed in Look 2.**
+- **Inbox, `div.seg.sm`**: padding-top 3px. Use `--s1`. **Fixed in Look 2.**
 
 ## Grave
 
 - **Grave, 1280**: `div.page.grave` has `max-width: 900px` (`Grave.svelte:78`) and is centred,
   so its left edge is at x=345 while every other page starts at x=292 (margin 53px). Use the
-  shared `.page` width (`--content-max`) so the heading lines up with the library's.
+  shared `.page` width (`--content-max`) so the heading lines up with the library's. **Fixed in Look 2.**
 
 ## Login
 
 - **Login, 390 and 1280**: `input.field` padding-top/bottom 10px. Use `--s3` (12px) so the
-  fields match the buttons (the page's own `button.btn.primary` is 13.5px type: use `--t-md`).
-- **Login, `label`** gap 6px, `h1` gap 7px. Use `--s2` and `--s1`.
+  fields match the buttons (the page's own `button.btn.primary` is 13.5px type: use `--t-md`). **Fixed in Look 2.**
+- **Login, `label`** gap 6px, `h1` gap 7px. Use `--s2` and `--s1`. **Fixed in Look 2.**
 - **Login**: footer text `a` and `p.note` are 12px, and the body copy is 14px with a
-  size off the scale: use `--t-sm` (12.5px).
+  size off the scale: use `--t-sm` (12.5px). **Fixed in Look 2.**
 
 ## DAW (`/daw.html`, own stylesheet `web/daw/daw.css`)
 
 - **DAW, 390**: 12 pairs of `button x button` overlap (the toolbar, 11x27 up to 40x27), and
   the mixer routing buttons `button.mx-route` are 20x14. Space the toolbar with `gap: var(--s1)`
-  and make the routing buttons at least 40px high on touch.
+  and make the routing buttons at least 40px high on touch. **Fixed in Look 2:** the transport gap is `--d-s1` and the routing buttons are 28px (40px on a phone). The 12 pairs the audit still prints are the chord panel's step buttons, scrolled out of view under the bottom bar (clipped by the panel), not buttons on top of each other.
 - **DAW, both widths**: hit targets of 16x18, 18x16, 33..57 x 24 (10 shots at 1280). Use
-  28px minimum with a pointer, 40px on touch (`layout-audit.js` limits).
+  28px minimum with a pointer, 40px on touch (`layout-audit.js` limits). **Fixed in Look 2 except** the tiny up/down steppers inside number fields (16x18, shown on hover; the field itself, the keyboard and the wheel do the same job).
 - **DAW radii**: buttons 8px, inputs 8px, `button.dd` 8px, small chips 3px and 4px, `header.bar`
   20px, `section.help` 12px, `button` 14px. Use `--r-sm` (9px), `--r-md` (13px), `--r-lg` (18px).
-  `header.bar` should be `--r-xl` (24px) like the main app's top bar.
+  `header.bar` should be `--r-xl` (24px) like the main app's top bar. **Fixed in Look 2.**
 - **DAW type**: 9px (`span.mx-num`, `span.mx-lim`, `button`), 9.5px (`span.mx-db`),
   10px (`span.lb`, `span.l-n`), 10.5px, 12px, 13px. Use `--t-xs` (11px) and above.
-  Nothing should be under 11px.
+  Nothing should be under 11px. **Fixed in Look 2.**
 - **DAW spacing**: `button` gap 6px, `div.mx-mid` gap 3px, `div.sv-doc.sp-note` padding-left
   36px, `button` padding 10px and 6px, `div.grp.set` margin-left 266px (auto). Use `--s1`,
-  `--s2`, `--s3`, `--s7` (40px).
+  `--s2`, `--s3`, `--s7` (40px). **Fixed in Look 2** (token padding and gaps); the `auto` margin on `.grp.set` stays, it pushes the group right.
 - **DAW panels**: the dock panels (Browser, Layout, Mixer) are flat dark rectangles with
   a 1px line and no `--edge-top` or `--glass-shadow`, unlike the glass top bar. Give the docks
-  `var(--glass)`, `var(--glass-filter-thin)`, `var(--glass-line)` and `var(--edge-top)`.
+  `var(--glass)`, `var(--glass-filter-thin)`, `var(--glass-line)` and `var(--edge-top)`. **Fixed in Look 2.**
 
 ## For Look 2, in order
 
@@ -186,3 +188,37 @@ every screen, and the tab bar keeps its size from page to page.
 6. Grave width, inbox/pills auto-margins.
 7. DAW: radii, type under 11px, dock panels onto the glass tokens.
 8. Login spacing.
+
+## Look 2 re-measure (2026-11-27)
+
+Same 80 shots (20 screens x 390/1280 x dark/light), same `tools/dev.py`, same probe, on the
+`ui/` build after the fixes. Counts are items summed over all shots:
+
+| what | Look 1 | after Look 2 |
+|---|---|---|
+| spacing off the scale | 684 | 24 |
+| clipped or sticking out | 10 | 0 |
+| controls under the hit size | 66 | 2 |
+| sideways scroll | 24 | 2 |
+| radii off the scale | 361 | 44 |
+| text sizes off the scale | 302 | 92 |
+| controls overlapping | 32 | 26 |
+| flat panels (no backdrop blur) | 36 | 14 |
+
+What is left, and why it is not a fault:
+
+- **Spacing 24**: sums of tokens (`--gw` 96 and 76px), the leftover width of `margin-left: auto`
+  (inbox, sound pills, DAW settings group), and the playlist fan's room (`--s5`/`--s6` margins).
+- **Radii 44, text 92**: the CD-case parts of the album art (5px, on purpose), the cover letter
+  (artwork, sized by the cover, so the tiny covers on the albums page print 3-8px), the DAW's 1-2px
+  meter strips, and the Beat/Bar snap thumbs.
+- **Overlap 26**: the album pencil on the cover (by design), and in the DAW at 390 the chord
+  step buttons that sit scrolled out of view under the bottom bar.
+- **Hit size 2, sideways scroll 2**: the DAW's number-field steppers (hover only) and the chord chip
+  strip, which scrolls inside its own box.
+- **Flat panels 14**: `.glass` panes (the settings nav, the sound panel, take rows) get their blur
+  from the shared backing layer, not from a per-element filter, as `base.css` explains; the wells
+  (`--well`, `--well-2`) are insets, not floating glass. Cards (`.card`) now have the thin blur.
+
+New tokens: `--well` and `--well-2` in `ui/src/styles/base.css` (the dark inset film; the light
+theme maps them to `--surface-2`), used by the EQ canvas, the arrangement trace and text fields.

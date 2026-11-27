@@ -373,6 +373,8 @@ try {
     await js(`(() => { const i = document.querySelector("#mixerview .mx-wurl"); i.value = "/daw/vendor/wam/test-gain.js"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     for (let i = 0; i < 120 && !(await vis('#mixerview [data-fx="open"]')); i++) await sleep(100);
     need(await vis('#mixerview [data-fx="open"]'), "the plugin did not load: " + (await js(`document.querySelector("#mixerview .mx-wst")?.textContent + " " + JSON.stringify(window.jriterDaw.plugins())`)));
+    // The "added" toast sits bottom right and can cover the Open button for a moment: let it go first.
+    for (let i = 0; i < 80 && (await vis(".toasts .toast")); i++) await sleep(100);
     await click('#mixerview [data-fx="open"]'); await sleep(200);
     need(await vis("#test-plugin-gui"), "the plugin window did not show its own controls");
     await js(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`); await sleep(300);
