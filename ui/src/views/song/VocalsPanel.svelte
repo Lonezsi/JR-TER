@@ -241,15 +241,14 @@
   .none { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s2); padding: var(--s5) var(--s3); color: var(--text-2); }
   .none p { max-width: 44ch; }
   @media (max-width: 640px) {
-    .controls { flex-wrap: nowrap; }
     .controls .btn.lg { height: 42px; padding: 0 var(--s5); font-size: var(--t-md); }
   }
   @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
-  .devices { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-left: auto; }
+  .devices { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-left: var(--s5); }
   .dev { display: inline-flex; align-items: center; gap: var(--s2); color: var(--text-3); }
   .dev :global(.dropdown-field) { max-width: 200px; }
   /* A phone: the two pickers share the row evenly and their names truncate inside. */
-  :global(html[data-narrow]) .devices { width: 100%; margin-left: 0; }
+  :global(html[data-narrow]) .controls .devices { width: 100%; max-width: 100%; margin-left: 0; }
   :global(html[data-narrow]) .dev { flex: 1 1 100%; min-width: 0; }
   :global(html[data-narrow]) .dev :global(.dropdown-field) { width: 100%; max-width: none; }
 </style>

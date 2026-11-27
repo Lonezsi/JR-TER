@@ -592,10 +592,12 @@
   .rrow.live .name { color: var(--accent-text); }
 
   .chk {
-    flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
     border: 1.5px solid var(--line-2); color: var(--accent-ink); opacity: 0; transition: opacity var(--fast), background var(--fast);
   }
   .rrow:hover .chk, .rlist:focus-within .chk, .chk.on { opacity: 1; }
+  /* A 22px circle, but a 40px hit area: the pad around it is part of the button. */
+  .chk::after { content: ""; position: absolute; inset: -9px; }
   .chk.on { background: var(--accent); border-color: transparent; }
   /* The name is what the row is for: it never gets less than this, and the columns around it
      give way in the order they matter least (see the container queries below). */

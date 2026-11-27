@@ -57,6 +57,9 @@
   --safe-r: env(safe-area-inset-right, 0px);
 
   color-scheme: dark;
+  /* A well: what a canvas or a text field sits in, pressed into the glass (Look 2). */
+  --well: rgb(0 0 0 / 0.38);
+  --well-2: rgb(0 0 0 / 0.26);
 }
 
 /* LIGHT. The same glass in daylight: a pale warm-grey page, white film, dark ink. The
@@ -68,6 +71,8 @@
   --bg-deep: #ECE9EB;
   --surface: #FFFFFF;
   --surface-2: #F7F5F6;
+  --well: var(--surface-2);
+  --well-2: var(--surface-2);
   --elevated: #FFFFFF;
   --hover: rgba(20, 16, 24, 0.06);
   --pressed: rgba(20, 16, 24, 0.10);
@@ -279,11 +284,12 @@ html[data-blur="native"] .backing { display: none; }
   box-shadow: var(--edge-top), var(--shadow-3);
   border-radius: var(--r-lg);
 }
-/* A card inside a screen: the same film and the same edge. It does not blur anything of
-   its own, because what is behind it is the ground, which is already a 70px blur: blurring
-   a blur changes nothing you could see, and it costs a render pass per card. */
+/* A card inside a screen: the same film and the same edge. It takes the thin blur, so
+   a card over artwork or the particles reads as glass like the panes do (Look 2). */
 .card {
   background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter-thin);
+  backdrop-filter: var(--glass-filter-thin);
   border: 0;
   border-radius: var(--r-lg);
   box-shadow: var(--edge-top);

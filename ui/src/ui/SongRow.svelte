@@ -134,6 +134,7 @@
   }
   .grip:hover { color: var(--text); background: var(--hover); }
   .grip:active { cursor: grabbing; }
+  @media (pointer: coarse) { .grip { height: var(--s7); width: var(--s6); } }
   .over {
     position: absolute; inset: 0; display: grid; place-items: center; border-radius: var(--r-sm);
     background: rgba(0, 0, 0, 0.45); color: var(--accent-text);

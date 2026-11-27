@@ -32,7 +32,7 @@
 
 <style>
   .card-album { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
-  .frame { position: relative; aspect-ratio: 1; margin-right: 16%; }
+  .frame { position: relative; aspect-ratio: 1; margin-right: var(--s6); }
   .art { display: block; width: 100%; height: 100%; border-radius: var(--r-lg); transition: transform var(--med), box-shadow var(--med); }
   .art :global(.albumart) { width: 100% !important; height: 100% !important; margin-right: 0 !important; }
 

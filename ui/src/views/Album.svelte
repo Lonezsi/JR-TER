@@ -332,7 +332,9 @@
   .slot { position: relative; border-radius: var(--r-md); }
   .slot :global(.item) { width: 100%; }
   .slot:global(.lifted) { background: var(--glass-2); box-shadow: var(--shadow-3); }
+  @media (pointer: coarse) { .year { min-height: var(--s7); padding-block: var(--s2); } }
   @media (max-width: 640px) {
+    .heroshape { margin-right: var(--s5); }
     .hero { flex-direction: column; align-items: stretch; gap: var(--s4); padding: 0; margin: 0; }
     .art { align-self: center; --art: var(--hero-art); }
   }
@@ -340,8 +342,8 @@
   /* Up one level: where this lives. Back always means up (H does the same). */
   .uplink { align-self: flex-start; margin: calc(var(--s2) * -1) 0 calc(var(--s1) * -1) calc(var(--s2) * -1); color: var(--text-2); }
   /* The disc peeks out to the right, so the words keep its room. */
-  .heroshape { position: relative; flex: none; margin-right: calc(var(--art) * 0.16); }
+  .heroshape { position: relative; flex: none; margin-right: var(--s6); }
   .heroshape .art :global(.albumart) { margin-right: 0 !important; }
   /* The stickers' pen: on the case's corner, out of the cover's click. */
-  .stickers-btn { position: absolute; left: -10px; bottom: -10px; z-index: 5; background: var(--glass-2); box-shadow: var(--shadow-1); }
+  .stickers-btn { position: absolute; left: var(--s2); bottom: var(--s2); z-index: 5; background: var(--glass-2); box-shadow: var(--shadow-1); }
 </style>

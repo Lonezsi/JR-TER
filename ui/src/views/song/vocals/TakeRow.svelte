@@ -98,7 +98,8 @@
   .row { display: flex; align-items: center; gap: var(--s3); min-height: 48px; }
   .wave { width: 96px; height: 30px; flex: none; }
   .name { display: flex; flex-direction: column; line-height: 1.3; }
-  .title { font-weight: 600; text-align: left; border-radius: 6px; padding: 0 2px; margin-left: -2px; color: var(--text); }
+  .title { font-weight: 600; text-align: left; border-radius: var(--r-sm); padding: 0 var(--s1); margin-left: calc(var(--s1) * -1); color: var(--text); }
+  @media (pointer: coarse) { button.title { min-height: var(--s7); } }
   button.title:hover { background: var(--hover); }
   .sub { font-size: var(--t-sm); }
   .edit { flex: none; }

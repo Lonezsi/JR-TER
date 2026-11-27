@@ -765,7 +765,7 @@
   /* Explicit direction and padding: the global .group in controls.css is a column of
      settings rows, and without these it wins and stacks every toolbar button. */
   .group { display: flex; flex-direction: row; align-items: center; gap: var(--s1); flex-wrap: wrap; padding: 0; }
-  .bpm { display: flex; align-items: center; gap: 6px; padding: 0 var(--s1); font-size: var(--t-sm); }
+  .bpm { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s1); font-size: var(--t-sm); }
   .bpm .field { width: 74px; text-align: right; font-weight: 600; }
   .spacer { flex: 1 1 8px; }
   .tail { flex-wrap: nowrap; margin-left: auto; }
@@ -775,14 +775,14 @@
   /* A phone: tempo and offset are a row each, lined up on the same left edge, and the
      tools sit on their own row at the right. Every control the same 40px height. */
   /* Tempo gets a row; Offset shares its row with undo, zoom and ⋯ at the right end. */
-  :global(html[data-narrow]) .head { display: grid; grid-template-columns: auto 1fr; gap: var(--s2); }
+  :global(html[data-narrow]) .head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2); }
   :global(html[data-narrow]) .head > .group:first-child { grid-column: 1 / -1; }
   :global(html[data-narrow]) .tail { gap: 0; }
   :global(html[data-narrow]) .head .group :global(.icon-btn.sm) { width: 30px; }
   :global(html[data-narrow]) .tail :global(.icon-btn.sm) { width: 28px; }
   :global(html[data-narrow]) .bpm .field { width: 62px; }
   :global(html[data-narrow]) .head .spacer { display: none; }
-  :global(html[data-narrow]) .head .group { flex-wrap: nowrap; }
+  :global(html[data-narrow]) .head .group { flex-wrap: wrap; min-width: 0; }
   :global(html[data-narrow]) .head :global(.btn.sm), :global(html[data-narrow]) .head :global(.icon-btn.sm), :global(html[data-narrow]) .head .field { height: 40px; }
   :global(html[data-narrow]) .tail { justify-self: end; }
   .small { font-size: var(--t-sm); }
@@ -802,8 +802,9 @@
   .lcd b { font-size: 15px; font-weight: 600; color: var(--accent-hi); text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent); }
   .lcd b i { font-style: normal; opacity: 0.55; }
   .lcd span { font-size: 11px; opacity: 0.8; }
-  .snap { display: inline-flex; padding: 2px; border-radius: var(--r-pill); background: rgba(0, 0, 0, 0.3); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }
-  .snap button { height: 24px; padding: 0 10px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600; color: var(--text-3); transition: background var(--fast), color var(--fast); }
+  .snap { display: inline-flex; padding: var(--s1); border-radius: var(--r-pill); background: rgba(0, 0, 0, 0.3); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }
+  .snap button { height: 28px; padding: 0 var(--s3); border-radius: var(--r-pill); font-size: var(--t-sm); font-weight: 600; color: var(--text-3); transition: background var(--fast), color var(--fast); }
+  @media (pointer: coarse) { .snap button { height: 40px; } }
   .snap button:hover { color: var(--text); }
   .snap button.on { background: var(--glass-2); color: var(--text); box-shadow: var(--edge-top); }
   .tail :global(.icon-btn.on) { color: var(--accent-text); background: var(--hover); }

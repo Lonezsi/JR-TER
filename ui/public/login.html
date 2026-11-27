@@ -68,7 +68,7 @@ body::before {
 }
 @media (prefers-reduced-motion: reduce) { .door { animation: none; } }
 .door h1 {
-  display: flex; align-items: center; gap: 7px;
+  display: flex; align-items: center; gap: var(--s1);
   font-family: var(--display); font-weight: 800; font-size: 34px;
   letter-spacing: -0.03em; margin: 0 0 var(--s2);
 }
@@ -79,32 +79,33 @@ body::before {
    rewritten on load and swaps between the setup and sign in wordings. */
 .slogan {
   margin: 0 0 var(--s4);
-  font-size: 11.5px; letter-spacing: 0.06em;
+  font-size: var(--t-xs); letter-spacing: 0.06em;
   color: var(--text-3);
 }
-.door p { color: var(--text-2); margin: 0 0 var(--s6); font-size: 14px; line-height: 1.6; }
+.door p { color: var(--text-2); margin: 0 0 var(--s6); font-size: var(--t-md); line-height: 1.6; }
 .door label {
-  display: flex; flex-direction: column; gap: 6px;
-  font-size: 12.5px; font-weight: 600; color: var(--text-2);
+  display: flex; flex-direction: column; gap: var(--s2);
+  font-size: var(--t-sm); font-weight: 600; color: var(--text-2);
   margin-bottom: var(--s4);
 }
-.door .btn { width: 100%; height: 44px; }
+.door .btn { width: 100%; height: 44px; font-size: var(--t-md); }
+.door .field { height: auto; padding-block: var(--s3); }
 .note {
-  margin: var(--s5) 0 0; font-size: 12.5px; color: var(--text-3); line-height: 1.6;
+  margin: var(--s5) 0 0; font-size: var(--t-sm); color: var(--text-3); line-height: 1.6;
 }
-.note.legal { margin-top: var(--s3); font-size: 12px; }
+.note.legal { margin-top: var(--s3); font-size: var(--t-sm); }
 .note.legal a { color: var(--accent); }
 .problem {
-  margin: 0 0 var(--s4); padding: 10px var(--s4);
+  margin: 0 0 var(--s4); padding: var(--s3) var(--s4);
   border-radius: var(--r-md);
   background: rgba(212, 104, 94, 0.12);
-  color: var(--bad-hi); font-size: 13px; font-weight: 600;
+  color: var(--bad-hi); font-size: var(--t-sm); font-weight: 600;
 }
 /* Same reason as the app: an author rule setting display beats the browser's own
    [hidden] rule, and .door label sets display: flex. */
 [hidden] { display: none !important; }
 /* Foyer, the machine's one sign-in: a quiet line above the form, never a wall */
-.foyer-line { margin: 0 0 var(--s4); font-size: 13px; color: var(--text-2); }
+.foyer-line { margin: 0 0 var(--s4); font-size: var(--t-sm); color: var(--text-2); }
 .foyer-line a, .foyer-line button {
   color: var(--accent); font: inherit; font-weight: 600;
   background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none;

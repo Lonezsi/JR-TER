@@ -207,7 +207,7 @@
 <style>
   .trace {
     position: relative; height: 84px; border-radius: var(--r-md); overflow: hidden;
-    background: rgba(0, 0, 0, 0.26); border: 1px solid var(--line);
+    background: var(--well-2); border: 1px solid var(--line);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
     cursor: pointer; user-select: none; touch-action: pan-y;
     transition: border-color var(--fast), box-shadow var(--fast);

@@ -171,7 +171,7 @@
 <style>
   .wrap {
     position: relative; border-radius: var(--r-lg); overflow: hidden;
-    background: rgba(0, 0, 0, 0.38); border: 1px solid var(--line);
+    background: var(--well); border: 1px solid var(--line);
     user-select: none; touch-action: none;
   }
   canvas { width: 100%; height: 190px; touch-action: none; }

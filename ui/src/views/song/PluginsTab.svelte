@@ -51,7 +51,7 @@
   li { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-md); }
   .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .mute { opacity: 0.65; font-size: 12px; margin: 0; }
-  .tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; opacity: 0.7; }
+  .tag { font-size: var(--t-xs); padding: 1px var(--s2); border-radius: var(--r-pill); border: 1px solid currentColor; opacity: 0.7; }
   .tag.warn { color: #e0a030; opacity: 1; }
   .page { margin-left: 6px; color: inherit; vertical-align: middle; }
 </style>

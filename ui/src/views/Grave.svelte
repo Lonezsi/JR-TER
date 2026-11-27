@@ -75,7 +75,8 @@
 </div>
 
 <style>
-  .grave { max-width: 900px; }
+  /* The page keeps the shared width (so its heading lines up with the library's); only its rows stay a calm column. */
+  .grave > :global(*) { max-width: 900px; }
   .uplink { align-self: flex-start; margin: calc(var(--s2) * -1) 0 calc(var(--s1) * -1) calc(var(--s2) * -1); color: var(--text-2); }
   .lede { margin: 0; color: var(--text-2); }
   .item { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); }
