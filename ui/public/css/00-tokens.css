@@ -30,6 +30,13 @@
  */
 
 :root {
+  /* Type scale (the same one as ui/src/styles/base.css; the sign-in page reads it here). */
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 20px;
+
   /* One soft blob on the black, and the reason it is worth having is the glass.
      The main panel is a pane, and on the library screens there is nothing behind it to
      bend: a flat black backdrop through a displacement map is still flat black. This gives
