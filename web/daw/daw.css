@@ -353,7 +353,7 @@ body.drop .roll, .midi-over { box-shadow: inset 0 0 0 2px var(--d-acc) !importan
 .mx-head button:hover { color: var(--d-fg); background: var(--d-key); }
 .mx-strips { display: flex; overflow-x: auto; padding-bottom: var(--d-s1); align-items: stretch; }
 .mx-strip {
-  flex: none; width: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--d-s1) 0 var(--d-s2);
+  flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--d-s1) 0 var(--d-s2);
   border-right: 1px solid var(--d-line); transition: background-color var(--d-fast);
 }
 .mx-strip > :not(.mx-mid) { flex-shrink: 0; }

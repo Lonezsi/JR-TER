@@ -126,5 +126,5 @@
 
 <style>
   .down { height: 100%; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--s4); padding: var(--s7); max-width: 640px; margin: 0 auto; }
-  code { font-family: var(--mono); background: var(--hover); padding: 2px var(--s2); border-radius: 6px; }
+  code { font-family: var(--mono); background: var(--hover); padding: 2px var(--s2); border-radius: var(--r-sm); }
 </style>

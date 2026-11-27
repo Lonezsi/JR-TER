@@ -17,8 +17,8 @@
 
   const box = $derived(typeof size === "number" ? `${size}px` : size);
   // Room above for the fan, in the cover's own scale (a percentage margin would be of the row).
-  const room = $derived(typeof size === "number" ? "var(--s1)" : `calc(${size} * 0.12)`);
-  const side = $derived(typeof size === "number" ? "var(--s2)" : `calc(${size} * 0.14)`);
+  const room = $derived(typeof size === "number" ? "var(--s1)" : "var(--s5)");
+  const side = $derived(typeof size === "number" ? "var(--s2)" : "var(--s6)");
   const back = $derived(behind.slice(0, 3));
 </script>
 

@@ -592,13 +592,13 @@
   .rrow.live .name { color: var(--accent-text); }
 
   .chk {
-    position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
-    border: 1.5px solid var(--line-2); color: var(--accent-ink); opacity: 0; transition: opacity var(--fast), background var(--fast);
+    position: relative; flex: none; width: var(--s6); height: var(--s6); border-radius: 50%; display: grid; place-items: center;
+    border: 2px solid transparent; background-clip: padding-box; box-shadow: inset 0 0 0 1.5px var(--line-2); color: var(--accent-ink); opacity: 0; transition: opacity var(--fast), background var(--fast);
   }
   .rrow:hover .chk, .rlist:focus-within .chk, .chk.on { opacity: 1; }
-  /* A 22px circle, but a 40px hit area: the pad around it is part of the button. */
-  .chk::after { content: ""; position: absolute; inset: -9px; }
-  .chk.on { background: var(--accent); border-color: transparent; }
+  /* A 24px circle in a 28px button (40 on touch): the clear border is the hit area. */
+  @media (pointer: coarse) { .chk { width: var(--s7); height: var(--s7); border-width: 8px; } }
+  .chk.on { background: var(--accent); box-shadow: none; }
   /* The name is what the row is for: it never gets less than this, and the columns around it
      give way in the order they matter least (see the container queries below). */
   .main { flex: 2 1 220px; min-width: 120px; display: flex; flex-direction: column; gap: 2px; }

@@ -770,7 +770,7 @@
   .spacer { flex: 1 1 8px; }
   .tail { flex-wrap: nowrap; margin-left: auto; }
   .lbl { font-size: var(--t-sm); }
-  :global(html[data-narrow]) .lbl { width: 52px; flex: none; }
+  :global(html[data-narrow]) .lbl { width: 44px; flex: none; }
   :global(html[data-narrow]) .bpm { padding: 0; }
   /* A phone: tempo and offset are a row each, lined up on the same left edge, and the
      tools sit on their own row at the right. Every control the same 40px height. */
@@ -780,7 +780,10 @@
   :global(html[data-narrow]) .tail { gap: 0; }
   :global(html[data-narrow]) .head .group :global(.icon-btn.sm) { width: 30px; }
   :global(html[data-narrow]) .tail :global(.icon-btn.sm) { width: 28px; }
-  :global(html[data-narrow]) .bpm .field { width: 62px; }
+  :global(html[data-narrow]) .bpm .field { width: 52px; }
+  :global(html[data-narrow]) .bpm { gap: var(--s1); }
+  :global(html[data-narrow]) .snap { max-width: 100%; }
+  :global(html[data-narrow]) .snap button { padding: 0 var(--s2); }
   :global(html[data-narrow]) .head .spacer { display: none; }
   :global(html[data-narrow]) .head .group { flex-wrap: wrap; min-width: 0; }
   :global(html[data-narrow]) .head :global(.btn.sm), :global(html[data-narrow]) .head :global(.icon-btn.sm), :global(html[data-narrow]) .head .field { height: 40px; }
@@ -799,7 +802,7 @@
     background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05);
     font-family: var(--mono); line-height: 30px; color: var(--accent-text); white-space: nowrap;
   }
-  .lcd b { font-size: 15px; font-weight: 600; color: var(--accent-hi); text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .lcd b { font-size: var(--t-lg); font-weight: 600; color: var(--accent-hi); text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent); }
   .lcd b i { font-style: normal; opacity: 0.55; }
   .lcd span { font-size: 11px; opacity: 0.8; }
   .snap { display: inline-flex; padding: var(--s1); border-radius: var(--r-pill); background: rgba(0, 0, 0, 0.3); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }

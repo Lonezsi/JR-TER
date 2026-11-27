@@ -371,9 +371,6 @@
   .meta { font-size: var(--t-sm); }
   .small { font-size: var(--t-sm); }
   .onoff { display: inline-flex; align-items: center; gap: var(--s2); font-size: var(--t-sm); font-weight: 600; color: var(--text-2); cursor: pointer; margin-left: var(--s1); }
-  .onoff :global(.switch) { width: 38px; height: 22px; }
-  .onoff :global(.knob) { width: 18px; height: 18px; }
-  .onoff :global(.switch.on .knob) { transform: translateX(16px); }
 
   .sending { display: flex; align-items: center; gap: var(--s3); }
   .progress { flex: 1 1 auto; height: 4px; border-radius: 4px; background: var(--line-2); overflow: hidden; }

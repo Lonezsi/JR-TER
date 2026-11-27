@@ -129,7 +129,7 @@
   @media (pointer: coarse) { .more { opacity: 1; } }
   @media (max-width: 520px) { .ver { display: none; } }
   .grip {
-    display: grid; place-items: center; width: 24px; height: 36px; flex: none; margin-left: -6px;
+    display: grid; place-items: center; width: var(--s6); height: 36px; flex: none; margin-left: calc(var(--s1) * -1);
     color: var(--text-3); cursor: grab; touch-action: none; border-radius: var(--r-sm);
   }
   .grip:hover { color: var(--text); background: var(--hover); }

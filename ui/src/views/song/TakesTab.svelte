@@ -141,11 +141,13 @@
   }
   .play:hover { transform: scale(1.06); }
   .n { font: 800 var(--t-md)/1 var(--display); width: 3.4ch; color: var(--text); flex: none; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
-  .info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--s1); }
   .top { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
-  .name { font-weight: 600; text-align: left; border-radius: 6px; padding: 0 2px; margin: 0 -2px; min-width: 0; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+  .name { font-weight: 600; text-align: left; border-radius: var(--r-sm); padding: 0 var(--s1); margin: 0; min-width: 0; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
   button.name:hover { background: var(--hover); }
-  .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+  button.name { min-height: var(--s6); }
+  @media (pointer: coarse) { button.name { min-height: var(--s7); } }
+  .tag { flex: none; display: inline-flex; align-items: center; gap: var(--s1); }
   .sub { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-sm); color: var(--text-2); min-width: 0; }
   .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); flex: none; }
   .stats { display: flex; gap: var(--s3); font-size: var(--t-xs); color: var(--text-3); flex: none; white-space: nowrap; }

@@ -218,7 +218,7 @@
   .listen { gap: var(--s3); }
   .desc {
     width: 100%; max-width: 640px; resize: none; overflow: hidden; background: transparent; border: 0; outline: 0;
-    padding: 2px 0; font: 500 var(--t-md)/1.5 var(--font); color: var(--text-2); border-radius: 6px;
+    padding: 2px 0; font: 500 var(--t-md)/1.5 var(--font); color: var(--text-2); border-radius: var(--r-sm);
   }
   .desc:hover:not([readonly]), .desc:focus { color: var(--text); }
   .desc::placeholder { color: var(--text-3); }

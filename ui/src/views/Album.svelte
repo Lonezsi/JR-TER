@@ -332,7 +332,8 @@
   .slot { position: relative; border-radius: var(--r-md); }
   .slot :global(.item) { width: 100%; }
   .slot:global(.lifted) { background: var(--glass-2); box-shadow: var(--shadow-3); }
-  @media (pointer: coarse) { .year { min-height: var(--s7); padding-block: var(--s2); } }
+    .year { min-height: var(--s6); }
+  @media (pointer: coarse) { .year { min-height: var(--s7); } }
   @media (max-width: 640px) {
     .heroshape { margin-right: var(--s5); }
     .hero { flex-direction: column; align-items: stretch; gap: var(--s4); padding: 0; margin: 0; }

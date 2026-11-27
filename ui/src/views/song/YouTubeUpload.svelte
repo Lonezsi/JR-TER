@@ -245,7 +245,7 @@
   audio { width: 100%; }
   .pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
   @media (max-width: 640px) { .pills { grid-template-columns: 1fr; } }
-  .pill { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: var(--s3) var(--s4); border-radius: var(--r-md); border: 1px solid var(--glass-line); background: var(--glass-2); color: var(--text); }
+  .pill { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: var(--s3) var(--s4); border-radius: var(--r-md); border: 1px solid var(--glass-line); background: var(--glass-2); -webkit-backdrop-filter: var(--glass-filter-thin); backdrop-filter: var(--glass-filter-thin); color: var(--text); }
   .pill span { font-size: var(--t-xs); color: var(--text-3); font-weight: 500; }
   .pill.on { border-color: var(--accent-line); background: var(--accent-soft); }
   .log { font: 500 var(--t-xs)/1.4 var(--mono); max-height: 200px; overflow: auto; padding: var(--s3); background: rgba(0, 0, 0, 0.3); border-radius: var(--r-md); white-space: pre-wrap; }

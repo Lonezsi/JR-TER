@@ -31,6 +31,6 @@
   .toast.bad { border-color: color-mix(in srgb, var(--bad) 55%, transparent); color: #FFD9D9; }
   .msg { min-width: 0; overflow-wrap: anywhere; }
   .times { color: var(--text-3); }
-  .act { color: var(--accent-text); font-weight: 600; flex: none; padding: 2px var(--s1); border-radius: 6px; }
+  .act { color: var(--accent-text); font-weight: 600; flex: none; padding: 2px var(--s1); border-radius: var(--r-sm); }
   .act:hover { text-decoration: underline; }
 </style>

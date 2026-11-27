@@ -483,7 +483,7 @@
   }
   .tab {
     flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    border-radius: calc(var(--r-xl) - 5px); font: 600 var(--t-xs)/1 var(--font); color: var(--text-3);
+    border-radius: var(--r-lg); font: 600 var(--t-xs)/1 var(--font); color: var(--text-3);
     transition: color var(--fast), background var(--fast);
   }
   .tab.on { color: var(--accent-text); background: color-mix(in srgb, var(--text) 8%, transparent); }

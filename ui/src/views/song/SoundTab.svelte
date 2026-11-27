@@ -410,8 +410,9 @@
   .lw { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .link .name { font: 600 var(--t-sm)/1.1 var(--font); white-space: nowrap; }
   .what { font-size: var(--t-xs); color: var(--text-2); white-space: nowrap; }
-  .power { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line-2); }
-  @media (pointer: coarse) { .power::before { content: ""; position: absolute; inset: -9px; } }
+  /* A 22px disc in a 28px (40 on touch) button: the border is clear and the film stops at its padding box. */
+  .power { position: relative; flex: none; width: var(--s6); height: var(--s6); border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, 0.35); background-clip: padding-box; border: 3px solid transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
+  @media (pointer: coarse) { .power { width: var(--s7); height: var(--s7); border-width: 9px; } }
   .power::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); transition: background var(--fast), box-shadow var(--fast); }
   .power[aria-pressed="true"]::after { background: var(--accent); }
   .drop { flex: none; width: 3px; height: 40px; border-radius: 2px; background: var(--accent); }

@@ -316,7 +316,7 @@
   .gutter.fixed { width: var(--gw, calc(var(--s8) + var(--s7))); justify-content: flex-end; padding-right: var(--s3); gap: var(--s2); pointer-events: auto; opacity: 0.55; }
   .edit .row:hover .gutter.fixed, .gutter.fixed:focus-within { opacity: 1; }
   /* The warning is the app's own warning icon, in amber; a meter note is the same icon, quieter. */
-  .flag { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: hsl(38 90% 62%); }
+  .flag { width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--r-sm); color: hsl(38 90% 62%); }
   .flag:hover, .flag[aria-expanded="true"] { background: var(--hover); }
   .flag.meter { color: var(--text-3); }
   .pop {
