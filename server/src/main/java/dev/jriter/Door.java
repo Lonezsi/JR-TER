@@ -17,7 +17,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Every request passes here first: the same order as jriter/http.py's _route. A broken
  * auth.json shuts everything but /api/health; /orarend becomes a fragment redirect; then
- * the door, by cookie, Foyer, or a scoped machine token. Puts the account in WHO.
+ * the door, by cookie, Foyer, or a scoped machine token. Puts the account in WHO. The security
+ * headers (Csp) go on first, so every answer carries them.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -33,8 +34,12 @@ public class Door extends OncePerRequestFilter {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Auth auth;
+    private final Csp csp;
 
-    public Door(Auth auth) { this.auth = auth; }
+    public Door(Auth auth, Csp csp) {
+        this.auth = auth;
+        this.csp = csp;
+    }
 
     /** The account this request is, or null. */
     public static Long who(HttpServletRequest req) { return (Long) req.getAttribute(WHO); }
@@ -44,6 +49,7 @@ public class Door extends OncePerRequestFilter {
             throws ServletException, IOException {
         String path = req.getRequestURI();
         String method = req.getMethod();
+        Csp.secure(res, csp.policy(path)); // first, so redirects and 401s carry the headers too
 
         String broken = auth.damaged();
         if (broken != null && !path.equals("/api/health")) {

@@ -1,5 +1,17 @@
 [
  {
+  "version": "4.34.19",
+  "date": "2026-11-28",
+  "name": "JR!TER",
+  "title": "Pages say what may run on them",
+  "notes": [
+   "Every answer now tells the browser which scripts may run on the page, so code slipped in from somewhere else does not run.",
+   "No other site can show JR!TER inside its own page.",
+   "The DAW still loads plugins from the sites you allowed.",
+   "The server no longer says which Tomcat version it is on its error pages."
+  ]
+ },
+ {
   "version": "4.34.18",
   "date": "2026-11-28",
   "name": "JR!TER",
