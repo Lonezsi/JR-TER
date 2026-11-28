@@ -514,6 +514,7 @@ public class ExportController {
         long length = req.getContentLengthLong();
         if (length <= 0) throw new ApiError("That upload had no file in it.");
         if (length > MAX_IMPORT) throw new ApiError("That file is bigger than a library file can be.", 413);
+        blobs.room(acct, length);
         Path tmp = Files.createTempFile("jriter-import-", ".zip");
         try {
             try (InputStream in = req.getInputStream(); OutputStream out = Files.newOutputStream(tmp)) {

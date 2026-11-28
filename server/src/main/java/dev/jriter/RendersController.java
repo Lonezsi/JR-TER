@@ -145,7 +145,7 @@ public class RendersController {
         String ext = Api.extOf(filename);
         if (!Api.AUDIO_EXT.contains(ext))
             throw new ApiError((ext.isEmpty() ? filename : ext) + " is not an audio file JR!TER handles");
-        Blobs.Stored s = blobs.putStream(acct, req.getInputStream(), length);
+        Blobs.Stored s = blobs.putUpload(req, acct, length);
         AudioMeta.Probe meta = AudioMeta.probe(blobs.pathFor(acct, s.digest()), ext);
         String origin = Api.header(req, "X-Origin");
         Remembered r = remember(acct, s.digest(), ext, s.size(), filename, Api.header(req, "X-Source-Path"),

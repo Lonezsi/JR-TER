@@ -175,7 +175,7 @@ public class VersionsController {
         if (!Api.AUDIO_EXT.contains(ext))
             throw new ApiError((ext.isEmpty() ? filename : ext) + " is not an audio file JR!TER handles");
 
-        Blobs.Stored stored = blobs.putStream(acct, req.getInputStream(), length);
+        Blobs.Stored stored = blobs.putUpload(req, acct, length);
         Map<String, Object> same = db.one("SELECT * FROM versions WHERE song_id = ? AND digest = ?", songId, stored.digest());
         if (same != null) {
             Map<String, Object> out = new LinkedHashMap<>();

@@ -55,6 +55,13 @@ final class Api {
     static long AUDIO_MOST = 300L * 1024 * 1024;
     static long IMAGE_MOST = 20L * 1024 * 1024;
 
+    /** The most one account keeps, all files together (CONDOM 4b). Not final so a test can lower it. */
+    static long ACCOUNT_MOST = 20L * 1024 * 1024 * 1024;
+
+    static String gb(long bytes) {
+        return bytes >= 1073741824L ? (bytes / 1073741824L) + " GB" : mb(bytes);
+    }
+
     static String mb(long bytes) {
         return (bytes / 1048576) + " MB";
     }

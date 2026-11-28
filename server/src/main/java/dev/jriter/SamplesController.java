@@ -102,7 +102,7 @@ public class SamplesController {
         base = base.substring(0, base.length() - Api.extOf(base).length());
         String name = clean(base, 80);
         if (name.isEmpty()) name = "Sound";
-        Blobs.Stored stored = blobs.putStream(acct, req.getInputStream(), length);
+        Blobs.Stored stored = blobs.putUpload(req, acct, length);
         Map<String, Object> same = db.one("SELECT * FROM samples WHERE digest = ? AND name = ? AND folder = ?",
                 stored.digest(), name, folder);
         if (same != null) {

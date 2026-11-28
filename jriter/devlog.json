@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.34.18",
+  "date": "2026-11-28",
+  "name": "JR!TER",
+  "title": "Room for 20 GB each",
+  "notes": [
+   "Each account keeps up to 20 GB of files. An upload that would go past it is refused, and the message says how to make room.",
+   "A friend's upload to a song you shared counts against the friend, not you.",
+   "Deleted files stop counting once they leave the grave; empty the grave to free room at once."
+  ]
+ },
+ {
   "version": "4.34.17",
   "date": "2026-11-28",
   "name": "JR!TER",
