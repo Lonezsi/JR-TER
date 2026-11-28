@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.34.20",
+  "date": "2026-11-28",
+  "name": "JR!TER",
+  "title": "Server errors say less",
+  "notes": [
+   "When something breaks on the server, everyone but the owner sees one plain sentence and a reference, not the inner workings.",
+   "The owner still sees what went wrong, and the reference finds it in the fault log.",
+   "Only the owner can read or clear the fault log."
+  ]
+ },
+ {
   "version": "4.34.19",
   "date": "2026-11-28",
   "name": "JR!TER",
