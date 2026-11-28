@@ -54,6 +54,11 @@ public class Accounts {
         "CREATE INDEX IF NOT EXISTS tokens_account ON tokens(account_id)",
         "CREATE TABLE IF NOT EXISTS foyer_links (foyer_id TEXT PRIMARY KEY,"
             + " account_id INTEGER NOT NULL UNIQUE, linked_at REAL NOT NULL, handle TEXT NOT NULL DEFAULT '')",
+        // Files a guest put into an owner's library; they count against the guest (CONDOM 4b).
+        "CREATE TABLE IF NOT EXISTS guest_uploads (id INTEGER PRIMARY KEY, guest INTEGER NOT NULL,"
+            + " owner INTEGER NOT NULL, digest TEXT NOT NULL, size INTEGER NOT NULL, created_at REAL NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS guest_uploads_guest ON guest_uploads(guest)",
+        "CREATE INDEX IF NOT EXISTS guest_uploads_owner ON guest_uploads(owner)",
     };
 
     private final Config config;
@@ -396,6 +401,21 @@ public class Accounts {
         if (handle == null || handle.isEmpty()) return;
         run("UPDATE foyer_links SET handle = ? WHERE foyer_id = ? AND handle <> ?", handle, foyerId, handle);
     }
+
+    public void guestUploaded(long guest, long owner, String digest, long size) {
+        insert("INSERT INTO guest_uploads (guest, owner, digest, size, created_at) VALUES (?, ?, ?, ?, ?)",
+                guest, owner, digest, size, now());
+    }
+
+    public List<Map<String, Object>> guestUploadsBy(long guest) {
+        return query("SELECT * FROM guest_uploads WHERE guest = ?", guest);
+    }
+
+    public List<Map<String, Object>> guestUploadsTo(long owner) {
+        return query("SELECT * FROM guest_uploads WHERE owner = ?", owner);
+    }
+
+    public void forgetGuestUpload(long id) { run("DELETE FROM guest_uploads WHERE id = ?", id); }
 
     public void unlinkFoyer(long account) { run("DELETE FROM foyer_links WHERE account_id = ?", account); }
 

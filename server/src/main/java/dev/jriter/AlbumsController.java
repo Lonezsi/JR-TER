@@ -304,7 +304,7 @@ public class AlbumsController {
         String ext = Api.extOf(filename);
         if (!ArtworkController.IMAGE_EXT.contains(ext))
             throw new ApiError((ext.isEmpty() ? filename : ext) + " is not an image JR!TER handles");
-        Blobs.Stored stored = blobs.putStream(acct, req.getInputStream(), length);
+        Blobs.Stored stored = blobs.putUpload(req, acct, length);
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("cover_digest", stored.digest());
         p.put("cover_ext", ext);

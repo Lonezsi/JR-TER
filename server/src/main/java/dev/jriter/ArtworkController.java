@@ -62,7 +62,7 @@ public class ArtworkController {
         if (!IMAGE_EXT.contains(ext))
             throw new ApiError((ext.isEmpty() ? filename : ext) + " is not an image JR!TER handles");
 
-        Blobs.Stored stored = blobs.putStream(acct, req.getInputStream(), length);
+        Blobs.Stored stored = blobs.putUpload(req, acct, length);
         Map<String, Object> same = db.one("SELECT * FROM artwork WHERE song_id = ? AND digest = ?",
                 song.get("id"), stored.digest());
         Map<String, Object> out = new LinkedHashMap<>();

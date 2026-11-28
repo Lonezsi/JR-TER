@@ -119,7 +119,7 @@ public class VocalsController {
         } catch (NumberFormatException e) {
             throw new ApiError("X-Offset and X-Duration are seconds");
         }
-        Blobs.Stored stored = blobs.putStream(acct, req.getInputStream(), length);
+        Blobs.Stored stored = blobs.putUpload(req, acct, length);
         double now = Accounts.now();
         String label = Api.header(req, "X-Label");
         if (label.length() > 80) label = label.substring(0, 80);

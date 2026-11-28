@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,6 +22,12 @@ public class Blobs {
     private final Config config;
 
     private Library library;
+
+    private Accounts accounts;
+
+    /** Lets the quota see who a file is billed to (null in plain tests: no ledger). */
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setAccounts(Accounts accounts) { this.accounts = accounts; }
 
     public Blobs(Config config) { this.config = config; }
 
@@ -60,6 +67,52 @@ public class Blobs {
         } finally {
             Files.deleteIfExists(tmp);
         }
+    }
+
+    private static long folderSize(Path dir) throws IOException {
+        if (!Files.isDirectory(dir)) return 0;
+        try (java.util.stream.Stream<Path> s = Files.walk(dir)) {
+            return s.filter(Files::isRegularFile).mapToLong(p -> {
+                try { return Files.size(p); } catch (IOException e) { return 0; }
+            }).sum();
+        }
+    }
+
+    /**
+     * What an account is charged for: every file in its folder, less what guests put there
+     * (those are the guests' own), plus what it put into other libraries as a guest. Ledger
+     * rows whose file is gone are dropped. shortcut: walks the folder on every upload; keep a
+     * running total if it gets slow.
+     */
+    public long used(long account) throws IOException {
+        long total = folderSize(dir(account));
+        if (accounts == null) return total;
+        for (Map<String, Object> r : accounts.guestUploadsTo(account)) {
+            if (Files.isRegularFile(pathFor(account, (String) r.get("digest")))) total -= Accounts.num(r.get("size"));
+            else accounts.forgetGuestUpload(Accounts.num(r.get("id")));
+        }
+        for (Map<String, Object> r : accounts.guestUploadsBy(account)) {
+            long owner = Accounts.num(r.get("owner"));
+            if (Files.isRegularFile(pathFor(owner, (String) r.get("digest")))) total += Accounts.num(r.get("size"));
+            else accounts.forgetGuestUpload(Accounts.num(r.get("id")));
+        }
+        return Math.max(0, total);
+    }
+
+    /** 413 if keeping length more bytes would take the payer past the account total. */
+    public void room(long payer, long length) throws IOException {
+        if (used(payer) + length > Api.ACCOUNT_MOST)
+            throw new ApiError("That would take you past " + Api.gb(Api.ACCOUNT_MOST)
+                    + ", the most one account keeps here. Delete something and empty the grave to make room.", 413);
+    }
+
+    /** An upload from a request: the guest pays when it came through a share, else the library's account. */
+    public Stored putUpload(jakarta.servlet.http.HttpServletRequest req, long acct, long length) throws IOException {
+        long guest = Api.guest(req);
+        room(guest != 0 ? guest : acct, length);
+        Stored s = putStream(acct, req.getInputStream(), length);
+        if (guest != 0 && s.added() && accounts != null) accounts.guestUploaded(guest, acct, s.digest(), s.size());
+        return s;
     }
 
     public Stored putPath(long account, Path source) throws IOException {
