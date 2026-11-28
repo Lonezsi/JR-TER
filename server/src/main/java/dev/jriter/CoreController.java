@@ -176,6 +176,7 @@ public class CoreController {
     @GetMapping("/api/health/errors")
     public Object errors(HttpServletRequest req) {
         Api.acct(req);
+        if (!Api.isOwner(req)) throw new ApiError("Only the owner reads the fault log.", 403);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("errors", problems.recent(Api.queryInt(req, "limit", 50)));
         out.putAll(problems.count());
@@ -185,6 +186,7 @@ public class CoreController {
     @DeleteMapping("/api/health/errors")
     public Object forgetErrors(HttpServletRequest req) {
         Api.acct(req);
+        if (!Api.isOwner(req)) throw new ApiError("Only the owner reads the fault log.", 403);
         problems.clear();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("cleared", true);

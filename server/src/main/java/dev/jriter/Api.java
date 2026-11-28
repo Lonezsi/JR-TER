@@ -15,6 +15,12 @@ final class Api {
         return who;
     }
 
+    /** True when the library's owner is asking in person (not a guest through a share). */
+    static boolean isOwner(HttpServletRequest req) {
+        Long who = Door.who(req);
+        return who != null && who == Accounts.OWNER && guest(req) == 0;
+    }
+
     /** Request attribute: the guest account, when a shared request runs in the owner's library. */
     static final String GUEST = "jriter.guest";
 
