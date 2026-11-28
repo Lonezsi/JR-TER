@@ -338,6 +338,7 @@ public class YouTubeController {
         SongsController.getSong(library.of(acct), id);
         long length = req.getContentLengthLong();
         if (length <= 0) throw new ApiError("no file in that upload");
+        if (length > Api.AUDIO_MOST) throw new ApiError("That mix is over " + Api.mb(Api.AUDIO_MOST) + ", too big to keep here.", 413);
         Blobs.Stored s = blobs.putStream(acct, req.getInputStream(), length);
         AudioMeta.Probe meta = AudioMeta.probe(blobs.pathFor(acct, s.digest()), ".wav");
         if (meta.duration() == 0) throw new ApiError("That did not arrive as a readable wav. Render it again.", 400);

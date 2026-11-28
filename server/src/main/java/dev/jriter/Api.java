@@ -51,6 +51,14 @@ final class Api {
     static final java.util.List<String> AUDIO_EXT =
             java.util.List.of(".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus");
 
+    /** Per-file upload caps (CONDOM 4a). Not final so a test can lower them. */
+    static long AUDIO_MOST = 300L * 1024 * 1024;
+    static long IMAGE_MOST = 20L * 1024 * 1024;
+
+    static String mb(long bytes) {
+        return (bytes / 1048576) + " MB";
+    }
+
     static String audioType(String ext) {
         return AUDIO_TYPES.getOrDefault(ext == null ? "" : ext.toLowerCase(Locale.ROOT), "application/octet-stream");
     }

@@ -298,6 +298,7 @@ public class AlbumsController {
         Map<String, Object> album = getAlbum(db, id);
         long length = req.getContentLengthLong();
         if (length <= 0) throw new ApiError("no image in that upload");
+        if (length > Api.IMAGE_MOST) throw new ApiError("That cover is over " + Api.mb(Api.IMAGE_MOST) + ", too big to keep here.", 413);
         String filename = Api.header(req, "X-Filename");
         if (filename.isEmpty()) filename = "cover.jpg";
         String ext = Api.extOf(filename);

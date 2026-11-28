@@ -139,6 +139,7 @@ public class RendersController {
         long acct = Api.acct(req);
         long length = req.getContentLengthLong();
         if (length <= 0) throw new ApiError("no file in that upload");
+        if (length > Api.AUDIO_MOST) throw new ApiError("That render is over " + Api.mb(Api.AUDIO_MOST) + ", too big to keep here.", 413);
         String filename = Api.header(req, "X-Filename");
         if (filename.isEmpty()) filename = "render.wav";
         String ext = Api.extOf(filename);
