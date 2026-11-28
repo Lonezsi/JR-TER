@@ -1,5 +1,15 @@
 [
  {
+  "version": "4.34.17",
+  "date": "2026-11-28",
+  "name": "JR!TER",
+  "title": "Size limits on uploads",
+  "notes": [
+   "A render or a mix can be up to 300 MB, a song picture or album cover up to 20 MB. Bigger files are refused before anything is stored, and the message says why.",
+   "The same limits apply to a friend working on a song you shared."
+  ]
+ },
+ {
   "version": "4.34.16",
   "date": "2026-11-27",
   "name": "JR!TER",

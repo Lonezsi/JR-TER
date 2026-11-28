@@ -168,6 +168,7 @@ public class VersionsController {
         long songId = Accounts.num(song.get("id"));
         long length = req.getContentLengthLong();
         if (length <= 0) throw new ApiError("no file in that upload");
+        if (length > Api.AUDIO_MOST) throw new ApiError("That mix is over " + Api.mb(Api.AUDIO_MOST) + ", too big to keep here.", 413);
         String filename = Api.header(req, "X-Filename");
         if (filename.isEmpty()) filename = "render.mp3";
         String ext = Api.extOf(filename);
