@@ -1,5 +1,16 @@
 [
  {
+  "version": "4.34.8",
+  "date": "2026-11-27",
+  "name": "JR!TER",
+  "title": "The timetable is for friends",
+  "notes": [
+   "The timetable is shown only to the owner and the owner's friends on Foyer. An account made from a song share link, or any account not tied to a Foyer friend, gets a short note instead.",
+   "A friend sees it when they are signed in on Foyer in the same browser and their JR!TER account is connected to Foyer in Settings.",
+   "The privacy notice says so."
+  ]
+ },
+ {
   "version": "4.34.7",
   "date": "2026-11-26",
   "name": "JR!TER",

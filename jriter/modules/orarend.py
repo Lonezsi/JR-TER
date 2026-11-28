@@ -14,9 +14,12 @@ this repository is public. So the timetable is a file in the account's own direc
 beside its database, which is in data/ and is not committed. The code is public and the
 week is not.
 
-ONE WEEK, THE OWNER'S, READ BY EVERYBODY SIGNED IN. It used to be per account like
-everything else, so a friend signing in got their own empty week and could not see the one
-they had been sent to look at. Now every account reads the owner's file (accounts.OWNER),
+ONE WEEK, THE OWNER'S, READ BY THE OWNER AND THE OWNER'S FOYER FRIENDS. It used to be per
+account like everything else, so a friend signing in got their own empty week and could not
+see the one they had been sent to look at. For a while every account read it, but it names a
+third party and share-link accounts are strangers (CONDOM legal 3). Now the owner reads it,
+and so does an account tied to a Foyer account that Foyer says is the owner's friend, checked
+live from the Foyer cookie of the request. Everyone reads the owner's file (accounts.OWNER),
 and only the owner can change it: the class routes refuse anybody else. The path is named
 explicitly rather than left to who.must(), so it is never "whoever happens to be bound".
 
@@ -110,6 +113,19 @@ def _only_the_owner():
                     403)
 
 
+def _may_read(req):
+    """The owner, or the owner's Foyer friend whose tied Foyer account is signed in here."""
+    me = who.must()
+    if me == accounts.OWNER:
+        return True
+    tied = accounts.foyer_of(me)
+    if not tied:
+        return False
+    from . import auth
+    f = auth.foyer(req.headers)
+    return bool(f and f.get("id") == tied and f.get("ownerFriend"))
+
+
 def read(account=None):
     """The week as it is on disk, or nothing.
 
@@ -137,6 +153,11 @@ def week(req):
     `missing` and `broken` are told apart because the screens for them are different: one
     says how to make one, the other says which line will not parse.
     """
+    if not _may_read(req):
+        who_ = _owner_name()
+        raise Error("Az órarendet csak %s és a Foyer-barátai láthatják. Ha az vagy, jelentkezz "
+                    "be a Foyeren, és kösd össze a fiókodat a Beállításokban."
+                    % (who_ or "a tulajdonosa"), 403)
     found = read()
     # Whose week this is, and whether the caller may change it. The page hides the
     # editing for anybody else; the class routes refuse them regardless.
